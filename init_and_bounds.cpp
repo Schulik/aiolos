@@ -117,7 +117,9 @@ hydro_run::hydro_run(string filename) {
         cout<<"pos3"<<endl;
         
         x_i        = np_zeros(num_cells+1);		//The cell boundaries
-        x_i12      = np_zeros(num_cells+2);		    //The cell mid positions
+        x_i12      = np_zeros(num_cells+2);		//The cell mid positions
+        surf       = np_zeros(num_cells+1);     // intercell surfaces
+        vol        = np_zeros(num_cells+2);     // cell volumes
         timesteps  = np_zeros(num_cells+2);		    
         timesteps_cs= np_zeros(num_cells+2);	
         finalstep   = np_zeros(num_cells+2);
@@ -147,6 +149,16 @@ hydro_run::hydro_run(string filename) {
         //Assign the last boundary as domain maximum as long as nonuniform grid is in the test-phase
         domain_max = x_i[num_cells];
         cout<<"We have a DOMAIN MAX = "<<domain_max<<endl;
+        
+        //Compute inter-sphere surfaces
+        for(int i=0; i<num_cells+1; i++) {
+            surf[i] = 4. * M_PI * x_i[i] * x_i[i];
+        }
+        
+        //Compute shell volumes
+        for(int i=1; i<num_cells+1; i++) {
+            vol[i] = 4./3. * M_PI * ( pow(x_i[i],3.) - pow(x_i[i-1],3.) );
+        }
         
         //Compute cell mid positions. Ghost cells also have mid positions in order to balance their pressure gradients
         // but need to be calculated after this loop
@@ -186,11 +198,12 @@ hydro_run::hydro_run(string filename) {
         
         
         
-        u      = init_AOS(num_cells+2); //{ np_ones(num_cells*3);   //Conserved hyperbolic variables: density, mass flux, energy density
-        phi    = np_zeros(num_cells+2);  //Parabolic Variables: gravitational potential
-        enclosed_mass = np_zeros(num_cells+2);
-        source = init_AOS(num_cells+2);  //Parabolic Variables: gravitational potential
-        flux   = init_AOS(num_cells+1);
+        u               = init_AOS(num_cells+2); //{ np_ones(num_cells*3);   //Conserved hyperbolic variables: density, mass flux, energy density
+        phi             = np_zeros(num_cells+2);  //Parabolic Variables: gravitational potential
+        enclosed_mass   = np_zeros(num_cells+2);
+        source          = init_AOS(num_cells+2);  //Parabolic Variables: gravitational potential
+        source_pressure = init_AOS(num_cells+2);  //Parabolic Variables: gravitational potential
+        flux            = init_AOS(num_cells+1);
         //left_ghost = AOS(0,0,0);
         //right_ghost= AOS(0,0,0);
         
@@ -330,12 +343,12 @@ void hydro_run::initialize_hydrostatic_atmosphere_nonuniform() {
     //
     for(int i=0; i<=num_cells+1; i++) {
             //temperature[i] = planet_mass / x_i12[i] / (cv * gamma_adiabat) + 1.;
-            temperature[i] = - phi[i] / (cv * gamma_adiabat) + 1.;
+            temperature[i] = - 0.75 * phi[i] / (cv * gamma_adiabat) + 1.;
             
             //Add temperature bumps and troughs
-            temperature[i] += 1. * exp( - pow(x_i12[i] - 1.e-1 ,2.) / (0.1) );
+            //temperature[i] += 1. * exp( - pow(x_i12[i] - 1.e-1 ,2.) / (0.1) );
             
-            temperature[i] -= 3. * exp( - pow(x_i12[i] - 3.e-3 ,2.) / (1.e-3) );
+            //temperature[i] -= 3. * exp( - pow(x_i12[i] - 3.e-3 ,2.) / (1.e-3) );
     }
     
     //Last normal cell has to be awkwardly initialized

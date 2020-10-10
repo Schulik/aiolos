@@ -27,6 +27,7 @@ void hydro_run::compute_pressure() {
         speed[i]           = u[i].u2 / u[i].u1;
         pressure[i]        = (gamma_adiabat-1.)*(u[i].u3 - 0.5* u[i].u2 * speed[i] );
         internal_energy[i] = u[i].u3 / u[i].u1 - 0.5 * speed[i] * speed[i];
+        temperature[i]     = internal_energy[i] / cv;
         cs[i]              = std::sqrt(gamma_adiabat * pressure[i] / u[i].u1);
     }
     
@@ -228,7 +229,7 @@ simulation_parameter read_parameter_from_file(string filename, string variablena
 
 
 //Print 2 
-void hydro_run::print_AOS_component_tofile(double *x, AOS* data, AOS* fluxes , int timestepnumber) {
+void hydro_run::print_AOS_component_tofile(double *x, AOS* data, AOS* fluxes, int timestepnumber) {
     
     string filename;
     stringstream filenamedummy;
@@ -261,7 +262,7 @@ void hydro_run::print_AOS_component_tofile(double *x, AOS* data, AOS* fluxes , i
             
             //flux[i] - flux[i+1] + source[i]
             
-            outfile<<x[i]<<'\t'<<data[i].u1<<'\t'<<data[i].u2<<'\t'<<data[i].u3<<'\t'<<fluxes[i].u1<<'\t'<<fluxes[i].u2<<'\t'<<fluxes[i].u3<<'\t'<<((flux[i-1].u1 - flux[i].u1)/dx[i] + source[i].u1)<<'\t'<<((flux[i-1].u2 - flux[i].u2)/dx[i] + source[i].u2)<<'\t'<<((flux[i-1].u3 - flux[i].u3)/dx[i] + source[i].u3)<<'\t'<<pressure[i]<<'\t'<<data[i].u2/data[i].u1<<'\t'<<temperature[i] <<'\t'<<timesteps[i]<<'\t'<<phi[i]<<'\t'<<timesteps_cs[i]<<'\t'<<opticaldepth[i]<<'\t'<<hydrostat<<'\t'<<hydrostat2<<'\t'<<hydrostat3<<'\t'<<endl;
+            outfile<<x[i]<<'\t'<<data[i].u1<<'\t'<<data[i].u2<<'\t'<<data[i].u3<<'\t'<<fluxes[i].u1<<'\t'<<fluxes[i].u2<<'\t'<<fluxes[i].u3<<'\t'<<((flux[i-1].u1 - flux[i].u1)/dx[i] + source[i].u1)<<'\t'<<((flux[i-1].u2 - flux[i].u2)/dx[i] + source[i].u2)<<'\t'<<((flux[i-1].u3 - flux[i].u3)/dx[i] + source[i].u3)<<'\t'<<pressure[i]<<'\t'<<data[i].u2/data[i].u1<<'\t'<<temperature[i] <<'\t'<<timesteps[i]<<'\t'<<phi[i]<<'\t'<<timesteps_cs[i]<<'\t'<<opticaldepth[i]<<'\t'<<hydrostat<<'\t'<<hydrostat2<<'\t'<<hydrostat3<<'\t'<<enclosed_mass[i]<<endl;
         }
         
         //Print right ghost stuff
@@ -270,6 +271,6 @@ void hydro_run::print_AOS_component_tofile(double *x, AOS* data, AOS* fluxes , i
     else cout << "Unable to open file.";
     outfile.close();
     
-    cout<<"Sucessfully written file "<<filenamedummy.str()<<" with smoothed gravity = "<<rs_at_moment<<endl;
+    cout<<"Sucessfully written file "<<filenamedummy.str()<<" with smoothed gravity = "<<rs_at_moment<<" at time "<<globalTime<<" and dt="<<dt<<endl;
  
 }
