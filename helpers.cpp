@@ -10,7 +10,7 @@ AOS* init_AOS(int num) {
 //
 //
 void hydro_run::compute_pressure() {
-    
+    /*
     speed[0]           = left_ghost.u2 / left_ghost.u1;
     pressure[0]        = (gamma_adiabat-1.)*(left_ghost.u3 - 0.5* left_ghost.u2 * speed[0] );
     internal_energy[0] = left_ghost.u3 / left_ghost.u1 - 0.5 * speed[0] * speed[0];
@@ -20,9 +20,10 @@ void hydro_run::compute_pressure() {
     pressure[num_cells+1]        = (gamma_adiabat-1.)*(right_ghost.u3 - 0.5* right_ghost.u2 * speed[num_cells+1] );
     internal_energy[num_cells+1] = right_ghost.u3 / right_ghost.u1 - 0.5 * speed[num_cells+1] * speed[num_cells+1];
     cs[num_cells+1]              = std::sqrt(gamma_adiabat * pressure[num_cells+1] / u[num_cells+1].u1);
+    */
     
     //Pressure now defined also on ghost cells, so that the analytic fluxes can be computed there
-    for(int i=1;i<num_cells+1;i++) {
+    for(int i=0;i<=num_cells+1;i++) {
         speed[i]           = u[i].u2 / u[i].u1;
         pressure[i]        = (gamma_adiabat-1.)*(u[i].u3 - 0.5* u[i].u2 * speed[i] );
         internal_energy[i] = u[i].u3 / u[i].u1 - 0.5 * speed[i] * speed[i];
@@ -60,7 +61,7 @@ double hydro_run::get_cfl_timestep() {
     //double finalstep = 0.;
     
     snd_crs_time=0;
-    for(int i=0; i<num_cells; i++) {
+    for(int i=1; i<=num_cells; i++) {
         
         //Computing the inverse timesteps first
         timesteps[i]    = std::abs(u[i].u2 / u[i].u1 / dx[i]); 
@@ -234,12 +235,10 @@ void hydro_run::print_AOS_component_tofile(double *x, AOS* data, AOS* fluxes , i
     string truncated_name = stringsplit(simname,".")[0];
     filenamedummy<<"output_"<<truncated_name<<"_t"<<timestepnumber<<".dat";
     
-    //cout<<"Trying to open file "<<filenamedummy.str()<<endl;
+    if(debug > 1)
+        cout<<"Trying to open file "<<filenamedummy.str()<<endl;
     
     ofstream outfile(filenamedummy.str(), ios::out);
-    //outfile.open(filename);
-    
-    
     
     if (outfile.is_open())
     {
@@ -248,24 +247,25 @@ void hydro_run::print_AOS_component_tofile(double *x, AOS* data, AOS* fluxes , i
         double hydrostat = 0., hydrostat2 = 0., hydrostat3 = 0.;
         
         //Print left ghost stuff
-        outfile<<ghost_xi_left<<'\t'<<left_ghost.u1<<'\t'<<left_ghost.u2<<'\t'<<left_ghost.u3<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<pressure[0]<<'\t'<<left_ghost.u2/left_ghost.u1<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<phi_left_ghost<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<endl;
+        outfile<<x[0]<<'\t'<<data[0].u1<<'\t'<<data[0].u2<<'\t'<<data[0].u3<<'\t'<<fluxes[0].u1<<'\t'<<fluxes[0].u2<<'\t'<<fluxes[0].u3<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<pressure[0]<<'\t'<<data[0].u2/data[0].u1<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<phi[0]<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<endl;
         
         //Print the domain
-        for(int i=0; i<num_cells; i++) {
+        for(int i=1; i<=num_cells; i++) {
             
-            hydrostat2 = flux[i+1].u2;//pressure[i+1] - pressure[i];
+            hydrostat = flux[i].u2/dx[i] ; //hydrostat2 + hydrostat3 ; 
+            hydrostat2 = flux[i+1].u2/dx[i];//pressure[i+1] - pressure[i];
             hydrostat3 = source[i].u2;//0.5 * (data[i].u1 + data[i+1].u1) * (phi[i+1] - phi[i]);
-            hydrostat = flux[i].u2 ; //hydrostat2 + hydrostat3 ; 
+            
             
             //outfile<<x[i]<<'\t'<<data[i].u1<<'\t'<<data[i].u2<<'\t'<<data[i].u3<<'\t'<<fluxes[i].u1<<'\t'<<fluxes[i].u2<<'\t'<<fluxes[i].u3<<'\t'<<fluxes[i+1].u1<<'\t'<<fluxes[i+1].u2<<'\t'<<fluxes[i+1].u3<<'\t'<<pressure[i]<<'\t'<<data[i].u2/data[i].u1<<'\t'<<internal_energy[i] <<'\t'<<timesteps[i]<<'\t'<<phi[i]<<'\t'<<timesteps_cs[i]<<'\t'<<opticaldepth[i]<<'\t'<<radiative_flux[i] <<endl;
             
             //flux[i] - flux[i+1] + source[i]
             
-            outfile<<x[i]<<'\t'<<data[i].u1<<'\t'<<data[i].u2<<'\t'<<data[i].u3<<'\t'<<fluxes[i].u1<<'\t'<<fluxes[i].u2<<'\t'<<fluxes[i].u3<<'\t'<<(flux[i].u1 - flux[i+1].u1 + source[i].u1)<<'\t'<<(flux[i].u2 - flux[i+1].u2 + source[i].u2)<<'\t'<<(flux[i].u3 - flux[i+1].u3 + source[i].u3)<<'\t'<<pressure[i]<<'\t'<<data[i].u2/data[i].u1<<'\t'<<internal_energy[i] <<'\t'<<timesteps[i]<<'\t'<<phi[i]<<'\t'<<timesteps_cs[i]<<'\t'<<opticaldepth[i]<<'\t'<<hydrostat<<'\t'<<hydrostat2<<'\t'<<hydrostat3<<'\t'<<endl;
+            outfile<<x[i]<<'\t'<<data[i].u1<<'\t'<<data[i].u2<<'\t'<<data[i].u3<<'\t'<<fluxes[i].u1<<'\t'<<fluxes[i].u2<<'\t'<<fluxes[i].u3<<'\t'<<((flux[i-1].u1 - flux[i].u1)/dx[i] + source[i].u1)<<'\t'<<((flux[i-1].u2 - flux[i].u2)/dx[i] + source[i].u2)<<'\t'<<((flux[i-1].u3 - flux[i].u3)/dx[i] + source[i].u3)<<'\t'<<pressure[i]<<'\t'<<data[i].u2/data[i].u1<<'\t'<<internal_energy[i] <<'\t'<<timesteps[i]<<'\t'<<phi[i]<<'\t'<<timesteps_cs[i]<<'\t'<<opticaldepth[i]<<'\t'<<hydrostat<<'\t'<<hydrostat2<<'\t'<<hydrostat3<<'\t'<<endl;
         }
         
         //Print right ghost stuff
-        outfile<<ghost_xi_right<<'\t'<<right_ghost.u1<<'\t'<<right_ghost.u2<<'\t'<<right_ghost.u3<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<pressure[num_cells]<<'\t'<<right_ghost.u2/right_ghost.u1<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<phi_right_ghost<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<endl;
+        outfile<<x[num_cells+1]<<'\t'<<data[num_cells+1].u1<<'\t'<<data[num_cells+1].u2<<'\t'<<data[num_cells+1].u3<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<pressure[num_cells+1]<<'\t'<<data[num_cells+1].u2/data[num_cells+1].u1<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<phi[num_cells+1]<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<endl;
     }
     else cout << "Unable to open file.";
     outfile.close();

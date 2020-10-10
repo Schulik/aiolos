@@ -140,6 +140,7 @@ class hydro_run
     double output_time;
     double snd_crs_time;
     int plotskip;
+    int steps;
 
     ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     //
@@ -172,9 +173,8 @@ class hydro_run
     AOS *source;
     AOS *flux;
     double *phi;            //Parabolic Variables: gravitational potential
-    double phi_left_ghost, phi_right_ghost;
-    double ghost_xi_left, ghost_xi_right;
-    AOS left_ghost, right_ghost; //Ghost cells for boundaries
+    double *omegaplus;
+    double *omegaminus;
 
     AOS *u_output;       //Array of arrays to store snapshots of u
     double *phi_output;     //Array of arrays to store snapshots of phi
@@ -226,6 +226,7 @@ class hydro_run
     void initialize_space_test(AOS background);
     void initialize_custom_setup();
     void initialize_hydrostatic_atmosphere();
+    void initialize_hydrostatic_atmosphere_nonuniform();
     void initialize_gravitational_potential();
     
     
@@ -242,10 +243,6 @@ class hydro_run
     //
     // Boundaries
     //
-    //AOS get_boundaries_1();
-    //AOS get_boundaries_2();
-    //AOS get_boundaries_3();
-    //AOS get_boundaries_4();
     
     void boundaries_const_both(AOS &left_ghost, const AOS &leftval, const AOS &rightval, AOS &right_ghost );
     void boundaries_open_both(AOS &left_ghost, const AOS &leftval, const AOS &leftval2, const AOS &rightval2, const AOS &rightval, AOS &right_ghost );
@@ -259,9 +256,10 @@ class hydro_run
     //Gravity
     void init_grav_pot();
     double get_p_hydrostatic(AOS &u, double &phi_l, double &phi_r, const int &i);
+    double get_p_hydrostatic_nonuniform(const int &i, const int &plusminus);
     double get_phi_grav(double &r, double &mass);
     void update_mass_and_pot();
-    AOS source_grav(AOS &u, double &phi_l, double &phi_r);
+    AOS source_grav(AOS &u, int &j);
     
     //Radiation
     void update_radiation();

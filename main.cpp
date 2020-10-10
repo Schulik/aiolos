@@ -24,9 +24,9 @@ int main(int argc, char** argv)
     string tmpstring;
     int debug;
     int suppress_warnings_global = 0;
-    cout<<"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
+    cout<<"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~";
     cout<<"Welcome to AIOLOS! May a gentle breeze lead your way home. argc="<<argc<<endl;
-    cout<<"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
+    cout<<"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~";
     
     //
     // Loop through all args, in order to find the name of the parameter file (KEY), debug options etc.
@@ -70,9 +70,6 @@ int main(int argc, char** argv)
         
     
     try {
-        //string filename = "simulation.par";
-
-        //read_simulation_parameters("simulation.par");
 
         cout<<"In main, construction of simulation is about to start."<<endl;
        

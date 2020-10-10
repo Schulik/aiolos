@@ -1,10 +1,8 @@
 #include "main.h"
 
-//extern AOS* init_AOS(int num);
-
 void hydro_run::execute() { 
      
-    int steps = 0; //, i,j;
+    steps = 0;
     double output_counter = 0;
     const int maxsteps = 1e9;
     double dt = 1e-3; //get_cfl_timestep();
@@ -16,7 +14,7 @@ void hydro_run::execute() {
     
     ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~////
     //                                                                         //
-    // Simulation main loop, let'se goooooooooooooooo! *Insert Super Mario*    //
+    // Simulation main loop                                                    //
     //                                                                         //
     ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~////
     for (globalTime = 0; (globalTime < t_max) && (steps < maxsteps); ) {
@@ -42,51 +40,50 @@ void hydro_run::execute() {
         //
         // For noflux-boundaries, boundaries 1, we symmetrize gravity in order to assure zero flux with the source function
         //
-        ghost_xi_left   = x_i12[0] - (x_i12[1] - x_i12[0]);
-        ghost_xi_right  = x_i12[num_cells-1] + (x_i12[num_cells-1] - x_i12[num_cells-2]);
+        
+        //ghost_xi_left   = x_i12[0] - (x_i12[1] - x_i12[0]);
+        //ghost_xi_right  = x_i12[num_cells-1] + (x_i12[num_cells-1] - x_i12[num_cells-2]);
         if(boundaries_number == 4) {
-            phi_left_ghost  = get_phi_grav(x_i12[0],           planet_mass);
-            phi_right_ghost = get_phi_grav(x_i12[num_cells-1], planet_mass);
+            phi[0]           = get_phi_grav(x_i12[1],         planet_mass);
+            phi[num_cells+1] = get_phi_grav(x_i12[num_cells], planet_mass);
         } else {
-            phi_left_ghost  = get_phi_grav(ghost_xi_left, planet_mass);
-            phi_right_ghost = get_phi_grav(ghost_xi_right, enclosed_mass[num_cells-1]);
+            phi[0]           = get_phi_grav(x_i12[1],  planet_mass);
+            phi[num_cells+1] = get_phi_grav(x_i12[num_cells+1], planet_mass);
         }
         
         
-        //Compute the boundary values, WARNING: ALWAYS DO THAT FIRST
+        //Compute the boundary values
         if(boundaries_number == 1) {
             if(steps==0)
                 cout<<"Const boundaries on both sides, given by inital conditions"<<endl;
-            boundaries_const_both(left_ghost, u[0], u[num_cells-1], right_ghost );
+            boundaries_const_both(u[0], u[1], u[num_cells], u[num_cells+1] );
         }
         else if(boundaries_number == 2) {
             if(steps==0)
                 cout<<"Open boundaries on both sides / Wall+open if using gravity."<<endl;
-            boundaries_open_both(left_ghost, u[0], u[1], u[num_cells-2], u[num_cells-1], right_ghost );
+            boundaries_open_both(u[0], u[1], u[2], u[num_cells-1], u[num_cells], u[num_cells+1] );
             
         }
         else if(boundaries_number == 3) {
             if(steps==0)
                 cout<<"Wall and inflow boundaries."<<endl;
-            boundaries_planet_mdot(left_ghost, u[0], u[num_cells-1], right_ghost );
+            boundaries_planet_mdot(u[0], u[1], u[num_cells], u[num_cells+1] );
         }
         else if(boundaries_number == 4) {
             if(steps==0)
                 cout<<"Wall boundaries on both sides."<<endl;
-            boundaries_wall_both(left_ghost, u[0], u[num_cells-1], right_ghost );
+            boundaries_wall_both(u[0], u[1], u[num_cells], u[num_cells+1] );
         }
         else {
             if(steps==0)
                 cout<<"WARNING: default boundaries!"<<endl;
-            boundaries_const_both(left_ghost, AOS(1,1,1), AOS(1,1,1), right_ghost );
+            boundaries_const_both(u[0], AOS(1,1,1), AOS(1,1,1), u[num_cells+1] );
         }
             
         
         //if(steps==0)
         //    cout<<" initial ghost momentum after start: "<<left_ghost.u2<<endl;
         
-        //boundval_left  = conserved2[0];          //In general, this should be a function of the conserved[0] value
-        //boundval_right = conserved2[num_cells-1];
         if(debug >= 2)
             cout<<"Done."<<endl<<" Before compute pressure... ";
         compute_pressure();
@@ -97,35 +94,33 @@ void hydro_run::execute() {
         //
         // Step 2: Compute fluxes and sources
         //
-        for(int j=0; j<num_cells; j++) {
+        for(int j=1; j <= num_cells; j++) {
             
-            if(j==0) {
-                flux[0] = hllc_flux(left_ghost, u[j],  phi_left_ghost, phi[j],   0, j); //Flux with ghost cell on left
-                flux[1] = hllc_flux(u[j],       u[j+1],phi[j],         phi[j+1], j, j+1); //First regular flux, jumpstarting the chain of fluxes
-            }
-            else if(j==num_cells-1)
-                flux[j+1] = hllc_flux(u[j],     right_ghost, phi[j], phi_right_ghost, j, j); //Last flux with ghost cell on right
-            else {
-                flux[j+1] = hllc_flux(u[j], u[j+1], phi[j], phi[j+1], j, j+1); //Regular flux for most of the domain
-            }
+            if(j==1) 
+                flux[0] = hllc_flux(u[j-1], u[j],  phi[j-1], phi[j],   j-1, j); //Flux with ghost cell on left
             
+            flux[j] = hllc_flux(u[j], u[j+1], phi[j], phi[j+1], j, j+1); //Everything else is taken into account by the right flux
+
+            /*if(j==2) {
+                char alp;
+                cout<<"flux[0]="<<flux[0].u1<<" / "<<flux[0].u2<<" / "<<flux[0].u3<<endl;
+                cout<<"flux[1]="<<flux[1].u1<<" / "<<flux[1].u2<<" / "<<flux[1].u3<<endl;
+                //cout<<"flux[2]="<<flux[2].u1<<" / "<<flux[2].u2<<" / "<<flux[2].u3<<endl;
+                
+                cout<<"u[0]="<<u[0].u1<<" / "<<u[0].u2<<" / "<<u[0].u3<<endl;
+                cout<<"u[1]="<<u[1].u1<<" / "<<u[1].u2<<" / "<<u[1].u3<<endl;
+                cout<<"u[2]="<<u[2].u1<<" / "<<u[2].u2<<" / "<<u[2].u3<<endl;
+                cout<<"phi[0,1,2]="<<phi[0]<<" / "<<phi[1]<<" / "<<phi[2]<<endl;
+                cin>>alp;
+            }*/
         }
         
         if(debug >= 2)
             cout<<"Done. Starting sources."<<endl;
         
-        for(int j=0; j<num_cells; j++) {
+        for(int j=1; j<=num_cells; j++) 
+            source[j]    = source_grav(u[j], j);
         
-            //cout<<" "<<j;
-            
-            if(j == 0)
-                source[j]    = source_grav(u[j], phi_left_ghost, phi[j+1]);
-            else if (j == num_cells-1) {
-                source[j]    = source_grav(u[j], phi[j-1], phi_right_ghost);
-            }
-            else
-                source[j]    = source_grav(u[j], phi[j-1], phi[j+1]);
-        }
         
         //
         // Output data, when required. Keep the output here, between the flux and conserved variable update, so that the 
@@ -147,24 +142,31 @@ void hydro_run::execute() {
         //
         
         //#pragma omp simd
-        for(int i=0; i<num_cells; i++) {
+        for(int i=1; i<=num_cells; i++) {
             
-            u[i] = u[i] + (flux[i] - flux[i+1] + source[i]) * dt/dx[i];
+            u[i] = u[i] + (flux[i-1] - flux[i]) * dt/dx[i] + source[i] * dt;
             
-            //u[j].u1 += dt/dx[j] * ( flux[j].u1 - flux[j+1].u1);
-            //u[j].u2 += dt/dx[j] * ( flux[j].u2 - flux[j+1].u2);
-            //u[j].u3 += dt/dx[j] * ( flux[j].u3 - flux[j+1].u3);
+            /*if(i==1 || i==num_cells || i==20) {
+                char alpha;
+                cout<<"Debuggin fluxes in cell i= "<<i<<": fl-fr = "<<((flux[i-1].u2 - flux[i].u2)/dx[i])<<endl;
+                cout<<"Debuggin fluxes: s = "<<source[i].u2<<endl;
+                cout<<"Debuggin fluxes: fl-fr+s = "<<((flux[i-1].u2 - flux[i].u2)/dx[i] + source[i].u2)<<endl;
+                cin>>alpha;
+            }*/
         }
+            
+        
+
+        
         
         if(debug >= 2)
             cout<<" Before updating rad fluxes... ";
         
         if(use_rad_fluxes) {
-            for(int i=0; i<num_cells-1; i++) {
-                u[i].u3 = u[i].u3 + (radiative_flux[i] - radiative_flux[i+1]) * 0.1; //Just tryout numbers for now
+            for(int i=1; i<=num_cells; i++) {
+                u[i].u3 = u[i].u3 + (radiative_flux[i-1] - radiative_flux[i]); //Dummy physics for now
             }
         }
-        
         
         globalTime += dt;
         steps++;
@@ -178,8 +180,7 @@ void hydro_run::execute() {
         if(debug >= 1)
             cout<<"timestep in execute()="<<dt<<" stepnum "<<steps<<" totaltime"<<globalTime<<endl;
         
-        
-        
+    
     }
     cout<<endl;
     
@@ -203,22 +204,17 @@ AOS hydro_run::hllc_flux(AOS &leftval, AOS &rightval, double &phi_l, double &phi
     double ul = speed[jleft]; //leftval.u2  / leftval.u1; 
     double ur = speed[jright];      //rightval.u2 / rightval.u1;
     
-    //Pressures, TODO: Replace with grav_pressure(pressure2[jleft])
-    //double pl = pressure[jleft]; //(gamma_adiabat-1.)*(leftval.u3 - 0.5* leftval.u2*leftval.u2 / leftval.u1 ); //pressure[jleft]; 
-    //double pr = pressure[jright]; //(gamma_adiabat-1.)*(rightval.u3 - 0.5* rightval.u2*rightval.u2 / rightval.u1 ); //pressure[jright]; 
-    double pl = get_p_hydrostatic(leftval, phi_r, phi_l, jleft);
-    double pr = get_p_hydrostatic(rightval, phi_l, phi_r, jright);
+    //Pressures with hydrostatic reconstruction
+    //double pl = get_p_hydrostatic(leftval, phi_r, phi_l, jleft);
+    //double pr = get_p_hydrostatic(rightval, phi_l, phi_r, jright);
+    
+    double pl = get_p_hydrostatic_nonuniform(jleft,  +1);
+    double pr = get_p_hydrostatic_nonuniform(jright, -1);
     
     //Speed of shocks
     double SL = ul - std::sqrt(gamma_adiabat*pl/leftval.u1);
     double SR = ur + std::sqrt(gamma_adiabat*pr/rightval.u1);
     
-    //double SL = ul - std::sqrt(gamma_adiabat*pressure2[jleft]/leftval.u1);
-    //double SR = ur + std::sqrt(gamma_adiabat*pressure2[jright]/rightval.u1);
-    
-    //Analytic fluxes
-    //AOS FL = AOS (leftval.u2, leftval.u2 * ul  + pl, ul * (leftval.u3 + pl) );
-    //AOS FR = AOS (rightval.u2,rightval.u2 * ur + pr, ur * (rightval.u3+ pr) );
      
     //Intermediate values in the star region, equations 10.30 -10.39 in Toro
     double SS     = ( pr-pl+leftval.u2*(SL - ul)-rightval.u2*(SR-ur) )/(leftval.u1*(SL - ul)-rightval.u1*(SR-ur) );

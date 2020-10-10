@@ -19,7 +19,7 @@
     //
     void hydro_run::init_grav_pot() {
         
-        for(int i = 0; i < num_cells; i++) {
+        for(int i = 1; i <= num_cells; i++) {
             enclosed_mass[i] = planet_mass;      //No self-gravity
             phi[i]           = get_phi_grav(x_i12[i], enclosed_mass[i]);
             
@@ -40,7 +40,7 @@
         
         enclosed_mass[0] = planet_mass;
         
-        for(int i = 0; i < num_cells; i++) {
+        for(int i = 0; i <= num_cells+1; i++) {
             
             if(debug >= 4) {
                 if(i==0)
@@ -98,20 +98,84 @@
     // takes:
     // returns:
     //
-    // Val
     double hydro_run::get_p_hydrostatic(AOS &u, double &phi_l, double &phi_r,const int &i) {
         
-        double p        = (gamma_adiabat-1.)*(u.u3  - 0.5* u.u2*u.u2 / u.u1 );
-        //double diffgrav = phi_l - phi_r 
-        double pfinal   = p - 0.5 * u.u1 * (phi_l - phi_r);
+        double ptemp    = (gamma_adiabat-1.)*(u.u3  - 0.5* u.u2*u.u2 / u.u1 );
+        double pfinal   = pressure[i] - 0.5 * u.u1 * (phi_l - phi_r);
+        
+        /*
+        if(switchi > 0) {
+            pfinal = pressure[i] - dx[i] * omegaplus[i] * u.u1 * (phi[i-1] - phi[i]) / (dx[i-1] + dx[i]);
+        }
+        else {
+            pfinal = pressure[i] - dx[i] * omegaminus[i] * u.u1 * (phi[i+1] - phi[i]) / (dx[i+1] + dx[i]);
+        }*/
+        
+        char a;
+        //if self.debug > 2:
+         //   print(" In P_HYDROSTATIC : phi_l-phi_r = " + repr(phi_l) + "-" + repr(phi_r) + " p,pfinal = " + repr([p,pfinal]))
+
+        if (pfinal < 0.) {
+            if(suppress_warnings == 0) {
+                cout<<"Warning: Negative pressure computed and replaced in cell "<<i<<" at time= "<<globalTime<<" iter = "<<steps<<endl;
+                cout<<" cell "<<i;
+                cout<<" u =  "<<u.u1<<"/"<<u.u2<<"/"<<u.u3;
+                cout<<" phil-phir "<<(phi_l-phi_r)<<" p= "<<pressure[i]<< " ptemp= "<<ptemp<<" pfinal= "<<pfinal<<endl;
+                cin>>a;
+            }
+                
+            return pressure[i];
+        }
+            
+        return pfinal;
+    }
+    
+    
+    
+    //
+    // p_hydrostatic_nonuniform - hydrostatic reconstruction, after Eq. A.4 in KM2016
+    //
+    // takes:
+    // returns:
+    //
+    double hydro_run::get_p_hydrostatic_nonuniform(const int &i, const int &plusminus) {
+        
+        //double ptemp    = (gamma_adiabat-1.)*(u.u3  - 0.5* u.u2*u.u2 / u.u1 );
+        double pfinal;   //= pressure[i] - 0.5 * u.u1 * (phi_l - phi_r);
+        double phi_l = 0;
+        double phi_r = 0;
+        
+        /*if(i==0)
+            pfinal = pressure[0] - 0.5 * u[0].u1 * (phi[1] - phi[0]);
+        
+        else if(i==num_cells+1)
+            pfinal = pressure[num_cells+1] - 0.5 * u[num_cells+1].u1 * (phi[num_cells] - phi[num_cells+1]);
+        
+        else {
+            */
+            if(plusminus == -1) {
+                pfinal = pressure[i] - dx[i] * omegaplus[i] * u[i].u1 * (phi[i-1] - phi[i]) / (dx[i-1] + dx[i]);
+            }
+            else {
+                pfinal = pressure[i] - dx[i] * omegaminus[i] * u[i].u1 * (phi[i+1] - phi[i]) / (dx[i+1] + dx[i]);
+            }
+            
+        //}
         
         //if self.debug > 2:
          //   print(" In P_HYDROSTATIC : phi_l-phi_r = " + repr(phi_l) + "-" + repr(phi_r) + " p,pfinal = " + repr([p,pfinal]))
 
         if (pfinal < 0.) {
-            if(suppress_warnings == 0)
-                cout<<"Warning: Negative pressure computed and replaced in cell "<<i<<" at time= "<<globalTime<<"."<<endl;
-            return p;
+            if(suppress_warnings == 0) {
+                char a;
+                cout<<"Warning: Negative pressure computed and replaced in nonuniform cell "<<i<<" at time= "<<globalTime<<" iter = "<<steps<<endl;
+                cout<<" cell "<<i;
+                cout<<" u =  "<<u[i].u1<<"/"<<u[i].u2<<"/"<<u[i].u3;
+                cout<<" phil-phir "<<(phi_l-phi_r)<<" p= "<<pressure[i]<<" pfinal= "<<pfinal<<endl;
+                cin>>a;
+            }
+                
+            return pressure[i];
         }
             
         return pfinal;
@@ -123,13 +187,24 @@
     // takes:   state vector of rho,rhou,E, (hence R^vars) position (\in R^1)  and makes gravity, coriolis force or whatever from it 
     // returns: vector \in R^vars
     //
-    // Validity: TBD
-    AOS hydro_run::source_grav(AOS &u, double &phileft, double &phiright) {
+    AOS hydro_run::source_grav(AOS &u, int &j) {
         
         //if self.debug > 2:
         //    print(" In SOURCE_GRAV: phileft, phiright = " + repr([phileft, phiright]))
-
-        return  AOS(0, u.u1, u.u2) * (phiright - phileft) * (-0.5);
+    
+        //
+        // The last regular cells get the uniform grid treatment
+        // because omegas cannot be defined in those cells, without defining spacing for the ghost cells, which I dont want to do
+        //
+        if(j==1 || j==num_cells ) 
+            return AOS(0, u.u1, u.u2) * (-1.) * (phi[j+1] - phi[j-1]) / (x_i12[j+1] - x_i12[j-1]); 
+        else {
+            
+            return AOS(0, u.u1, u.u2) * (-1.) * ( omegaplus[j] * (phi[j] - phi[j-1]) / (dx[j] + dx[j-1]) + omegaminus[j] * (phi[j+1] - phi[j]) / (dx[j+1] + dx[j]) );
+            
+        }
+        
+        //return  AOS(0, u.u1, u.u2) * (-1.) * (phi[j+1] - phi[j-1]) / (x_i12[j+1] - x_i12[j-1]);
     }
 
     
