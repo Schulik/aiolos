@@ -19,10 +19,24 @@ hydro_run::hydro_run(string filename) {
         //
         ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         double dx0;
-        dx0         = read_parameter_from_file(filename,"PARI_DOMAIN_DX", TYPE_DOUBLE, debug).dvalue;
-        domain_min  = read_parameter_from_file(filename,"PARI_DOMAIN_MIN", TYPE_DOUBLE, debug).dvalue;
-        domain_max  = read_parameter_from_file(filename,"PARI_DOMAIN_MAX", TYPE_DOUBLE, debug).dvalue;
-        num_cells = (int)((domain_max - domain_min)/dx0);
+        dx0              = read_parameter_from_file(filename,"PARI_DOMAIN_DX", TYPE_DOUBLE, debug).dvalue;
+        cells_per_decade = read_parameter_from_file(filename,"PARI_CELLS_PER_DECADE", TYPE_DOUBLE, debug).dvalue;
+        type_of_grid     = read_parameter_from_file(filename,"PARI_GRID_TYPE", TYPE_INT, debug).ivalue;
+        domain_min       = read_parameter_from_file(filename,"PARI_DOMAIN_MIN", TYPE_DOUBLE, debug).dvalue;
+        domain_max       = read_parameter_from_file(filename,"PARI_DOMAIN_MAX", TYPE_DOUBLE, debug).dvalue;
+        
+        cout<<"pos1"<<endl;
+        cout<<"log10(domain_min) = "<<log10f(domain_min)<<endl;\
+        cout<<"log10(domain_max) = "<<log10f(domain_max)<<endl;
+        cout<<"cells per decade = "<<cells_per_decade<<endl;
+        
+        if(type_of_grid == 0)
+            num_cells        = (int)((domain_max - domain_min)/dx0);
+        else {
+            num_cells        = (int) ( (log10f(domain_max) - log10f(domain_min)) * cells_per_decade );
+            dx0              = domain_min;
+        }
+            
         //num_cells must always be read in pretty early, as all other memory allocations in this function depend on it.
         //Note-to-self: Don't change the order of read_parameter_from_file commands.
         
@@ -32,7 +46,7 @@ hydro_run::hydro_run(string filename) {
         output_time = read_parameter_from_file(filename,"PARI_TIME_OUTPUT", TYPE_DOUBLE, debug).dvalue; 
         globalTime = 0.0;    
     
-    
+        cout<<"pos2, cell number = "<<num_cells<<endl;
     
         ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         //
@@ -100,6 +114,8 @@ hydro_run::hydro_run(string filename) {
         //
         ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+        cout<<"pos3"<<endl;
+        
         x_i        = np_zeros(num_cells+1);		//The cell boundaries
         x_i12      = np_zeros(num_cells+2);		    //The cell mid positions
         timesteps  = np_zeros(num_cells+2);		    
@@ -109,6 +125,8 @@ hydro_run::hydro_run(string filename) {
         omegaplus  = np_zeros(num_cells+2);
         omegaminus = np_zeros(num_cells+2);
         
+        cout<<"pos4"<<endl;
+        
         //
         // Compute cell wall boundaries
         //         First and last two cells near boundaries are uniform
@@ -116,14 +134,15 @@ hydro_run::hydro_run(string filename) {
         x_i[0] = domain_min;
         x_i[1] = x_i[0] + dx0;
         x_i[2] = x_i[1] + dx0;
+        double dlogx = pow(10.,1./cells_per_decade);
         for(int i=3; i< num_cells-1; i++) {
             //x_i[i] = (domain_min + dx0 * double(i));
-            x_i[i] = x_i[i-1] + dx0 * double(i-2); //(domain_min + dx0 * double(i));
+            //x_i[i] = x_i[i-1] + dx0 * double(i-2); //(domain_min + dx0 * double(i));
+            x_i[i]   = x_i[i-1] * dlogx;
         }
         double dxlast = x_i[num_cells-2] - x_i[num_cells-3];
         x_i[num_cells-1] = x_i[num_cells-2] + dxlast;
         x_i[num_cells]   = x_i[num_cells-1] + dxlast;
-        
         
         //Assign the last boundary as domain maximum as long as nonuniform grid is in the test-phase
         domain_max = x_i[num_cells];
@@ -279,93 +298,6 @@ hydro_run::hydro_run(string filename) {
 //
 //
 //
-void hydro_run::initialize_hydrostatic_atmosphere() {
-    
-    cout<<"ATTENTION: Initializing hydrostatic atmosphere and overwriting prior initial values."<<endl;
-    
-    //const_T = 1.; //read_parameter_from_file(filename,"PARI_CONST_TEMP", TYPE_DOUBLE, debug).dvalue; //Time until we reach rs starting at;
-    cv      = 1.;
-    
-    long double temp_rhofinal;
-    long double factor_inner, factor_outer;
-    //long double factor_grav;
-    long double delta_phi;
-    long double T_inner;
-    long double T_outer;
-    
-    // debugvariables
-    //long double debug_dens;
-    //long double debug_energy;
-    
-    //
-    // Start with the outermost cell and build up a hydrostatic atmosphere
-    // Fulfilling KKM16, Eqn. 17
-    //
-    //long double temp_increase = T_increment;
-    //long double tempgrad  = 0.;
-    //long double tempgrad2 = 0.;
-    long double residual  = 0.;
-    
-    //
-    // First, initialize (adiabatic) temperature
-    //
-    for(int i=0; i<=num_cells+1; i++) {
-            //temperature[i] = planet_mass / x_i12[i] / (cv * gamma_adiabat) + 1.;
-            temperature[i] = - phi[i] / (cv * gamma_adiabat) + 1.;
-    }
-    
-    //
-    // Now construct hydrostatic densities according to the temperature and adiabatic EOS so that
-    //
-    for(int i=num_cells; i>=0; i--)  {
-        
-        //
-        // Increase temperatures for arbitrary stratifications
-        //
-        T_outer = temperature[i+1]; 
-        T_inner = temperature[i]; 
-        
-        //
-        // Construct next density as to fulfil the hydrostatic condition
-        //
-        factor_outer = (gamma_adiabat-1.) * cv * T_outer;
-        factor_inner = (gamma_adiabat-1.) * cv * T_inner; 
-        delta_phi    = phi[i+1] - phi[i];
-        temp_rhofinal = u[i+1].u1 * (2.* factor_outer + delta_phi) / (2. * factor_inner - delta_phi);
-        
-        //
-        // 1st order assignment
-        // 
-        u[i] = AOS(temp_rhofinal, 0., cv * temp_rhofinal * T_inner) ;
-        
-        if( (i==20 || i== num_cells-20) && debug >= 0) {
-            cout.precision(16);
-            cout<<" i="<<i<<endl;
-            cout<<"In hydostatic init: factor_outer/delta_phi = "<< factor_outer / delta_phi << " factor_inner/delta_phi = "<< factor_inner / delta_phi <<endl;
-            cout<<"In hydostatic init: factor_dens = "<< (2.* factor_outer / delta_phi + 1.) / (2. * factor_inner / delta_phi - 1.) <<endl;
-            cout<<"Ratio of densities inner/outer = "<< temp_rhofinal/u[i+1].u1 <<endl;
-            cout<<"Ratio of temperatures inner/outer = "<<T_inner/T_outer<<endl;
-            cout<<"Ratio of pressures inner/outer = "<<cv * temp_rhofinal * T_inner /u[i+1].u3<<endl;
-            //tempgrad = (gamma_adiabat-1.)*cv*u[i+1].u1*T_outer - (gamma_adiabat-1.)*cv*u[i].u1*T_inner  + 0.5 * (u[i].u1 + u[i+1].u1) * delta_phi;
-            //tempgrad2 = ((gamma_adiabat-1.)*cv*T_outer + 0.5 * delta_phi) * u[i+1].u1 - ((gamma_adiabat-1.)*cv*T_inner  + 0.5 * delta_phi ) * u[i].u1 ;
-            residual = (gamma_adiabat-1.)*cv*u[i+1].u1*T_outer - (gamma_adiabat-1.)*cv*u[i].u1*T_inner  + 0.5 * (u[i].u1 + u[i+1].u1) * delta_phi;
-            //cout<<"pressure diff "<<(gamma_adiabat-1.)*u[i+1].u3 - (gamma_adiabat-1.)*(u[i].u3)<<endl;
-            cout<<"pressure diff "<<( ((gamma_adiabat-1.)*cv*u[i+1].u1*T_outer - (gamma_adiabat-1.)*cv*u[i].u1*T_inner)/dx[i])<<endl;
-            cout<<"density sum with potential "<<(0.5 * (u[i].u1 + u[i+1].u1) * delta_phi/dx[i])<<endl;
-            cout<<"density diff "<<(u[i].u1 - u[i+1].u1)<<endl;
-            cout<<"density sum " <<(u[i].u1 + u[i+1].u1)<<endl;
-            cout<<"residual = "<<residual<<endl;
-            
-            //cout<<"residual2 = "<<residual<<endl;
-            //cout<<"sum of hydrostatic gradients = "<<tempgrad<<endl;
-            //cout<<"sum2 of hydrostatic gradients = "<<tempgrad2<<endl;
-        }
-    }
-}
-
-//
-//
-//
 void hydro_run::initialize_hydrostatic_atmosphere_nonuniform() {
     
     cout<<"ATTENTION: Initializing nonuniform hydrostatic atmosphere and overwriting prior initial values."<<endl;
@@ -398,7 +330,12 @@ void hydro_run::initialize_hydrostatic_atmosphere_nonuniform() {
     //
     for(int i=0; i<=num_cells+1; i++) {
             //temperature[i] = planet_mass / x_i12[i] / (cv * gamma_adiabat) + 1.;
-            temperature[i] = - 0.5* phi[i] / (cv * gamma_adiabat) + 1.;
+            temperature[i] = - phi[i] / (cv * gamma_adiabat) + 1.;
+            
+            //Add temperature bumps and troughs
+            temperature[i] += 1. * exp( - pow(x_i12[i] - 1.e-1 ,2.) / (0.1) );
+            
+            temperature[i] -= 3. * exp( - pow(x_i12[i] - 3.e-3 ,2.) / (1.e-3) );
     }
     
     //Last normal cell has to be awkwardly initialized
@@ -407,27 +344,23 @@ void hydro_run::initialize_hydrostatic_atmosphere_nonuniform() {
     for(int i=num_cells; i>=0; i--)  {
         
         //
-        // Increase temperatures for arbitrary stratifications
+        // Construct next density as to fulfil the hydrostatic condition
         //
         T_outer = temperature[i+1];
         T_inner = temperature[i];  
-        
-        //
-        // Construct next density as to fulfil the hydrostatic condition
-        //
+
         factor_outer = (gamma_adiabat-1.) * cv * T_outer; //TODO: Replace with T_outer for non-isothermal EOS
         factor_inner = (gamma_adiabat-1.) * cv * T_inner; //TODO: Replace with T_inner for non-isothermal EOS
         metric_outer = (phi[i+1] - phi[i]) * omegaplus[i+1] * dx[i+1] / (dx[i+1] + dx[i]);
         metric_inner = (phi[i+1] - phi[i]) * omegaminus[i]  * dx[i]   / (dx[i+1] + dx[i]);
         
-        //temp_rhofinal = u[i+1].u1 * (2.* factor_outer + delta_phi) / (2. * factor_inner - delta_phi);
         temp_rhofinal = u[i+1].u1 * (factor_outer + metric_outer) / (factor_inner - metric_inner);
         
-        //
-        // 1st order assignment
-        // 
         u[i] = AOS(temp_rhofinal, 0., cv * temp_rhofinal * T_inner) ;
         
+        //
+        // Debug info
+        // 
         if( (i==20 || i== num_cells-20) && debug >= 0) {
             cout.precision(16);
             cout<<" i="<<i<<endl;
