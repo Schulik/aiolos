@@ -47,9 +47,9 @@ const double cflfactor = 0.9;
 //
 // Functions mimicking certain numpy functionalities
 //
-std::vector<double>np_zeros(int);
-std::vector<double>np_ones(int);
-std::vector<double>np_somevalue(int, double);
+std::vector<double> np_zeros(int);
+std::vector<double> np_ones(int);
+std::vector<double> np_somevalue(int, double);
 
 //
 // Everything to define and read simulation parameters
@@ -129,18 +129,18 @@ class hydro_run
     int num_cells;
     double cells_per_decade;
     int type_of_grid;       //0 = cartesian, 1 = log
-    std::vector<double>x_i;    		//The cell boundaries
-    std::vector<double>x_i12;  		//The cell mid positions
-    std::vector<double>surf;
-    std::vector<double>vol;
+    std::vector<double> x_i;    		//The cell boundaries
+    std::vector<double> x_i12;  		//The cell mid positions
+    std::vector<double> surf;
+    std::vector<double> vol;
 
     double dt;
     double cflfactor;
     double t_max;
     double globalTime;
-    std::vector<double>timesteps;
-    std::vector<double>timesteps_cs;
-    std::vector<double>finalstep;
+    std::vector<double> timesteps;
+    std::vector<double> timesteps_cs;
+    std::vector<double> finalstep;
     double output_time;
     double snd_crs_time;
     int plotskip;
@@ -172,17 +172,17 @@ class hydro_run
     //
     ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-    std::vector<AOS>u;              //Conserved hyperbolic variables: density, mass flux, energy density
-    std::vector<AOS>oldu;           //Conserved hyperbolic variables: density, mass flux, energy density
-    std::vector<AOS>source;         // Gravitational source term
-    std::vector<AOS>source_pressure;// Geometric source term
-    std::vector<AOS>flux;
-    std::vector<double>phi;            //Parabolic Variables: gravitational potential
-    std::vector<double>omegaplus;
-    std::vector<double>omegaminus;
+    std::vector<AOS> u;              //Conserved hyperbolic variables: density, mass flux, energy density
+    std::vector<AOS> oldu;           //Conserved hyperbolic variables: density, mass flux, energy density
+    std::vector<AOS> source;         // Gravitational source term
+    std::vector<AOS> source_pressure;// Geometric source term
+    std::vector<AOS> flux;
+    std::vector<double> phi;            //Parabolic Variables: gravitational potential
+    std::vector<double> omegaplus;
+    std::vector<double> omegaminus;
 
-    std::vector<AOS>u_output;       //Array of arrays to store snapshots of u
-    std::vector<double>phi_output;     //Array of arrays to store snapshots of phi
+    std::vector<AOS> u_output;       //Array of arrays to store snapshots of u
+    std::vector<double> phi_output;     //Array of arrays to store snapshots of phi
     
     int timecount;
     int plotcounter;
@@ -193,15 +193,15 @@ class hydro_run
     //
     ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     
-    std::vector<double>cs;         //Speed of sound array
-    std::vector<double>pressure;   
-    std::vector<double>internal_energy;
-    std::vector<double>speed;
-    std::vector<double>enclosed_mass;
-    std::vector<double>opticaldepth;
-    std::vector<double>opacity;
-    std::vector<double>temperature;
-    std::vector<double>radiative_flux;
+    std::vector<double> cs;         //Speed of sound array
+    std::vector<double> pressure;   
+    std::vector<double> internal_energy;
+    std::vector<double> speed;
+    std::vector<double> enclosed_mass;
+    std::vector<double> opticaldepth;
+    std::vector<double> opacity;
+    std::vector<double> temperature;
+    std::vector<double> radiative_flux;
     
     
     ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
