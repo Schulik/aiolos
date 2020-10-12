@@ -40,7 +40,7 @@
         
         enclosed_mass[0] = planet_mass;
         
-        for(int i = 0; i <= num_cells+1; i++) {
+        for(int i = 1; i <= num_cells+1; i++) {
             
             if(debug >= 4) {
                 if(i==0)
@@ -50,8 +50,8 @@
             }
             
             if (use_self_gravity == 1) {
-                //enclosed_mass[i] += 4. * 3.141592 * x_i12[i] * x_i12[i] * u[i].u1; //Straightfoward integration of the poisson equation
-                enclosed_mass[i] += x_i12[i] * u[i].u1; //Cartesian poisson equation to not let gravity initially diverge at bounds
+                enclosed_mass[i] = enclosed_mass[i-1] +  4. * 3.141592 * x_i12[i] * x_i12[i] * (x_i[i]-x_i[i-1]) * u[i].u1; //Straightfoward integration of the poisson equation
+                //enclosed_mass[i] += x_i12[i] * u[i].u1; //Cartesian poisson equation to not let gravity initially diverge at bounds
             }
             
             phi[i]           = get_phi_grav(x_i12[i], enclosed_mass[i]);
@@ -70,6 +70,9 @@
     //
     double hydro_run::get_phi_grav(double &r, double &mass) {
         
+        //
+        // Deepening the potential if needed
+        //
         if(globalTime < rs_time) {
                 
             rs_at_moment = 0.5 - (0.5 + rs) * (globalTime/rs_time) ;
@@ -77,6 +80,9 @@
         else
             rs_at_moment = rs;
         
+        //
+        // Linear or 1/r gravity
+        //
         if(use_linear_gravity)
             return mass*abs(r);
         else
@@ -172,7 +178,7 @@
                 cout<<" cell "<<i;
                 cout<<" u =  "<<u[i].u1<<"/"<<u[i].u2<<"/"<<u[i].u3;
                 cout<<" phil-phir "<<(phi_l-phi_r)<<" p= "<<pressure[i]<<" pfinal= "<<pfinal<<endl;
-                cin>>a;
+                //cin>>a;
             }
                 
             return pressure[i];

@@ -127,8 +127,12 @@ class hydro_run
     double *dx;
     double domain_min, domain_max;
     int num_cells;
+    double cells_per_decade;
+    int type_of_grid;       //0 = cartesian, 1 = log
     double *x_i;    		//The cell boundaries
     double *x_i12;  		//The cell mid positions
+    double *surf;
+    double *vol;
 
     double dt;
     double cflfactor;
@@ -170,7 +174,8 @@ class hydro_run
 
     AOS *u;              //Conserved hyperbolic variables: density, mass flux, energy density
     AOS *oldu;           //Conserved hyperbolic variables: density, mass flux, energy density
-    AOS *source;
+    AOS *source;         // Gravitational source term
+    AOS *source_pressure;// Geometric source term
     AOS *flux;
     double *phi;            //Parabolic Variables: gravitational potential
     double *omegaplus;
@@ -225,7 +230,7 @@ class hydro_run
     void initialize_default_test();
     void initialize_space_test(AOS background);
     void initialize_custom_setup();
-    void initialize_hydrostatic_atmosphere();
+    //void initialize_hydrostatic_atmosphere();
     void initialize_hydrostatic_atmosphere_nonuniform();
     void initialize_gravitational_potential();
     

@@ -5,7 +5,7 @@ void hydro_run::execute() {
     steps = 0;
     double output_counter = 0;
     const int maxsteps = 1e9;
-    double dt = 1e-3; //get_cfl_timestep();
+    dt = 1e-3; //get_cfl_timestep();
     
     cout<<"Beginning main loop with num_cells="<<num_cells<<" and timestep="<<dt<<" cflfacotr="<<cflfactor<<endl;
     
@@ -102,7 +102,7 @@ void hydro_run::execute() {
             flux[j] = hllc_flux(u[j], u[j+1], phi[j], phi[j+1], j, j+1); //Everything else is taken into account by the right flux
 
             /*if(j==2) {
-                char alp;
+                char alp;ms are which form of objects which have a velocity standard deviation comparable to their m
                 cout<<"flux[0]="<<flux[0].u1<<" / "<<flux[0].u2<<" / "<<flux[0].u3<<endl;
                 cout<<"flux[1]="<<flux[1].u1<<" / "<<flux[1].u2<<" / "<<flux[1].u3<<endl;
                 //cout<<"flux[2]="<<flux[2].u1<<" / "<<flux[2].u2<<" / "<<flux[2].u3<<endl;
@@ -118,10 +118,11 @@ void hydro_run::execute() {
         if(debug >= 2)
             cout<<"Done. Starting sources."<<endl;
         
-        for(int j=1; j<=num_cells; j++) 
-            source[j]    = source_grav(u[j], j);
-        
-        
+        for(int j=1; j<=num_cells; j++) {
+            source[j]          = source_grav(u[j], j);
+            source_pressure[j] = AOS(0, pressure[j] * (surf[j]-surf[j-1])/vol[j] ,0); //Metric term 2P/r in a discretization that well-balances constant states
+        }
+            
         //
         // Output data, when required. Keep the output here, between the flux and conserved variable update, so that the 
         // zeroth output has the initialized conserved values, but already the first fluxes.
@@ -142,9 +143,13 @@ void hydro_run::execute() {
         //
         
         //#pragma omp simd
-        for(int i=1; i<=num_cells; i++) {
+        for(int j=1; j<=num_cells; j++) {
             
-            u[i] = u[i] + (flux[i-1] - flux[i]) * dt/dx[i] + source[i] * dt;
+            //Cartesian
+            u[j] = u[j] + (flux[j-1] - flux[j]) * dt/dx[j] + source[j] * dt;
+            
+            //Spherical
+            //u[j] = u[j] + (flux[j-1] * surf[j-1] - flux[j] * surf[j]) * dt/vol[j] + (source[j] + source_pressure[j] * 0.) * dt;
             
             /*if(i==1 || i==num_cells || i==20) {
                 char alpha;
@@ -163,8 +168,8 @@ void hydro_run::execute() {
             cout<<" Before updating rad fluxes... ";
         
         if(use_rad_fluxes) {
-            for(int i=1; i<=num_cells; i++) {
-                u[i].u3 = u[i].u3 + (radiative_flux[i-1] - radiative_flux[i]); //Dummy physics for now
+            for(int j=1; j<=num_cells; j++) {
+                u[j].u3 = u[j].u3 + (radiative_flux[j-1] - radiative_flux[j]); //Dummy physics for now
             }
         }
         
