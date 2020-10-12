@@ -153,13 +153,13 @@ hydro_run::hydro_run(string filename) {
         //Compute inter-sphere surfaces
         for(int i=0; i<num_cells+1; i++) {
             surf[i] = 4. * M_PI * x_i[i] * x_i[i];
-            surf[i] = 1.; //comment this line out for 3D or write less lazy code
+            //surf[i] = 1.; //comment this line out for 3D or write less lazy code
         }
         
         //Compute shell volumes
         for(int i=1; i<num_cells+1; i++) {
             vol[i] = 4./3. * M_PI * ( pow(x_i[i],3.) - pow(x_i[i-1],3.) );
-            vol[i] = 1.; //comment this line out for 3D
+            //vol[i] = 1.; //comment this line out for 3D
         }
         
         //Compute cell mid positions. Ghost cells also have mid positions in order to balance their pressure gradients

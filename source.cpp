@@ -50,7 +50,7 @@
             }
             
             
-            enclosed_mass[i] = enclosed_mass[i-1] +  4. * 3.141592 * (pow(x_i[i],3.)-pow(x_i[i-1],3.)/3. * u[i].u1; //Straightfoward integration of the poisson eqn
+            enclosed_mass[i] = enclosed_mass[i-1] +  4. * 3.141592 * (pow(x_i[i],3.)-pow(x_i[i-1],3.) )/3. * u[i].u1; //Straightfoward integration of the poisson eqn
             
             
             if (use_self_gravity == 1) 
