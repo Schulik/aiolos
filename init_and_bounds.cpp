@@ -558,12 +558,6 @@ void hydro_run::boundaries_wall_both(AOS &left_ghost, const AOS &leftval, const 
 
 hydro_run::~hydro_run() {
     
-    delete x_i;
-    delete x_i12;
-    delete u;
-    delete oldu;
-    delete phi; 
-    
     cout<<"The destructor is called, but its empty so far."<<endl;
     
 }

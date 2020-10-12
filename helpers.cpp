@@ -1,9 +1,7 @@
 #include "main.h"
 
-AOS* init_AOS(int num) {
-    AOS* tmp = new AOS[num];
-    
-    return tmp;
+std::vector<AOS> init_AOS(int num) {   
+    return std::vector<AOS>(num);
 }
 
 //
@@ -98,46 +96,25 @@ double hydro_run::get_cfl_timestep() {
 //
 // Return a 1-D array of zeroes, identical to the numpy function
 //
-double *np_zeros(int size) {
+std::vector<double> np_zeros(int size) {
 
-    double *tmp = new double[size];
-    if(tmp == NULL)
-        throw 1;
-
-    for(int i=0; i<size; i++)
-        tmp[i] = 0.;
-
-    return tmp;
+    return std::vector<double>(size, 0.0) ;
 }
 
 //
 // Return a 1-D array of one, identical to the numpy function
 //
-double *np_ones(int size) {
+std::vector<double> nnp_ones(int size) {
 
-    double *tmp = new double[size];
-    if(tmp == NULL)
-        throw 0;
-
-    for(int i=0; i<size; i++)
-        tmp[i] = 1.;
-
-    return tmp;
+    return std::vector<double>(size, 1.0) ;
 }
-
 //
 // Return a 1-D array of a constant value, identical to the numpy function
 //
-double *np_somevalue(int size, double set_value) {
+std::vector<double> np_somevalue(int size, double set_value) {
 
-    double *tmp = new double[size];
-    if(tmp == NULL)
-        throw 0;
+     return std::vector<double>(size, set_value) ;
 
-    for(int i=0; i<size; i++)
-        tmp[i] = set_value;
-
-    return tmp;
 }
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -229,8 +206,10 @@ simulation_parameter read_parameter_from_file(string filename, string variablena
 
 
 //Print 2 
-void hydro_run::print_AOS_component_tofile(double *x, AOS* data, AOS* fluxes, int timestepnumber) {
-    
+void hydro_run::print_AOS_component_tofile(const std::vector<double>& x, 
+                                          const std::vector<AOS>& data,
+                                          const std::vector<AOS>& fluxes,
+                                          int timestepnumber) {
     string filename;
     stringstream filenamedummy;
     string truncated_name = stringsplit(simname,".")[0];
