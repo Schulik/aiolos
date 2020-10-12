@@ -345,12 +345,12 @@ void hydro_run::initialize_hydrostatic_atmosphere_nonuniform() {
     //
     for(int i=0; i<=num_cells+1; i++) {
             //temperature[i] = planet_mass / x_i12[i] / (cv * gamma_adiabat) + 1.;
-            temperature[i] = - 0.75 * phi[i] / (cv * gamma_adiabat) + 1.;
+            temperature[i] = - 1.0 * phi[i] / (cv * gamma_adiabat) + 1.;
             
             //Add temperature bumps and troughs
-            //temperature[i] += 1. * exp( - pow(x_i12[i] - 1.e-1 ,2.) / (0.1) );
+            temperature[i] += 4. * exp( - pow(x_i12[i] - 1.e-1 ,2.) / (0.1) );
             
-            //temperature[i] -= 3. * exp( - pow(x_i12[i] - 3.e-3 ,2.) / (1.e-3) );
+            temperature[i] -= 40. * exp( - pow(x_i12[i] - 3.e-3 ,2.) / (1.e-3) );
     }
     
     //Last normal cell has to be awkwardly initialized
