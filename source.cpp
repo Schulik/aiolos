@@ -173,11 +173,11 @@
 
         if (pfinal < 0.) {
             if(suppress_warnings == 0) {
-                char a;
                 cout<<"Warning: Negative pressure computed and replaced in nonuniform cell "<<i<<" at time= "<<globalTime<<" iter = "<<steps<<endl;
                 cout<<" cell "<<i;
                 cout<<" u =  "<<u[i].u1<<"/"<<u[i].u2<<"/"<<u[i].u3;
                 cout<<" phil-phir "<<(phi_l-phi_r)<<" p= "<<pressure[i]<<" pfinal= "<<pfinal<<endl;
+                //char a ;
                 //cin>>a;
             }
                 

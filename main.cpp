@@ -21,7 +21,6 @@
 int main(int argc, char** argv)
 {
     string simulationname;
-    string tmpstring;
     int debug;
     int suppress_warnings_global = 0;
     cout<<"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~";
@@ -39,7 +38,7 @@ int main(int argc, char** argv)
     
     for(int i=0; i<argc; i++) {
         
-        tmpstring = argv[i];
+        string tmpstring = argv[i];
         
         if(tmpstring.compare("-par") == 0) {
             simulationname      = argv[i+1];
@@ -54,7 +53,7 @@ int main(int argc, char** argv)
             i++;
         }
         if(tmpstring.compare("-war") == 0) {
-            string tmpstring         = argv[i+1];
+            string yet_another_string = argv[i+1];
             suppress_warnings_global =   std::stoi(tmpstring);
             
             cout<<"Suppressing warnings yes/no = 1/0 : "<<suppress_warnings_global<<endl;
@@ -86,11 +85,11 @@ int main(int argc, char** argv)
     catch (int err){
         
         switch(err) {
-            case 0: cout<<"np_zeros allocation failed!"<<endl;
-            case 1: cout<<"np_ones allocation failed!"<<endl;
-            case 2: cout<<"np_zeros allocation failed!"<<endl;
-            default:cout<<"Unknown integer error occured!"<<endl;
-        }
+            case 0: cout<<"np_zeros allocation failed!"<<endl; break ;
+            case 1: cout<<"np_ones allocation failed!"<<endl; break ;
+            case 2: cout<<"np_zeros allocation failed!"<<endl; break ;
+            default:cout<<"Unknown integer error occured!"<<endl; break ;
+        } 
     }
     catch (std::bad_alloc& ba)
     {
