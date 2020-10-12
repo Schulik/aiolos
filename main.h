@@ -47,9 +47,9 @@ const double cflfactor = 0.9;
 //
 // Functions mimicking certain numpy functionalities
 //
-double *np_zeros(int);
-double *np_ones(int);
-double *np_somevalue(int, double);
+std::vector<double>np_zeros(int);
+std::vector<double>np_ones(int);
+std::vector<double>np_somevalue(int, double);
 
 //
 // Everything to define and read simulation parameters
@@ -124,23 +124,23 @@ class hydro_run
     //
     ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-    double *dx;
+    std::vector<double>dx;
     double domain_min, domain_max;
     int num_cells;
     double cells_per_decade;
     int type_of_grid;       //0 = cartesian, 1 = log
-    double *x_i;    		//The cell boundaries
-    double *x_i12;  		//The cell mid positions
-    double *surf;
-    double *vol;
+    std::vector<double>x_i;    		//The cell boundaries
+    std::vector<double>x_i12;  		//The cell mid positions
+    std::vector<double>surf;
+    std::vector<double>vol;
 
     double dt;
     double cflfactor;
     double t_max;
     double globalTime;
-    double *timesteps;
-    double *timesteps_cs;
-    double *finalstep;
+    std::vector<double>timesteps;
+    std::vector<double>timesteps_cs;
+    std::vector<double>finalstep;
     double output_time;
     double snd_crs_time;
     int plotskip;
@@ -172,17 +172,17 @@ class hydro_run
     //
     ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-    AOS *u;              //Conserved hyperbolic variables: density, mass flux, energy density
-    AOS *oldu;           //Conserved hyperbolic variables: density, mass flux, energy density
-    AOS *source;         // Gravitational source term
-    AOS *source_pressure;// Geometric source term
-    AOS *flux;
-    double *phi;            //Parabolic Variables: gravitational potential
-    double *omegaplus;
-    double *omegaminus;
+    std::vector<AOS>u;              //Conserved hyperbolic variables: density, mass flux, energy density
+    std::vector<AOS>oldu;           //Conserved hyperbolic variables: density, mass flux, energy density
+    std::vector<AOS>source;         // Gravitational source term
+    std::vector<AOS>source_pressure;// Geometric source term
+    std::vector<AOS>flux;
+    std::vector<double>phi;            //Parabolic Variables: gravitational potential
+    std::vector<double>omegaplus;
+    std::vector<double>omegaminus;
 
-    AOS *u_output;       //Array of arrays to store snapshots of u
-    double *phi_output;     //Array of arrays to store snapshots of phi
+    std::vector<AOS>u_output;       //Array of arrays to store snapshots of u
+    std::vector<double>phi_output;     //Array of arrays to store snapshots of phi
     
     int timecount;
     int plotcounter;
@@ -193,15 +193,15 @@ class hydro_run
     //
     ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     
-    double *cs;         //Speed of sound array
-    double *pressure;   
-    double *internal_energy;
-    double *speed;
-    double *enclosed_mass;
-    double *opticaldepth;
-    double *opacity;
-    double *temperature;
-    double *radiative_flux;
+    std::vector<double>cs;         //Speed of sound array
+    std::vector<double>pressure;   
+    std::vector<double>internal_energy;
+    std::vector<double>speed;
+    std::vector<double>enclosed_mass;
+    std::vector<double>opticaldepth;
+    std::vector<double>opacity;
+    std::vector<double>temperature;
+    std::vector<double>radiative_flux;
     
     
     ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -242,7 +242,10 @@ class hydro_run
     double get_max_soundspeed();
     double get_cfl_timestep();
     void compute_pressure();
-    void print_AOS_component_tofile(double *x, AOS* data, AOS* fluxes , int timestepnumber);
+    void print_AOS_component_tofile(const std::vector<double>& x, 
+                                    const std::vector<AOS>& data,
+                                    const std::vector<AOS>& fluxes,
+                                    int timestepnumber);
     
     
     //
@@ -289,6 +292,6 @@ public:
     void set_suppress_warnings(int j) {suppress_warnings = j;}
 };
 
-AOS* init_AOS(int num);
+std::vector<AOS> init_AOS(int num);
 vector<string> stringsplit(const string& str, const string& delim);
 simulation_parameter read_parameter_from_file(string, string, int, int);
