@@ -102,7 +102,7 @@ void hydro_run::execute() {
             flux[j] = hllc_flux(u[j], u[j+1], phi[j], phi[j+1], j, j+1); //Everything else is taken into account by the right flux
 
             /*if(j==2) {
-                char alp;
+                char alp;ms are which form of objects which have a velocity standard deviation comparable to their m
                 cout<<"flux[0]="<<flux[0].u1<<" / "<<flux[0].u2<<" / "<<flux[0].u3<<endl;
                 cout<<"flux[1]="<<flux[1].u1<<" / "<<flux[1].u2<<" / "<<flux[1].u3<<endl;
                 //cout<<"flux[2]="<<flux[2].u1<<" / "<<flux[2].u2<<" / "<<flux[2].u3<<endl;
@@ -146,10 +146,10 @@ void hydro_run::execute() {
         for(int j=1; j<=num_cells; j++) {
             
             //Cartesian
-            //u[j] = u[j] + (flux[j-1] - flux[j]) * dt/dx[j] + source[j] * dt;
+            u[j] = u[j] + (flux[j-1] - flux[j]) * dt/dx[j] + source[j] * dt;
             
             //Spherical
-            u[j] = u[j] + (flux[j-1] * surf[j-1] - flux[j] * surf[j]) * dt/vol[j] + (source[j] + source_pressure[j]) * dt;
+            //u[j] = u[j] + (flux[j-1] * surf[j-1] - flux[j] * surf[j]) * dt/vol[j] + (source[j] + source_pressure[j] * 0.) * dt;
             
             /*if(i==1 || i==num_cells || i==20) {
                 char alpha;
