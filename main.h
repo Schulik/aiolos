@@ -54,11 +54,10 @@ std::vector<double> np_somevalue(int, double);
 //
 // Everything to define and read simulation parameters
 //
+template<typename T>
 struct simulation_parameter {
     string name;
-    int type;
-    double dvalue;
-    int ivalue;
+    T value ;
     string svalue;
 };
 
@@ -310,4 +309,6 @@ public:
 
 std::vector<AOS> init_AOS(int num);
 vector<string> stringsplit(const string& str, const string& delim);
-simulation_parameter read_parameter_from_file(string, string, int, int);
+
+template<typename T>
+simulation_parameter<T> read_parameter_from_file(string, string, int);

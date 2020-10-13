@@ -19,11 +19,11 @@ hydro_run::hydro_run(string filename) {
         //
         ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         double dx0;
-        dx0              = read_parameter_from_file(filename,"PARI_DOMAIN_DX", TYPE_DOUBLE, debug).dvalue;
-        cells_per_decade = read_parameter_from_file(filename,"PARI_CELLS_PER_DECADE", TYPE_DOUBLE, debug).dvalue;
-        type_of_grid     = read_parameter_from_file(filename,"PARI_GRID_TYPE", TYPE_INT, debug).ivalue;
-        domain_min       = read_parameter_from_file(filename,"PARI_DOMAIN_MIN", TYPE_DOUBLE, debug).dvalue;
-        domain_max       = read_parameter_from_file(filename,"PARI_DOMAIN_MAX", TYPE_DOUBLE, debug).dvalue;
+        dx0              = read_parameter_from_file<double>(filename,"PARI_DOMAIN_DX", debug).value;
+        cells_per_decade = read_parameter_from_file<double>(filename,"PARI_CELLS_PER_DECADE", debug).value;
+        type_of_grid     = read_parameter_from_file<int>(filename,"PARI_GRID_TYPE", debug).value;
+        domain_min       = read_parameter_from_file<double>(filename,"PARI_DOMAIN_MIN", debug).value;
+        domain_max       = read_parameter_from_file<double>(filename,"PARI_DOMAIN_MAX", debug).value;
         
         cout<<"pos1"<<endl;
         cout<<"log10(domain_min) = "<<log10f(domain_min)<<endl;\
@@ -40,10 +40,10 @@ hydro_run::hydro_run(string filename) {
         //num_cells must always be read in pretty early, as all other memory allocations in this function depend on it.
         //Note-to-self: Don't change the order of read_parameter_from_file commands.
         
-        dt          = read_parameter_from_file(filename,"PARI_TIME_DT", TYPE_DOUBLE, debug).dvalue;
-        cflfactor   = read_parameter_from_file(filename,"PARI_CFLFACTOR", TYPE_DOUBLE, debug).dvalue;
-        t_max       = read_parameter_from_file(filename,"PARI_TIME_TMAX", TYPE_DOUBLE, debug).dvalue;
-        output_time = read_parameter_from_file(filename,"PARI_TIME_OUTPUT", TYPE_DOUBLE, debug).dvalue; 
+        dt          = read_parameter_from_file<double>(filename,"PARI_TIME_DT", debug).value;
+        cflfactor   = read_parameter_from_file<double>(filename,"PARI_CFLFACTOR", debug).value;
+        t_max       = read_parameter_from_file<double>(filename,"PARI_TIME_TMAX", debug).value;
+        output_time = read_parameter_from_file<double>(filename,"PARI_TIME_OUTPUT", debug).value; 
         globalTime = 0.0;    
     
         cout<<"pos2, cell number = "<<num_cells<<endl;
@@ -63,9 +63,9 @@ hydro_run::hydro_run(string filename) {
         //debug             = read_parameter_from_file(filename,"PARI_DEBUGLEVEL", TYPE_INT, debug).ivalue;   
         
         //cout<<"Pos1"<<endl;
-        boundaries_number = read_parameter_from_file(filename,"PARI_BOUND_TYPE", TYPE_INT, debug).ivalue;
+        boundaries_number = read_parameter_from_file<int>(filename,"PARI_BOUND_TYPE", debug).value;
         //cout<<"Pos2"<<endl;
-        problem_number    = read_parameter_from_file(filename,"PARI_PROBLEM_NUMBER", TYPE_INT, debug).ivalue;
+        problem_number    = read_parameter_from_file<int>(filename,"PARI_PROBLEM_NUMBER", debug).value;
         //cout<<"Pos3"<<endl;
  
         // Setup boundaries
@@ -87,13 +87,13 @@ hydro_run::hydro_run(string filename) {
         if (boundaries_number == 4)
             boundary_left = boundary_right = BoundaryType::reflecting ;
         
-        use_self_gravity  = read_parameter_from_file(filename,"PARI_SELF_GRAV_SWITCH", TYPE_INT, debug).ivalue;
-        use_linear_gravity= read_parameter_from_file(filename,"PARI_LINEAR_GRAV", TYPE_INT, debug).ivalue;
-        use_rad_fluxes    = read_parameter_from_file(filename,"PARI_USE_RADIATION", TYPE_INT, debug).ivalue;
+        use_self_gravity  = read_parameter_from_file<int>(filename,"PARI_SELF_GRAV_SWITCH", debug).value;
+        use_linear_gravity= read_parameter_from_file<int>(filename,"PARI_LINEAR_GRAV", debug).value;
+        use_rad_fluxes    = read_parameter_from_file<int>(filename,"PARI_USE_RADIATION", debug).value;
         
         double constopa;
         if(use_rad_fluxes==1)
-            constopa   = read_parameter_from_file(filename,"PARI_CONST_OPAC", TYPE_DOUBLE, debug).dvalue;
+            constopa   = read_parameter_from_file<double>(filename,"PARI_CONST_OPAC", debug).value;
         else
             constopa   = 1.;
         
@@ -122,10 +122,10 @@ hydro_run::hydro_run(string filename) {
         //
         ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-        gamma_adiabat   = read_parameter_from_file(filename,"PARI_GAMMA", TYPE_DOUBLE, debug).dvalue; //ratio of specific heats
+        gamma_adiabat   = read_parameter_from_file<double>(filename,"PARI_GAMMA", debug).value; //ratio of specific heats
         ggminusone      = gamma_adiabat*(gamma_adiabat-1.);
-        const_T         = read_parameter_from_file(filename,"PARI_CONST_TEMP", TYPE_DOUBLE, debug).dvalue;
-        T_increment     = read_parameter_from_file(filename,"PARI_TEMP_INCR", TYPE_DOUBLE, debug).dvalue;
+        const_T         = read_parameter_from_file<double>(filename,"PARI_CONST_TEMP",  debug).value;
+        T_increment     = read_parameter_from_file<double>(filename,"PARI_TEMP_INCR", debug).value;
         
         ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         //
@@ -268,15 +268,15 @@ hydro_run::hydro_run(string filename) {
         //
         if(problem_number == 1) {
             
-            double u1l = read_parameter_from_file(filename,"PARI_INIT_DATA_U1L", TYPE_DOUBLE, debug).dvalue;
-            double u2l = read_parameter_from_file(filename,"PARI_INIT_DATA_U2L", TYPE_DOUBLE, debug).dvalue;
-            double u3l = read_parameter_from_file(filename,"PARI_INIT_DATA_U3L", TYPE_DOUBLE, debug).dvalue;
+            double u1l = read_parameter_from_file<double>(filename,"PARI_INIT_DATA_U1L", debug).value;
+            double u2l = read_parameter_from_file<double>(filename,"PARI_INIT_DATA_U2L", debug).value;
+            double u3l = read_parameter_from_file<double>(filename,"PARI_INIT_DATA_U3L", debug).value;
             
-            double u1r = read_parameter_from_file(filename,"PARI_INIT_DATA_U1R", TYPE_DOUBLE, debug).dvalue;
-            double u2r = read_parameter_from_file(filename,"PARI_INIT_DATA_U2R", TYPE_DOUBLE, debug).dvalue;
-            double u3r = read_parameter_from_file(filename,"PARI_INIT_DATA_U3R", TYPE_DOUBLE, debug).dvalue;
+            double u1r = read_parameter_from_file<double>(filename,"PARI_INIT_DATA_U1R", debug).value;
+            double u2r = read_parameter_from_file<double>(filename,"PARI_INIT_DATA_U2R", debug).value;
+            double u3r = read_parameter_from_file<double>(filename,"PARI_INIT_DATA_U3R", debug).value;
             
-            SHOCK_TUBE_MID = read_parameter_from_file(filename,"PARI_INIT_SHOCK_MID", TYPE_DOUBLE, debug).dvalue;
+            SHOCK_TUBE_MID = read_parameter_from_file<double>(filename,"PARI_INIT_SHOCK_MID", debug).value;
             
             //Conversion from shock tube parameters (given as dens, velocity, pressure) to conserved variables (dens, momentum, internal energy)
             SHOCK_TUBE_UL = AOS(u1l, u1l*u2l, 0.5*u1l*u2l*u2l + u3l/(gamma_adiabat-1.) );
@@ -295,18 +295,18 @@ hydro_run::hydro_run(string filename) {
             
             cout<<"Problem 2 pos0."<<endl;
             
-            double u1 = read_parameter_from_file(filename,"PARI_INIT_DATA_U1", TYPE_DOUBLE, debug).dvalue;
-            double u2 = read_parameter_from_file(filename,"PARI_INIT_DATA_U2", TYPE_DOUBLE, debug).dvalue;
-            double u3 = read_parameter_from_file(filename,"PARI_INIT_DATA_U3", TYPE_DOUBLE, debug).dvalue;
+            double u1 = read_parameter_from_file<double>(filename,"PARI_INIT_DATA_U1", debug).value;
+            double u2 = read_parameter_from_file<double>(filename,"PARI_INIT_DATA_U2", debug).value;
+            double u3 = read_parameter_from_file<double>(filename,"PARI_INIT_DATA_U3", debug).value;
             
             cout<<"Problem 2 pos1."<<endl;
             
-            planet_mass     = read_parameter_from_file(filename,"PARI_PLANET_MASS", TYPE_DOUBLE, debug).dvalue; //in Earth masses
-            planet_position = read_parameter_from_file(filename,"PARI_PLANET_POS", TYPE_DOUBLE, debug).dvalue;  //inside the simulation domain
-            rs              = read_parameter_from_file(filename,"PARI_SMOOTHING_LENGTH", TYPE_DOUBLE, debug).dvalue; //Gravitational smoothing length in hill 
-            rs_time         = read_parameter_from_file(filename,"PARI_SMOOTHING_TIME", TYPE_DOUBLE, debug).dvalue; //Time until we reach rs starting at rs_at_moment
+            planet_mass     = read_parameter_from_file<double>(filename,"PARI_PLANET_MASS", debug).value; //in Earth masses
+            planet_position = read_parameter_from_file<double>(filename,"PARI_PLANET_POS", debug).value;  //inside the simulation domain
+            rs              = read_parameter_from_file<double>(filename,"PARI_SMOOTHING_LENGTH", debug).value; //Gravitational smoothing length in hill 
+            rs_time         = read_parameter_from_file<double>(filename,"PARI_SMOOTHING_TIME", debug).value; //Time until we reach rs starting at rs_at_moment
             rs_at_moment    = 0.2;
-            init_static_atmosphere = read_parameter_from_file(filename,"PARI_INIT_STATIC", TYPE_INT, debug).ivalue; //Yesno, isothermal at the moment
+            init_static_atmosphere = read_parameter_from_file<int>(filename,"PARI_INIT_STATIC", debug).value; //Yesno, isothermal at the moment
             
             cout<<"Problem 2 pos2."<<endl;
             
@@ -320,7 +320,7 @@ hydro_run::hydro_run(string filename) {
             }
             //mdot boundaries
             if(boundaries_number == 3) {
-                mdot = read_parameter_from_file(filename,"ACCRETION_RATE", TYPE_DOUBLE, debug).dvalue; //Accretion rate in numerical units
+                mdot = read_parameter_from_file<double>(filename,"ACCRETION_RATE", debug).value; //Accretion rate in numerical units
     
                 double rho0 = BACKGROUND_U.u1;
                 double e0   = BACKGROUND_U.u3 - 0.5 * BACKGROUND_U.u2 * BACKGROUND_U.u2 / rho0;
