@@ -63,8 +63,6 @@ hydro_run::hydro_run(string filename) {
         //debug             = read_parameter_from_file(filename,"PARI_DEBUGLEVEL", TYPE_INT, debug).ivalue;   
         
         //cout<<"Pos1"<<endl;
-        geometry = read_parameter_from_file<Geometry>(filename, "COORDINATE_SYSTEM", debug, Geometry::cartesian).value;
-
         boundaries_number = read_parameter_from_file<int>(filename,"PARI_BOUND_TYPE", debug).value;
         //cout<<"Pos2"<<endl;
         problem_number    = read_parameter_from_file<int>(filename,"PARI_PROBLEM_NUMBER", debug).value;
@@ -174,7 +172,6 @@ hydro_run::hydro_run(string filename) {
         }
         //Uniform grid
         else {
-            
             num_cells = (int)((domain_max-domain_min)/dx0);
             for(int i=1; i<= num_cells; i++) {
                 x_i[i] = x_i[i-1] + dx0;
@@ -182,18 +179,27 @@ hydro_run::hydro_run(string filename) {
         }
        
         //Compute inter-sphere surfaces
-        for(int i=0; i<num_cells+1; i++) {
-            switch (geometry) {
+        // Read geometry from file:
+        geometry = read_parameter_from_file<Geometry>(filename, "PARI_GEOMETRY", debug, Geometry::cartesian).value;
+        switch (geometry) {
             case Geometry::cartesian:
-                surf[i] = 1 ;
+                cout<<"Initializing cartesian geometry."<<endl;
+                for(int i=0; i<num_cells+1; i++) {
+                    surf[i] = 1 ;
+                }
                 break;
             case Geometry::cylindrical:
-                surf[i] = 2*M_PI * x_i[i] ;
+                cout<<"Initializing cylindrical geometry."<<endl;
+                for(int i=0; i<num_cells+1; i++) {
+                    surf[i] = 2*M_PI * x_i[i] ;
+                }
                 break;
             case Geometry::spherical:
-                surf[i] = 4*M_PI * x_i[i]*x_i[i] ;
+                cout<<"Initializing spherical geometry."<<endl;
+                for(int i=0; i<num_cells+1; i++) {
+                    surf[i] = 4*M_PI * x_i[i]*x_i[i] ;
+                }
                 break;
-            }
         }
         
         //Compute shell volumes

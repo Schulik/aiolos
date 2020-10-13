@@ -52,6 +52,8 @@ void hydro_run::execute() {
             phi[num_cells+1] = get_phi_grav(x_i12[num_cells+1], planet_mass);
         }
         
+        apply_boundary_left() ;
+        apply_boundary_right() ;
         
         //Compute the boundary values
         if(boundaries_number == 1) {
@@ -154,11 +156,17 @@ void hydro_run::execute() {
         //#pragma omp simd
         for(int j=1; j<=num_cells; j++) {
             
-            //Cartesian
-            u[j] = u[j] + (flux[j-1] - flux[j]) * dt/dx[j] + source[j] * dt;
-            
-            //Spherical
-            //u[j] = u[j] + (flux[j-1] * surf[j-1] - flux[j] * surf[j]) * dt/vol[j] + (source[j] + source_pressure[j]) * dt;
+            switch(geometry) {
+                case Geometry::cartesian:
+                    u[j] = u[j] + (flux[j-1] - flux[j]) * dt/dx[j] + source[j] * dt;
+                    break;
+                case Geometry::cylindrical:
+                    u[j] = u[j] + (flux[j-1] * surf[j-1] - flux[j] * surf[j]) * dt/vol[j] + source[j] * dt;
+                    break;
+                case Geometry::spherical:
+                    u[j] = u[j] + (flux[j-1] * surf[j-1] - flux[j] * surf[j]) * dt/vol[j] + (source[j] + source_pressure[j]) * dt;
+                    break;
+            }
             
             /*if(i==1 || i==num_cells || i==20) {
                 char alpha;
