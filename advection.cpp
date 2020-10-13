@@ -5,7 +5,7 @@ void hydro_run::execute() {
     steps = 0;
     double output_counter = 0;
     const int maxsteps = 1e9;
-    dt = 1e-3; //get_cfl_timestep();
+    dt = get_cfl_timestep();
     double pressure_temp;
     
     cout<<"Beginning main loop with num_cells="<<num_cells<<" and timestep="<<dt<<" cflfacotr="<<cflfactor<<endl;
@@ -132,6 +132,9 @@ void hydro_run::execute() {
             /*if(j==1 || j==num_cells || j==20) {
                 char alpha;
                 cout<<"Debuggin fluxes in cell i= "<<j<<": fl-fr = "<<((flux[j-1].u2 - flux[j].u2)/dx[j])<<endl;
+                cout<<"fl.u1 = "<<flux[j-1].u1<<": fr.u1 = "<<flux[j].u1<<endl;
+                cout<<"fl.u2 = "<<flux[j-1].u2<<": fr.u2 = "<<flux[j].u2<<endl;
+                cout<<"fl.u3 = "<<flux[j-1].u3<<": fr.u3 = "<<flux[j].u3<<endl;
                 cout<<"Debuggin fluxes: s = "<<source[j].u2<<endl;
                 cout<<"Debuggin fluxes: fl-fr+s = "<<((flux[j-1].u2 - flux[j].u2)/dx[j] + source[j].u2)<<endl;
                 cin>>alpha;
