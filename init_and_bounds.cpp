@@ -153,21 +153,33 @@ hydro_run::hydro_run(string filename) {
         //         First and last two cells near boundaries are uniform
         //
         x_i[0] = domain_min;
-        x_i[1] = x_i[0] + dx0;
-        x_i[2] = x_i[1] + dx0;
-        double dlogx = pow(10.,1./cells_per_decade);
-        for(int i=3; i< num_cells-1; i++) {
-            //x_i[i] = (domain_min + dx0 * double(i));
-            //x_i[i] = x_i[i-1] + dx0 * double(i-2); //(domain_min + dx0 * double(i));
-            x_i[i]   = x_i[i-1] * dlogx;
+        if(type_of_grid==1) {
+            
+            x_i[1] = x_i[0] + dx0;
+            x_i[2] = x_i[1] + dx0;
+            double dlogx = pow(10.,1./cells_per_decade);
+            for(int i=3; i< num_cells-1; i++) {
+                //x_i[i] = (domain_min + dx0 * double(i));
+                //x_i[i] = x_i[i-1] + dx0 * double(i-2); //(domain_min + dx0 * double(i));
+                x_i[i]   = x_i[i-1] * dlogx;
+            }
+            double dxlast = x_i[num_cells-2] - x_i[num_cells-3];
+            x_i[num_cells-1] = x_i[num_cells-2] + dxlast;
+            x_i[num_cells]   = x_i[num_cells-1] + dxlast;
+            
+            //Assign the last boundary as domain maximum as long as nonuniform grid is in the test-phase
+            domain_max = x_i[num_cells];
+            cout<<"We have a DOMAIN MAX = "<<domain_max<<endl;
+                
         }
-        double dxlast = x_i[num_cells-2] - x_i[num_cells-3];
-        x_i[num_cells-1] = x_i[num_cells-2] + dxlast;
-        x_i[num_cells]   = x_i[num_cells-1] + dxlast;
-        
-        //Assign the last boundary as domain maximum as long as nonuniform grid is in the test-phase
-        domain_max = x_i[num_cells];
-        cout<<"We have a DOMAIN MAX = "<<domain_max<<endl;
+        //Uniform grid
+        else {
+            
+            num_cells = (int)((domain_max-domain_min)/dx0);
+            for(int i=1; i< num_cells-1; i++) {
+                x_i[i] = x_i[i-1] + dx0;
+            }
+        }
        
         //Compute inter-sphere surfaces
         // TODO: Read geometry from file:
