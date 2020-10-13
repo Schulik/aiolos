@@ -121,7 +121,8 @@ class hydro_run
     int use_linear_gravity;
     int use_rad_fluxes;
     int suppress_warnings;
-
+    int init_geometry;
+    
     Geometry geometry ;
     BoundaryType boundary_left ;
     BoundaryType boundary_right ;
