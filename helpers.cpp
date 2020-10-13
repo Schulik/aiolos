@@ -1,3 +1,4 @@
+#include <sstream>
 #include "main.h"
 
 std::vector<AOS> init_AOS(int num) {   
@@ -153,7 +154,16 @@ vector<string> stringsplit(const string& str, const string& delim)
 //
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-simulation_parameter read_parameter_from_file(string filename, string variablename, int desired_vartype, int debug) {
+template<typename T> 
+T parse_item(string item) {
+    std::stringstream ss(item);
+    T val;
+    ss >> val;
+    return val;
+}
+
+template<typename T>
+simulation_parameter<T> read_parameter_from_file(string filename, string variablename, int debug) {
     
     ifstream file(filename);
     string line;
@@ -161,7 +171,7 @@ simulation_parameter read_parameter_from_file(string filename, string variablena
         cout<<"Couldnt open file "<<filename<<"!!!!!!!!!!1111"<<endl;
         
     }
-    simulation_parameter tmp_parameter = {"NaN",0,0.,0,"NaN"};
+    simulation_parameter<T> tmp_parameter = {"NaN",T(),"NaN"};
     int found = 0;
     
     //cout<<"    In read_parameter Pos1"<<endl;
@@ -173,20 +183,12 @@ simulation_parameter read_parameter_from_file(string filename, string variablena
         if(line.find(variablename) != string::npos) {
             tmp_parameter.name = variablename;
             
-            if(desired_vartype == TYPE_INT)
-                tmp_parameter.ivalue = std::stoi(stringsplit(line," ")[1]); //stoi() is the string to integer function
-            else if(desired_vartype == TYPE_DOUBLE)
-                tmp_parameter.dvalue = std::stod(stringsplit(line," ")[1]);
-            tmp_parameter.svalue = stringsplit(line," ")[1];
-            
+            tmp_parameter.value = parse_item<T>(stringsplit(line," ")[1]) ;
+
             if(debug > 0)
-                cout<<"Found variable called "<<variablename<<" and set it to "<<tmp_parameter.ivalue<<" "<<tmp_parameter.dvalue<<" "<<tmp_parameter.svalue<<endl;
+                cout<<"Found variable called "<<variablename<<" and set it to "<<tmp_parameter.value<<endl;
             found++;
         }
-
-        //cout<<"    end "<<endl;
-        
-        //fscanf(filename, "%s %f", &var_name, &tempdata);
     }
     
     //cout<<"    In read_parameter Pos2"<<endl;
@@ -203,6 +205,11 @@ simulation_parameter read_parameter_from_file(string filename, string variablena
     file.close();
     return tmp_parameter;
 }
+
+template simulation_parameter<bool>  read_parameter_from_file(string, string, int);
+template simulation_parameter<int> read_parameter_from_file(string, string, int);
+template simulation_parameter<double> read_parameter_from_file(string, string, int);
+template simulation_parameter<string> read_parameter_from_file(string, string, int);
 
 
 //Print 2 
