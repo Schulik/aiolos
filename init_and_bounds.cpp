@@ -159,8 +159,6 @@ hydro_run::hydro_run(string filename) {
             x_i[2] = x_i[1] + dx0;
             double dlogx = pow(10.,1./cells_per_decade);
             for(int i=3; i< num_cells-1; i++) {
-                //x_i[i] = (domain_min + dx0 * double(i));
-                //x_i[i] = x_i[i-1] + dx0 * double(i-2); //(domain_min + dx0 * double(i));
                 x_i[i]   = x_i[i-1] * dlogx;
             }
             double dxlast = x_i[num_cells-2] - x_i[num_cells-3];
@@ -176,7 +174,7 @@ hydro_run::hydro_run(string filename) {
         else {
             
             num_cells = (int)((domain_max-domain_min)/dx0);
-            for(int i=1; i< num_cells-1; i++) {
+            for(int i=1; i< num_cells; i++) {
                 x_i[i] = x_i[i-1] + dx0;
             }
         }
