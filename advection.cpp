@@ -57,23 +57,30 @@ void hydro_run::execute() {
         if(boundaries_number == 1) {
             if(steps==0)
                 cout<<"Const boundaries on both sides, given by inital conditions"<<endl;
-            boundaries_const_both(u[0], u[1], u[num_cells], u[num_cells+1] );
+            apply_boundary_left() ;
+            apply_boundary_right() ;
+            //boundaries_const_both(u[0], u[1], u[num_cells], u[num_cells+1] );
         }
         else if(boundaries_number == 2) {
             if(steps==0)
                 cout<<"Open boundaries on both sides / Wall+open if using gravity."<<endl;
-            boundaries_open_both(u[0], u[1], u[2], u[num_cells-1], u[num_cells], u[num_cells+1] );
-            
+            apply_boundary_left() ;
+            apply_boundary_right() ;
+//            boundaries_open_both(u[0], u[1], u[2], u[num_cells-1], u[num_cells], u[num_cells+1] );            
         }
         else if(boundaries_number == 3) {
             if(steps==0)
                 cout<<"Wall and inflow boundaries."<<endl;
-            boundaries_planet_mdot(u[0], u[1], u[num_cells], u[num_cells+1] );
+            apply_boundary_left() ;
+            apply_boundary_right() ;
+            //boundaries_planet_mdot(u[0], u[1], u[num_cells], u[num_cells+1] );
         }
         else if(boundaries_number == 4) {
             if(steps==0)
                 cout<<"Wall boundaries on both sides."<<endl;
-            boundaries_wall_both(u[0], u[1], u[num_cells], u[num_cells+1] );
+            apply_boundary_left() ;
+            apply_boundary_right() ;
+            //boundaries_wall_both(u[0], u[1], u[num_cells], u[num_cells+1] );
         }
         else {
             if(steps==0)

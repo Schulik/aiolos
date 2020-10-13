@@ -101,7 +101,7 @@ enum class Geometry {
     cartesian = 0, cylindrical = 1, spherical = 2
 } ;
 enum class BoundaryType {
-    user = 0, open = 1, reflecting = 2, fixed = 3
+    user = 0, open = 1, reflecting = 2, fixed = 3, periodic = 4,
 } ;
 
 class hydro_run
