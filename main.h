@@ -312,3 +312,6 @@ vector<string> stringsplit(const string& str, const string& delim);
 
 template<typename T>
 simulation_parameter<T> read_parameter_from_file(string, string, int);
+
+template<typename T>
+simulation_parameter<T> read_parameter_from_file(string, string, int, T defaul);

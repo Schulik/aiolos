@@ -63,6 +63,8 @@ hydro_run::hydro_run(string filename) {
         //debug             = read_parameter_from_file(filename,"PARI_DEBUGLEVEL", TYPE_INT, debug).ivalue;   
         
         //cout<<"Pos1"<<endl;
+        geometry = static_cast<Geometry>(read_parameter_from_file<int>(filename, "COORDINATE_SYSTEM", debug, 0).value);
+
         boundaries_number = read_parameter_from_file<int>(filename,"PARI_BOUND_TYPE", debug).value;
         //cout<<"Pos2"<<endl;
         problem_number    = read_parameter_from_file<int>(filename,"PARI_PROBLEM_NUMBER", debug).value;
@@ -174,14 +176,12 @@ hydro_run::hydro_run(string filename) {
         else {
             
             num_cells = (int)((domain_max-domain_min)/dx0);
-            for(int i=1; i< num_cells; i++) {
+            for(int i=1; i<= num_cells; i++) {
                 x_i[i] = x_i[i-1] + dx0;
             }
         }
        
         //Compute inter-sphere surfaces
-        // TODO: Read geometry from file:
-        geometry = Geometry::spherical ;
         for(int i=0; i<num_cells+1; i++) {
             switch (geometry) {
             case Geometry::cartesian:
