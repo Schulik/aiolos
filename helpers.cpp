@@ -222,7 +222,7 @@ simulation_parameter<T> read_parameter_from_file(string filename, string variabl
 
 
 template<typename T>
-simulation_parameter<T> read_parameter_from_file(string filename, string variablename, int debug, T my_default) {
+simulation_parameter<T> read_parameter_from_file(string filename, string variablename, int debug, T default_) {
     simulation_parameter<T> parameter ;
 
     try {
@@ -230,7 +230,7 @@ simulation_parameter<T> read_parameter_from_file(string filename, string variabl
     } catch (ParameterError& e) {
         if (e.count == 0) {
             parameter.name = variablename ;
-            parameter.value = my_default ;
+            parameter.value = default_ ;
         }
         else
             throw ; // re-throw because we can't help with duplicated parameters
@@ -244,6 +244,9 @@ template simulation_parameter<bool>  read_parameter_from_file(string, string, in
 template simulation_parameter<int> read_parameter_from_file(string, string, int, int);
 template simulation_parameter<double> read_parameter_from_file(string, string, int, double);
 template simulation_parameter<string> read_parameter_from_file(string, string, int, string);
+
+template simulation_parameter<Geometry> read_parameter_from_file(string, string, int, Geometry);
+template simulation_parameter<BoundaryType> read_parameter_from_file(string, string, int, BoundaryType);
 
 
 //Print 2 

@@ -63,7 +63,7 @@ hydro_run::hydro_run(string filename) {
         //debug             = read_parameter_from_file(filename,"PARI_DEBUGLEVEL", TYPE_INT, debug).ivalue;   
         
         //cout<<"Pos1"<<endl;
-        geometry = static_cast<Geometry>(read_parameter_from_file<int>(filename, "COORDINATE_SYSTEM", debug, 0).value);
+        geometry = read_parameter_from_file<Geometry>(filename, "COORDINATE_SYSTEM", debug, Geometry::cartesian).value;
 
         boundaries_number = read_parameter_from_file<int>(filename,"PARI_BOUND_TYPE", debug).value;
         //cout<<"Pos2"<<endl;
