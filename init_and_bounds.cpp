@@ -67,6 +67,25 @@ hydro_run::hydro_run(string filename) {
         //cout<<"Pos2"<<endl;
         problem_number    = read_parameter_from_file(filename,"PARI_PROBLEM_NUMBER", TYPE_INT, debug).ivalue;
         //cout<<"Pos3"<<endl;
+ 
+        // Setup boundaries
+        if (boundaries_number == 1) {
+            boundary_left = boundary_right = BoundaryType::fixed ;
+            SHOCK_TUBE_UR = SHOCK_TUBE_UL = AOS(1,1,1) ;
+        }
+        if (boundaries_number == 2) {
+            if (problem_number == 2) {
+                boundary_left = BoundaryType::reflecting ;
+                boundary_right = BoundaryType::open ;
+            }
+            else {
+                boundary_left = BoundaryType::open ;
+                boundary_right = BoundaryType::open ;
+            }
+        }
+        // Wall / Reflecting boundaries at both ends
+        if (boundaries_number == 4)
+            boundary_left = boundary_right = BoundaryType::reflecting ;
         
         use_self_gravity  = read_parameter_from_file(filename,"PARI_SELF_GRAV_SWITCH", TYPE_INT, debug).ivalue;
         use_linear_gravity= read_parameter_from_file(filename,"PARI_LINEAR_GRAV", TYPE_INT, debug).ivalue;
@@ -149,17 +168,38 @@ hydro_run::hydro_run(string filename) {
         //Assign the last boundary as domain maximum as long as nonuniform grid is in the test-phase
         domain_max = x_i[num_cells];
         cout<<"We have a DOMAIN MAX = "<<domain_max<<endl;
-        
+       
         //Compute inter-sphere surfaces
+        // TODO: Read geometry from file:
+        geometry = Geometry::spherical ;
         for(int i=0; i<num_cells+1; i++) {
-            surf[i] = 4. * M_PI * x_i[i] * x_i[i];
-            //surf[i] = 1.; //comment this line out for 3D or write less lazy code
+            switch (geometry) {
+            case Geometry::cartesian:
+                surf[i] = 1 ;
+                break;
+            case Geometry::cylindrical:
+                surf[i] = 2*M_PI * x_i[i] ;
+                break;
+            case Geometry::spherical:
+                surf[i] = 4*M_PI * x_i[i]*x_i[i] ;
+                break;
+            }
         }
         
         //Compute shell volumes
         for(int i=1; i<num_cells+1; i++) {
-            vol[i] = 4./3. * M_PI * ( pow(x_i[i],3.) - pow(x_i[i-1],3.) );
-            //vol[i] = 1.; //comment this line out for 3D
+            switch (geometry) {          
+            case Geometry::cartesian:
+                vol[i] = x_i[i] - x_i[i-1] ;
+                break;
+            case Geometry::cylindrical:
+                vol[i] = M_PI * (x_i[i]*x_i[i] - x_i[i-1]*x_i[i-1]);
+                break;
+            case Geometry::spherical:
+                vol[i] = (4*M_PI/3) * 
+                    (x_i[i]*x_i[i]*x_i[i] - x_i[i-1]*x_i[i-1]*x_i[i-1]);
+                break;
+            }
         }
         
         //Compute cell mid positions. Ghost cells also have mid positions in order to balance their pressure gradients
@@ -243,6 +283,7 @@ hydro_run::hydro_run(string filename) {
             SHOCK_TUBE_UR = AOS(u1r, u1r*u2r, 0.5*u1r*u2r*u2r + u3r/(gamma_adiabat-1.));
             
             initialize_shock_tube_test(SHOCK_TUBE_UL, SHOCK_TUBE_UR);
+        
             
             if(debug > 0) 
                 cout<<"Successfully initialized problem 1."<<endl;
@@ -267,15 +308,29 @@ hydro_run::hydro_run(string filename) {
             rs_at_moment    = 0.2;
             init_static_atmosphere = read_parameter_from_file(filename,"PARI_INIT_STATIC", TYPE_INT, debug).ivalue; //Yesno, isothermal at the moment
             
-            //mdot boundaries
-            if(boundaries_number == 3) {
-                mdot = read_parameter_from_file(filename,"ACCRETION_RATE", TYPE_DOUBLE, debug).dvalue; //Accretion rate in numerical units
-            }
-            
             cout<<"Problem 2 pos2."<<endl;
             
             //Conversion from shock tube parameters (given as dens, velocity, pressure) to conserved variables (dens, momentum, internal energy)
             BACKGROUND_U = AOS(u1, u1*u2, 0.5*u1*u2*u2 + u3/(gamma_adiabat-1.) );
+
+            if (boundaries_number == 1) {
+                boundary_left = BoundaryType::reflecting ;
+                boundary_right = BoundaryType::fixed ;
+                SHOCK_TUBE_UR = BACKGROUND_U ;
+            }
+            //mdot boundaries
+            if(boundaries_number == 3) {
+                mdot = read_parameter_from_file(filename,"ACCRETION_RATE", TYPE_DOUBLE, debug).dvalue; //Accretion rate in numerical units
+    
+                double rho0 = BACKGROUND_U.u1;
+                double e0   = BACKGROUND_U.u3 - 0.5 * BACKGROUND_U.u2 * BACKGROUND_U.u2 / rho0;
+    
+                SHOCK_TUBE_UR = AOS(rho0, -mdot, e0 + 0.5 * mdot * mdot / rho0 );
+
+                boundary_left = BoundaryType::reflecting ;
+                boundary_right = BoundaryType::fixed ;
+            }
+            
             
             cout<<"Problem 2 pos3."<<endl;
             
@@ -555,6 +610,65 @@ void hydro_run::boundaries_wall_both(AOS &left_ghost, const AOS &leftval, const 
     right_ghost= AOS( rightval.u1, -rightval.u2, rightval.u3);
 }
 
+void hydro_run::apply_boundary_left() {
+    double E_kinetic, pressure_active, pressure_bound ;
+    switch(boundary_left) {
+        case BoundaryType::user:
+            user_boundary_left();
+            break;
+        case BoundaryType::open:
+            u[0] = u[1]; 
+            E_kinetic = 0.5*u[1].u2*u[1].u2/u[1].u1 ;
+            pressure_active  = (gamma_adiabat-1.) * (u[1].u3 - E_kinetic);
+            // Hydrostatic pressure extrapolation 
+            pressure_bound = pressure_active - u[1].u1 * (phi[0] - phi[1]) ;
+            pressure_bound = std::max(pressure_bound, 0.0) ;
+            u[0].u3 = pressure_bound/(gamma_adiabat-1.) + E_kinetic ;
+            break ;
+        case BoundaryType::reflecting:
+            u[0] = u[1]; 
+            u[0].u2 *= -1;
+            phi[0] = phi[1] ;
+            break;
+        case BoundaryType::fixed:
+            u[0] = SHOCK_TUBE_UL;
+            break;
+        case BoundaryType::periodic:
+            u[0] = u[num_cells];
+            phi[0] = phi[num_cells] ;
+            break;
+    }
+}
+
+void hydro_run::apply_boundary_right() {
+    double E_kinetic, pressure_active, pressure_bound ;
+    switch(boundary_right) {
+        case BoundaryType::user:
+            user_boundary_right();
+            break;
+        case BoundaryType::open:
+            u[num_cells+1] = u[num_cells]; 
+            E_kinetic = 0.5*u[num_cells].u2*u[num_cells].u2/u[num_cells].u1 ;
+            pressure_active  = (gamma_adiabat-1.) * (u[num_cells].u3 - E_kinetic);
+            // Hydrostatic pressure extrapolation 
+            pressure_bound = pressure_active - u[num_cells].u1 * (phi[num_cells+1] - phi[num_cells]) ;
+            pressure_bound = std::max(pressure_bound, 0.0) ;
+            u[num_cells+1].u3 = pressure_bound/(gamma_adiabat-1.) + E_kinetic ;
+            break ;
+        case BoundaryType::reflecting:
+            u[num_cells+1] = u[num_cells]; 
+            u[num_cells+1].u2 *= -1;
+            phi[num_cells+1] = phi[num_cells] ;
+            break;
+        case BoundaryType::fixed:
+            u[num_cells+1] = SHOCK_TUBE_UR;
+            break;
+        case BoundaryType::periodic:
+            u[num_cells+1] = u[1];
+            phi[num_cells+1] = phi[1] ;
+            break;
+    }
+}
 
 hydro_run::~hydro_run() {
     
