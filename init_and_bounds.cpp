@@ -173,33 +173,29 @@ hydro_run::hydro_run(string filename) {
         //Uniform grid
         else {
             num_cells = (int)((domain_max-domain_min)/dx0);
-            for(int i=1; i< num_cells; i++) {
+            for(int i=1; i<= num_cells; i++) {
                 x_i[i] = x_i[i-1] + dx0;
             }
         }
        
         //Compute inter-sphere surfaces
-        // TODO: Read geometry from file:
-        init_geometry = read_parameter_from_file<int>(filename,"PARI_GEOMETRY", debug).value;
-        
-        switch (init_geometry) {
-            case 0:
+        // Read geometry from file:
+        geometry = read_parameter_from_file<Geometry>(filename, "PARI_GEOMETRY", debug, Geometry::cartesian).value;
+        switch (geometry) {
+            case Geometry::cartesian:
                 cout<<"Initializing cartesian geometry."<<endl;
-                geometry = Geometry::cartesian;
                 for(int i=0; i<num_cells+1; i++) {
                     surf[i] = 1 ;
                 }
                 break;
-            case 1:
+            case Geometry::cylindrical:
                 cout<<"Initializing cylindrical geometry."<<endl;
-                geometry = Geometry::cylindrical;
                 for(int i=0; i<num_cells+1; i++) {
                     surf[i] = 2*M_PI * x_i[i] ;
                 }
                 break;
-            case 2:
+            case Geometry::spherical:
                 cout<<"Initializing spherical geometry."<<endl;
-                geometry = Geometry::spherical;
                 for(int i=0; i<num_cells+1; i++) {
                     surf[i] = 4*M_PI * x_i[i]*x_i[i] ;
                 }

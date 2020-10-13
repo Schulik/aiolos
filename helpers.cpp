@@ -1,4 +1,5 @@
 #include <sstream>
+#include <stdexcept>
 #include "main.h"
 
 std::vector<AOS> init_AOS(int num) {   
@@ -162,15 +163,26 @@ T parse_item(string item) {
     return val;
 }
 
+class ParameterError : public std::invalid_argument {
+  public:
+    ParameterError(int count_, string msg)
+      : std::invalid_argument(msg), count(count_)
+    { } ;
+  
+  int count ;
+} ;
+
 template<typename T>
 simulation_parameter<T> read_parameter_from_file(string filename, string variablename, int debug) {
     
     ifstream file(filename);
     string line;
     if(!file) {
-        cout<<"Couldnt open file "<<filename<<"!!!!!!!!!!1111"<<endl;
-        
+        std::stringstream error ;
+        error << "Could not open parameter file:" << filename << endl ;
+        throw std::runtime_error(error.str()) ;
     }
+
     simulation_parameter<T> tmp_parameter = {"NaN",T(),"NaN"};
     int found = 0;
     
@@ -194,22 +206,47 @@ simulation_parameter<T> read_parameter_from_file(string filename, string variabl
     //cout<<"    In read_parameter Pos2"<<endl;
     
     if(found == 0) {
-            tmp_parameter.name = variablename;
-            if(debug > 0)
-                cout<<"WARNING: Variable "<<variablename<<" not found in parameterfile!"<<endl;
+        std:: stringstream error ;
+        error << "ERROR: Variable "<<variablename<<" not found in parameterfile!"<<endl;
+        throw ParameterError(0, error.str()) ;
     }
     if(found > 1) {
-            cout<<"WARNING: Variable "<<variablename<<" defined more than once in parameterfile!"<<endl;
+        std:: stringstream error ;
+        error <<"ERROR: Variable "<<variablename<<" defined more than once in parameterfile!"<<endl;
+        throw ParameterError(found, error.str()) ;
     }
     
     file.close();
     return tmp_parameter;
 }
 
-template simulation_parameter<bool>  read_parameter_from_file(string, string, int);
-template simulation_parameter<int> read_parameter_from_file(string, string, int);
-template simulation_parameter<double> read_parameter_from_file(string, string, int);
-template simulation_parameter<string> read_parameter_from_file(string, string, int);
+
+template<typename T>
+simulation_parameter<T> read_parameter_from_file(string filename, string variablename, int debug, T default_) {
+    simulation_parameter<T> parameter ;
+
+    try {
+       parameter = read_parameter_from_file<T>(filename, variablename, debug) ;
+    } catch (ParameterError& e) {
+        if (e.count == 0) {
+            parameter.name = variablename ;
+            parameter.value = default_ ;
+        }
+        else
+            throw ; // re-throw because we can't help with duplicated parameters
+    }
+
+    return parameter ;
+}
+
+
+template simulation_parameter<bool>  read_parameter_from_file(string, string, int, bool);
+template simulation_parameter<int> read_parameter_from_file(string, string, int, int);
+template simulation_parameter<double> read_parameter_from_file(string, string, int, double);
+template simulation_parameter<string> read_parameter_from_file(string, string, int, string);
+
+template simulation_parameter<Geometry> read_parameter_from_file(string, string, int, Geometry);
+template simulation_parameter<BoundaryType> read_parameter_from_file(string, string, int, BoundaryType);
 
 
 //Print 2 

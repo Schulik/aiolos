@@ -1,3 +1,6 @@
+#ifndef _AIOLOS_MAIN_H_
+#define _AIOLOS_MAIN_H_
+
 #include <iostream>
 #include <fstream>
 #include <sstream>
@@ -6,6 +9,7 @@
 #include <string>
 #include <vector>
 #include <math.h>
+#include <type_traits>
 #include "advection.h"
 #include "source.h"
 
@@ -99,9 +103,32 @@ struct AOS {
 enum class Geometry {
     cartesian = 0, cylindrical = 1, spherical = 2
 } ;
+
+inline std::istream& operator>>(std::istream& is, Geometry& obj) {
+    std::underlying_type<Geometry>::type tmp ;
+    is >> tmp ;
+    obj = static_cast<Geometry>(tmp) ;
+    return is ;
+}
+inline std::ostream& operator<<(std::ostream& os, Geometry obj) {
+    os << static_cast<std::underlying_type<Geometry>::type>(obj) ;
+    return os ;
+}
+
 enum class BoundaryType {
     user = 0, open = 1, reflecting = 2, fixed = 3, periodic = 4,
 } ;
+inline std::istream& operator>>(std::istream& is, BoundaryType& obj) {
+    std::underlying_type<BoundaryType>::type tmp ;
+    is >> tmp ;
+    obj = static_cast<BoundaryType>(tmp) ;
+    return is ;
+}
+inline std::ostream& operator<<(std::ostream& os, BoundaryType obj) {
+    os << static_cast<std::underlying_type<BoundaryType>::type>(obj) ;
+    return os ;
+}
+
 
 class hydro_run
 {
@@ -313,3 +340,8 @@ vector<string> stringsplit(const string& str, const string& delim);
 
 template<typename T>
 simulation_parameter<T> read_parameter_from_file(string, string, int);
+
+template<typename T>
+simulation_parameter<T> read_parameter_from_file(string, string, int, T defaul);
+
+#endif//_AIOLOS_MAIN_H
