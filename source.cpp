@@ -49,12 +49,15 @@
                     cout<<"In update mass, last element."<<endl;
             }
             
-            if (use_self_gravity == 1) {
-                enclosed_mass[i] = enclosed_mass[i-1] +  4. * 3.141592 * x_i12[i] * x_i12[i] * (x_i[i]-x_i[i-1]) * u[i].u1; //Straightfoward integration of the poisson equation
-                //enclosed_mass[i] += x_i12[i] * u[i].u1; //Cartesian poisson equation to not let gravity initially diverge at bounds
-            }
             
-            phi[i]           = get_phi_grav(x_i12[i], enclosed_mass[i]);
+            enclosed_mass[i] = enclosed_mass[i-1] +  4. * 3.141592 * (pow(x_i[i],3.)-pow(x_i[i-1],3.) )/3. * u[i].u1; //Straightfoward integration of the poisson eqn
+            
+            
+            if (use_self_gravity == 1) 
+                phi[i]           = get_phi_grav(x_i12[i], enclosed_mass[i]);
+            else
+                phi[i]           = get_phi_grav(x_i12[i], enclosed_mass[0]);
+            
         }
         
         if(debug >= 3)

@@ -6,6 +6,7 @@ void hydro_run::execute() {
     double output_counter = 0;
     const int maxsteps = 1e9;
     dt = 1e-3; //get_cfl_timestep();
+    double pressure_temp;
     
     cout<<"Beginning main loop with num_cells="<<num_cells<<" and timestep="<<dt<<" cflfacotr="<<cflfactor<<endl;
     
@@ -120,7 +121,8 @@ void hydro_run::execute() {
         
         for(int j=1; j<=num_cells; j++) {
             source[j]          = source_grav(u[j], j);
-            source_pressure[j] = AOS(0, pressure[j] * (surf[j]-surf[j-1])/vol[j] ,0); //Metric term 2P/r in a discretization that well-balances constant states
+            pressure_temp      = pressure[j];
+            source_pressure[j] = AOS(0, pressure_temp * (surf[j]-surf[j-1])/vol[j] ,0); //Metric term 2P/r in a discretization that well-balances constant states
         }
             
         //
@@ -149,7 +151,7 @@ void hydro_run::execute() {
             u[j] = u[j] + (flux[j-1] - flux[j]) * dt/dx[j] + source[j] * dt;
             
             //Spherical
-            //u[j] = u[j] + (flux[j-1] * surf[j-1] - flux[j] * surf[j]) * dt/vol[j] + (source[j] + source_pressure[j] * 0.) * dt;
+            //u[j] = u[j] + (flux[j-1] * surf[j-1] - flux[j] * surf[j]) * dt/vol[j] + (source[j] + source_pressure[j]) * dt;
             
             /*if(i==1 || i==num_cells || i==20) {
                 char alpha;
