@@ -10,17 +10,6 @@ std::vector<AOS> init_AOS(int num) {
 //
 //
 void hydro_run::compute_pressure() {
-    /*
-    speed[0]           = left_ghost.u2 / left_ghost.u1;
-    pressure[0]        = (gamma_adiabat-1.)*(left_ghost.u3 - 0.5* left_ghost.u2 * speed[0] );
-    internal_energy[0] = left_ghost.u3 / left_ghost.u1 - 0.5 * speed[0] * speed[0];
-    cs[0]              = std::sqrt(gamma_adiabat * pressure[0] / u[0].u1);
-    
-    speed[num_cells+1]           = right_ghost.u2 / right_ghost.u1;
-    pressure[num_cells+1]        = (gamma_adiabat-1.)*(right_ghost.u3 - 0.5* right_ghost.u2 * speed[num_cells+1] );
-    internal_energy[num_cells+1] = right_ghost.u3 / right_ghost.u1 - 0.5 * speed[num_cells+1] * speed[num_cells+1];
-    cs[num_cells+1]              = std::sqrt(gamma_adiabat * pressure[num_cells+1] / u[num_cells+1].u1);
-    */
     
     //Pressure now defined also on ghost cells, so that the analytic fluxes can be computed there
     for(int i=0;i<=num_cells+1;i++) {
@@ -37,16 +26,7 @@ void hydro_run::compute_pressure() {
      this->debug = debug;
 }
 
-double hydro_run::get_wave_speeds(AOS &input_vec, const double &sign, const int &j) {
-    
-    return 0.;
-}
-
 AOS hydro_run::analytic_flux(AOS &input_vec, const int &j) {
-    
-    //double p = (gamma_adiabat-1.)*(input_vec.u3 - 0.5* input_vec.u2*input_vec.u2 / input_vec.u1 );
-
-    //AOS tmp = {input_vec.u2, input_vec.u2*input_vec.u2/input_vec.u1 + pressure2[j], input_vec.u2/input_vec.u1 * (input_vec.u3 + pressure2[j]) };
      
     return AOS (input_vec.u2, input_vec.u2*input_vec.u2/input_vec.u1 + pressure[j], input_vec.u2/input_vec.u1 * (input_vec.u3 + pressure[j]) );
 }
@@ -285,7 +265,7 @@ void hydro_run::print_AOS_component_tofile(const std::vector<double>& x,
             
             //flux[i] - flux[i+1] + source[i]
             
-            outfile<<x[i]<<'\t'<<data[i].u1<<'\t'<<data[i].u2<<'\t'<<data[i].u3<<'\t'<<fluxes[i].u1<<'\t'<<fluxes[i].u2<<'\t'<<fluxes[i].u3<<'\t'<<((flux[i-1].u1 - flux[i].u1)/dx[i] + source[i].u1)<<'\t'<<((flux[i-1].u2 - flux[i].u2)/dx[i] + source[i].u2)<<'\t'<<((flux[i-1].u3 - flux[i].u3)/dx[i] + source[i].u3)<<'\t'<<pressure[i]<<'\t'<<data[i].u2/data[i].u1<<'\t'<<temperature[i] <<'\t'<<timesteps[i]<<'\t'<<phi[i]<<'\t'<<timesteps_cs[i]<<'\t'<<opticaldepth[i]<<'\t'<<hydrostat<<'\t'<<hydrostat2<<'\t'<<hydrostat3<<'\t'<<enclosed_mass[i]<<endl;
+            outfile<<x[i]<<'\t'<<data[i].u1<<'\t'<<data[i].u2<<'\t'<<data[i].u3<<'\t'<<fluxes[i].u1<<'\t'<<fluxes[i].u2<<'\t'<<fluxes[i].u3<<'\t'<<((flux[i-1].u1 - flux[i].u1)/dx[i] + source[i].u1)<<'\t'<<((flux[i-1].u2 - flux[i].u2)/dx[i] + source[i].u2)<<'\t'<<((flux[i-1].u3 - flux[i].u3)/dx[i] + source[i].u3)<<'\t'<<pressure[i]<<'\t'<<data[i].u2/data[i].u1<<'\t'<<internal_energy[i] <<'\t'<<timesteps[i]<<'\t'<<phi[i]<<'\t'<<timesteps_cs[i]<<'\t'<<opticaldepth[i]<<'\t'<<hydrostat<<'\t'<<hydrostat2<<'\t'<<hydrostat3<<'\t'<<enclosed_mass[i]<<endl;
         }
         
         //Print right ghost stuff

@@ -120,12 +120,13 @@
             pfinal = pressure[i] - dx[i] * omegaminus[i] * u.u1 * (phi[i+1] - phi[i]) / (dx[i+1] + dx[i]);
         }*/
         
-        char a;
+        
         //if self.debug > 2:
          //   print(" In P_HYDROSTATIC : phi_l-phi_r = " + repr(phi_l) + "-" + repr(phi_r) + " p,pfinal = " + repr([p,pfinal]))
 
         if (pfinal < 0.) {
             if(suppress_warnings == 0) {
+                char a;
                 cout<<"Warning: Negative pressure computed and replaced in cell "<<i<<" at time= "<<globalTime<<" iter = "<<steps<<endl;
                 cout<<" cell "<<i;
                 cout<<" u =  "<<u.u1<<"/"<<u.u2<<"/"<<u.u3;
@@ -180,8 +181,8 @@
                 cout<<" cell "<<i;
                 cout<<" u =  "<<u[i].u1<<"/"<<u[i].u2<<"/"<<u[i].u3;
                 cout<<" phil-phir "<<(phi_l-phi_r)<<" p= "<<pressure[i]<<" pfinal= "<<pfinal<<endl;
-                //char a ;
-                //cin>>a;
+                char a ;
+                cin>>a;
             }
                 
             return pressure[i];
@@ -241,12 +242,6 @@
         
         for(int i = num_cells-2; i>=0; i--)  {
             opticaldepth[i] = opticaldepth[i+1] + opacity[i] * u[i].u1 * (x_i12[i+1] - x_i12[i]);
-            
-            //This is a fake temperature and we onyl use a simplified relaxation for the internal energy density to simulate cooling
-            temperature[i]      = u[i].u3 - 0.5 * u[i].u2 * u[i].u2 / u[i].u1 ; // energy density, TODO: divide by cv and rho
-            
-            //This is the real temperature, from thermodynamics
-            //temperature = (u[i].u3 - 0.5 * u[i].u2 * u[i].u2 / u[i].u1 ) / (cv & u[i].u1);
             
             radiative_flux[i] = pow(temperature[i], 4.) / ( 3./4. * ( 2./3. + opticaldepth[i]) ); //Hubeny 1990 relation with zero scattering
             

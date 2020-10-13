@@ -63,11 +63,15 @@ hydro_run::hydro_run(string filename) {
         //debug             = read_parameter_from_file(filename,"PARI_DEBUGLEVEL", TYPE_INT, debug).ivalue;   
         
         //cout<<"Pos1"<<endl;
-        boundaries_number = read_parameter_from_file<int>(filename,"PARI_BOUND_TYPE", debug).value;
+        //boundaries_number = read_parameter_from_file<int>(filename,"PARI_BOUND_TYPE", debug).value;
+        boundary_left  = read_parameter_from_file<BoundaryType>(filename,"PARI_BOUND_TYPE_LEFT", debug).value;
+        boundary_right = read_parameter_from_file<BoundaryType>(filename,"PARI_BOUND_TYPE_RIGHT", debug).value;
         //cout<<"Pos2"<<endl;
         problem_number    = read_parameter_from_file<int>(filename,"PARI_PROBLEM_NUMBER", debug).value;
         //cout<<"Pos3"<<endl;
  
+        cout<<"boundaries used: "<<boundary_left<<" / "<<boundary_right<<endl;
+        /*
         // Setup boundaries
         if (boundaries_number == 1) {
             boundary_left = boundary_right = BoundaryType::fixed ;
@@ -86,6 +90,7 @@ hydro_run::hydro_run(string filename) {
         // Wall / Reflecting boundaries at both ends
         if (boundaries_number == 4)
             boundary_left = boundary_right = BoundaryType::reflecting ;
+        */
         
         use_self_gravity  = read_parameter_from_file<int>(filename,"PARI_SELF_GRAV_SWITCH", debug).value;
         use_linear_gravity= read_parameter_from_file<int>(filename,"PARI_LINEAR_GRAV", debug).value;
@@ -299,7 +304,6 @@ hydro_run::hydro_run(string filename) {
             SHOCK_TUBE_UR = AOS(u1r, u1r*u2r, 0.5*u1r*u2r*u2r + u3r/(gamma_adiabat-1.));
             
             initialize_shock_tube_test(SHOCK_TUBE_UL, SHOCK_TUBE_UR);
-        
             
             if(debug > 0) 
                 cout<<"Successfully initialized problem 1."<<endl;
@@ -392,24 +396,16 @@ void hydro_run::initialize_hydrostatic_atmosphere_nonuniform() {
     long double temp_rhofinal;
     long double factor_inner, factor_outer;
     //long double factor_grav;
-    long double delta_phi;
+    //long double delta_phi;
     long double T_inner;
     long double T_outer;
     long double metric_inner;
     long double metric_outer;
-    
-    // debugvariables
-    //long double debug_dens;
-    //long double debug_energy;
-    
     //
     // Start with the outermost cell and build up a hydrostatic atmosphere
     // Fulfilling KKM16, Eqn. 17
     //
-    //long double temp_increase = T_increment;
-    //long double tempgrad  = 0.;
-    //long double tempgrad2 = 0.;
-    long double residual  = 0.;
+    //long double residual  = 0.;
     
     //
     // First, initialize (adiabatic) temperature
@@ -451,19 +447,19 @@ void hydro_run::initialize_hydrostatic_atmosphere_nonuniform() {
             cout.precision(16);
             cout<<" i="<<i<<endl;
             cout<<"In hydostatic init: factor_outer/metric_outer = "<< factor_outer / metric_outer << " factor_inner/metric_inner = "<< factor_inner / metric_inner <<endl;
-            cout<<"In hydostatic init: factor_dens = "<< (2.* factor_outer / delta_phi + 1.) / (2. * factor_inner / delta_phi - 1.) <<endl;
+            //cout<<"In hydostatic init: factor_dens = "<< (2.* factor_outer / delta_phi + 1.) / (2. * factor_inner / delta_phi - 1.) <<endl;
             cout<<"Ratio of densities inner/outer = "<< temp_rhofinal/u[i+1].u1 <<endl;
             cout<<"Ratio of temperatures inner/outer = "<<T_inner/T_outer<<endl;
             cout<<"Ratio of pressures inner/outer = "<<cv * temp_rhofinal * T_inner /u[i+1].u3<<endl;
             //tempgrad = (gamma_adiabat-1.)*cv*u[i+1].u1*T_outer - (gamma_adiabat-1.)*cv*u[i].u1*T_inner  + 0.5 * (u[i].u1 + u[i+1].u1) * delta_phi;
             //tempgrad2 = ((gamma_adiabat-1.)*cv*T_outer + 0.5 * delta_phi) * u[i+1].u1 - ((gamma_adiabat-1.)*cv*T_inner  + 0.5 * delta_phi ) * u[i].u1 ;
-            residual = (gamma_adiabat-1.)*cv*u[i+1].u1*T_outer - (gamma_adiabat-1.)*cv*u[i].u1*T_inner  + 0.5 * (u[i].u1 + u[i+1].u1) * delta_phi;
+            //residual = (gamma_adiabat-1.)*cv*u[i+1].u1*T_outer - (gamma_adiabat-1.)*cv*u[i].u1*T_inner  + 0.5 * (u[i].u1 + u[i+1].u1) * delta_phi;
             //cout<<"pressure diff "<<(gamma_adiabat-1.)*u[i+1].u3 - (gamma_adiabat-1.)*(u[i].u3)<<endl;
             cout<<"pressure diff "<<( ((gamma_adiabat-1.)*cv*u[i+1].u1*T_outer - (gamma_adiabat-1.)*cv*u[i].u1*T_inner)/dx[i])<<endl;
-            cout<<"density sum with potential "<<(0.5 * (u[i].u1 + u[i+1].u1) * delta_phi/dx[i])<<endl;
+            //cout<<"density sum with potential "<<(0.5 * (u[i].u1 + u[i+1].u1) * delta_phi/dx[i])<<endl;
             cout<<"density diff "<<(u[i].u1 - u[i+1].u1)<<endl;
             cout<<"density sum " <<(u[i].u1 + u[i+1].u1)<<endl;
-            cout<<"residual = "<<residual<<endl;
+            //cout<<"residual = "<<residual<<endl;
             
             //cout<<"residual2 = "<<residual<<endl;
             //cout<<"sum of hydrostatic gradients = "<<tempgrad<<endl;
@@ -565,7 +561,7 @@ void hydro_run::boundaries_open_both(AOS &left_ghost, const AOS &leftval, const 
         //double small_momentum = 1e-10;
         //double small_dens     = 1e-10;
         double tmp_r_dens     = rightval.u1 + dr1;
-        double tmp_r_momentum = rightval.u2 + dr2;
+        //double tmp_r_momentum = rightval.u2 + dr2;
         
         //Wall left
         left_ghost = AOS( leftval.u1, -leftval.u2, leftval.u3); 
@@ -573,10 +569,10 @@ void hydro_run::boundaries_open_both(AOS &left_ghost, const AOS &leftval, const 
         //Inflow/outflow boundary conditions, that do not allow sign change across the last cell boundary, otherwise horrible things happen
         
         //Sign change detect
-        if((rightval.u2 + dr2)/rightval.u2 < 0) {
-            tmp_r_momentum = rightval.u2;
+        //if((rightval.u2 + dr2)/rightval.u2 < 0) {
+        //    tmp_r_momentum = rightval.u2;
             //tmp_r_momentum = small_momentum;
-        }
+        //}
         if(tmp_r_dens < 0.) {
             tmp_r_dens = rightval.u1;
             

@@ -11,7 +11,6 @@ void hydro_run::execute() {
     cout<<"Beginning main loop with num_cells="<<num_cells<<" and timestep="<<dt<<" cflfacotr="<<cflfactor<<endl;
     
     compute_pressure();
-    //print_AOS_component_tofile(x_i12, u, flux, 0);
     
     ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~////
     //                                                                         //
@@ -39,56 +38,18 @@ void hydro_run::execute() {
         //
         // Step 1: Boundary values
         //
-        // For noflux-boundaries, boundaries 1, we symmetrize gravity in order to assure zero flux with the source function
         //
         
-        //ghost_xi_left   = x_i12[0] - (x_i12[1] - x_i12[0]);
-        //ghost_xi_right  = x_i12[num_cells-1] + (x_i12[num_cells-1] - x_i12[num_cells-2]);
         if(boundaries_number == 4) {
             phi[0]           = get_phi_grav(x_i12[1],         planet_mass);
             phi[num_cells+1] = get_phi_grav(x_i12[num_cells], planet_mass);
         } else {
-            phi[0]           = get_phi_grav(x_i12[1],  planet_mass);
+            phi[0]           = get_phi_grav(x_i12[1],          planet_mass);
             phi[num_cells+1] = get_phi_grav(x_i12[num_cells+1], planet_mass);
         }
         
         apply_boundary_left() ;
         apply_boundary_right() ;
-        
-        //Compute the boundary values
-        if(boundaries_number == 1) {
-            if(steps==0)
-                cout<<"Const boundaries on both sides, given by inital conditions"<<endl;
-            apply_boundary_left() ;
-            apply_boundary_right() ;
-            //boundaries_const_both(u[0], u[1], u[num_cells], u[num_cells+1] );
-        }
-        else if(boundaries_number == 2) {
-            if(steps==0)
-                cout<<"Open boundaries on both sides / Wall+open if using gravity."<<endl;
-            apply_boundary_left() ;
-            apply_boundary_right() ;
-//            boundaries_open_both(u[0], u[1], u[2], u[num_cells-1], u[num_cells], u[num_cells+1] );            
-        }
-        else if(boundaries_number == 3) {
-            if(steps==0)
-                cout<<"Wall and inflow boundaries."<<endl;
-            apply_boundary_left() ;
-            apply_boundary_right() ;
-            //boundaries_planet_mdot(u[0], u[1], u[num_cells], u[num_cells+1] );
-        }
-        else if(boundaries_number == 4) {
-            if(steps==0)
-                cout<<"Wall boundaries on both sides."<<endl;
-            apply_boundary_left() ;
-            apply_boundary_right() ;
-            //boundaries_wall_both(u[0], u[1], u[num_cells], u[num_cells+1] );
-        }
-        else {
-            if(steps==0)
-                cout<<"WARNING: default boundaries!"<<endl;
-            boundaries_const_both(u[0], AOS(1,1,1), AOS(1,1,1), u[num_cells+1] );
-        }
             
         
         //if(steps==0)
@@ -107,9 +68,9 @@ void hydro_run::execute() {
         for(int j=1; j <= num_cells; j++) {
             
             if(j==1) 
-                flux[0] = hllc_flux(u[j-1], u[j],  phi[j-1], phi[j],   j-1, j); //Flux with ghost cell on left
+                flux[0] = hllc_flux(u[j-1], u[j], j-1, j); //Flux with ghost cell on left
             
-            flux[j] = hllc_flux(u[j], u[j+1], phi[j], phi[j+1], j, j+1); //Everything else is taken into account by the right flux
+            flux[j] = hllc_flux(u[j], u[j+1], j, j+1); //Everything else is taken into account by the right flux
 
             /*if(j==2) {
                 char alp;ms are which form of objects which have a velocity standard deviation comparable to their m
@@ -168,18 +129,14 @@ void hydro_run::execute() {
                     break;
             }
             
-            /*if(i==1 || i==num_cells || i==20) {
+            /*if(j==1 || j==num_cells || j==20) {
                 char alpha;
-                cout<<"Debuggin fluxes in cell i= "<<i<<": fl-fr = "<<((flux[i-1].u2 - flux[i].u2)/dx[i])<<endl;
-                cout<<"Debuggin fluxes: s = "<<source[i].u2<<endl;
-                cout<<"Debuggin fluxes: fl-fr+s = "<<((flux[i-1].u2 - flux[i].u2)/dx[i] + source[i].u2)<<endl;
+                cout<<"Debuggin fluxes in cell i= "<<j<<": fl-fr = "<<((flux[j-1].u2 - flux[j].u2)/dx[j])<<endl;
+                cout<<"Debuggin fluxes: s = "<<source[j].u2<<endl;
+                cout<<"Debuggin fluxes: fl-fr+s = "<<((flux[j-1].u2 - flux[j].u2)/dx[j] + source[j].u2)<<endl;
                 cin>>alpha;
             }*/
         }
-            
-        
-
-        
         
         if(debug >= 2)
             cout<<" Before updating rad fluxes... ";
@@ -212,7 +169,7 @@ void hydro_run::execute() {
 }
 
 
-AOS hydro_run::hllc_flux(AOS &leftval, AOS &rightval, double &phi_l, double &phi_r, const int &jleft, const int& jright) 
+AOS hydro_run::hllc_flux(AOS &leftval, AOS &rightval, const int &jleft, const int& jright) 
 {
     //int decision = -1;
     AOS flux;

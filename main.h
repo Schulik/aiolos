@@ -319,11 +319,11 @@ class hydro_run
     // 
     // Riemann solver
     //
-    double get_wave_speeds(AOS &input_vec, const double &sign, const int &j);
+    //double get_wave_speeds(AOS &input_vec, const double &sign, const int &j);
     AOS analytic_flux(AOS &input_vec, const int &j);
     
-    AOS hll_flux (AOS &leftvalue, AOS &rightvalue,                               const int &jleft, const int &jright);
-    AOS hllc_flux(AOS &leftvalue, AOS &rightvalue, double &phi_l, double &phi_r, const int &jleft, const int &jright);
+    AOS hll_flux (AOS &leftvalue, AOS &rightvalue, const int &jleft, const int &jright);
+    AOS hllc_flux(AOS &leftvalue, AOS &rightvalue, const int &jleft, const int &jright);
     
 public:
     
