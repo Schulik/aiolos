@@ -268,8 +268,10 @@ class hydro_run
 
     void apply_boundary_left();
     void apply_boundary_right();
-    void user_boundary_left() {};
-    void user_boundary_right() {};
+    void user_boundary_left();
+    void user_boundary_right();
+
+    void user_initial_conditions();
 
     //
     // Source terms
