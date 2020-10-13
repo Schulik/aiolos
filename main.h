@@ -97,7 +97,12 @@ struct AOS {
  
 }; 
 
-
+enum class Geometry {
+    cartesian = 0, cylindrical = 1, spherical = 2
+} ;
+enum class BoundaryType {
+    user = 0, open = 1, reflecting = 2, fixed = 3
+} ;
 
 class hydro_run
 {
@@ -117,6 +122,10 @@ class hydro_run
     int use_linear_gravity;
     int use_rad_fluxes;
     int suppress_warnings;
+
+    Geometry geometry ;
+    BoundaryType boundary_left ;
+    BoundaryType boundary_right ;
 
     ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     //
@@ -256,6 +265,11 @@ class hydro_run
     void boundaries_open_both(AOS &left_ghost, const AOS &leftval, const AOS &leftval2, const AOS &rightval2, const AOS &rightval, AOS &right_ghost );
     void boundaries_planet_mdot(AOS &left_ghost, const AOS &leftval, const AOS &rightval, AOS &right_ghost );
     void boundaries_wall_both(AOS &left_ghost, const AOS &leftval, const AOS &rightval, AOS &right_ghost );
+
+    void apply_boundary_left();
+    void apply_boundary_right();
+    void user_boundary_left() {};
+    void user_boundary_right() {};
 
     //
     // Source terms

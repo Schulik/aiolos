@@ -149,17 +149,38 @@ hydro_run::hydro_run(string filename) {
         //Assign the last boundary as domain maximum as long as nonuniform grid is in the test-phase
         domain_max = x_i[num_cells];
         cout<<"We have a DOMAIN MAX = "<<domain_max<<endl;
-        
+       
         //Compute inter-sphere surfaces
+        // TODO: Read geometry from file:
+        geometry = Geometry::spherical ;
         for(int i=0; i<num_cells+1; i++) {
-            surf[i] = 4. * M_PI * x_i[i] * x_i[i];
-            surf[i] = 1.; //comment this line out for 3D or write less lazy code
+            switch (geometry) {
+            case Geometry::cartesian:
+                surf[i] = 1 ;
+                break;
+            case Geometry::cylindrical:
+                surf[i] = 2*M_PI * x_i[i] ;
+                break;
+            case Geometry::spherical:
+                surf[i] = 4*M_PI * x_i[i]*x_i[i] ;
+                break;
+            }
         }
         
         //Compute shell volumes
         for(int i=1; i<num_cells+1; i++) {
-            vol[i] = 4./3. * M_PI * ( pow(x_i[i],3.) - pow(x_i[i-1],3.) );
-            vol[i] = 1.; //comment this line out for 3D
+            switch (geometry) {          
+            case Geometry::cartesian:
+                vol[i] = x_i[i] - x_i[i-1] ;
+                break;
+            case Geometry::cylindrical:
+                vol[i] = M_PI * (x_i[i]*x_i[i] - x_i[i-1]*x_i[i-1]);
+                break;
+            case Geometry::spherical:
+                vol[i] = (4*M_PI/3) * 
+                    (x_i[i]*x_i[i]*x_i[i] - x_i[i-1]*x_i[i-1]*x_i[i-1]);
+                break;
+            }
         }
         
         //Compute cell mid positions. Ghost cells also have mid positions in order to balance their pressure gradients
@@ -555,6 +576,57 @@ void hydro_run::boundaries_wall_both(AOS &left_ghost, const AOS &leftval, const 
     right_ghost= AOS( rightval.u1, -rightval.u2, rightval.u3);
 }
 
+void hydro_run::apply_boundary_left() {
+    double E_kinetic, pressure_active, pressure_bound ;
+    switch(boundary_left) {
+        case BoundaryType::user:
+            user_boundary_left();
+            break;
+        case BoundaryType::open:
+            u[0] = u[1]; 
+            E_kinetic = 0.5*u[1].u2*u[1].u2/u[1].u1 ;
+            pressure_active  = (gamma_adiabat-1.) * (u[1].u3 - E_kinetic);
+            // Hydrostatic pressure extrapolation 
+            pressure_bound = pressure_active - u[1].u1 * (phi[0] - phi[1]) ;
+            pressure_bound = std::max(pressure_bound, 0.0) ;
+            u[0].u3 = pressure_bound/(gamma_adiabat-1.) + E_kinetic ;
+            break ;
+        case BoundaryType::reflecting:
+            u[0] = u[1]; 
+            u[0].u2 *= -1;
+            phi[0] = phi[1] ;
+            break;
+        case BoundaryType::fixed:
+            u[0] = SHOCK_TUBE_UL;
+            break;
+    }
+}
+
+void hydro_run::apply_boundary_right() {
+    double E_kinetic, pressure_active, pressure_bound ;
+    switch(boundary_right) {
+        case BoundaryType::user:
+            user_boundary_right();
+            break;
+        case BoundaryType::open:
+            u[num_cells+1] = u[num_cells]; 
+            E_kinetic = 0.5*u[num_cells].u2*u[num_cells].u2/u[num_cells].u1 ;
+            pressure_active  = (gamma_adiabat-1.) * (u[num_cells].u3 - E_kinetic);
+            // Hydrostatic pressure extrapolation 
+            pressure_bound = pressure_active - u[num_cells].u1 * (phi[num_cells+1] - phi[num_cells]) ;
+            pressure_bound = std::max(pressure_bound, 0.0) ;
+            u[num_cells+1].u3 = pressure_bound/(gamma_adiabat-1.) + E_kinetic ;
+            break ;
+        case BoundaryType::reflecting:
+            u[num_cells+1] = u[num_cells]; 
+            u[num_cells+1].u2 *= -1;
+            phi[num_cells+1] = phi[num_cells] ;
+            break;
+        case BoundaryType::fixed:
+            u[num_cells+1] = SHOCK_TUBE_UR;
+            break;
+    }
+}
 
 hydro_run::~hydro_run() {
     
