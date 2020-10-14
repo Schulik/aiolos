@@ -117,17 +117,7 @@ void hydro_run::execute() {
         
         //#pragma omp simd
         for(int j=1; j<=num_cells; j++) {
-            
-            switch(geometry) {
-                case Geometry::cartesian:
-                    u[j] = u[j] + (flux[j-1] - flux[j]) * dt/dx[j] + source[j] * dt;
-                    break;
-                case Geometry::cylindrical:
-                    u[j] = u[j] + (flux[j-1] * surf[j-1] - flux[j] * surf[j]) * dt/vol[j] + source[j] * dt;
-                    break;
-                case Geometry::spherical:
-                    u[j] = u[j] + (flux[j-1] * surf[j-1] - flux[j] * surf[j]) * dt/vol[j] + (source[j] + source_pressure[j]) * dt;
-                    break;
+            u[j] = u[j] + (flux[j-1] * surf[j-1] - flux[j] * surf[j]) * dt/vol[j] + (source[j] + source_pressure[j]) * dt;
             }
             
             
