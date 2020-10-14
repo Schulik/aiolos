@@ -1,7 +1,7 @@
 
 #include <stdexcept>
 
-#include "main.h"
+#include "aiolos.h"
 
 void hydro_run::user_boundary_left() {
     throw std::runtime_error(

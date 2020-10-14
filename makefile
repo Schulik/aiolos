@@ -9,6 +9,10 @@ SRC = $(wildcard *.cpp)
 OBJ = $(SRC:.cpp=.o)
 INC = $(SRC:.cpp=.h)
 
+TEST_OBJ = $(subst main.o, test_files/main.o, $(OBJ))
+
+
+
 #euler_hllc: $(OBJ)
 #	$(CXX) -o $@ $(OBJ) $(CXXFLAGS) $(LDFLAGS) $(BFLAGS)
 
@@ -16,8 +20,14 @@ aiolos: $(OBJ) makefile
 	$(CXX) -o $@ $(OBJ) $(CXXFLAGS) $(LDFLAGS)
 	#./$@
 
-%.o: %.cpp %.h makefile
-	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< $(BFLAGS)
+%.o: %.cpp makefile aiolos.h
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< $(BFLAGS) -o $@ 
+
+.PHONY: tests
+
+tests: $(TEST_OBJ) makefile aiolos.h
+	$(CXX) -o  $@  $(TEST_OBJ) $(CXXFLAGS) $(LDFLAGS)
+	
 
 clean:
-	rm *.o
+	rm *.o test_files/*.o

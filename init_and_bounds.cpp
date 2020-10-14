@@ -1,4 +1,4 @@
-#include "main.h"
+#include "aiolos.h"
 
 //extern AOS* init_AOS(int num);
 

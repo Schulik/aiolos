@@ -1,6 +1,6 @@
 #include <sstream>
 #include <stdexcept>
-#include "main.h"
+#include "aiolos.h"
 
 std::vector<AOS> init_AOS(int num) {   
     return std::vector<AOS>(num);
