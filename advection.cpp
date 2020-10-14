@@ -118,7 +118,6 @@ void hydro_run::execute() {
         //#pragma omp simd
         for(int j=1; j<=num_cells; j++) {
             u[j] = u[j] + (flux[j-1] * surf[j-1] - flux[j] * surf[j]) * dt/vol[j] + (source[j] + source_pressure[j]) * dt;
-            }
             
             
             if( (debug > 0) && ( j==1 || j==num_cells || j==(num_cells/2) )) {
