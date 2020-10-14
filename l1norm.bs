@@ -1,4 +1,7 @@
 #!/bin/bash
+#Script usage : bash l1norm.bs planet_cartesian
+# Where the last string is the name of the *.par file, without *.par
+
 name=$1
 file1=output_$1_t0.dat
 file2=output_$1_t-666.dat
