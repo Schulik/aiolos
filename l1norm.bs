@@ -1,4 +1,8 @@
 #!/bin/bash
-file1=$1
-file2=$2
-paste $1 $2 | awk 'BEGIN{norm=0.} {norm+=sqrt(($23-$2)*($23-$2))} END{printf("Total l1 norm is %1.8e.\n",norm)}'
+name=$1
+file1=output_$1_t0.dat
+file2=output_$1_t-666.dat
+echo "Computing L1-norm with initial density data from "$file1" and final density data from "$file2
+paste $file1 $file2 | awk -v CONVFMT=%.17g 'BEGIN{tmp=0.; norm=0.} {tmp=($23-$2);if(tmp<0) tmp=($2-$23); norm+=tmp} END{printf("Total l1 density norm is %1.8e.\n",norm)}'
+paste $file1 $file2 | awk -v CONVFMT=%.17g 'BEGIN{norm=0.} {norm+=sqrt(($24-$3)*($24-$3))} END{printf("Total l1 momentum norm is %1.8e.\n",norm)}'
+paste $file1 $file2 | awk -v CONVFMT=%.17g 'BEGIN{norm=0.} {norm+=sqrt(($32-$11)*($32-$11))} END{printf("Total l1 pressure norm is %1.8e.\n",norm)}'
