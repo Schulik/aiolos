@@ -27,7 +27,7 @@ aiolos: $(OBJ) makefile
 
 tests: $(TEST_OBJ) makefile aiolos.h
 	$(CXX) -o  $@  $(TEST_OBJ) $(CXXFLAGS) $(LDFLAGS)
-	
+	./tests > /dev/null
 
 clean:
 	rm *.o test_files/*.o

@@ -388,7 +388,7 @@ hydro_run::hydro_run(string filename) {
             initialize_hydrostatic_atmosphere_nonuniform();
         }
         
-        USE_WAVE = read_parameter_from_file<int>(filename,"WAVE_USE", debug).value; 
+        USE_WAVE = read_parameter_from_file<int>(filename,"WAVE_USE", debug, 0).value; 
         if(USE_WAVE==1) {
             WAVE_AMPLITUDE = read_parameter_from_file<double>(filename,"WAVE_AMPLITUDE", debug).value; 
             WAVE_PERIOD    = read_parameter_from_file<double>(filename,"WAVE_PERIOD", debug).value; 

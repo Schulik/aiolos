@@ -9,13 +9,16 @@ PARI_PROBLEM_NUMBER     1
 # Problem numbers explained: shock_tube, no grav = 1, planet with grav = 2
 #
 PARI_INIT_DATA_SWITCH   1
-PARI_INIT_DATA_U1L      1.4
-PARI_INIT_DATA_U2L      0.
-PARI_INIT_DATA_U3L      1.
+PARI_INIT_DATA_U1L      1.
+PARI_INIT_DATA_U2L      -19.59745
+PARI_INIT_DATA_U3L      1000.
 PARI_INIT_DATA_U1R      1.
-PARI_INIT_DATA_U2R      0.
-PARI_INIT_DATA_U3R      1.
-PARI_INIT_SHOCK_MID      0.5
+PARI_INIT_DATA_U2R      -19.59745
+PARI_INIT_DATA_U3R      0.01
+PARI_INIT_SHOCK_MID      0.8
+
+OUTPUT_FILENAME         test_files/shock_tube5.par
+
 
 PARI_SELF_GRAV_SWITCH   0
 PARI_LINEAR_GRAV        0

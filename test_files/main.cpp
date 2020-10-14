@@ -20,31 +20,30 @@
 
 bool run_test(std::string test_name, int suppress_warn=1, int debug=0) {
       
-    //try {
+    try {
         hydro_run test(test_name);
         test.set_suppress_warnings(suppress_warn);
         test.set_debug(debug);
         test.execute(); 
-    /*} catch (...) {
+    } catch (...) {
         std::cerr << "Test " << test_name << " crashed" << std::endl ;
         return false ;
     }
-    std::cerr << "Test " << test_name << " passed" << std::endl ;
-    */
+    std::cerr << "Test " << test_name << " completed" << std::endl ;
+
     return true ;
 }
 
 int main()
 {
     int count = 0 ;
-    count += run_test("test_files/shock_tube1_new.par") ;
-    return 0 ;
-    count += run_test("test_files/shock_tube2_new.par") ;
-    count += run_test("test_files/shock_tube3_new.par") ;
-    count += run_test("test_files/shock_tube4_new.par") ;
-    count += run_test("test_files/shock_tube5_new.par") ;
-    count += run_test("test_files/shock_tube6_new.par") ;
-    count += run_test("test_files/shock_tube7_new.par") ;
+    count += !run_test("test_files/shock_tube1.par") ;
+    count += !run_test("test_files/shock_tube2.par") ;
+    count += !run_test("test_files/shock_tube3.par") ;
+    count += !run_test("test_files/shock_tube4.par") ;
+    count += !run_test("test_files/shock_tube5.par") ;
+    count += !run_test("test_files/shock_tube6.par") ;
+    count += !run_test("test_files/shock_tube7.par") ;
     
     return count ;
 }
