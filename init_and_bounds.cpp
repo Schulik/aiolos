@@ -428,7 +428,7 @@ void hydro_run::initialize_hydrostatic_atmosphere_nonuniform() {
     //
     for(int i=num_cells+1; i>=0; i--) {
             //temperature[i] = planet_mass / x_i12[i] / (cv * gamma_adiabat) + 1.;
-            temperature[i] = - 1.0 * phi[i] / (cv * gamma_adiabat) + 1.;
+            temperature[i] = - 1.0 * phi[i] / (cv * gamma_adiabat) + 10.;
             //temperature[i] = 100.;
         
             //Add temperature bumps and troughs
@@ -459,11 +459,16 @@ void hydro_run::initialize_hydrostatic_atmosphere_nonuniform() {
         //
         // Debug info
         // 
-        if( (i==20 || i== num_cells-20) && debug >= 0) {
-        //if( i==0 ) {
+        //if( (i==20 || i== num_cells-20) && debug >= 0) {
+        //if( i>0 ) {
+        if(1==0) {
+            char a;
             cout.precision(16);
             cout<<"In INIT STATIC i="<<i<<endl;
             cout<<"In hydostatic init: factor_outer/metric_outer = "<< factor_outer / metric_outer << " factor_inner/metric_inner = "<< factor_inner / metric_inner <<endl;
+            cout<<"factor_outer+metric_outer = "<< (factor_outer + metric_outer) << " factor_inner-metric_inner = "<<( factor_inner - metric_inner) <<endl;
+            cout<<"metric_outer = "<< metric_outer << " metric_inner = "<<metric_inner <<endl;
+            cout<<"factor_outer = "<< factor_outer << " factor_inner = "<<factor_inner <<endl;
             //cout<<"In hydostatic init: factor_dens = "<< (2.* factor_outer / delta_phi + 1.) / (2. * factor_inner / delta_phi - 1.) <<endl;
             cout<<"Ratio of densities inner/outer = "<< temp_rhofinal/u[i+1].u1 <<endl;
             cout<<"Ratio of temperatures inner/outer = "<<T_inner/T_outer<<" t_inner ="<<T_inner<<" t_outer ="<<T_outer<<endl;
@@ -483,6 +488,7 @@ void hydro_run::initialize_hydrostatic_atmosphere_nonuniform() {
             //cout<<"sum2 of hydrostatic gradients = "<<tempgrad2<<endl;
             cout<<"Resulting density == "<<temp_rhofinal<<endl;
             cout<<" density before "<<u[i+1].u1<<endl;
+            cin>>a;
         }
     }
 
