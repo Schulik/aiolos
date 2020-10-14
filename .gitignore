@@ -3,6 +3,7 @@
 *~
 test_files/*.o
 test_files/*.dat
+test_files/*.png
 test_files/*~
 aiolos
 tests

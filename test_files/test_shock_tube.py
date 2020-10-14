@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 import numpy as np
 
 from load_aiolos import load_aiolos_snap, load_aiolos_params
@@ -216,6 +216,39 @@ def setup_riemann_solver(param_file):
                                               
     return Riemann(L, R, GAMMA)                                             
 
+def plot_riemann_solution(snap, param_file):
+    exact = setup_riemann_solver(param_file)
+
+    params = load_aiolos_params(param_file)
+    x0 = float(params['PARI_INIT_SHOCK_MID'])
+    t  = float(params['PARI_TIME_TMAX'])
+
+   
+    import matplotlib.pyplot as plt
+
+    f, axes = plt.subplots(2,2)
+    f.suptitle('Riemann Problem {}'.format(par_num))
+
+    axes[0][0].plot(x, data['density'], '+', c='k')
+    axes[0][0].plot(x, exact.density(xa, t), c='k')
+    axes[0][0].set_ylabel('density')
+
+    axes[0][1].plot(x, data['velocity'], '+', c='k')
+    axes[0][1].plot(x, exact.velocity(xa, t), c='k')
+    axes[0][1].set_ylabel('velocity')
+
+    axes[1][0].plot(x, data['pressure'], '+', c='k')
+    axes[1][0].plot(x, exact.pressure(xa, t), c='k')
+    axes[1][0].set_ylabel('pressure')
+    axes[1][1].set_xlabel('x')
+
+    u= (data['energy'] - 0.5*data['momentum']*data['velocity'])/data['density']
+    axes[1][1].plot(x, u, '+', c='k')
+    axes[1][1].plot(x, exact.internal_energy(xa, t), c='k')
+    axes[1][1].set_ylabel('internal energy')
+    axes[1][1].set_xlabel('x')
+
+    return f
     
 def check_riemann_problem(par_num, L1_target=0):
     param_file = 'shock_tube{}.par'.format(par_num)
@@ -237,7 +270,9 @@ def check_riemann_problem(par_num, L1_target=0):
     else:
         print("Riemann test {} L1 check failed. ".format(par_num) + 
               "L1={}, expected={}".format(L1,L1_target))
-    
+
+    #plot_riemann_solution(snap, param_file)
+        
     
 if __name__ == "__main__":
     L1_errors = [np.nan, 0.016, 0.033, 0.25,
