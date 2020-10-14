@@ -17,7 +17,7 @@ PARI_INIT_DATA_U2R      2.0
 PARI_INIT_DATA_U3R      0.4
 PARI_INIT_SHOCK_MID      0.5
 
-OUTPUT_FILENAME         test_files/shock_tube2.par
+OUTPUT_FILENAME         test_files/shock_tube2
 
 PARI_SELF_GRAV_SWITCH   0
 PARI_LINEAR_GRAV        0

@@ -17,7 +17,7 @@ PARI_INIT_DATA_U2R      -19.59745
 PARI_INIT_DATA_U3R      0.01
 PARI_INIT_SHOCK_MID      0.8
 
-OUTPUT_FILENAME         test_files/shock_tube5.par
+OUTPUT_FILENAME         test_files/shock_tube5
 
 
 PARI_SELF_GRAV_SWITCH   0
@@ -36,7 +36,7 @@ PARI_DOMAIN_MAX         1.
 PARI_TIME_DT            1e-3
 PARI_CFLFACTOR          0.9
 PARI_TIME_TMAX          0.012
-PARI_TIME_OUTPUT        1.e-1
+PARI_TIME_OUTPUT        0.012
 
 #Physical parameters
 PARI_PLANET_POS         0.
