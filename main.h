@@ -216,7 +216,9 @@ class hydro_run
     std::vector<double> phi;            //Parabolic Variables: gravitational potential
     std::vector<double> omegaplus;
     std::vector<double> omegaminus;
-
+    std::vector<double> source_pressure_prefactor_left;
+    std::vector<double> source_pressure_prefactor_right;
+    
     std::vector<AOS> u_output;       //Array of arrays to store snapshots of u
     std::vector<double> phi_output;     //Array of arrays to store snapshots of phi
     
@@ -231,6 +233,8 @@ class hydro_run
     
     std::vector<double> cs;         //Speed of sound array
     std::vector<double> pressure;   
+    std::vector<double> pressure_l; //reconstructed pressures left  
+    std::vector<double> pressure_r; //reconstructed pressures right  
     std::vector<double> internal_energy;
     std::vector<double> speed;
     std::vector<double> enclosed_mass;
@@ -268,6 +272,7 @@ class hydro_run
     void initialize_custom_setup();
     //void initialize_hydrostatic_atmosphere();
     void initialize_hydrostatic_atmosphere_nonuniform();
+    void initialize_hydrostatic_atmosphere_nonuniformSph();
     void initialize_gravitational_potential();
     
     

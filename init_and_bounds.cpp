@@ -150,6 +150,8 @@ hydro_run::hydro_run(string filename) {
         dx         = np_zeros(num_cells+2);
         omegaplus  = np_zeros(num_cells+2);
         omegaminus = np_zeros(num_cells+2);
+        source_pressure_prefactor_left    = np_zeros(num_cells+2);
+        source_pressure_prefactor_right   = np_zeros(num_cells+2);
         
         cout<<"pos4"<<endl;
         
@@ -240,7 +242,7 @@ hydro_run::hydro_run(string filename) {
         cout<<" FIRST AND LAST DX = "<<dx[0]<<" / "<<dx[num_cells+1]<<endl;
         
         //Ghost cells
-        x_i12[0]           = domain_min - (x_i12[1] - x_i[0]); //Assuming
+        x_i12[0]           = domain_min - (x_i12[1] - x_i[0]);
         x_i12[num_cells+1] = domain_max + (x_i[num_cells] - x_i12[num_cells]); 
         
         //
@@ -259,7 +261,13 @@ hydro_run::hydro_run(string filename) {
         omegaminus[num_cells+1] = omegaminus[num_cells] + (omegaminus[num_cells] - omegaminus[num_cells-1]);
         omegaplus[num_cells+1]  = omegaplus[num_cells]  + (omegaplus[num_cells] - omegaplus[num_cells-1]);
         
-        
+        for(int i=1; i<num_cells+1; i++) {
+            //source_pressure_prefactor_left[i]  = pow(x_i[i-1],2.) * (4./3.*M_PI+4.*M_PI) + 4./3.*M_PI * (pow(x_i[i],2.) + x_i[i-1]*x_i[i]); 
+            //source_pressure_prefactor_right[i] = pow(x_i[i],2.)  *  (4./3.*M_PI-4.*M_PI) + 4./3.*M_PI * (pow(x_i[i-1],2.) + x_i[i-1]*x_i[i]); 
+            
+            source_pressure_prefactor_left[i]  = (surf[i-1]/vol[i] - 1./dx[i]); 
+            source_pressure_prefactor_right[i] = (surf[i]  /vol[i] - 1./dx[i]); 
+        }
         
         u               = init_AOS(num_cells+2); //{ np_ones(num_cells*3);   //Conserved hyperbolic variables: density, mass flux, energy density
         phi             = np_zeros(num_cells+2);  //Parabolic Variables: gravitational potential
@@ -370,6 +378,8 @@ hydro_run::hydro_run(string filename) {
         //////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         
         pressure        = np_zeros(num_cells+2); //Those helper quantities are also defined on the ghost cells, so they get +2
+        pressure_l      = np_zeros(num_cells+2); 
+        pressure_r      = np_zeros(num_cells+2); 
         internal_energy = np_zeros(num_cells+2);
         speed           = np_zeros(num_cells+2);
         cs              = np_zeros(num_cells+2);
@@ -410,7 +420,7 @@ void hydro_run::initialize_hydrostatic_atmosphere_nonuniform() {
     //
     // First, initialize (adiabatic) temperature
     //
-    for(int i=0; i<=num_cells+1; i++) {
+    for(int i=num_cells+1; i>=0; i--) {
             //temperature[i] = planet_mass / x_i12[i] / (cv * gamma_adiabat) + 1.;
             temperature[i] = - 1.0 * phi[i] / (cv * gamma_adiabat) + 1.;
             
@@ -444,12 +454,13 @@ void hydro_run::initialize_hydrostatic_atmosphere_nonuniform() {
         // Debug info
         // 
         if( (i==20 || i== num_cells-20) && debug >= 0) {
+        //if( i==0 ) {
             cout.precision(16);
-            cout<<" i="<<i<<endl;
+            cout<<"In INIT STATIC i="<<i<<endl;
             cout<<"In hydostatic init: factor_outer/metric_outer = "<< factor_outer / metric_outer << " factor_inner/metric_inner = "<< factor_inner / metric_inner <<endl;
             //cout<<"In hydostatic init: factor_dens = "<< (2.* factor_outer / delta_phi + 1.) / (2. * factor_inner / delta_phi - 1.) <<endl;
             cout<<"Ratio of densities inner/outer = "<< temp_rhofinal/u[i+1].u1 <<endl;
-            cout<<"Ratio of temperatures inner/outer = "<<T_inner/T_outer<<endl;
+            cout<<"Ratio of temperatures inner/outer = "<<T_inner/T_outer<<" t_inner ="<<T_inner<<" t_outer ="<<T_outer<<endl;
             cout<<"Ratio of pressures inner/outer = "<<cv * temp_rhofinal * T_inner /u[i+1].u3<<endl;
             //tempgrad = (gamma_adiabat-1.)*cv*u[i+1].u1*T_outer - (gamma_adiabat-1.)*cv*u[i].u1*T_inner  + 0.5 * (u[i].u1 + u[i+1].u1) * delta_phi;
             //tempgrad2 = ((gamma_adiabat-1.)*cv*T_outer + 0.5 * delta_phi) * u[i+1].u1 - ((gamma_adiabat-1.)*cv*T_inner  + 0.5 * delta_phi ) * u[i].u1 ;
@@ -464,8 +475,11 @@ void hydro_run::initialize_hydrostatic_atmosphere_nonuniform() {
             //cout<<"residual2 = "<<residual<<endl;
             //cout<<"sum of hydrostatic gradients = "<<tempgrad<<endl;
             //cout<<"sum2 of hydrostatic gradients = "<<tempgrad2<<endl;
+            cout<<"Resulting density == "<<temp_rhofinal<<endl;
+            cout<<" density before "<<u[i+1].u1<<endl;
         }
     }
+
 }
 
 

@@ -24,6 +24,7 @@
             phi[i]           = get_phi_grav(x_i12[i], enclosed_mass[i]);
             
         }
+        phi[0]           = get_phi_grav(x_i12[1],         planet_mass);
             
 
     }
@@ -152,9 +153,7 @@
         
         //double ptemp    = (gamma_adiabat-1.)*(u.u3  - 0.5* u.u2*u.u2 / u.u1 );
         double pfinal;   //= pressure[i] - 0.5 * u.u1 * (phi_l - phi_r);
-        double phi_l = 0;
-        double phi_r = 0;
-        
+    
         /*if(i==0)
             pfinal = pressure[0] - 0.5 * u[0].u1 * (phi[1] - phi[0]);
         
@@ -178,9 +177,9 @@
         if (pfinal < 0.) {
             if(suppress_warnings == 0) {
                 cout<<"Warning: Negative pressure computed and replaced in nonuniform cell "<<i<<" at time= "<<globalTime<<" iter = "<<steps<<endl;
-                cout<<" cell "<<i;
-                cout<<" u =  "<<u[i].u1<<"/"<<u[i].u2<<"/"<<u[i].u3;
-                cout<<" phil-phir "<<(phi_l-phi_r)<<" p= "<<pressure[i]<<" pfinal= "<<pfinal<<endl;
+                cout<<" cell "<<i<<" case /pm = "<<plusminus<<endl;
+                cout<<" u =  "<<u[i].u1<<"/"<<u[i].u2<<"/"<<u[i].u3<<endl;
+                cout<<" phil-phir "<<(phi[i+plusminus] - phi[i])<<" p= "<<pressure[i]<<" pfinal= "<<pfinal<<endl;
                 char a ;
                 cin>>a;
             }

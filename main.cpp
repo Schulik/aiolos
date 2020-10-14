@@ -30,7 +30,7 @@ int main(int argc, char** argv)
     //
     // Loop through all args, in order to find the name of the parameter file (KEY), debug options etc.
     //
-    
+    cout<<std::scientific;
     cout<<"Use -par name.par to give key parameters to the executable."<<endl;
     
     int parameterfile_found = 0;
@@ -54,7 +54,7 @@ int main(int argc, char** argv)
         }
         if(tmpstring.compare("-war") == 0) {
             string yet_another_string = argv[i+1];
-            suppress_warnings_global =   std::stoi(tmpstring);
+            suppress_warnings_global =   std::stoi(yet_another_string);
             
             cout<<"Suppressing warnings yes/no = 1/0 : "<<suppress_warnings_global<<endl;
             i++;
