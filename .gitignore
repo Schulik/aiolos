@@ -1,0 +1,9 @@
+*.o
+*.dat
+*~
+test_files/*.o
+test_files/*.dat
+test_files/*~
+aiolos
+tests
+.vscode
