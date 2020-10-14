@@ -7,8 +7,7 @@ void hydro_run::execute() {
     const int maxsteps = 1e9;
     dt = get_cfl_timestep();
     double pressure_temp;
-    double pressure_temp2;
-    
+        
     cout<<"Beginning main loop with num_cells="<<num_cells<<" and timestep="<<dt<<" cflfacotr="<<cflfactor<<endl;
     
     compute_pressure();
