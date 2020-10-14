@@ -88,7 +88,7 @@
         // Linear or 1/r gravity
         //
         if(use_linear_gravity)
-            return mass*abs(r);
+            return -mass*abs(domain_max - r);
         else
         {
             if(abs(r-planet_position) > rs_at_moment )

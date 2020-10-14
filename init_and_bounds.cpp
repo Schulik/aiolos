@@ -161,10 +161,11 @@ hydro_run::hydro_run(string filename) {
         //
         x_i[0] = domain_min;
         if(type_of_grid==1) {
-            
-            x_i[1] = x_i[0] + dx0;
-            x_i[2] = x_i[1] + dx0;
             double dlogx = pow(10.,1./cells_per_decade);
+            
+            x_i[1] = x_i[0] * dlogx;
+            x_i[2] = x_i[1] + (x_i[1] - x_i[0]);
+            
             for(int i=3; i< num_cells-1; i++) {
                 x_i[i]   = x_i[i-1] * dlogx;
             }
@@ -428,11 +429,11 @@ void hydro_run::initialize_hydrostatic_atmosphere_nonuniform() {
     for(int i=num_cells+1; i>=0; i--) {
             //temperature[i] = planet_mass / x_i12[i] / (cv * gamma_adiabat) + 1.;
             temperature[i] = - 1.0 * phi[i] / (cv * gamma_adiabat) + 1.;
-            
+            //temperature[i] = 100.;
+        
             //Add temperature bumps and troughs
-            temperature[i] += TEMPERATURE_BUMP_STRENGTH * 4. * exp( - pow(x_i12[i] - 1.e-1 ,2.) / (0.1) );
-            
-            temperature[i] -= TEMPERATURE_BUMP_STRENGTH * 40. * exp( - pow(x_i12[i] - 3.e-3 ,2.) / (1.e-3) );
+            //temperature[i] += TEMPERATURE_BUMP_STRENGTH * 4. * exp( - pow(x_i12[i] - 1.e-1 ,2.) / (0.1) );
+            //temperature[i] -= TEMPERATURE_BUMP_STRENGTH * 40. * exp( - pow(x_i12[i] - 3.e-3 ,2.) / (1.e-3) );
     }
     
     //Last normal cell has to be awkwardly initialized
@@ -706,8 +707,10 @@ void hydro_run::apply_boundary_right() {
 //
 void hydro_run::add_wave(double globalTime, double WAVE_PERIOD, double WAVE_AMPLITUDE)  {
     
+    
     u[0].u2 = u[0].u1 * WAVE_AMPLITUDE * std::sin(12.*M_PI*globalTime/WAVE_PERIOD);
     u[1].u2 = u[0].u2;
+    
 }
 hydro_run::~hydro_run() {
     
