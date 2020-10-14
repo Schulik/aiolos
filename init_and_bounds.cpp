@@ -262,9 +262,6 @@ hydro_run::hydro_run(string filename) {
         omegaplus[num_cells+1]  = omegaplus[num_cells]  + (omegaplus[num_cells] - omegaplus[num_cells-1]);
         
         for(int i=1; i<num_cells+1; i++) {
-            //source_pressure_prefactor_left[i]  = pow(x_i[i-1],2.) * (4./3.*M_PI+4.*M_PI) + 4./3.*M_PI * (pow(x_i[i],2.) + x_i[i-1]*x_i[i]); 
-            //source_pressure_prefactor_right[i] = pow(x_i[i],2.)  *  (4./3.*M_PI-4.*M_PI) + 4./3.*M_PI * (pow(x_i[i-1],2.) + x_i[i-1]*x_i[i]); 
-            
             source_pressure_prefactor_left[i]  = (surf[i-1]/vol[i] - 1./dx[i]); 
             source_pressure_prefactor_right[i] = (surf[i]  /vol[i] - 1./dx[i]); 
         }
@@ -391,6 +388,14 @@ hydro_run::hydro_run(string filename) {
             initialize_hydrostatic_atmosphere_nonuniform();
         }
         
+        USE_WAVE = read_parameter_from_file<int>(filename,"WAVE_USE", debug).value; 
+        if(USE_WAVE==1) {
+            WAVE_AMPLITUDE = read_parameter_from_file<double>(filename,"WAVE_AMPLITUDE", debug).value; 
+            WAVE_PERIOD    = read_parameter_from_file<double>(filename,"WAVE_PERIOD", debug).value; 
+        }
+        
+        // TEMPERATURE_BUMP_STRENGTH = read_parameter_from_file<double>(filename,"TEMPERATURE_BUMP_STRENGTH", debug).value; 
+        
         if(debug > 0)
             cout<<"Ended init."<<endl;
 }
@@ -425,9 +430,9 @@ void hydro_run::initialize_hydrostatic_atmosphere_nonuniform() {
             temperature[i] = - 1.0 * phi[i] / (cv * gamma_adiabat) + 1.;
             
             //Add temperature bumps and troughs
-            temperature[i] += 4. * exp( - pow(x_i12[i] - 1.e-1 ,2.) / (0.1) );
+            temperature[i] += TEMPERATURE_BUMP_STRENGTH * 4. * exp( - pow(x_i12[i] - 1.e-1 ,2.) / (0.1) );
             
-            temperature[i] -= 40. * exp( - pow(x_i12[i] - 3.e-3 ,2.) / (1.e-3) );
+            temperature[i] -= TEMPERATURE_BUMP_STRENGTH * 40. * exp( - pow(x_i12[i] - 3.e-3 ,2.) / (1.e-3) );
     }
     
     //Last normal cell has to be awkwardly initialized
@@ -696,6 +701,14 @@ void hydro_run::apply_boundary_right() {
     }
 }
 
+//
+// Creates a wave at the inner boundary supposedly propagating upwards in the gravity well
+//
+void hydro_run::add_wave(double globalTime, double WAVE_PERIOD, double WAVE_AMPLITUDE)  {
+    
+    u[0].u2 = u[0].u1 * WAVE_AMPLITUDE * std::sin(12.*M_PI*globalTime/WAVE_PERIOD);
+    u[1].u2 = u[0].u2;
+}
 hydro_run::~hydro_run() {
     
     cout<<"The destructor is called, but its empty so far."<<endl;

@@ -49,7 +49,9 @@ void hydro_run::execute() {
         
         apply_boundary_left() ;
         apply_boundary_right() ;
-            
+        
+        if(USE_WAVE==1) 
+                add_wave(globalTime, WAVE_PERIOD, WAVE_AMPLITUDE);
         
         //if(steps==0)
         //    cout<<" initial ghost momentum after start: "<<left_ghost.u2<<endl;
@@ -90,20 +92,8 @@ void hydro_run::execute() {
         
         for(int j=1; j<=num_cells; j++) {
             source[j]          = source_grav(u[j], j);
-            //pressure_temp = 0.5*(omegaminus[j] * pressure_l[j] + omegaplus[j] * pressure_r[j]); 
-            //pressure_temp = 0.85* omegaminus[j] * pressure_l[j] + 0.15 * omegaplus[j] * pressure_r[j]; 
-            pressure_temp2 = (0.75* omegaminus[j] * pressure[j-1] + 0.25* omegaplus[j] * pressure_r[j+1]) * (surf[j]-surf[j-1])/vol[j] ; 
-            pressure_temp = 0.5*(source_pressure_prefactor_right[j] * pressure_l[j] + source_pressure_prefactor_left[j] * pressure_r[j]);
-            source_pressure[j] = AOS(0, pressure_temp2  ,0); 
-            //source_pressure[j] = AOS(0, pressure_temp ,0); 
-            if(debug >= 999) {
-                
-                cout<<" i="<<j<<" pS1="<<pressure_temp<<" pS2="<<pressure_temp2<<endl;
-                
-            }
-                
-                
-                //cout<<"pressure_temp / pressure["<<j<<"] = "<<pressure_temp/pressure[j]<<" || prefl="<<source_pressure_prefactor_left[j]<<" press_l="<<pressure_l[j]<<" || prefr="<<source_pressure_prefactor_right[j]<<" press_r="<<pressure_r[j]<<" sum_omega="<<omegaplus[j] +omegaminus[j]<<endl;
+            pressure_temp      = -(source_pressure_prefactor_left[j] * pressure_l[j] - source_pressure_prefactor_right[j] * pressure_r[j]);
+            source_pressure[j] = AOS(0, pressure_temp  ,0); 
         }
             
         //
@@ -140,27 +130,30 @@ void hydro_run::execute() {
                     break;
             }
             
-            if( (debug > 0) && ( j==1 || j==num_cells || j==20 )) {
+            
+            if( (debug > 0) && ( j==1 || j==num_cells || j==(num_cells/2) )) {
                 char alpha;
                 cout<<"Debuggin fluxes in cell i= "<<j<<endl; 
                 cout<<"fl.u1 = "<<flux[j-1].u1<<": fr.u1 = "<<flux[j].u1<<endl;
                 cout<<"fl.u2 = "<<flux[j-1].u2<<": fr.u2 = "<<flux[j].u2<<endl;
                 cout<<"fl.u3 = "<<flux[j-1].u3<<": fr.u3 = "<<flux[j].u3<<endl;
                 cout<<"Cartesian fluxes: Fl-Fr+s = "<<((flux[j-1].u2 - flux[j].u2)/dx[j] + source[j].u2)<<endl;
-                cout<<"D_surface/volume="<<(0.5*(surf[j]-surf[j-1])/vol[j])<<" vs. 1/dx="<<dx[j]<<endl;
+                cout<<"D_surface/volume="<<(0.5*(surf[j]-surf[j-1])/vol[j])<<" vs. 1/dx="<<(1./dx[j])<<endl;
                 cout<<endl;
                 cout<<"s = "<<source[j].u2<<endl;
                 cout<<"sP = "<<source_pressure[j].u2<<endl;
                 
                 cout<<"Al*Fl - Ar*Fr = "<<((flux[j-1].u2 * surf[j-1] - flux[j].u2 * surf[j]) /vol[j])<<endl;
                 cout<<"Al*Fl - Ar*Fr + sP = "<<((flux[j-1].u2 * surf[j-1] - flux[j].u2 * surf[j]) /vol[j] + source_pressure[j].u2)<<endl;
-                cout<<"dP/dr = "<<((pressure[j-1] - pressure[j])/dx[j])<<endl;
+                cout<<"dP/dr = "<<((pressure_l[j] - pressure_r[j])/dx[j])<<endl;
+                cout<<"dP/dr + S = "<<((pressure_l[j] - pressure_r[j])/dx[j] + source[j].u2)<<endl;
                 cout<<endl;
                 cout<<"Al*Fl - Ar*Fr + s = "<<((flux[j-1].u2 * surf[j-1] - flux[j].u2 * surf[j]) /vol[j] + (source[j].u2))<<endl;
                 cout<<"Al*Fl - Ar*Fr + s + sP = "<<((flux[j-1].u2 * surf[j-1] - flux[j].u2 * surf[j]) /vol[j] + (source[j].u2 +source_pressure[j].u2))<<endl;
                 cin>>alpha;
             }
         }
+        
         
         if(debug >= 2)
             cout<<" Before updating rad fluxes... ";

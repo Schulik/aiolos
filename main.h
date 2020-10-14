@@ -255,6 +255,12 @@ class hydro_run
     AOS SHOCK_TUBE_UL, SHOCK_TUBE_UR; //For problem_number==1
     AOS BACKGROUND_U;                 //For problem_number==2
     
+    double TEMPERATURE_BUMP_STRENGTH = 1.;
+    
+    int    USE_WAVE;
+    double WAVE_AMPLITUDE;
+    double WAVE_PERIOD;
+    
     ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     //
     // Functions
@@ -297,7 +303,8 @@ class hydro_run
     void boundaries_open_both(AOS &left_ghost, const AOS &leftval, const AOS &leftval2, const AOS &rightval2, const AOS &rightval, AOS &right_ghost );
     void boundaries_planet_mdot(AOS &left_ghost, const AOS &leftval, const AOS &rightval, AOS &right_ghost );
     void boundaries_wall_both(AOS &left_ghost, const AOS &leftval, const AOS &rightval, AOS &right_ghost );
-
+    void add_wave(double time, double tmax, double amplitude);
+    
     void apply_boundary_left();
     void apply_boundary_right();
     void user_boundary_left();
