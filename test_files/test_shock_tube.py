@@ -1,4 +1,5 @@
 #!/usr/bin/python3
+import sys, os
 import numpy as np
 
 from load_aiolos import load_aiolos_snap, load_aiolos_params
@@ -216,13 +217,21 @@ def setup_riemann_solver(param_file):
                                               
     return Riemann(L, R, GAMMA)                                             
 
-def plot_riemann_solution(snap, param_file):
+def plot_riemann_solution(par_num):
+    param_file = 'shock_tube{}.par'.format(par_num)
+    snap_file = 'shock_tube{}_t-666.dat'.format(par_num)
+
+    #Get the Riemann problem
     exact = setup_riemann_solver(param_file)
+
+    data = load_aiolos_snap(snap_file)
 
     params = load_aiolos_params(param_file)
     x0 = float(params['PARI_INIT_SHOCK_MID'])
     t  = float(params['PARI_TIME_TMAX'])
 
+    x = data['x']
+    xa = x - x0
    
     import matplotlib.pyplot as plt
 
@@ -231,16 +240,19 @@ def plot_riemann_solution(snap, param_file):
 
     axes[0][0].plot(x, data['density'], '+', c='k')
     axes[0][0].plot(x, exact.density(xa, t), c='k')
-    axes[0][0].set_ylabel('density')
+    axes[0][0].set_ylabel('density')   
+    axes[0][0].xaxis.set_ticklabels([])
+
 
     axes[0][1].plot(x, data['velocity'], '+', c='k')
     axes[0][1].plot(x, exact.velocity(xa, t), c='k')
     axes[0][1].set_ylabel('velocity')
+    axes[0][1].xaxis.set_ticklabels([])
 
     axes[1][0].plot(x, data['pressure'], '+', c='k')
     axes[1][0].plot(x, exact.pressure(xa, t), c='k')
     axes[1][0].set_ylabel('pressure')
-    axes[1][1].set_xlabel('x')
+    axes[1][0].set_xlabel('x')
 
     u= (data['energy'] - 0.5*data['momentum']*data['velocity'])/data['density']
     axes[1][1].plot(x, u, '+', c='k')
@@ -248,9 +260,12 @@ def plot_riemann_solution(snap, param_file):
     axes[1][1].set_ylabel('internal energy')
     axes[1][1].set_xlabel('x')
 
+    f.subplots_adjust(top=0.9, bottom=0.11,
+                      left=0.095, right=0.965,
+                      hspace=0.05, wspace=0.235)
     return f
     
-def check_riemann_problem(par_num, L1_target=0):
+def check_riemann_problem(par_num, L1_target=0, make_plots=False):
     param_file = 'shock_tube{}.par'.format(par_num)
     snap_file = 'shock_tube{}_t-666.dat'.format(par_num)
 
@@ -271,12 +286,24 @@ def check_riemann_problem(par_num, L1_target=0):
         print("Riemann test {} L1 check failed. ".format(par_num) + 
               "L1={}, expected={}".format(L1,L1_target))
 
-    #plot_riemann_solution(snap, param_file)
+    if make_plots:
+        os.makedirs('plots', exist_ok=True)
+        fig_name = os.path.join('plots', 'shock_tube{}.png'.format(par_num))
+        plot_riemann_solution(par_num).savefig(fig_name)
         
     
 if __name__ == "__main__":
+    import argparse
+    
+    parser = argparse.ArgumentParser("Check shock tube test results")
+    parser.add_argument("-p", "--make_plots", default=None,
+                        action="store_true",
+                        help="Make plots of the results")
+    args = parser.parse_args()
+
+
     L1_errors = [np.nan, 0.016, 0.033, 0.25,
                  0.95, 0.078, 0.0040, 0.0035]
     for i in range(1, 8):
-        check_riemann_problem(i, L1_errors[i])
+        check_riemann_problem(i, L1_errors[i], args.make_plots)
 
