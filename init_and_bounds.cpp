@@ -58,14 +58,7 @@ hydro_run::hydro_run(string filename, double debug_) {
         //In main, execution is about to start.
 
         simname = filename;
-        //par_control  = par_control;
-        //par_numerics = par_numerics;
-        //par_physics  = par_physics;
         
-        //debug             = read_parameter_from_file(filename,"PARI_DEBUGLEVEL", TYPE_INT, debug).ivalue;   
-        
-        //cout<<"Pos1"<<endl;
-        //boundaries_number = read_parameter_from_file<int>(filename,"PARI_BOUND_TYPE", debug).value;
         boundary_left  = read_parameter_from_file<BoundaryType>(filename,"PARI_BOUND_TYPE_LEFT", debug).value;
         boundary_right = read_parameter_from_file<BoundaryType>(filename,"PARI_BOUND_TYPE_RIGHT", debug).value;
         //cout<<"Pos2"<<endl;
@@ -73,42 +66,11 @@ hydro_run::hydro_run(string filename, double debug_) {
         //cout<<"Pos3"<<endl;
  
         cout<<"boundaries used: "<<boundary_left<<" / "<<boundary_right<<endl;
-        /*
-        // Setup boundaries
-        if (boundaries_number == 1) {
-            boundary_left = boundary_right = BoundaryType::fixed ;
-            SHOCK_TUBE_UR = SHOCK_TUBE_UL = AOS(1,1,1) ;
-        }
-        if (boundaries_number == 2) {
-            if (problem_number == 2) {
-                boundary_left = BoundaryType::reflecting ;
-                boundary_right = BoundaryType::open ;
-            }
-            else {
-                boundary_left = BoundaryType::open ;
-                boundary_right = BoundaryType::open ;
-            }
-        }
-        // Wall / Reflecting boundaries at both ends
-        if (boundaries_number == 4)
-            boundary_left = boundary_right = BoundaryType::reflecting ;
-        */
         
         use_self_gravity  = read_parameter_from_file<int>(filename,"PARI_SELF_GRAV_SWITCH", debug).value;
         use_linear_gravity= read_parameter_from_file<int>(filename,"PARI_LINEAR_GRAV", debug).value;
         use_rad_fluxes    = read_parameter_from_file<int>(filename,"PARI_USE_RADIATION", debug).value;
         
-        double constopa;
-        if(use_rad_fluxes==1)
-            constopa   = read_parameter_from_file<double>(filename,"PARI_CONST_OPAC", debug).value;
-        else
-            constopa   = 1.;
-        
-        
-        opacity        = np_somevalue(num_cells+2, constopa);
-        opticaldepth   = np_zeros(num_cells+2);
-        radiative_flux = np_zeros(num_cells+1);
-        temperature    = np_somevalue(num_cells+2, 1.);
             
         
         if(use_self_gravity)
@@ -122,17 +84,6 @@ hydro_run::hydro_run(string filename, double debug_) {
         //	3 = Inflow left, outflow right
         //finalplotnumber = 1
         solver = 0;
-
-        ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        //
-        // Physical
-        //
-        ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-        gamma_adiabat   = read_parameter_from_file<double>(filename,"PARI_GAMMA", debug).value; //ratio of specific heats
-        ggminusone      = gamma_adiabat*(gamma_adiabat-1.);
-        const_T         = read_parameter_from_file<double>(filename,"PARI_CONST_TEMP",  debug).value;
-        T_increment     = read_parameter_from_file<double>(filename,"PARI_TEMP_INCR", debug).value;
         
         ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         //
@@ -270,18 +221,51 @@ hydro_run::hydro_run(string filename, double debug_) {
             source_pressure_prefactor_right[i] = (surf[i]  /vol[i] - 1./dx[i]); 
         }
         
+                
+        ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        //
+        // Physical
+        //
+        ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        
+        const_gamma_adiabat = read_parameter_from_file<double>(filename,"PARI_GAMMA", debug).value; //ratio of specific heats
+        const_cv            = read_parameter_from_file<double>(filename,"PARI_CONST_CV", debug).value; //ratio of specific heats
+        const_T             = read_parameter_from_file<double>(filename,"PARI_CONST_TEMP",  debug).value;
+        T_increment         = read_parameter_from_file<double>(filename,"PARI_TEMP_INCR", debug).value;
+        
+        
+        if(use_rad_fluxes==1)
+            const_opacity   = read_parameter_from_file<double>(filename,"PARI_CONST_OPAC", debug).value;
+        else
+            const_opacity   = 1.;
+        
         u               = init_AOS(num_cells+2); //{ np_ones(num_cells*3);   //Conserved hyperbolic variables: density, mass flux, energy density
         phi             = np_zeros(num_cells+2);  //Parabolic Variables: gravitational potential
         enclosed_mass   = np_zeros(num_cells+2);
         source          = init_AOS(num_cells+2);  //Parabolic Variables: gravitational potential
         source_pressure = init_AOS(num_cells+2);  //Parabolic Variables: gravitational potential
         flux            = init_AOS(num_cells+1);
-        //left_ghost = AOS(0,0,0);
-        //right_ghost= AOS(0,0,0);
         
-        //u_output = [];    //Array of arrays to store snapshots of u
-        //phi_output = [];  //Array of arrays to store snapshots of phi
-
+        gamma_adiabat   = np_somevalue(num_cells+2, const_gamma_adiabat);
+        cv              = np_somevalue(num_cells+2, const_cv);
+        opacity        = np_somevalue(num_cells+2, const_opacity);
+        opticaldepth   = np_zeros(num_cells+2);
+        radiative_flux = np_zeros(num_cells+1);
+        temperature    = np_somevalue(num_cells+2, const_T);
+        
+        //////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        //
+        // Last thing to do: Initialize derived quantities
+        //
+        //////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        
+        pressure        = np_zeros(num_cells+2); //Those helper quantities are also defined on the ghost cells, so they get +2
+        pressure_l      = np_zeros(num_cells+2); 
+        pressure_r      = np_zeros(num_cells+2); 
+        internal_energy = np_zeros(num_cells+2);
+        speed           = np_zeros(num_cells+2);
+        cs              = np_zeros(num_cells+2);
+        
         timecount = 0;
         plotcounter = 0;
         
@@ -290,7 +274,7 @@ hydro_run::hydro_run(string filename, double debug_) {
                 //cout<<"rho[0], v[0], e[0] = "<<u[0]<<" "<<u[num_cells]<<" "<<u[2*num_cells]<<endl;
                 cout<<"First cell coordinates: |<--"<<x_i[0]<<" // "<<x_i12[0]<<" // "<<x_i[1]<<"-->|"<<endl;
                 cout<<"Last cell coordinates:  |<--"<<x_i[num_cells-1]<<" // "<<x_i12[num_cells-1]<<" // "<<x_i[num_cells]<<"-->|"<<endl;
-                cout<<"Value of gamma: "<<gamma_adiabat<<endl;
+                cout<<"Value of gamma: "<<gamma_adiabat[num_cells]<<endl;
         } 
         
         //
@@ -309,8 +293,8 @@ hydro_run::hydro_run(string filename, double debug_) {
             SHOCK_TUBE_MID = read_parameter_from_file<double>(filename,"PARI_INIT_SHOCK_MID", debug).value;
             
             //Conversion from shock tube parameters (given as dens, velocity, pressure) to conserved variables (dens, momentum, internal energy)
-            SHOCK_TUBE_UL = AOS(u1l, u1l*u2l, 0.5*u1l*u2l*u2l + u3l/(gamma_adiabat-1.) );
-            SHOCK_TUBE_UR = AOS(u1r, u1r*u2r, 0.5*u1r*u2r*u2r + u3r/(gamma_adiabat-1.));
+            SHOCK_TUBE_UL = AOS(u1l, u1l*u2l, 0.5*u1l*u2l*u2l + u3l/(gamma_adiabat[0]-1.) );
+            SHOCK_TUBE_UR = AOS(u1r, u1r*u2r, 0.5*u1r*u2r*u2r + u3r/(gamma_adiabat[num_cells]-1.));
             
             initialize_shock_tube_test(SHOCK_TUBE_UL, SHOCK_TUBE_UR);
             
@@ -340,7 +324,7 @@ hydro_run::hydro_run(string filename, double debug_) {
             cout<<"Problem 2 pos2."<<endl;
             
             //Conversion from shock tube parameters (given as dens, velocity, pressure) to conserved variables (dens, momentum, internal energy)
-            BACKGROUND_U = AOS(u1, u1*u2, 0.5*u1*u2*u2 + u3/(gamma_adiabat-1.) );
+            BACKGROUND_U = AOS(u1, u1*u2, 0.5*u1*u2*u2 + u3/(gamma_adiabat[0]-1.) );
 
      
             /* mdot boundaries
@@ -377,19 +361,6 @@ hydro_run::hydro_run(string filename, double debug_) {
         else 
             initialize_default_test();
         
-        //////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        //
-        // Last thing to do: Initialize derived quantities
-        //
-        //////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        
-        pressure        = np_zeros(num_cells+2); //Those helper quantities are also defined on the ghost cells, so they get +2
-        pressure_l      = np_zeros(num_cells+2); 
-        pressure_r      = np_zeros(num_cells+2); 
-        internal_energy = np_zeros(num_cells+2);
-        speed           = np_zeros(num_cells+2);
-        cs              = np_zeros(num_cells+2);
-        
         
         USE_WAVE = read_parameter_from_file<int>(filename,"WAVE_USE", debug, 0).value; 
         if(USE_WAVE==1) {
@@ -398,8 +369,6 @@ hydro_run::hydro_run(string filename, double debug_) {
         }
         
         // TEMPERATURE_BUMP_STRENGTH = read_parameter_from_file<double>(filename,"TEMPERATURE_BUMP_STRENGTH", debug).value; 
-        
-        
         
         if(debug > 0)
             cout<<"Ended init."<<endl;
@@ -411,7 +380,6 @@ hydro_run::hydro_run(string filename, double debug_) {
 void hydro_run::initialize_hydrostatic_atmosphere_nonuniform() {
     
     cout<<"ATTENTION: Initializing nonuniform hydrostatic atmosphere and overwriting prior initial values."<<endl;
-    cv      = 1.;
     
     long double temp_rhofinal;
     long double factor_inner, factor_outer;
@@ -432,7 +400,7 @@ void hydro_run::initialize_hydrostatic_atmosphere_nonuniform() {
     //
     for(int i=num_cells+1; i>=0; i--) {
             //temperature[i] = planet_mass / x_i12[i] / (cv * gamma_adiabat) + 1.;
-            temperature[i] = - 1.0 * phi[i] / (cv * gamma_adiabat) + 10.;
+            temperature[i] = - 1.0 * phi[i] / (cv[i] * gamma_adiabat[i]) + temperature[num_cells+1];
             //temperature[i] = 100.;
         
             //Add temperature bumps and troughs
@@ -453,14 +421,14 @@ void hydro_run::initialize_hydrostatic_atmosphere_nonuniform() {
         T_outer = temperature[i+1];
         T_inner = temperature[i];  
 
-        factor_outer = (gamma_adiabat-1.) * cv * T_outer; //TODO: Replace with T_outer for non-isothermal EOS
-        factor_inner = (gamma_adiabat-1.) * cv * T_inner; //TODO: Replace with T_inner for non-isothermal EOS
+        factor_outer = (gamma_adiabat[i+1]-1.) * cv[i+1] * T_outer; //TODO: Replace with T_outer for non-isothermal EOS
+        factor_inner = (gamma_adiabat[i]  -1.)   * cv[i]   * T_inner; //TODO: Replace with T_inner for non-isothermal EOS
         metric_outer = (phi[i+1] - phi[i]) * omegaplus[i+1] * dx[i+1] / (dx[i+1] + dx[i]);
         metric_inner = (phi[i+1] - phi[i]) * omegaminus[i]  * dx[i]   / (dx[i+1] + dx[i]);
         
         temp_rhofinal = u[i+1].u1 * (factor_outer + metric_outer) / (factor_inner - metric_inner);
         
-        u[i] = AOS(temp_rhofinal, 0., cv * temp_rhofinal * T_inner) ;
+        u[i] = AOS(temp_rhofinal, 0., cv[i] * temp_rhofinal * T_inner) ;
         
         //
         // Debug info
@@ -478,12 +446,12 @@ void hydro_run::initialize_hydrostatic_atmosphere_nonuniform() {
             //cout<<"In hydostatic init: factor_dens = "<< (2.* factor_outer / delta_phi + 1.) / (2. * factor_inner / delta_phi - 1.) <<endl;
             cout<<"Ratio of densities inner/outer = "<< temp_rhofinal/u[i+1].u1 <<endl;
             cout<<"Ratio of temperatures inner/outer = "<<T_inner/T_outer<<" t_inner ="<<T_inner<<" t_outer ="<<T_outer<<endl;
-            cout<<"Ratio of pressures inner/outer = "<<cv * temp_rhofinal * T_inner /u[i+1].u3<<endl;
+            cout<<"Ratio of pressures inner/outer = "<<cv[i] * temp_rhofinal * T_inner /u[i+1].u3<<endl;
             //tempgrad = (gamma_adiabat-1.)*cv*u[i+1].u1*T_outer - (gamma_adiabat-1.)*cv*u[i].u1*T_inner  + 0.5 * (u[i].u1 + u[i+1].u1) * delta_phi;
             //tempgrad2 = ((gamma_adiabat-1.)*cv*T_outer + 0.5 * delta_phi) * u[i+1].u1 - ((gamma_adiabat-1.)*cv*T_inner  + 0.5 * delta_phi ) * u[i].u1 ;
             //residual = (gamma_adiabat-1.)*cv*u[i+1].u1*T_outer - (gamma_adiabat-1.)*cv*u[i].u1*T_inner  + 0.5 * (u[i].u1 + u[i+1].u1) * delta_phi;
             //cout<<"pressure diff "<<(gamma_adiabat-1.)*u[i+1].u3 - (gamma_adiabat-1.)*(u[i].u3)<<endl;
-            cout<<"pressure diff "<<( ((gamma_adiabat-1.)*cv*u[i+1].u1*T_outer - (gamma_adiabat-1.)*cv*u[i].u1*T_inner)/dx[i])<<endl;
+            cout<<"pressure diff "<<( ((gamma_adiabat[i+1]-1.)*cv[i+1]*u[i+1].u1*T_outer - (gamma_adiabat[i]-1.)*cv[i]*u[i].u1*T_inner)/dx[i])<<endl;
             //cout<<"density sum with potential "<<(0.5 * (u[i].u1 + u[i+1].u1) * delta_phi/dx[i])<<endl;
             cout<<"density diff "<<(u[i].u1 - u[i+1].u1)<<endl;
             cout<<"density sum " <<(u[i].u1 + u[i+1].u1)<<endl;
@@ -550,25 +518,25 @@ void hydro_run::apply_boundary_left() {
             user_boundary_left();
             break;
         case BoundaryType::open:
-            u[0] = u[1]; 
-            E_kinetic = 0.5*u[1].u2*u[1].u2/u[1].u1 ;
-            pressure_active  = (gamma_adiabat-1.) * (u[1].u3 - E_kinetic);
+            u[0]            = u[1]; 
+            E_kinetic       = 0.5 * u[1].u2 * u[1].u2 / u[1].u1 ;
+            pressure_active = (gamma_adiabat[1]-1.) * (u[1].u3 - E_kinetic);
             // Hydrostatic pressure extrapolation 
             pressure_bound = pressure_active - u[1].u1 * (phi[0] - phi[1]) ;
             pressure_bound = std::max(pressure_bound, 0.0) ;
-            u[0].u3 = pressure_bound/(gamma_adiabat-1.) + E_kinetic ;
+            u[0].u3        = pressure_bound/(gamma_adiabat[0]-1.) + E_kinetic ;
             break ;
         case BoundaryType::reflecting:
-            u[0] = u[1]; 
+            u[0]     = u[1]; 
             u[0].u2 *= -1;
-            phi[0] = phi[1] ;
+            phi[0]   = phi[1] ;
             break;
         case BoundaryType::fixed:
-            u[0] = SHOCK_TUBE_UL;
+            u[0]     = SHOCK_TUBE_UL;
             break;
         case BoundaryType::periodic:
-            u[0] = u[num_cells];
-            phi[0] = phi[num_cells] ;
+            u[0]     = u[num_cells];
+            phi[0]   = phi[num_cells] ;
             break;
     }
 }
@@ -580,25 +548,25 @@ void hydro_run::apply_boundary_right() {
             user_boundary_right();
             break;
         case BoundaryType::open:
-            u[num_cells+1] = u[num_cells]; 
-            E_kinetic = 0.5*u[num_cells].u2*u[num_cells].u2/u[num_cells].u1 ;
-            pressure_active  = (gamma_adiabat-1.) * (u[num_cells].u3 - E_kinetic);
+            u[num_cells+1]    = u[num_cells]; 
+            E_kinetic         = 0.5 * u[num_cells].u2 * u[num_cells].u2 / u[num_cells].u1 ;
+            pressure_active   = (gamma_adiabat[num_cells]-1.) * (u[num_cells].u3 - E_kinetic);
             // Hydrostatic pressure extrapolation 
-            pressure_bound = pressure_active - u[num_cells].u1 * (phi[num_cells+1] - phi[num_cells]) ;
-            pressure_bound = std::max(pressure_bound, 0.0) ;
-            u[num_cells+1].u3 = pressure_bound/(gamma_adiabat-1.) + E_kinetic ;
+            pressure_bound    = pressure_active - u[num_cells].u1 * (phi[num_cells+1] - phi[num_cells]) ;
+            pressure_bound    = std::max(pressure_bound, 0.0) ;
+            u[num_cells+1].u3 = pressure_bound / (gamma_adiabat[num_cells+1]-1.) + E_kinetic ;
             break ;
         case BoundaryType::reflecting:
-            u[num_cells+1] = u[num_cells]; 
+            u[num_cells+1]     = u[num_cells]; 
             u[num_cells+1].u2 *= -1;
-            phi[num_cells+1] = phi[num_cells] ;
+            phi[num_cells+1]   = phi[num_cells] ;
             break;
         case BoundaryType::fixed:
-            u[num_cells+1] = SHOCK_TUBE_UR;
+            u[num_cells+1]     = SHOCK_TUBE_UR;
             break;
         case BoundaryType::periodic:
-            u[num_cells+1] = u[1];
-            phi[num_cells+1] = phi[1] ;
+            u[num_cells+1]     = u[1];
+            phi[num_cells+1]   = phi[1] ;
             break;
     }
 }

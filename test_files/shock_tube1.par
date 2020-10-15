@@ -48,3 +48,4 @@ PARI_CONST_TEMP         1.
 PARI_TEMP_INCR          1.e-8
 PARI_USE_RADIATION      0
 PARI_CONST_OPAC         1.
+PARI_CONST_CV           1.

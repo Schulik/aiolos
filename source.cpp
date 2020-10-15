@@ -53,7 +53,6 @@
             
             enclosed_mass[i] = enclosed_mass[i-1] +  4. * 3.141592 * (pow(x_i[i],3.)-pow(x_i[i-1],3.) )/3. * u[i].u1; //Straightfoward integration of the poisson eqn
             
-            
             if (use_self_gravity == 1) 
                 phi[i]           = get_phi_grav(x_i12[i], enclosed_mass[i]);
             else
@@ -97,7 +96,6 @@
                 return -mass * (pow(r-planet_position,3.)/pow(rs_at_moment,4.)  - 2.* pow(r-planet_position,2.)/pow(rs_at_moment,3.) + 2./rs_at_moment );
             
         }
-            //return -mass/( sqrt( pow(r-planet_position,2.) + rs_at_moment*rs_at_moment) );
             
     }
 
@@ -110,17 +108,8 @@
     //
     double hydro_run::get_p_hydrostatic(AOS &u, double &phi_l, double &phi_r,const int &i) {
         
-        double ptemp    = (gamma_adiabat-1.)*(u.u3  - 0.5* u.u2*u.u2 / u.u1 );
+        double ptemp    = (gamma_adiabat[i]-1.)*(u.u3  - 0.5* u.u2*u.u2 / u.u1 );
         double pfinal   = pressure[i] - 0.5 * u.u1 * (phi_l - phi_r);
-        
-        /*
-        if(switchi > 0) {
-            pfinal = pressure[i] - dx[i] * omegaplus[i] * u.u1 * (phi[i-1] - phi[i]) / (dx[i-1] + dx[i]);
-        }
-        else {
-            pfinal = pressure[i] - dx[i] * omegaminus[i] * u.u1 * (phi[i+1] - phi[i]) / (dx[i+1] + dx[i]);
-        }*/
-        
         
         //if self.debug > 2:
          //   print(" In P_HYDROSTATIC : phi_l-phi_r = " + repr(phi_l) + "-" + repr(phi_r) + " p,pfinal = " + repr([p,pfinal]))
@@ -151,26 +140,14 @@
     //
     double hydro_run::get_p_hydrostatic_nonuniform(const int &i, const int &plusminus) {
         
-        //double ptemp    = (gamma_adiabat-1.)*(u.u3  - 0.5* u.u2*u.u2 / u.u1 );
-        double pfinal;   //= pressure[i] - 0.5 * u.u1 * (phi_l - phi_r);
+        double pfinal;
     
-        /*if(i==0)
-            pfinal = pressure[0] - 0.5 * u[0].u1 * (phi[1] - phi[0]);
-        
-        else if(i==num_cells+1)
-            pfinal = pressure[num_cells+1] - 0.5 * u[num_cells+1].u1 * (phi[num_cells] - phi[num_cells+1]);
-        
-        else {
-            */
-            if(plusminus == -1) {
+        if(plusminus == -1) {
                 pfinal = pressure[i] - dx[i] * omegaplus[i] * u[i].u1 * (phi[i-1] - phi[i]) / (dx[i-1] + dx[i]);
-            }
-            else {
+        } else {
                 pfinal = pressure[i] - dx[i] * omegaminus[i] * u[i].u1 * (phi[i+1] - phi[i]) / (dx[i+1] + dx[i]);
-            }
+        }
             
-        //}
-        
         //if self.debug > 2:
          //   print(" In P_HYDROSTATIC : phi_l-phi_r = " + repr(phi_l) + "-" + repr(phi_r) + " p,pfinal = " + repr([p,pfinal]))
 
@@ -213,13 +190,8 @@
             
         }
         
-        //return  AOS(0, u.u1, u.u2) * (-1.) * (phi[j+1] - phi[j-1]) / (x_i12[j+1] - x_i12[j-1]);
     }
 
-    
-        
-        
-        
     
         ///////////////////////////////////////////////////////////
         //

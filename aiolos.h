@@ -195,12 +195,10 @@ class hydro_run
     double rs_time;
     int    init_static_atmosphere;
     int    static_atmosphere_tempprofile;
-    double gamma_adiabat;           //ratio of specific heats
-    double ggminusone;
-    double mdot;
-    double cv;
     double const_T;
-    double T_increment;
+    double const_gamma_adiabat;
+    double const_cv;
+    double const_opacity;
 
     ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     //
@@ -242,7 +240,8 @@ class hydro_run
     std::vector<double> opacity;
     std::vector<double> temperature;
     std::vector<double> radiative_flux;
-    
+    std::vector<double> cv;
+    std::vector<double> gamma_adiabat;           //ratio of specific heats
     
     ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     //
@@ -260,6 +259,9 @@ class hydro_run
     int    USE_WAVE;
     double WAVE_AMPLITUDE;
     double WAVE_PERIOD;
+    
+    double mdot;
+    double T_increment;
     
     ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     //

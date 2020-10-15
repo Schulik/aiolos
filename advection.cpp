@@ -112,7 +112,6 @@ void hydro_run::execute() {
         for(int j=1; j<=num_cells; j++) {
             u[j] = u[j] + (flux[j-1] * surf[j-1] - flux[j] * surf[j]) * dt/vol[j] + (source[j] + source_pressure[j]) * dt;
             
-            
             if( (debug > 0) && ( j==1 || j==num_cells || j==(num_cells/2) )) {
                 char alpha;
                 cout<<"Debuggin fluxes in cell i= "<<j<<endl; 
@@ -167,30 +166,19 @@ void hydro_run::execute() {
 
 AOS hydro_run::hllc_flux(AOS &leftval, AOS &rightval, const int &jleft, const int& jright) 
 {
-    //int decision = -1;
     AOS flux;
- 
-    /*double SL = wave_speeds2(leftval,  d_minusone, jleft); 
-    double SR = wave_speeds2(rightval, d_plusone,  (jleft+1));
-    AOS    FL = analytic_flux2(leftval, jleft);
-    AOS    FR = analytic_flux2(rightval,(jleft+1)); */
     
     //Speed of gas
-    double ul = speed[jleft]; //leftval.u2  / leftval.u1; 
-    double ur = speed[jright];      //rightval.u2 / rightval.u1;
+    double ul = speed[jleft]; 
+    double ur = speed[jright];
     
-    //Pressures with hydrostatic reconstruction
-    //double pl = get_p_hydrostatic(leftval, phi_r, phi_l, jleft);
-    //double pr = get_p_hydrostatic(rightval, phi_l, phi_r, jright);
-    
-    double pl = pressure_r[jleft];  //get_p_hydrostatic_nonuniform(jleft,  +1);
-    double pr = pressure_l[jright]; //get_p_hydrostatic_nonuniform(jright, -1);
+    double pl = pressure_r[jleft];  
+    double pr = pressure_l[jright]; 
     
     //Speed of shocks
-    double SL = ul - std::sqrt(gamma_adiabat*pl/leftval.u1);
-    double SR = ur + std::sqrt(gamma_adiabat*pr/rightval.u1);
+    double SL = ul - std::sqrt(gamma_adiabat[jleft]*pl/leftval.u1);
+    double SR = ur + std::sqrt(gamma_adiabat[jright]*pr/rightval.u1);
     
-     
     //Intermediate values in the star region, equations 10.30 -10.39 in Toro
     double SS     = ( pr-pl+leftval.u2*(SL - ul)-rightval.u2*(SR-ur) )/(leftval.u1*(SL - ul)-rightval.u1*(SR-ur) );
     
@@ -202,7 +190,6 @@ AOS hydro_run::hllc_flux(AOS &leftval, AOS &rightval, const int &jleft, const in
         AOS FS_L       = FL + (US_L - leftval)  * SL;    
            
         flux = FS_L;
-        //decision = 0;
     }
     else if ((SS <= 0) && (SR >= 0)) {
         
@@ -212,17 +199,14 @@ AOS hydro_run::hllc_flux(AOS &leftval, AOS &rightval, const int &jleft, const in
         AOS FS_R       = FR + (US_R - rightval) * SR;
         
         flux = FS_R;
-        //decision = 1;
     }
     else if (SL >= 0) {
         AOS FL = AOS (leftval.u2, leftval.u2 * ul  + pl, ul * (leftval.u3 + pl) );
         flux = FL;
-        //decision = 2;
     }
     else if (SR <= 0) {
         AOS FR = AOS (rightval.u2,rightval.u2 * ur + pr, ur * (rightval.u3 + pr) );
         flux = FR;
-        //decision = 3;
     }
     return flux;
 }
