@@ -1,6 +1,6 @@
 #include <sstream>
 #include <stdexcept>
-#include "main.h"
+#include "aiolos.h"
 
 std::vector<AOS> init_AOS(int num) {   
     return std::vector<AOS>(num);
@@ -240,15 +240,29 @@ void hydro_run::print_AOS_component_tofile(const std::vector<double>& x,
                                           const std::vector<AOS>& data,
                                           const std::vector<AOS>& fluxes,
                                           int timestepnumber) {
-    string filename;
-    stringstream filenamedummy;
-    string truncated_name = stringsplit(simname,".")[0];
-    filenamedummy<<"output_"<<truncated_name<<"_t"<<timestepnumber<<".dat";
-    
+                                              
+    // Choose a sensible default output name
+    string filename ;
+    {
+        stringstream filenamedummy;
+        string truncated_name = stringsplit(simname,".")[0];
+        filenamedummy<<"output_"<<truncated_name;
+        filename = filenamedummy.str() ;
+    }
+
+    filename = read_parameter_from_file<string>(simname, "OUTPUT_FILENAME", debug, filename).value ;
+
+    // Add the snap number
+    {
+        stringstream filenamedummy;
+        filenamedummy << filename << "_t" << timestepnumber << ".dat";
+        filename = filenamedummy.str() ;
+    }
+
     if(debug > 1)
-        cout<<"Trying to open file "<<filenamedummy.str()<<endl;
+        cout<<"Trying to open file "<<filename<<endl;
     
-    ofstream outfile(filenamedummy.str(), ios::out);
+    ofstream outfile(filename, ios::out);
     
     if (outfile.is_open())
     {
@@ -262,8 +276,8 @@ void hydro_run::print_AOS_component_tofile(const std::vector<double>& x,
         //Print the domain
         for(int i=1; i<=num_cells; i++) {
             
-            hydrostat = flux[i].u2/dx[i] ; //hydrostat2 + hydrostat3 ; 
-            hydrostat2 = flux[i+1].u2/dx[i];//pressure[i+1] - pressure[i];
+            hydrostat = flux[i-1].u2/dx[i] ; //hydrostat2 + hydrostat3 ; 
+            hydrostat2 = flux[i].u2/dx[i];//pressure[i+1] - pressure[i];
             hydrostat3 = source[i].u2;//0.5 * (data[i].u1 + data[i+1].u1) * (phi[i+1] - phi[i]);
             
             
@@ -276,10 +290,11 @@ void hydro_run::print_AOS_component_tofile(const std::vector<double>& x,
         
         //Print right ghost stuff
         outfile<<x[num_cells+1]<<'\t'<<data[num_cells+1].u1<<'\t'<<data[num_cells+1].u2<<'\t'<<data[num_cells+1].u3<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<pressure[num_cells+1]<<'\t'<<data[num_cells+1].u2/data[num_cells+1].u1<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<phi[num_cells+1]<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<endl;
+   
+        cout<<"Sucessfully written file "<<filename<<" with smoothed gravity = "<<rs_at_moment<<" at time "<<globalTime<<" and dt="<<dt<<endl;
     }
-    else cout << "Unable to open file.";
+    else cout << "Unable to open file" << filename << endl; 
     outfile.close();
     
-    cout<<"Sucessfully written file "<<filenamedummy.str()<<" with smoothed gravity = "<<rs_at_moment<<" at time "<<globalTime<<" and dt="<<dt<<endl;
  
 }
