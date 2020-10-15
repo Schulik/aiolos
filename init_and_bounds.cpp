@@ -484,6 +484,8 @@ void hydro_run::initialize_hydrostatic_atmosphere_nonuniform() {
             cout<<" density before "<<u[i+1].u1<<endl;
         }
     }
+    
+    cout<<"Ended hydrostatic construction."<<endl;
 
 }
 
