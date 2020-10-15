@@ -195,8 +195,9 @@ class hydro_run
     double rs_time;
     int    init_static_atmosphere;
     int    static_atmosphere_tempprofile;
+    
     double gamma_adiabat;           //ratio of specific heats
-    double ggminusone;
+    //double ggminusone;
     double mdot;
     double cv;
     double const_T;

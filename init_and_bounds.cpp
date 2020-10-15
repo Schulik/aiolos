@@ -123,16 +123,6 @@ hydro_run::hydro_run(string filename, double debug_) {
         //finalplotnumber = 1
         solver = 0;
 
-        ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        //
-        // Physical
-        //
-        ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-        gamma_adiabat   = read_parameter_from_file<double>(filename,"PARI_GAMMA", debug).value; //ratio of specific heats
-        ggminusone      = gamma_adiabat*(gamma_adiabat-1.);
-        const_T         = read_parameter_from_file<double>(filename,"PARI_CONST_TEMP",  debug).value;
-        T_increment     = read_parameter_from_file<double>(filename,"PARI_TEMP_INCR", debug).value;
         
         ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         //
@@ -276,6 +266,23 @@ hydro_run::hydro_run(string filename, double debug_) {
         source          = init_AOS(num_cells+2);  //Parabolic Variables: gravitational potential
         source_pressure = init_AOS(num_cells+2);  //Parabolic Variables: gravitational potential
         flux            = init_AOS(num_cells+1);
+        
+        
+        ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        //
+        // Physical
+        //
+        ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        
+        //double const_gamma_adiabat = read_parameter_from_file<double>(filename,"PARI_GAMMA", debug).value; //ratio of specific heats
+        gamma_adiabat   = read_parameter_from_file<double>(filename,"PARI_GAMMA", debug).value;
+        //double const_cv = read_parameter_from_file<double>(filename,"PARI_CV", debug).value; //ratio of specific heats
+        cv   =  1; 
+        const_T         = read_parameter_from_file<double>(filename,"PARI_CONST_TEMP",  debug).value;
+        T_increment     = read_parameter_from_file<double>(filename,"PARI_TEMP_INCR", debug).value;
+        
+        
+        
         //left_ghost = AOS(0,0,0);
         //right_ghost= AOS(0,0,0);
         
@@ -411,7 +418,7 @@ hydro_run::hydro_run(string filename, double debug_) {
 void hydro_run::initialize_hydrostatic_atmosphere_nonuniform() {
     
     cout<<"ATTENTION: Initializing nonuniform hydrostatic atmosphere and overwriting prior initial values."<<endl;
-    cv      = 1.;
+    //cv      = 1.;
     
     long double temp_rhofinal;
     long double factor_inner, factor_outer;

@@ -92,7 +92,7 @@ std::vector<double> np_zeros(int size) {
 //
 // Return a 1-D array of one, identical to the numpy function
 //
-std::vector<double> nnp_ones(int size) {
+std::vector<double> np_ones(int size) {
 
     return std::vector<double>(size, 1.0) ;
 }
