@@ -5,12 +5,9 @@ void hydro_run::execute() {
     steps = 0;
     double output_counter = 0;
     const int maxsteps = 1e9;
-    dt = get_cfl_timestep();
     double pressure_temp;
         
     cout<<"Beginning main loop with num_cells="<<num_cells<<" and timestep="<<dt<<" cflfacotr="<<cflfactor<<endl;
-    
-    compute_pressure();
     
     ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~////
     //                                                                         //
@@ -18,6 +15,9 @@ void hydro_run::execute() {
     //                                                                         //
     ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~////
     for (globalTime = 0; (globalTime < t_max) && (steps < maxsteps); ) {
+        
+        compute_pressure();
+        dt = get_cfl_timestep();
         
         //
         // Step 0: Update gravity. Important for self-gravity and time-dependent smoothing length
@@ -154,9 +154,6 @@ void hydro_run::execute() {
         
         globalTime += dt;
         steps++;
-        
-        //This is already the next timestep. Note that the initial timestep is properly initialized!
-        dt = get_cfl_timestep();
         
         if(steps==1)
             cout<<"Initial sound crossing time = "<<snd_crs_time<<endl;
