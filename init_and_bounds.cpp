@@ -162,9 +162,11 @@ hydro_run::hydro_run(string filename) {
         x_i[0] = domain_min;
         if(type_of_grid==1) {
             
-            x_i[1] = x_i[0] + dx0;
-            x_i[2] = x_i[1] + dx0;
             double dlogx = pow(10.,1./cells_per_decade);
+            
+            x_i[1] = x_i[0] * dlogx;
+            x_i[2] = x_i[1] + (x_i[1] - x_i[0]);
+            
             for(int i=3; i< num_cells-1; i++) {
                 x_i[i]   = x_i[i-1] * dlogx;
             }
@@ -396,6 +398,8 @@ hydro_run::hydro_run(string filename) {
         
         // TEMPERATURE_BUMP_STRENGTH = read_parameter_from_file<double>(filename,"TEMPERATURE_BUMP_STRENGTH", debug).value; 
         
+        
+        
         if(debug > 0)
             cout<<"Ended init."<<endl;
 }
@@ -432,7 +436,7 @@ void hydro_run::initialize_hydrostatic_atmosphere_nonuniform() {
             //Add temperature bumps and troughs
             temperature[i] += TEMPERATURE_BUMP_STRENGTH * 4. * exp( - pow(x_i12[i] - 1.e-1 ,2.) / (0.1) );
             
-            temperature[i] -= TEMPERATURE_BUMP_STRENGTH * 40. * exp( - pow(x_i12[i] - 3.e-3 ,2.) / (1.e-3) );
+            temperature[i] -= TEMPERATURE_BUMP_STRENGTH * 15. * exp( - pow(x_i12[i] - 7.e-3 ,2.) / (1.5e-3) );
     }
     
     //Last normal cell has to be awkwardly initialized
