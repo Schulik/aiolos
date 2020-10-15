@@ -21,3 +21,19 @@ void hydro_run::user_initial_conditions(){
         "hydro::user_initial_conditions() not implemented. You must provide this "
         "method if you want to use user defined initial conditions.") ;
 }
+
+double hydro_run::eos_p_user(double density, double eint) {
+        throw std::runtime_error(
+        "hydro::eos_p_user() not implemented. You must provide this "
+        "method if you want to use a user-defined equation of state.") ;
+        
+        cout<<density<<eint;
+}
+
+double hydro_run::eos_e_user(double density, double temperature) {
+        throw std::runtime_error(
+        "hydro::eos_e_user() not implemented. You must provide this "
+        "method if you want to use a user-defined equation of state.") ;
+        
+        cout<<density<<temperature;
+}

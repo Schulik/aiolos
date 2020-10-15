@@ -210,3 +210,13 @@ AOS hydro_run::hllc_flux(AOS &leftval, AOS &rightval, const int &jleft, const in
     }
     return flux;
 }
+
+
+
+
+AOS hydro_run::analytic_flux(AOS &input_vec, const int &j) {
+     
+    return AOS (input_vec.u2, 
+                input_vec.u2*input_vec.u2/input_vec.u1 + pressure[j], 
+                input_vec.u2/input_vec.u1 * (input_vec.u3 + pressure[j]) );
+}

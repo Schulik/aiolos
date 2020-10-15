@@ -71,8 +71,6 @@ hydro_run::hydro_run(string filename, double debug_) {
         use_linear_gravity= read_parameter_from_file<int>(filename,"PARI_LINEAR_GRAV", debug).value;
         use_rad_fluxes    = read_parameter_from_file<int>(filename,"PARI_USE_RADIATION", debug).value;
         
-            
-        
         if(use_self_gravity)
             cout<<"WARNING: Self-gravity switched ON !!!"<<endl;
         else
@@ -253,6 +251,26 @@ hydro_run::hydro_run(string filename, double debug_) {
         radiative_flux = np_zeros(num_cells+1);
         temperature    = np_somevalue(num_cells+2, const_T);
         
+        //
+        // Determine which equation of states we are using
+        //
+        eos_pressure_type       = EOS_pressure_type::adiabatic;
+        eos_internal_energy_type = EOS_internal_energy_type::thermal;
+        
+        //Read EOS specifications from file
+        if(eos_pressure_type == EOS_pressure_type::tabulated) {
+            
+            //Read in data into tab_p;
+            read_tabulated_eos_data_pressure("eos_pressure.input");
+            
+        }
+        if(eos_internal_energy_type == EOS_internal_energy_type::tabulated) {
+            
+            //Read in data into tab_p;
+            read_tabulated_eos_data_eint("eos_internal_energy.input");
+        }
+        
+        
         //////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         //
         // Last thing to do: Initialize derived quantities
@@ -267,7 +285,6 @@ hydro_run::hydro_run(string filename, double debug_) {
         cs              = np_zeros(num_cells+2);
         
         timecount = 0;
-        plotcounter = 0;
         
         if(debug > 0) {
                 cout<<"DEBUGLEVEL 1: Samples of generated values"<<endl;
@@ -422,7 +439,7 @@ void hydro_run::initialize_hydrostatic_atmosphere_nonuniform() {
         T_inner = temperature[i];  
 
         factor_outer = (gamma_adiabat[i+1]-1.) * cv[i+1] * T_outer; //TODO: Replace with T_outer for non-isothermal EOS
-        factor_inner = (gamma_adiabat[i]  -1.)   * cv[i]   * T_inner; //TODO: Replace with T_inner for non-isothermal EOS
+        factor_inner = (gamma_adiabat[i]  -1.) * cv[i]   * T_inner; //TODO: Replace with T_inner for non-isothermal EOS
         metric_outer = (phi[i+1] - phi[i]) * omegaplus[i+1] * dx[i+1] / (dx[i+1] + dx[i]);
         metric_inner = (phi[i+1] - phi[i]) * omegaminus[i]  * dx[i]   / (dx[i+1] + dx[i]);
         

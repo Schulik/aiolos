@@ -129,6 +129,22 @@ inline std::ostream& operator<<(std::ostream& os, BoundaryType obj) {
     return os ;
 }
 
+enum class EOS_pressure_type {
+    adiabatic = 0, polytropic = 1, tabulated = 2, supernova = 3, user=4
+};
+
+enum class EOS_internal_energy_type {
+    thermal = 0, constant = 1, tabulated = 2, supernova = 3, user=4
+};
+
+class species {
+    
+    
+    
+    
+};
+
+
 
 class hydro_run
 {
@@ -153,7 +169,9 @@ class hydro_run
     Geometry geometry ;
     BoundaryType boundary_left ;
     BoundaryType boundary_right ;
-
+    EOS_pressure_type eos_pressure_type;
+    EOS_internal_energy_type eos_internal_energy_type;
+    
     ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     //
     //  Numerical
@@ -179,12 +197,12 @@ class hydro_run
     std::vector<double> finalstep;
     double output_time;
     double snd_crs_time;
-    int plotskip;
     int steps;
-
+    int timecount;
+    
     ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     //
-    // Physical
+    // Physical, global
     //
     ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -194,38 +212,32 @@ class hydro_run
     double rs_at_moment = 0 ;
     double rs_time;
     int    init_static_atmosphere;
-    int    static_atmosphere_tempprofile;
-    double const_T;
-    double const_gamma_adiabat;
-    double const_cv;
-    double const_opacity;
 
     ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     //
-    // Simulation data: Grid and variables
+    // Simulation data: Variables per species
     //
     ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     std::vector<AOS> u;              //Conserved hyperbolic variables: density, mass flux, energy density
-    std::vector<AOS> oldu;           //Conserved hyperbolic variables: density, mass flux, energy density
     std::vector<AOS> source;         // Gravitational source term
     std::vector<AOS> source_pressure;// Geometric source term
     std::vector<AOS> flux;
     std::vector<double> phi;            //Parabolic Variables: gravitational potential
+    std::vector<double> enclosed_mass;
     std::vector<double> omegaplus;
     std::vector<double> omegaminus;
     std::vector<double> source_pressure_prefactor_left;
     std::vector<double> source_pressure_prefactor_right;
     
-    std::vector<AOS> u_output;       //Array of arrays to store snapshots of u
-    std::vector<double> phi_output;     //Array of arrays to store snapshots of phi
-    
-    int timecount;
-    int plotcounter;
+    double const_T;
+    double const_gamma_adiabat;
+    double const_cv;
+    double const_opacity;
     
     ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     //
-    // temp variables: all helper variables, like intercell fluxes that are stored in between funciton calls etc.
+    // Primitives and other helper quantities
     //
     ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     
@@ -235,13 +247,20 @@ class hydro_run
     std::vector<double> pressure_r; //reconstructed pressures right  
     std::vector<double> internal_energy;
     std::vector<double> speed;
-    std::vector<double> enclosed_mass;
     std::vector<double> opticaldepth;
     std::vector<double> opacity;
     std::vector<double> temperature;
     std::vector<double> radiative_flux;
     std::vector<double> cv;
     std::vector<double> gamma_adiabat;           //ratio of specific heats
+    
+    std::vector<std::vector<double> > tab_p; //Dummy for tabulated pressure
+    std::vector<std::vector<double> > tab_p_x;
+    std::vector<std::vector<double> > tab_p_y;
+    
+    std::vector<std::vector<double> > tab_e; //Dummy for tabulated pressure
+    std::vector<std::vector<double> > tab_e_x;
+    std::vector<std::vector<double> > tab_e_y;
     
     ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     //
@@ -280,9 +299,8 @@ class hydro_run
     void initialize_custom_setup();
     //void initialize_hydrostatic_atmosphere();
     void initialize_hydrostatic_atmosphere_nonuniform();
-    void initialize_hydrostatic_atmosphere_nonuniformSph();
+    //void initialize_hydrostatic_atmosphere_nonuniformSph();
     void initialize_gravitational_potential();
-    
     
     //
     // Utilities
@@ -333,6 +351,22 @@ class hydro_run
     
     AOS hll_flux (AOS &leftvalue, AOS &rightvalue, const int &jleft, const int &jright);
     AOS hllc_flux(AOS &leftvalue, AOS &rightvalue, const int &jleft, const int &jright);
+    
+    //
+    // Equations of state
+    //
+    double eos_pressure(double density, double eint, int i);
+    double eos_eint    (double density, double temperature, int i);
+    
+    //TODO: Add inversion relations for EOS, like compute_density_from_p_and_T
+    
+    double eos_p_user(double density, double eint);
+    double eos_e_user(double density, double temperature);
+    
+    void   read_tabulated_eos_data_pressure(string filename);
+    void   read_tabulated_eos_data_eint    (string filename);
+    double interpolated_values_on_eos_p_grid(double dens, double eint);
+    double interpolated_values_on_eos_eint_grid(double dens, double temperature);
     
 public:
     

@@ -2,42 +2,15 @@
 #include <stdexcept>
 #include "aiolos.h"
 
-std::vector<AOS> init_AOS(int num) {   
-    return std::vector<AOS>(num);
-}
 
-//
-//
-//
-void hydro_run::compute_pressure() {
-    
-    //Pressure now defined also on ghost cells, so that the analytic fluxes can be computed there
-    for(int i=0;i<=num_cells+1;i++) {
-        speed[i]           = u[i].u2 / u[i].u1;
-        pressure[i]        = (gamma_adiabat[i]-1.)*(u[i].u3 - 0.5* u[i].u2 * speed[i] );
-        
-        if(i > 0)
-            pressure_l[i]      = get_p_hydrostatic_nonuniform(i,  -1);
-        if(i < num_cells+1)
-            pressure_r[i]      = get_p_hydrostatic_nonuniform(i,  +1);
-        
-        internal_energy[i] = u[i].u3 / u[i].u1 - 0.5 * speed[i] * speed[i];
-        temperature[i]     = internal_energy[i] / cv[i];
-        cs[i]              = std::sqrt(gamma_adiabat[i] * pressure[i] / u[i].u1);
-    }
-    
-}
 
- void hydro_run::set_debug(int debug) {
-     this->debug = debug;
-}
 
-AOS hydro_run::analytic_flux(AOS &input_vec, const int &j) {
-     
-    return AOS (input_vec.u2, 
-                input_vec.u2*input_vec.u2/input_vec.u1 + pressure[j], 
-                input_vec.u2/input_vec.u1 * (input_vec.u3 + pressure[j]) );
-}
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+//
+// CFL Timestep
+//
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
 
 double hydro_run::get_cfl_timestep() {
 
@@ -82,6 +55,11 @@ double hydro_run::get_cfl_timestep() {
 // Helper functions
 //
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+
+std::vector<AOS> init_AOS(int num) {   
+    return std::vector<AOS>(num);
+}
 
 //
 // Return a 1-D array of zeroes, identical to the numpy function
