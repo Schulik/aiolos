@@ -38,3 +38,4 @@ if __name__ == "__main__":
     check_steady_state("shock_tube6", [0,0,0])
     check_steady_state("shock_tube7", [4.9e-4, 4.9e-4, 0])
     check_steady_state("planet_cartesian", [0.01, 1.7e-10, 0.0])
+    check_steady_state("planet_spherical", [2.5e-1, 3.5e+2, 1.4e+2])

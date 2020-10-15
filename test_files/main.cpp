@@ -46,7 +46,7 @@ int main()
     count += !run_test("test_files/shock_tube7.par") ;
 
     count += !run_test("test_files/planet_cartesian.par") ;
-    //count += !run_test("test_files/planet_spherical.par") ;
+    count += !run_test("test_files/planet_spherical.par") ;
     
     return count ;
 }
