@@ -276,8 +276,8 @@ void hydro_run::print_AOS_component_tofile(const std::vector<double>& x,
         //Print the domain
         for(int i=1; i<=num_cells; i++) {
             
-            hydrostat = flux[i].u2/dx[i] ; //hydrostat2 + hydrostat3 ; 
-            hydrostat2 = flux[i+1].u2/dx[i];//pressure[i+1] - pressure[i];
+            hydrostat = flux[i-1].u2/dx[i] ; //hydrostat2 + hydrostat3 ; 
+            hydrostat2 = flux[i].u2/dx[i];//pressure[i+1] - pressure[i];
             hydrostat3 = source[i].u2;//0.5 * (data[i].u1 + data[i+1].u1) * (phi[i+1] - phi[i]);
             
             

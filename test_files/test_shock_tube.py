@@ -303,7 +303,7 @@ if __name__ == "__main__":
 
 
     L1_errors = [np.nan, 0.016, 0.033, 0.25,
-                 0.95, 0.078, 0.0040, 0.0035]
+                 1.06, 0.078, 0.0040, 0.0035]
     for i in range(1, 8):
         check_riemann_problem(i, L1_errors[i], args.make_plots)
 

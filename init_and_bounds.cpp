@@ -11,7 +11,9 @@ Initializer for a new simulation. Stores all parameters in the object, given to 
     
         par_physics: List of physics parameters
 */
-hydro_run::hydro_run(string filename) {
+hydro_run::hydro_run(string filename, double debug_) {
+
+        debug = debug_ ;
         
         ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         //
@@ -338,12 +340,9 @@ hydro_run::hydro_run(string filename) {
             //Conversion from shock tube parameters (given as dens, velocity, pressure) to conserved variables (dens, momentum, internal energy)
             BACKGROUND_U = AOS(u1, u1*u2, 0.5*u1*u2*u2 + u3/(gamma_adiabat-1.) );
 
-            if (boundaries_number == 1) {
-                boundary_left = BoundaryType::reflecting ;
-                boundary_right = BoundaryType::fixed ;
-                SHOCK_TUBE_UR = BACKGROUND_U ;
-            }
-            //mdot boundaries
+     
+            /* mdot boundaries
+             * needs fixing... Should just be specified as a BoundaryType::fixed boundary
             if(boundaries_number == 3) {
                 mdot = read_parameter_from_file<double>(filename,"ACCRETION_RATE", debug).value; //Accretion rate in numerical units
     
@@ -355,6 +354,7 @@ hydro_run::hydro_run(string filename) {
                 boundary_left = BoundaryType::reflecting ;
                 boundary_right = BoundaryType::fixed ;
             }
+            */
             
             
             cout<<"Problem 2 pos3."<<endl;
@@ -362,6 +362,13 @@ hydro_run::hydro_run(string filename) {
             initialize_background(BACKGROUND_U);
             init_grav_pot();
             
+            //
+            // If we want to initialize a hydrostatic atmosphere, then we overwrite the so far given density/pressure data and set every velocity to 0
+            //
+            if(init_static_atmosphere == 1) {
+                initialize_hydrostatic_atmosphere_nonuniform();
+            }
+
             if(debug > 0) 
                 cout<<"Successfully initialized problem 2."<<endl;
         }
@@ -381,12 +388,6 @@ hydro_run::hydro_run(string filename) {
         speed           = np_zeros(num_cells+2);
         cs              = np_zeros(num_cells+2);
         
-        //
-        // If we want to initialize a hydrostatic atmosphere, then we overwrite the so far given density/pressure data and set every velocity to 0
-        //
-        if(init_static_atmosphere == 1) {
-            initialize_hydrostatic_atmosphere_nonuniform();
-        }
         
         USE_WAVE = read_parameter_from_file<int>(filename,"WAVE_USE", debug, 0).value; 
         if(USE_WAVE==1) {
@@ -509,7 +510,7 @@ void hydro_run::initialize_shock_tube_test(const AOS &leftval,const AOS &rightva
     
     for(int i=0; i<=num_cells+1; i++) {
             
-        if(x_i[i] < SHOCK_TUBE_MID) 
+        if(x_i12[i] < SHOCK_TUBE_MID) 
             u[i] = leftval;
         else
             u[i] = rightval;
@@ -527,119 +528,6 @@ void hydro_run::initialize_background(const AOS &background) {
         u[i] = background;
 }
 
-//
-// Non-changing boundary conditions. Give values as leftval and rightval (for example the initial values from SHOCK_TUBE_UL and UR)
-//                                   and they are assigned to the ghost zones
-//
-//                                  In the case a planet is involved, the planet is by default assumed to be sitting at x=0 and 
-//                                  then the left boundary is WALL and the right is CONST.
-void hydro_run::boundaries_const_both(AOS &left_ghost, const AOS &leftval, const AOS &rightval, AOS &right_ghost ){
-    
-    if(debug >= 3)
-        cout<<"Inside boundaries_const_both. Assigning values left = "<<leftval.u1<<" "<<leftval.u2<<" "<<leftval.u3<<" and right = "<<leftval.u1<<" "<<rightval.u2<<" "<<rightval.u3<<endl;
-    
-    //For the shock tube test we use the initial values as boundaries
-    if(problem_number == 1) {
-        left_ghost  = SHOCK_TUBE_UL;
-        right_ghost = SHOCK_TUBE_UR;
-    } 
-    else if(problem_number == 2) {
-        
-        left_ghost = AOS( leftval.u1, -leftval.u2, leftval.u3); 
-        right_ghost= BACKGROUND_U;
-        
-    } else {
-        left_ghost  = leftval;
-        right_ghost = rightval;
-    }
-}
-
-
-
-
-//
-// Open boundaries on both ends: Takes the last and second last values on each side and extrapolates them to generate the ghost values
-//
-//                                  In the case a planet is involved, the planet is by default assumed to be sitting at x=0 and 
-//                                  then the left boundary is WALL and the right is OPEN.
-void hydro_run::boundaries_open_both(AOS &left_ghost, const AOS &leftval, const AOS &leftval2, const AOS &rightval2, const AOS &rightval, AOS &right_ghost ){
-    
-    if(debug >= 3)
-        cout<<"Inside boundaries_open_both. Assigning values left = "<<leftval.u1<<" "<<leftval.u2<<" "<<leftval.u3<<" and right = "<<leftval.u1<<" "<<rightval.u2<<" "<<rightval.u3<<endl;
-    
-    double dl1 = (leftval2.u1 - leftval.u1); /// (x_i[1] - x_i[0])
-    double dl2 = (leftval2.u2 - leftval.u2); /// (x_i[1] - x_i[0])
-    double dl3 = (leftval2.u3 - leftval.u3); /// (x_i[1] - x_i[0])
-    double dr1 = (rightval.u1 - rightval2.u1); /// (x_i[cell_number] - x_i[cell_number-1])
-    double dr2 = (rightval.u2 - rightval2.u2); // (x_i[cell_number] - x_i[cell_number-1])
-    double dr3 = (rightval.u3 - rightval2.u3); // (x_i[cell_number] - x_i[cell_number-1])
-
-    
-    if(problem_number == 2) {
-        
-        //double small_momentum = 1e-10;
-        //double small_dens     = 1e-10;
-        double tmp_r_dens     = rightval.u1 + dr1;
-        //double tmp_r_momentum = rightval.u2 + dr2;
-        
-        //Wall left
-        left_ghost = AOS( leftval.u1, -leftval.u2, leftval.u3); 
-        
-        //Inflow/outflow boundary conditions, that do not allow sign change across the last cell boundary, otherwise horrible things happen
-        
-        //Sign change detect
-        //if((rightval.u2 + dr2)/rightval.u2 < 0) {
-        //    tmp_r_momentum = rightval.u2;
-            //tmp_r_momentum = small_momentum;
-        //}
-        if(tmp_r_dens < 0.) {
-            tmp_r_dens = rightval.u1;
-            
-        }
-        double press_boundary   = (gamma_adiabat-1.) * (rightval.u3 - 0.5 * rightval.u2 * rightval.u2 / rightval.u1 );
-        double hydrostat_energy = (press_boundary - rightval.u1 * (phi[num_cells+1] - phi[num_cells]) ) / (gamma_adiabat-1.);
-        
-        
-        //right_ghost= AOS(tmp_r_dens, tmp_r_momentum, rightval.u3 + dr3 );
-        //right_ghost = AOS(rightval.u1, rightval.u2, rightval.u3);
-        right_ghost = AOS(rightval.u1, rightval.u2, hydrostat_energy);
-    }
-    else {
-        
-        left_ghost  = AOS( leftval.u1 - dl1, leftval.u2  - dl2,  leftval.u3 - dl3 ); 
-        right_ghost = AOS(rightval.u1 + dr1, rightval.u2 + dr2, rightval.u3 + dr3 );
-        
-    }
-        
-}
-
-void hydro_run::boundaries_planet_mdot(AOS &left_ghost, const AOS &leftval, const AOS &rightval, AOS &right_ghost ) {
-    
-    if(debug >= 3)
-        cout<<"Inside boundaries_planet_mdot. Assigning values left = "<<leftval.u1<<" "<<leftval.u2<<" "<<leftval.u3<<" and right = "<<leftval.u1<<" "<<rightval.u2<<" "<<rightval.u3<<endl;
-    
-    left_ghost  = AOS( leftval.u1, -leftval.u2, leftval.u3); 
-
-    double rho0 = BACKGROUND_U.u1;
-    double e0   = BACKGROUND_U.u3 - 0.5 * BACKGROUND_U.u2 * BACKGROUND_U.u2 / rho0;
-    
-    right_ghost = AOS(rho0, -mdot, e0 + 0.5 * mdot * mdot / rho0 );
-    //we compute back and forth between the two momenta and E's because the initial conditions could be 0 momentum, then we would have mdot=0    
-    
-}
-
-//
-// Wall boundary conditions on both. 
-//                                   
-
-void hydro_run::boundaries_wall_both(AOS &left_ghost, const AOS &leftval, const AOS &rightval, AOS &right_ghost ){
-    
-    if(debug >= 3)
-        cout<<"Inside boundaries_wall_both. Assigning values left = "<<leftval.u1<<" "<<leftval.u2<<" "<<leftval.u3<<" and right = "<<leftval.u1<<" "<<rightval.u2<<" "<<rightval.u3<<endl;
-    
-    left_ghost = AOS( leftval.u1, -leftval.u2, leftval.u3); 
-    right_ghost= AOS( rightval.u1, -rightval.u2, rightval.u3);
-}
 
 void hydro_run::apply_boundary_left() {
     double E_kinetic, pressure_active, pressure_bound ;

@@ -19,6 +19,8 @@ PARI_LINEAR_GRAV        0
 PARI_DEBUGLEVEL         1
 PARI_INIT_STATIC        1
 
+OUTPUT_FILENAME         test_files/planet_cartesian
+
 #Numerical parameters
 PARI_BOUND_TYPE         2
 PARI_BOUND_TYPE_LEFT    2

@@ -73,10 +73,9 @@ int main(int argc, char** argv)
         cout<<"In main, construction of simulation is about to start."<<endl;
        
         //Main simulation class object, is initialized with the simulation parameters from a file
-        hydro_run simulation1(simulationname);
+        hydro_run simulation1(simulationname, debug);
         
         simulation1.set_suppress_warnings(suppress_warnings_global);
-        simulation1.set_debug(debug);
 
         cout<<"In main, execution is about to start."<<endl;
         

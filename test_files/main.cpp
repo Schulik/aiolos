@@ -21,9 +21,9 @@
 bool run_test(std::string test_name, int suppress_warn=1, int debug=0) {
       
     try {
-        hydro_run test(test_name);
+        hydro_run test(test_name, debug);
         test.set_suppress_warnings(suppress_warn);
-        test.set_debug(debug);
+
         test.execute(); 
     } catch (...) {
         std::cerr << "Test " << test_name << " crashed" << std::endl ;
@@ -44,6 +44,9 @@ int main()
     count += !run_test("test_files/shock_tube5.par") ;
     count += !run_test("test_files/shock_tube6.par") ;
     count += !run_test("test_files/shock_tube7.par") ;
+
+    count += !run_test("test_files/planet_cartesian.par") ;
+    //count += !run_test("test_files/planet_spherical.par") ;
     
     return count ;
 }
