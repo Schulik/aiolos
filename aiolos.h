@@ -191,7 +191,7 @@ class hydro_run
     double planet_mass;     //in Earth masses
     double planet_position; //inside the simulation domain
     double rs;
-    double rs_at_moment;
+    double rs_at_moment = 0 ;
     double rs_time;
     int    init_static_atmosphere;
     int    static_atmosphere_tempprofile;
@@ -298,11 +298,6 @@ class hydro_run
     //
     // Boundaries
     //
-    
-    void boundaries_const_both(AOS &left_ghost, const AOS &leftval, const AOS &rightval, AOS &right_ghost );
-    void boundaries_open_both(AOS &left_ghost, const AOS &leftval, const AOS &leftval2, const AOS &rightval2, const AOS &rightval, AOS &right_ghost );
-    void boundaries_planet_mdot(AOS &left_ghost, const AOS &leftval, const AOS &rightval, AOS &right_ghost );
-    void boundaries_wall_both(AOS &left_ghost, const AOS &leftval, const AOS &rightval, AOS &right_ghost );
     void add_wave(double time, double tmax, double amplitude);
     
     void apply_boundary_left();
@@ -339,7 +334,7 @@ class hydro_run
     
 public:
     
-    hydro_run(string);
+    hydro_run(string, double debug=0);
     ~hydro_run();
     
     void execute(); //Main loop

@@ -1,4 +1,4 @@
-#include "main.h"
+#include "aiolos.h"
 
 void hydro_run::execute() { 
      
@@ -39,13 +39,7 @@ void hydro_run::execute() {
         // Step 1: Boundary values
         //
         //
-        
-        if(boundaries_number == 4) {
-            phi[num_cells+1] = get_phi_grav(x_i12[num_cells], planet_mass);
-        } else {
-            phi[num_cells+1] = get_phi_grav(x_i12[num_cells+1], planet_mass);
-        }
-        
+  
         apply_boundary_left() ;
         apply_boundary_right() ;
         
