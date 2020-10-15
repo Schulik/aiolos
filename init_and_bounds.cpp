@@ -71,27 +71,7 @@ hydro_run::hydro_run(string filename) {
         //cout<<"Pos3"<<endl;
  
         cout<<"boundaries used: "<<boundary_left<<" / "<<boundary_right<<endl;
-        /*
-        // Setup boundaries
-        if (boundaries_number == 1) {
-            boundary_left = boundary_right = BoundaryType::fixed ;
-            SHOCK_TUBE_UR = SHOCK_TUBE_UL = AOS(1,1,1) ;
-        }
-        if (boundaries_number == 2) {
-            if (problem_number == 2) {
-                boundary_left = BoundaryType::reflecting ;
-                boundary_right = BoundaryType::open ;
-            }
-            else {
-                boundary_left = BoundaryType::open ;
-                boundary_right = BoundaryType::open ;
-            }
-        }
-        // Wall / Reflecting boundaries at both ends
-        if (boundaries_number == 4)
-            boundary_left = boundary_right = BoundaryType::reflecting ;
-        */
-        
+ 
         use_self_gravity  = read_parameter_from_file<int>(filename,"PARI_SELF_GRAV_SWITCH", debug).value;
         use_linear_gravity= read_parameter_from_file<int>(filename,"PARI_LINEAR_GRAV", debug).value;
         use_rad_fluxes    = read_parameter_from_file<int>(filename,"PARI_USE_RADIATION", debug).value;
@@ -641,11 +621,11 @@ void hydro_run::boundaries_wall_both(AOS &left_ghost, const AOS &leftval, const 
     right_ghost= AOS( rightval.u1, -rightval.u2, rightval.u3);
 }
 
-void hydro_run::apply_boundary_left() {
+void hydro_run::apply_boundary_left(std::vector<AOS>& u) {
     double E_kinetic, pressure_active, pressure_bound ;
     switch(boundary_left) {
         case BoundaryType::user:
-            user_boundary_left();
+            user_boundary_left(u);
             break;
         case BoundaryType::open:
             u[0] = u[1]; 
@@ -671,11 +651,11 @@ void hydro_run::apply_boundary_left() {
     }
 }
 
-void hydro_run::apply_boundary_right() {
+void hydro_run::apply_boundary_right(std::vector<AOS>& u) {
     double E_kinetic, pressure_active, pressure_bound ;
     switch(boundary_right) {
         case BoundaryType::user:
-            user_boundary_right();
+            user_boundary_right(u);
             break;
         case BoundaryType::open:
             u[num_cells+1] = u[num_cells]; 
@@ -704,7 +684,7 @@ void hydro_run::apply_boundary_right() {
 //
 // Creates a wave at the inner boundary supposedly propagating upwards in the gravity well
 //
-void hydro_run::add_wave(double globalTime, double WAVE_PERIOD, double WAVE_AMPLITUDE)  {
+void hydro_run::add_wave(double globalTime, std::vector<AOS>&u)  {
     
     u[0].u2 = u[0].u1 * WAVE_AMPLITUDE * std::sin(12.*M_PI*globalTime/WAVE_PERIOD);
     u[1].u2 = u[0].u2;

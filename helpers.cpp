@@ -9,7 +9,7 @@ std::vector<AOS> init_AOS(int num) {
 //
 //
 //
-void hydro_run::compute_pressure() {
+void hydro_run::compute_pressure(const std::vector<AOS>& u) {
     
     //Pressure now defined also on ghost cells, so that the analytic fluxes can be computed there
     for(int i=0;i<=num_cells+1;i++) {

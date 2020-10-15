@@ -15,13 +15,6 @@
 
 using namespace std;
 
-//
-// Definition of helper constants, mainly used to initialize simulation parameter from file
-//
-const int TYPE_INT = 0;
-const int TYPE_DOUBLE = 1;
-const int TYPE_STRING = 2;
-
 //Basic physics quantities
 const double G        = 6.678e-8; //cgs units
 const double pi       = 3.141592;
@@ -116,7 +109,7 @@ inline std::ostream& operator<<(std::ostream& os, Geometry obj) {
 }
 
 enum class BoundaryType {
-    user = 0, open = 1, reflecting = 2, fixed = 3, periodic = 4,
+    user = 0, open = 1, reflecting = 2, fixed = 3, periodic = 4
 } ;
 inline std::istream& operator>>(std::istream& is, BoundaryType& obj) {
     std::underlying_type<BoundaryType>::type tmp ;
@@ -288,7 +281,7 @@ class hydro_run
     double get_phi_grav(); //Returns the value of the gravitational potential at a position
     double get_max_soundspeed();
     double get_cfl_timestep();
-    void compute_pressure();
+    void compute_pressure(const std::vector<AOS>& u);
     void print_AOS_component_tofile(const std::vector<double>& x, 
                                     const std::vector<AOS>& data,
                                     const std::vector<AOS>& fluxes,
@@ -303,12 +296,12 @@ class hydro_run
     void boundaries_open_both(AOS &left_ghost, const AOS &leftval, const AOS &leftval2, const AOS &rightval2, const AOS &rightval, AOS &right_ghost );
     void boundaries_planet_mdot(AOS &left_ghost, const AOS &leftval, const AOS &rightval, AOS &right_ghost );
     void boundaries_wall_both(AOS &left_ghost, const AOS &leftval, const AOS &rightval, AOS &right_ghost );
-    void add_wave(double time, double tmax, double amplitude);
+    void add_wave(double time, std::vector<AOS>&u);
     
-    void apply_boundary_left();
-    void apply_boundary_right();
-    void user_boundary_left();
-    void user_boundary_right();
+    void apply_boundary_left(std::vector<AOS>& u);
+    void apply_boundary_right(std::vector<AOS>& u);
+    void user_boundary_left(std::vector<AOS>& u);
+    void user_boundary_right(std::vector<AOS>& u);
 
     void user_initial_conditions();
 
@@ -316,12 +309,14 @@ class hydro_run
     // Source terms
     //
     
+    void runge_kutta_stage(std::vector<AOS>& u_in, std::vector<AOS>& u_out, double dt_stage) ;
+
     //Gravity
     void init_grav_pot();
     double get_p_hydrostatic(AOS &u, double &phi_l, double &phi_r, const int &i);
     double get_p_hydrostatic_nonuniform(const int &i, const int &plusminus);
     double get_phi_grav(double &r, double &mass);
-    void update_mass_and_pot();
+    void update_mass_and_pot(const std::vector<AOS>& u);
     AOS source_grav(AOS &u, int &j);
     
     //Radiation

@@ -34,7 +34,7 @@
     //
     // takes: r as array
     //    
-    void hydro_run::update_mass_and_pot() {
+    void hydro_run::update_mass_and_pot(const std::vector<AOS>& u) {
         
         if(debug >= 3)
             cout<<"In update mass. "<<endl;
@@ -51,7 +51,7 @@
             }
             
             
-            enclosed_mass[i] = enclosed_mass[i-1] +  4. * 3.141592 * (pow(x_i[i],3.)-pow(x_i[i-1],3.) )/3. * u[i].u1; //Straightfoward integration of the poisson eqn
+            enclosed_mass[i] = enclosed_mass[i-1] +  vol[i] * u[i].u1; //Straightfoward integration of the poisson eqn
             
             
             if (use_self_gravity == 1) 
