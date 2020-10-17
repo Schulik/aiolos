@@ -1,13 +1,26 @@
 #include "aiolos.h"
 
-void hydro_run::execute() { 
+
+////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+//
+//  CLASS SIMULATION
+//
+////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+void c_Sim::execute() { 
      
     steps = 0;
     double output_counter = 0;
     const int maxsteps = 1e9;
-    double pressure_temp;
+    //double pressure_temp;
         
-    cout<<"Beginning main loop with num_cells="<<num_cells<<" and timestep="<<dt<<" cflfacotr="<<cflfactor<<endl;
+    cout<<"Beginning main loop with num_cells="<<num_cells<<" and timestep="<<dt<<" cflfacotr="<<cflfactor<<" and num_species = "<<num_species<<endl;
+    if(num_species == 0) 
+        cout<<"WARNING: No species specified! I cannot work like that."<<endl;
     
     ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~////
     //                                                                         //
@@ -16,7 +29,9 @@ void hydro_run::execute() {
     ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~////
     for (globalTime = 0; (globalTime < t_max) && (steps < maxsteps); ) {
         
-        compute_pressure();
+        for(int s = 0; s < num_species; s++)
+            species[s].compute_pressure();
+        
         dt = get_cfl_timestep();
         
         //
@@ -32,6 +47,72 @@ void hydro_run::execute() {
         if(debug >= 2)
             cout<<"Before fluxes... ";
         
+        //
+        // Output data, when required. Keep the output here, between the flux and conserved variable update, so that the 
+        // zeroth output has the initialized conserved values, but already the first fluxes.
+        //
+        
+        //TODO: DO for all species...
+         if(steps==0) {
+             for(int s=0; s<num_species; s++)
+                species[s].print_AOS_component_tofile((int) output_counter);
+             
+             output_counter+=1.;
+         }
+         if(globalTime > output_counter*output_time){
+             if(debug >= 1)
+                 cout<<" Globaltime is "<<globalTime<<" and comparevalue is "<<output_counter<<" "<<output_time<<endl;
+             
+             for(int s=0; s<num_species; s++)
+                species[s].print_AOS_component_tofile((int)output_counter); 
+             
+             output_counter+=1.; 
+         }
+         
+        //
+        // Do a timestep on the entire grid for all species
+        //
+        for(int s = 0; s < num_species; s++)
+            species[s].execute();
+        
+        globalTime += dt;
+        steps++;
+        
+        if(steps==1)
+            cout<<"Initial sound crossing time = "<<max_snd_crs_time<<endl;
+        
+        if(debug >= 1)
+            cout<<"timestep in execute()="<<dt<<" stepnum "<<steps<<" totaltime"<<globalTime<<endl;
+        
+    
+    }
+    cout<<endl;
+    
+    //Print successful end result
+    cout<<"Finished at time="<<globalTime<<" after steps="<<steps<<" with num_cells="<<num_cells<<endl;
+    
+    for(int s=0; s<num_species; s++)
+        species[s].print_AOS_component_tofile(-666);
+}
+
+
+////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+//
+//  CLASS SPECIES
+//
+////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+
+//
+// Species::execute: This species very own riemann solution, before its modified globally by applying frictional forces
+//
+
+void c_Species::execute() {
+    
         if(use_rad_fluxes==1)
             update_radiation();
         
@@ -44,13 +125,14 @@ void hydro_run::execute() {
         apply_boundary_right() ;
         
         if(USE_WAVE==1) 
-                add_wave(globalTime, WAVE_PERIOD, WAVE_AMPLITUDE);
+                add_wave(base->globalTime, WAVE_PERIOD, WAVE_AMPLITUDE);
         
         //if(steps==0)
         //    cout<<" initial ghost momentum after start: "<<left_ghost.u2<<endl;
         
         if(debug >= 2)
             cout<<"Done."<<endl<<" Before compute pressure... ";
+        
         compute_pressure();
         
         if(debug >= 2)
@@ -85,24 +167,9 @@ void hydro_run::execute() {
         
         for(int j=1; j<=num_cells; j++) {
             source[j]          = source_grav(u[j], j);
-            pressure_temp      = -(source_pressure_prefactor_left[j] * pressure_l[j] - source_pressure_prefactor_right[j] * pressure_r[j]);
-            source_pressure[j] = AOS(0, pressure_temp  ,0); 
+            source_pressure[j] = AOS(0, -(base->source_pressure_prefactor_left[j] * pressure_l[j] - base->source_pressure_prefactor_right[j] * pressure_r[j])  ,0); 
         }
-            
-        //
-        // Output data, when required. Keep the output here, between the flux and conserved variable update, so that the 
-        // zeroth output has the initialized conserved values, but already the first fluxes.
-        //
-        if(steps==0) {
-            print_AOS_component_tofile(x_i12, u, flux, (int) output_counter);
-            output_counter+=1.;
-        }
-        if(globalTime > output_counter*output_time){
-            if(debug >= 1)
-                cout<<" Globaltime is "<<globalTime<<" and comparevalue is "<<output_counter<<" "<<output_time<<endl;
-            print_AOS_component_tofile(x_i12, u, flux, (int) output_counter); 
-            output_counter+=1.; 
-        }
+        
         
         //
         // Step 3: Add it all up to update the conserved variables
@@ -110,7 +177,7 @@ void hydro_run::execute() {
         
         //#pragma omp simd
         for(int j=1; j<=num_cells; j++) {
-            u[j] = u[j] + (flux[j-1] * surf[j-1] - flux[j] * surf[j]) * dt/vol[j] + (source[j] + source_pressure[j]) * dt;
+            u[j] = u[j] + (flux[j-1] * base->surf[j-1] - flux[j] * base->surf[j]) * base->dt / base->vol[j] + (source[j] + source_pressure[j]) * base->dt;
             
             if( (debug > 0) && ( j==1 || j==num_cells || j==(num_cells/2) )) {
                 char alpha;
@@ -118,19 +185,19 @@ void hydro_run::execute() {
                 cout<<"fl.u1 = "<<flux[j-1].u1<<": fr.u1 = "<<flux[j].u1<<endl;
                 cout<<"fl.u2 = "<<flux[j-1].u2<<": fr.u2 = "<<flux[j].u2<<endl;
                 cout<<"fl.u3 = "<<flux[j-1].u3<<": fr.u3 = "<<flux[j].u3<<endl;
-                cout<<"Cartesian fluxes: Fl-Fr+s = "<<((flux[j-1].u2 - flux[j].u2)/dx[j] + source[j].u2)<<endl;
-                cout<<"D_surface/volume="<<(0.5*(surf[j]-surf[j-1])/vol[j])<<" vs. 1/dx="<<(1./dx[j])<<endl;
+                cout<<"Cartesian fluxes: Fl-Fr+s = "<<((flux[j-1].u2 - flux[j].u2)/base->dx[j] + source[j].u2)<<endl;
+                cout<<"D_surface/volume="<<(0.5*(base->surf[j]-base->surf[j-1])/base->vol[j])<<" vs. 1/dx="<<(1./base->dx[j])<<endl;
                 cout<<endl;
                 cout<<"s = "<<source[j].u2<<endl;
                 cout<<"sP = "<<source_pressure[j].u2<<endl;
                 
-                cout<<"Al*Fl - Ar*Fr = "<<((flux[j-1].u2 * surf[j-1] - flux[j].u2 * surf[j]) /vol[j])<<endl;
-                cout<<"Al*Fl - Ar*Fr + sP = "<<((flux[j-1].u2 * surf[j-1] - flux[j].u2 * surf[j]) /vol[j] + source_pressure[j].u2)<<endl;
-                cout<<"dP/dr = "<<((pressure_l[j] - pressure_r[j])/dx[j])<<endl;
-                cout<<"dP/dr + S = "<<((pressure_l[j] - pressure_r[j])/dx[j] + source[j].u2)<<endl;
+                cout<<"Al*Fl - Ar*Fr = "<<((flux[j-1].u2 * base->surf[j-1] - flux[j].u2 * base->surf[j]) /base->vol[j])<<endl;
+                cout<<"Al*Fl - Ar*Fr + sP = "<<((flux[j-1].u2 * base->surf[j-1] - flux[j].u2 * base->surf[j]) / base->vol[j] + source_pressure[j].u2)<<endl;
+                cout<<"dP/dr = "<<((pressure_l[j] - pressure_r[j])/base->dx[j])<<endl;
+                cout<<"dP/dr + S = "<<((pressure_l[j] - pressure_r[j])/base->dx[j] + source[j].u2)<<endl;
                 cout<<endl;
-                cout<<"Al*Fl - Ar*Fr + s = "<<((flux[j-1].u2 * surf[j-1] - flux[j].u2 * surf[j]) /vol[j] + (source[j].u2))<<endl;
-                cout<<"Al*Fl - Ar*Fr + s + sP = "<<((flux[j-1].u2 * surf[j-1] - flux[j].u2 * surf[j]) /vol[j] + (source[j].u2 +source_pressure[j].u2))<<endl;
+                cout<<"Al*Fl - Ar*Fr + s = "<<((flux[j-1].u2 * base->surf[j-1] - flux[j].u2 * base->surf[j]) / base->vol[j] + (source[j].u2))<<endl;
+                cout<<"Al*Fl - Ar*Fr + s + sP = "<<((flux[j-1].u2 * base->surf[j-1] - flux[j].u2 * base->surf[j]) / base->vol[j] + (source[j].u2 +source_pressure[j].u2))<<endl;
                 cin>>alpha;
             }
         }
@@ -145,26 +212,11 @@ void hydro_run::execute() {
             }
         }
         
-        globalTime += dt;
-        steps++;
-        
-        if(steps==1)
-            cout<<"Initial sound crossing time = "<<snd_crs_time<<endl;
-        
-        if(debug >= 1)
-            cout<<"timestep in execute()="<<dt<<" stepnum "<<steps<<" totaltime"<<globalTime<<endl;
-        
     
-    }
-    cout<<endl;
     
-    //Print successful end result
-    cout<<"Finished at time="<<globalTime<<" after steps="<<steps<<" with num_cells="<<num_cells<<endl;
-    print_AOS_component_tofile(x_i12, u, flux, -666);
-}
+} 
 
-
-AOS hydro_run::hllc_flux(AOS &leftval, AOS &rightval, const int &jleft, const int& jright) 
+AOS c_Species::hllc_flux(AOS &leftval, AOS &rightval, const int &jleft, const int& jright) 
 {
     AOS flux;
     
@@ -214,7 +266,7 @@ AOS hydro_run::hllc_flux(AOS &leftval, AOS &rightval, const int &jleft, const in
 
 
 
-AOS hydro_run::analytic_flux(AOS &input_vec, const int &j) {
+AOS c_Species::analytic_flux(AOS &input_vec, const int &j) {
      
     return AOS (input_vec.u2, 
                 input_vec.u2*input_vec.u2/input_vec.u1 + pressure[j], 

@@ -21,7 +21,7 @@
 // Compute pressure: The most important function for all kinds of applications inside the code.
 //                   Is also the location of the equation of state (EOS). This should be the only instance in the code where P and the conserved variables are connected.
 //
-void hydro_run::compute_pressure() {
+void c_Species::compute_pressure() {
     
     //Pressure now defined also on ghost cells, so that the analytic fluxes can be computed there
     for(int i=0;i<=num_cells+1;i++) {
@@ -45,7 +45,7 @@ void hydro_run::compute_pressure() {
 }
 
 
-double hydro_run::eos_pressure(double dens, double eint, int i){
+double c_Species::eos_pressure(double dens, double eint, int i){
     double p;
     
     switch(eos_pressure_type) {
@@ -85,7 +85,7 @@ double hydro_run::eos_pressure(double dens, double eint, int i){
     return p;
 }
 
-double hydro_run::eos_eint(double dens, double temperature, int i) {
+double c_Species::eos_eint(double dens, double temperature, int i) {
     double eint;
     
     switch(eos_internal_energy_type) {
@@ -132,7 +132,7 @@ double hydro_run::eos_eint(double dens, double temperature, int i) {
 //
 //
 
-double hydro_run::interpolated_values_on_eos_p_grid(double dens, double eint) {
+double c_Species::interpolated_values_on_eos_p_grid(double dens, double eint) {
     
     double p;
     
@@ -149,7 +149,7 @@ double hydro_run::interpolated_values_on_eos_p_grid(double dens, double eint) {
     return p;
 }
 
-double hydro_run::interpolated_values_on_eos_eint_grid(double dens, double temperature) {
+double c_Species::interpolated_values_on_eos_eint_grid(double dens, double temperature) {
     
     double eint;
     
@@ -171,7 +171,7 @@ double hydro_run::interpolated_values_on_eos_eint_grid(double dens, double tempe
 //
 //
 
-void hydro_run::read_tabulated_eos_data_pressure(string filename) {
+void c_Species::read_tabulated_eos_data_pressure(string filename) {
     
     cout<<"Reading file "<<filename<<" in order to find me some good EOS data..."<<endl;
     //TODO:
@@ -187,7 +187,7 @@ void hydro_run::read_tabulated_eos_data_pressure(string filename) {
 //
 //
 
-void hydro_run::read_tabulated_eos_data_eint(string filename) {
+void c_Species::read_tabulated_eos_data_eint(string filename) {
     
     cout<<"Reading file "<<filename<<" in order to find me some good EOS data..."<<endl;
     //TODO
@@ -199,6 +199,10 @@ void hydro_run::read_tabulated_eos_data_eint(string filename) {
 }
 
 
- void hydro_run::set_debug(int debug) {
+ void c_Sim::set_debug(int debug) {
+     this->debug = debug;
+}
+
+ void c_Species::set_debug(int debug) {
      this->debug = debug;
 }

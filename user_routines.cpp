@@ -3,26 +3,26 @@
 
 #include "aiolos.h"
 
-void hydro_run::user_boundary_left() {
+void c_Species::user_boundary_left() {
     throw std::runtime_error(
         "hydro::user_boundary_left() not implemented. You must provide this "
         "method if you want to use user defined boundaries.") ;
 }
 
 
-void hydro_run::user_boundary_right() {
+void c_Species::user_boundary_right() {
     throw std::runtime_error(
         "hydro::user_boundary_right() not implemented. You must provide this "
         "method if you want to use user defined boundaries.") ;
 }
 
-void hydro_run::user_initial_conditions(){
+void c_Species::user_initial_conditions(){
     throw std::runtime_error(
         "hydro::user_initial_conditions() not implemented. You must provide this "
         "method if you want to use user defined initial conditions.") ;
 }
 
-double hydro_run::eos_p_user(double density, double eint) {
+double c_Species::eos_p_user(double density, double eint) {
         throw std::runtime_error(
         "hydro::eos_p_user() not implemented. You must provide this "
         "method if you want to use a user-defined equation of state.") ;
@@ -30,7 +30,7 @@ double hydro_run::eos_p_user(double density, double eint) {
         cout<<density<<eint;
 }
 
-double hydro_run::eos_e_user(double density, double temperature) {
+double c_Species::eos_e_user(double density, double temperature) {
         throw std::runtime_error(
         "hydro::eos_e_user() not implemented. You must provide this "
         "method if you want to use a user-defined equation of state.") ;

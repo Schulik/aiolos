@@ -2,18 +2,19 @@
 
 //extern AOS* init_AOS(int num);
 
-/*
-Initializer for a new simulation. Stores all parameters in the object, given to by the wrapper.
-    
-        par_control: List of control parameters
-    
-        par_numerics: List of numerical parameters
-    
-        par_physics: List of physics parameters
-*/
-hydro_run::hydro_run(string filename, double debug_) {
+////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+//
+//  CLASS SIMULATION
+//
+////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-        debug = debug_ ;
+c_Sim::c_Sim(string filename, string speciesfile, int debug) {
+
+        this->debug = debug ;
         
         ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         //
@@ -47,7 +48,8 @@ hydro_run::hydro_run(string filename, double debug_) {
         t_max       = read_parameter_from_file<double>(filename,"PARI_TIME_TMAX", debug).value;
         output_time = read_parameter_from_file<double>(filename,"PARI_TIME_OUTPUT", debug).value; 
         globalTime = 0.0;    
-    
+        timecount = 0;
+        
         cout<<"pos2, cell number = "<<num_cells<<endl;
     
         ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -59,13 +61,10 @@ hydro_run::hydro_run(string filename, double debug_) {
 
         simname = filename;
         
-        boundary_left  = read_parameter_from_file<BoundaryType>(filename,"PARI_BOUND_TYPE_LEFT", debug).value;
-        boundary_right = read_parameter_from_file<BoundaryType>(filename,"PARI_BOUND_TYPE_RIGHT", debug).value;
         //cout<<"Pos2"<<endl;
         problem_number    = read_parameter_from_file<int>(filename,"PARI_PROBLEM_NUMBER", debug).value;
         //cout<<"Pos3"<<endl;
  
-        cout<<"boundaries used: "<<boundary_left<<" / "<<boundary_right<<endl;
         
         use_self_gravity  = read_parameter_from_file<int>(filename,"PARI_SELF_GRAV_SWITCH", debug).value;
         use_linear_gravity= read_parameter_from_file<int>(filename,"PARI_LINEAR_GRAV", debug).value;
@@ -81,7 +80,7 @@ hydro_run::hydro_run(string filename, double debug_) {
         //	2 = Outflow on both ends
         //	3 = Inflow left, outflow right
         //finalplotnumber = 1
-        solver = 0;
+        //solver = 0;
         
         ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         //
@@ -95,9 +94,6 @@ hydro_run::hydro_run(string filename, double debug_) {
         x_i12      = np_zeros(num_cells+2);		//The cell mid positions
         surf       = np_zeros(num_cells+1);     // intercell surfaces
         vol        = np_zeros(num_cells+2);     // cell volumes
-        timesteps  = np_zeros(num_cells+2);		    
-        timesteps_cs= np_zeros(num_cells+2);	
-        finalstep   = np_zeros(num_cells+2);
         dx         = np_zeros(num_cells+2);
         omegaplus  = np_zeros(num_cells+2);
         omegaminus = np_zeros(num_cells+2);
@@ -219,6 +215,72 @@ hydro_run::hydro_run(string filename, double debug_) {
             source_pressure_prefactor_right[i] = (surf[i]  /vol[i] - 1./dx[i]); 
         }
         
+        //
+        //
+        // Initialize gravity first without any species. Hydrostatic construction needs gravity to start.
+        //
+        //
+        if(problem_number==2) {
+            
+            planet_mass     = read_parameter_from_file<double>(filename,"PARI_PLANET_MASS", debug).value; //in Earth masses
+            planet_position = read_parameter_from_file<double>(filename,"PARI_PLANET_POS", debug).value;  //inside the simulation domain
+            rs              = read_parameter_from_file<double>(filename,"PARI_SMOOTHING_LENGTH", debug).value; //Gravitational smoothing length in hill 
+            rs_time         = read_parameter_from_file<double>(filename,"PARI_SMOOTHING_TIME", debug).value; //Time until we reach rs starting at rs_at_moment
+            rs_at_moment    = 0.2;
+            
+        }
+
+            
+        enclosed_mass   = np_zeros(num_cells+2);
+        phi             = np_zeros(num_cells+2);  //Parabolic Variables: gravitational potential
+        init_grav_pot();
+        
+        //
+        //
+        // Create and initialize the species
+        //
+        //
+        num_species = read_parameter_from_file<int>(filename,"PARI_NUM_SPECIES", debug).value;
+        
+        
+        cout<<"Before species setup, num_cells="<<num_cells<<" x0="<<x_i[0]<<endl;
+        //species     = std::vector<c_Species>(num_species);
+        
+        species.reserve(num_species);
+        
+        for(int s = 0; s < num_species; s++) {
+            species.push_back(c_Species(this, filename, speciesfile, s, debug));
+        }
+        
+        //
+        //
+        // After successful init, compute all base quantities and determine first timestep
+        //
+        //
+        
+        for(int s = 0; s < num_species; s++)
+            species[s].compute_pressure();
+        
+        dt = get_cfl_timestep();
+        
+}
+
+
+////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+//
+//  CLASS SPECIES
+//
+////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+c_Species::c_Species(c_Sim *base_simulation, string filename, string species_filename, int species_index, int debug) {
+    
+        base               = base_simulation;
+        this_species_index = species_index;
+        num_cells          = base->num_cells;
                 
         ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         //
@@ -226,35 +288,36 @@ hydro_run::hydro_run(string filename, double debug_) {
         //
         ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         
-        const_gamma_adiabat = read_parameter_from_file<double>(filename,"PARI_GAMMA", debug).value; //ratio of specific heats
-        const_cv            = read_parameter_from_file<double>(filename,"PARI_CONST_CV", debug).value; //ratio of specific heats
-        const_T             = read_parameter_from_file<double>(filename,"PARI_CONST_TEMP",  debug).value;
-        T_increment         = read_parameter_from_file<double>(filename,"PARI_TEMP_INCR", debug).value;
+        read_species_data(species_filename, species_index);
         
-        
-        if(use_rad_fluxes==1)
-            const_opacity   = read_parameter_from_file<double>(filename,"PARI_CONST_OPAC", debug).value;
-        else
-            const_opacity   = 1.;
+        cout<<"After read speacies. cels="<<num_cells<<" this->cels"<<base->get_num_cells()<<" csim::numcells"<<base->num_cells<<endl;
+        cout<<" x[0]="<<base->x_i[0]<<endl;
         
         u               = init_AOS(num_cells+2); //{ np_ones(num_cells*3);   //Conserved hyperbolic variables: density, mass flux, energy density
-        phi             = np_zeros(num_cells+2);  //Parabolic Variables: gravitational potential
-        enclosed_mass   = np_zeros(num_cells+2);
+        
         source          = init_AOS(num_cells+2);  //Parabolic Variables: gravitational potential
         source_pressure = init_AOS(num_cells+2);  //Parabolic Variables: gravitational potential
         flux            = init_AOS(num_cells+1);
         
-        gamma_adiabat   = np_somevalue(num_cells+2, const_gamma_adiabat);
-        cv              = np_somevalue(num_cells+2, const_cv);
+        const_T_space = 1.; //Yet another parameter?
+        
+        gamma_adiabat  = np_somevalue(num_cells+2, const_gamma_adiabat);
+        cv             = np_somevalue(num_cells+2, const_cv);
         opacity        = np_somevalue(num_cells+2, const_opacity);
+        temperature    = np_somevalue(num_cells+2, const_T_space);
         opticaldepth   = np_zeros(num_cells+2);
         radiative_flux = np_zeros(num_cells+1);
-        temperature    = np_somevalue(num_cells+2, const_T);
+        
+        boundary_left  = read_parameter_from_file<BoundaryType>(filename,"PARI_BOUND_TYPE_LEFT", debug).value;
+        boundary_right = read_parameter_from_file<BoundaryType>(filename,"PARI_BOUND_TYPE_RIGHT", debug).value;
+        
+        cout<<"boundaries used in species["<<name<<"]: "<<boundary_left<<" / "<<boundary_right<<endl;
+        
         
         //
         // Determine which equation of states we are using
         //
-        eos_pressure_type       = EOS_pressure_type::adiabatic;
+        eos_pressure_type       = EOS_pressure_type::adiabatic;       //Read parameter from...
         eos_internal_energy_type = EOS_internal_energy_type::thermal;
         
         //Read EOS specifications from file
@@ -284,20 +347,22 @@ hydro_run::hydro_run(string filename, double debug_) {
         speed           = np_zeros(num_cells+2);
         cs              = np_zeros(num_cells+2);
         
-        timecount = 0;
+        timesteps    = np_zeros(num_cells+2);		    
+        timesteps_cs = np_zeros(num_cells+2);	
+        finalstep    = np_zeros(num_cells+2);
         
         if(debug > 0) {
                 cout<<"DEBUGLEVEL 1: Samples of generated values"<<endl;
                 //cout<<"rho[0], v[0], e[0] = "<<u[0]<<" "<<u[num_cells]<<" "<<u[2*num_cells]<<endl;
-                cout<<"First cell coordinates: |<--"<<x_i[0]<<" // "<<x_i12[0]<<" // "<<x_i[1]<<"-->|"<<endl;
-                cout<<"Last cell coordinates:  |<--"<<x_i[num_cells-1]<<" // "<<x_i12[num_cells-1]<<" // "<<x_i[num_cells]<<"-->|"<<endl;
+                cout<<"First cell coordinates: |<--"<<base->x_i[0]<<" // "<<base->x_i12[0]<<" // "<<base->x_i[1]<<"-->|"<<endl;
+                cout<<"Last cell coordinates:  |<--"<<base->x_i[num_cells-1]<<" // "<<base->x_i12[num_cells-1]<<" // "<<base->x_i[num_cells]<<"-->|"<<endl;
                 cout<<"Value of gamma: "<<gamma_adiabat[num_cells]<<endl;
         } 
         
         //
         // Problem 1: two states, left and right, separated at a mid-position
         //
-        if(problem_number == 1) {
+        if(base->problem_number == 1) {
             
             double u1l = read_parameter_from_file<double>(filename,"PARI_INIT_DATA_U1L", debug).value;
             double u2l = read_parameter_from_file<double>(filename,"PARI_INIT_DATA_U2L", debug).value;
@@ -321,7 +386,7 @@ hydro_run::hydro_run(string filename, double debug_) {
         //
         // Problem 2: A constant background state, with a planet embedded into it, free to evolve as physics dictates
         //
-        else if(problem_number == 2) {
+        else if(base->problem_number == 2) {
             
             cout<<"Problem 2 pos0."<<endl;
             
@@ -331,17 +396,15 @@ hydro_run::hydro_run(string filename, double debug_) {
             
             cout<<"Problem 2 pos1."<<endl;
             
-            planet_mass     = read_parameter_from_file<double>(filename,"PARI_PLANET_MASS", debug).value; //in Earth masses
-            planet_position = read_parameter_from_file<double>(filename,"PARI_PLANET_POS", debug).value;  //inside the simulation domain
-            rs              = read_parameter_from_file<double>(filename,"PARI_SMOOTHING_LENGTH", debug).value; //Gravitational smoothing length in hill 
-            rs_time         = read_parameter_from_file<double>(filename,"PARI_SMOOTHING_TIME", debug).value; //Time until we reach rs starting at rs_at_moment
-            rs_at_moment    = 0.2;
+            
             init_static_atmosphere = read_parameter_from_file<int>(filename,"PARI_INIT_STATIC", debug).value; //Yesno, isothermal at the moment
             
             cout<<"Problem 2 pos2."<<endl;
             
             //Conversion from shock tube parameters (given as dens, velocity, pressure) to conserved variables (dens, momentum, internal energy)
-            BACKGROUND_U = AOS(u1, u1*u2, 0.5*u1*u2*u2 + u3/(gamma_adiabat[0]-1.) );
+            //BACKGROUND_U = AOS(u1, u1*u2, 0.5*u1*u2*u2 + u3/(gamma_adiabat[0]-1.) );
+            
+            BACKGROUND_U = AOS(u1 * initial_fraction, u1*u2 * initial_fraction, 0.5*u1*u2*u2 * initial_fraction  + u3/(gamma_adiabat[0]-1.) );
 
      
             /* mdot boundaries
@@ -360,16 +423,23 @@ hydro_run::hydro_run(string filename, double debug_) {
             */
             
             
+            if(use_rad_fluxes==1)
+                const_opacity   = read_parameter_from_file<double>(filename,"PARI_CONST_OPAC", debug).value;
+            else
+                const_opacity   = 1.;
+        
+            
+            
             cout<<"Problem 2 pos3."<<endl;
             
             initialize_background(BACKGROUND_U);
-            init_grav_pot();
+            
             
             //
             // If we want to initialize a hydrostatic atmosphere, then we overwrite the so far given density/pressure data and set every velocity to 0
             //
             if(init_static_atmosphere == 1) {
-                initialize_hydrostatic_atmosphere_nonuniform();
+                initialize_hydrostatic_atmosphere();
             }
 
             if(debug > 0) 
@@ -389,12 +459,12 @@ hydro_run::hydro_run(string filename, double debug_) {
         
         if(debug > 0)
             cout<<"Ended init."<<endl;
+    
 }
 
-//
-//
-//
-void hydro_run::initialize_hydrostatic_atmosphere_nonuniform() {
+
+
+void c_Species::initialize_hydrostatic_atmosphere() {
     
     cout<<"ATTENTION: Initializing nonuniform hydrostatic atmosphere and overwriting prior initial values."<<endl;
     
@@ -417,17 +487,15 @@ void hydro_run::initialize_hydrostatic_atmosphere_nonuniform() {
     //
     for(int i=num_cells+1; i>=0; i--) {
             //temperature[i] = planet_mass / x_i12[i] / (cv * gamma_adiabat) + 1.;
-            temperature[i] = - 1.0 * phi[i] / (cv[i] * gamma_adiabat[i]) + temperature[num_cells+1];
+            temperature[i] = - 1.0 * base->phi[i] / (cv[i] * gamma_adiabat[i]) + const_T_space;
             //temperature[i] = 100.;
         
             //Add temperature bumps and troughs
-            temperature[i] += TEMPERATURE_BUMP_STRENGTH * 4. * exp( - pow(x_i12[i] - 1.e-1 ,2.) / (0.1) );
+            //temperature[i] += TEMPERATURE_BUMP_STRENGTH * 4.  * exp( - pow(base->x_i12[i] - 1.e-1 ,2.) / (0.1) );
             
-            temperature[i] -= TEMPERATURE_BUMP_STRENGTH * 15. * exp( - pow(x_i12[i] - 7.e-3 ,2.) / (1.5e-3) );
+            //temperature[i] -= TEMPERATURE_BUMP_STRENGTH * 15. * exp( - pow(base->x_i12[i] - 7.e-3 ,2.) / (1.5e-3) );
 
     }
-    
-    //Last normal cell has to be awkwardly initialized
     
     //At this point, the right ghost cell is already initialized, so we can just build up a hydrostatic state from there
     for(int i=num_cells; i>=0; i--)  {
@@ -440,8 +508,8 @@ void hydro_run::initialize_hydrostatic_atmosphere_nonuniform() {
 
         factor_outer = (gamma_adiabat[i+1]-1.) * cv[i+1] * T_outer; //TODO: Replace with T_outer for non-isothermal EOS
         factor_inner = (gamma_adiabat[i]  -1.) * cv[i]   * T_inner; //TODO: Replace with T_inner for non-isothermal EOS
-        metric_outer = (phi[i+1] - phi[i]) * omegaplus[i+1] * dx[i+1] / (dx[i+1] + dx[i]);
-        metric_inner = (phi[i+1] - phi[i]) * omegaminus[i]  * dx[i]   / (dx[i+1] + dx[i]);
+        metric_outer = (base->phi[i+1] - base->phi[i]) * base->omegaplus[i+1] * base->dx[i+1] / (base->dx[i+1] + base->dx[i]);
+        metric_inner = (base->phi[i+1] - base->phi[i]) * base->omegaminus[i]  * base->dx[i]   / (base->dx[i+1] + base->dx[i]);
         
         temp_rhofinal = u[i+1].u1 * (factor_outer + metric_outer) / (factor_inner - metric_inner);
         
@@ -452,10 +520,10 @@ void hydro_run::initialize_hydrostatic_atmosphere_nonuniform() {
         // 
         //if( (i==20 || i== num_cells-20) && debug >= 0) {
         //if( i>0 ) {
-        if(1==0) {
+        if(temp_rhofinal < 0) {
             char a;
             cout.precision(16);
-            cout<<"In INIT STATIC i="<<i<<endl;
+            cout<<"NEGATIVE DENSITY IN INIT STATIC i="<<i<<endl;
             cout<<"In hydostatic init: factor_outer/metric_outer = "<< factor_outer / metric_outer << " factor_inner/metric_inner = "<< factor_inner / metric_inner <<endl;
             cout<<"factor_outer+metric_outer = "<< (factor_outer + metric_outer) << " factor_inner-metric_inner = "<<( factor_inner - metric_inner) <<endl;
             cout<<"metric_outer = "<< metric_outer << " metric_inner = "<<metric_inner <<endl;
@@ -468,7 +536,7 @@ void hydro_run::initialize_hydrostatic_atmosphere_nonuniform() {
             //tempgrad2 = ((gamma_adiabat-1.)*cv*T_outer + 0.5 * delta_phi) * u[i+1].u1 - ((gamma_adiabat-1.)*cv*T_inner  + 0.5 * delta_phi ) * u[i].u1 ;
             //residual = (gamma_adiabat-1.)*cv*u[i+1].u1*T_outer - (gamma_adiabat-1.)*cv*u[i].u1*T_inner  + 0.5 * (u[i].u1 + u[i+1].u1) * delta_phi;
             //cout<<"pressure diff "<<(gamma_adiabat-1.)*u[i+1].u3 - (gamma_adiabat-1.)*(u[i].u3)<<endl;
-            cout<<"pressure diff "<<( ((gamma_adiabat[i+1]-1.)*cv[i+1]*u[i+1].u1*T_outer - (gamma_adiabat[i]-1.)*cv[i]*u[i].u1*T_inner)/dx[i])<<endl;
+            cout<<"pressure diff "<<( ((gamma_adiabat[i+1]-1.)*cv[i+1]*u[i+1].u1*T_outer - (gamma_adiabat[i]-1.)*cv[i]*u[i].u1*T_inner)/base->dx[i])<<endl;
             //cout<<"density sum with potential "<<(0.5 * (u[i].u1 + u[i+1].u1) * delta_phi/dx[i])<<endl;
             cout<<"density diff "<<(u[i].u1 - u[i+1].u1)<<endl;
             cout<<"density sum " <<(u[i].u1 + u[i+1].u1)<<endl;
@@ -491,7 +559,7 @@ void hydro_run::initialize_hydrostatic_atmosphere_nonuniform() {
 //
 // Initial conditions for shock tubes, dividing the domain into a left constant value and another right constant value
 //
-void hydro_run::initialize_default_test() {
+void c_Species::initialize_default_test() {
     
     cout<<"Initialized default simulation."<<endl;
     
@@ -503,13 +571,13 @@ void hydro_run::initialize_default_test() {
 //
 // Initial conditions for shock tubes, dividing the domain into a left constant value and another right constant value
 //
-void hydro_run::initialize_shock_tube_test(const AOS &leftval,const AOS &rightval) {
+void c_Species::initialize_shock_tube_test(const AOS &leftval,const AOS &rightval) {
     
     cout<<"Initialized shock tube test."<<endl;
     
     for(int i=0; i<=num_cells+1; i++) {
-            
-        if(x_i12[i] < SHOCK_TUBE_MID) 
+        
+        if(base->x_i12[i] < SHOCK_TUBE_MID) 
             u[i] = leftval;
         else
             u[i] = rightval;
@@ -519,7 +587,7 @@ void hydro_run::initialize_shock_tube_test(const AOS &leftval,const AOS &rightva
 //
 // Initial conditions for one constant background state
 //
-void hydro_run::initialize_background(const AOS &background) {
+void c_Species::initialize_background(const AOS &background) {
     
     cout<<"Initialized constant background state. state = "<<background.u1<<" "<<background.u2<<" "<<background.u3<<endl;
     
@@ -528,7 +596,7 @@ void hydro_run::initialize_background(const AOS &background) {
 }
 
 
-void hydro_run::apply_boundary_left() {
+void c_Species::apply_boundary_left() {
     double E_kinetic, pressure_active, pressure_bound ;
     switch(boundary_left) {
         case BoundaryType::user:
@@ -539,26 +607,26 @@ void hydro_run::apply_boundary_left() {
             E_kinetic       = 0.5 * u[1].u2 * u[1].u2 / u[1].u1 ;
             pressure_active = (gamma_adiabat[1]-1.) * (u[1].u3 - E_kinetic);
             // Hydrostatic pressure extrapolation 
-            pressure_bound = pressure_active - u[1].u1 * (phi[0] - phi[1]) ;
+            pressure_bound = pressure_active - u[1].u1 * (base->phi[0] - base->phi[1]) ;
             pressure_bound = std::max(pressure_bound, 0.0) ;
             u[0].u3        = pressure_bound/(gamma_adiabat[0]-1.) + E_kinetic ;
             break ;
         case BoundaryType::reflecting:
             u[0]     = u[1]; 
             u[0].u2 *= -1;
-            phi[0]   = phi[1] ;
+            base->phi[0]   = base->phi[1] ;
             break;
         case BoundaryType::fixed:
             u[0]     = SHOCK_TUBE_UL;
             break;
         case BoundaryType::periodic:
             u[0]     = u[num_cells];
-            phi[0]   = phi[num_cells] ;
+            base->phi[0]   = base->phi[num_cells] ;
             break;
     }
 }
 
-void hydro_run::apply_boundary_right() {
+void c_Species::apply_boundary_right() {
     double E_kinetic, pressure_active, pressure_bound ;
     switch(boundary_right) {
         case BoundaryType::user:
@@ -569,21 +637,21 @@ void hydro_run::apply_boundary_right() {
             E_kinetic         = 0.5 * u[num_cells].u2 * u[num_cells].u2 / u[num_cells].u1 ;
             pressure_active   = (gamma_adiabat[num_cells]-1.) * (u[num_cells].u3 - E_kinetic);
             // Hydrostatic pressure extrapolation 
-            pressure_bound    = pressure_active - u[num_cells].u1 * (phi[num_cells+1] - phi[num_cells]) ;
+            pressure_bound    = pressure_active - u[num_cells].u1 * (base->phi[num_cells+1] - base->phi[num_cells]) ;
             pressure_bound    = std::max(pressure_bound, 0.0) ;
             u[num_cells+1].u3 = pressure_bound / (gamma_adiabat[num_cells+1]-1.) + E_kinetic ;
             break ;
         case BoundaryType::reflecting:
             u[num_cells+1]     = u[num_cells]; 
             u[num_cells+1].u2 *= -1;
-            phi[num_cells+1]   = phi[num_cells] ;
+            base->phi[num_cells+1]   = base->phi[num_cells] ; //TODO: This will be called many times, too many!
             break;
         case BoundaryType::fixed:
             u[num_cells+1]     = SHOCK_TUBE_UR;
             break;
         case BoundaryType::periodic:
             u[num_cells+1]     = u[1];
-            phi[num_cells+1]   = phi[1] ;
+            base->phi[num_cells+1]   = base->phi[1] ; //TODO: This will be called too many times!
             break;
     }
 }
@@ -591,15 +659,17 @@ void hydro_run::apply_boundary_right() {
 //
 // Creates a wave at the inner boundary supposedly propagating upwards in the gravity well
 //
-void hydro_run::add_wave(double globalTime, double WAVE_PERIOD, double WAVE_AMPLITUDE)  {
+void c_Species::add_wave(double globalTime, double WAVE_PERIOD, double WAVE_AMPLITUDE)  {
     
     
     u[0].u2 = u[0].u1 * WAVE_AMPLITUDE * std::sin(12.*M_PI*globalTime/WAVE_PERIOD);
     u[1].u2 = u[0].u2;
     
 }
-hydro_run::~hydro_run() {
-    
-    cout<<"The destructor is called, but its empty so far."<<endl;
-    
+c_Sim::~c_Sim() {
+    //Empty
+}
+
+c_Species::~c_Species() {
+    //Empty
 }

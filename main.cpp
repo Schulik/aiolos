@@ -21,6 +21,7 @@
 int main(int argc, char** argv)
 {
     string simulationname;
+    string speciesfile;
     int debug;
     int suppress_warnings_global = 0;
     cout<<"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~";
@@ -34,6 +35,7 @@ int main(int argc, char** argv)
     cout<<"Use -par name.par to give key parameters to the executable."<<endl;
     
     int parameterfile_found = 0;
+    int speciesfile_found   = 0;
     debug = 0;
     
     for(int i=0; i<argc; i++) {
@@ -44,6 +46,12 @@ int main(int argc, char** argv)
             simulationname      = argv[i+1];
             parameterfile_found = 1;
             cout<<"Attempting at assingning a simulationname to simulationname: "<<simulationname<<endl;
+            i++;
+        }
+        if(tmpstring.compare("-spc") == 0) {
+            speciesfile         = argv[i+1];
+            speciesfile_found   = 1;
+            cout<<"Attempting at assingning the following string to speciesfile: "<<speciesfile<<endl;
             i++;
         }
         if(tmpstring.compare("-debug") == 0) {
@@ -66,6 +74,10 @@ int main(int argc, char** argv)
             cout<<"No simulationname found, chosing default simulationname: simulation.par"<<endl;
             simulationname = "simulation.par";
     }
+    if(!speciesfile_found) {
+            cout<<"No speciesfile found, chosing default speciesfile: mix.spc"<<endl;
+            speciesfile = "mix.spc";
+    }
         
     
     try {
@@ -73,7 +85,7 @@ int main(int argc, char** argv)
         cout<<"In main, construction of simulation is about to start."<<endl;
        
         //Main simulation class object, is initialized with the simulation parameters from a file
-        hydro_run simulation1(simulationname, debug);
+        c_Sim simulation1(simulationname, speciesfile, debug);
         
         simulation1.set_suppress_warnings(suppress_warnings_global);
 
@@ -92,7 +104,7 @@ int main(int argc, char** argv)
     }
     catch (std::bad_alloc& ba)
     {
-        std::cerr << "bad_alloc caught in hydro init block: " << ba.what() <<endl;
+        std::cerr << "bad_alloc caught in main simulation block: " << ba.what() <<endl;
     }
     catch(...) {
         cout<<"Unknown error in initialization of main variables!"<<endl;

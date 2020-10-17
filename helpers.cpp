@@ -12,7 +12,7 @@
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
-double hydro_run::get_cfl_timestep() {
+double c_Sim::get_cfl_timestep() {
 
     //
     // Compute individual max wave crossing timesteps per cell
@@ -22,21 +22,24 @@ double hydro_run::get_cfl_timestep() {
     //TODO: Compute sound crossing time for entire domain
     //double finalstep = 0.;
     
-    snd_crs_time=0;
-    for(int i=1; i<=num_cells; i++) {
+    max_snd_crs_time=0;
+    for(int s=0; s < num_species; s++) {
         
-        //Computing the inverse timesteps first
-        timesteps[i]    = std::abs(u[i].u2 / u[i].u1 / dx[i]); 
-        timesteps_cs[i] = std::abs(cs[i] / dx[i]);
-        finalstep[i]    = std::sqrt(timesteps[i]*timesteps[i] + timesteps_cs[i] * timesteps_cs[i]);
-        
-        //cout<<" timestep["<<i<<"]="<<timesteps[i]<<endl;
-        snd_crs_time += 2.* dx[i] / cs[i];
-        
-        if (finalstep[i] > minstep)
-            minstep = finalstep[i];  
+        species[s].snd_crs_time = 0;
+        for(int i=1; i<=num_cells; i++) {
+            
+            //Computing the inverse timesteps first
+            species[s].timesteps[i]    = std::abs(species[s].u[i].u2 / species[s].u[i].u1 / dx[i]); 
+            species[s].timesteps_cs[i] = std::abs(species[s].cs[i] / dx[i]);
+            species[s].finalstep[i]    = std::sqrt(species[s].timesteps[i]*species[s].timesteps[i] + species[s].timesteps_cs[i] * species[s].timesteps_cs[i]);
+            
+            //cout<<" timestep["<<i<<"]="<<timesteps[i]<<endl;
+            species[s].snd_crs_time += 2.* dx[i] / species[s].cs[i];
+            
+            if (species[s].finalstep[i] > minstep)
+                minstep = species[s].finalstep[i];  
+        }
     }
-    
     //Invert and apply CFL secutiry factor
     minstep = cflfactor * 0.4 / minstep;
     
@@ -120,6 +123,63 @@ vector<string> stringsplit(const string& str, const string& delim)
 //      simulation_parameter structure containing the name, type and value of a parameter found in a file
 //
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+void c_Species::read_species_data(string filename, int species_index) {
+    
+    
+    ifstream file(filename);
+    string line;
+    if(!file) {
+        cout<<"Couldnt open species file "<<filename<<"!!!!!!!!!!1111"<<endl;
+        
+    }
+    //simulation_parameter tmp_parameter = {"NaN",0,0.,0,"NaN"};
+    int found = 0;
+    
+    cout<<"    In read species Pos1"<<endl;
+    
+    while(std::getline( file, line )) {
+    
+        std::vector<string> stringlist = stringsplit(line," ");
+
+        //if(line.find(variablename) != string::npos) {
+        if(stringlist[0].find("@") != string::npos) {
+            
+            if(std::stoi(stringlist[1]) == species_index) {
+                
+                found = 1;
+                
+                this->name                = stringlist[2];
+                this->mass_amu            = std::stod(stringlist[3]);
+                this->const_cv            = std::stod(stringlist[4]);
+                this->const_gamma_adiabat = std::stod(stringlist[5]);
+                this->initial_fraction    = std::stod(stringlist[6]);
+                
+                if(debug > 0)
+                    cout<<"Found species called "<<name<<" with a mass of "<<mass_amu<<" cv "<<const_cv<<" gamma "<<const_gamma_adiabat<<" and zeta_0 = "<<initial_fraction<<endl;
+                
+            }
+
+        }
+    
+    }
+    
+    //cout<<"    In read_parameter Pos2"<<endl;
+    
+    if(found == 0) {
+            
+            if(debug > 0)
+                cout<<"WARNING: Species number "<<species_index<<" not found in parameterfile!"<<endl;
+    }
+    if(found > 1) {
+            cout<<"WARNING: Species number "<<species_index<<" defined more than once in parameterfile!"<<endl;
+    }
+    
+    file.close();
+    
+    cout<<"Leaving species readin now. Bye!"<<endl;
+}
+
 
 template<typename T> 
 T parse_item(string item) {
@@ -216,26 +276,23 @@ template simulation_parameter<BoundaryType> read_parameter_from_file(string, str
 
 
 //Print 2 
-void hydro_run::print_AOS_component_tofile(const std::vector<double>& x, 
-                                          const std::vector<AOS>& data,
-                                          const std::vector<AOS>& fluxes,
-                                          int timestepnumber) {
+void c_Species::print_AOS_component_tofile(int timestepnumber) {
                                               
     // Choose a sensible default output name
     string filename ;
     {
         stringstream filenamedummy;
-        string truncated_name = stringsplit(simname,".")[0];
-        filenamedummy<<"output_"<<truncated_name;
+        string truncated_name = stringsplit(base->simname,".")[0];
+        filenamedummy<<"output_"<<"_"<<truncated_name;
         filename = filenamedummy.str() ;
     }
 
-    filename = read_parameter_from_file<string>(simname, "OUTPUT_FILENAME", debug, filename).value ;
+    filename = read_parameter_from_file<string>(base->simname, "OUTPUT_FILENAME", debug, filename).value ;
 
     // Add the snap number
     {
         stringstream filenamedummy;
-        filenamedummy << filename << "_t" << timestepnumber << ".dat";
+        filenamedummy << filename<<"_"<< name << "_t" << timestepnumber << ".dat";
         filename = filenamedummy.str() ;
     }
 
@@ -251,27 +308,26 @@ void hydro_run::print_AOS_component_tofile(const std::vector<double>& x,
         double hydrostat = 0., hydrostat2 = 0., hydrostat3 = 0.;
         
         //Print left ghost stuff
-        outfile<<x[0]<<'\t'<<data[0].u1<<'\t'<<data[0].u2<<'\t'<<data[0].u3<<'\t'<<fluxes[0].u1<<'\t'<<fluxes[0].u2<<'\t'<<fluxes[0].u3<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<pressure[0]<<'\t'<<data[0].u2/data[0].u1<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<phi[0]<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<endl;
+        outfile<<base->x_i12[0]<<'\t'<<u[0].u1<<'\t'<<u[0].u2<<'\t'<<u[0].u3<<'\t'<<flux[0].u1<<'\t'<<flux[0].u2<<'\t'<<flux[0].u3<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<pressure[0]<<'\t'<<u[0].u2/u[0].u1<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<base->phi[0]<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<endl;
         
         //Print the domain
         for(int i=1; i<=num_cells; i++) {
             
-            hydrostat = flux[i-1].u2/dx[i] ; //hydrostat2 + hydrostat3 ; 
-            hydrostat2 = flux[i].u2/dx[i];//pressure[i+1] - pressure[i];
-            hydrostat3 = source[i].u2;//0.5 * (data[i].u1 + data[i+1].u1) * (phi[i+1] - phi[i]);
+            hydrostat = flux[i-1].u2/base->dx[i] ; //hydrostat2 + hydrostat3 ; 
+            hydrostat2 = flux[i].u2/base->dx[i];//pressure[i+1] - pressure[i];
+            hydrostat3 = source[i].u2;//0.5 * (u[i].u1 + u[i+1].u1) * (phi[i+1] - phi[i]);
             
-            
-            //outfile<<x[i]<<'\t'<<data[i].u1<<'\t'<<data[i].u2<<'\t'<<data[i].u3<<'\t'<<fluxes[i].u1<<'\t'<<fluxes[i].u2<<'\t'<<fluxes[i].u3<<'\t'<<fluxes[i+1].u1<<'\t'<<fluxes[i+1].u2<<'\t'<<fluxes[i+1].u3<<'\t'<<pressure[i]<<'\t'<<data[i].u2/data[i].u1<<'\t'<<internal_energy[i] <<'\t'<<timesteps[i]<<'\t'<<phi[i]<<'\t'<<timesteps_cs[i]<<'\t'<<opticaldepth[i]<<'\t'<<radiative_flux[i] <<endl;
+            //outfile<<x[i]<<'\t'<<u[i].u1<<'\t'<<u[i].u2<<'\t'<<u[i].u3<<'\t'<<flux[i].u1<<'\t'<<flux[i].u2<<'\t'<<flux[i].u3<<'\t'<<flux[i+1].u1<<'\t'<<flux[i+1].u2<<'\t'<<flux[i+1].u3<<'\t'<<pressure[i]<<'\t'<<u[i].u2/u[i].u1<<'\t'<<internal_energy[i] <<'\t'<<timesteps[i]<<'\t'<<phi[i]<<'\t'<<timesteps_cs[i]<<'\t'<<opticaldepth[i]<<'\t'<<radiative_flux[i] <<endl;
             
             //flux[i] - flux[i+1] + source[i]
             
-            outfile<<x[i]<<'\t'<<data[i].u1<<'\t'<<data[i].u2<<'\t'<<data[i].u3<<'\t'<<fluxes[i].u1<<'\t'<<fluxes[i].u2<<'\t'<<fluxes[i].u3<<'\t'<<((flux[i-1].u1 - flux[i].u1)/dx[i] + source[i].u1)<<'\t'<<((flux[i-1].u2 - flux[i].u2)/dx[i] + source[i].u2)<<'\t'<<((flux[i-1].u3 - flux[i].u3)/dx[i] + source[i].u3)<<'\t'<<pressure[i]<<'\t'<<data[i].u2/data[i].u1<<'\t'<<internal_energy[i] <<'\t'<<timesteps[i]<<'\t'<<phi[i]<<'\t'<<timesteps_cs[i]<<'\t'<<opticaldepth[i]<<'\t'<<hydrostat<<'\t'<<hydrostat2<<'\t'<<hydrostat3<<'\t'<<enclosed_mass[i]<<endl;
+            outfile<<base->x_i12[i]<<'\t'<<u[i].u1<<'\t'<<u[i].u2<<'\t'<<u[i].u3<<'\t'<<flux[i].u1<<'\t'<<flux[i].u2<<'\t'<<flux[i].u3<<'\t'<<((flux[i-1].u1 - flux[i].u1)/base->dx[i] + source[i].u1)<<'\t'<<((flux[i-1].u2 - flux[i].u2)/base->dx[i] + source[i].u2)<<'\t'<<((flux[i-1].u3 - flux[i].u3)/base->dx[i] + source[i].u3)<<'\t'<<pressure[i]<<'\t'<<u[i].u2/u[i].u1<<'\t'<<internal_energy[i] <<'\t'<<timesteps[i]<<'\t'<<base->phi[i]<<'\t'<<timesteps_cs[i]<<'\t'<<opticaldepth[i]<<'\t'<<hydrostat<<'\t'<<hydrostat2<<'\t'<<hydrostat3<<'\t'<<base->enclosed_mass[i]<<endl;
         }
         
         //Print right ghost stuff
-        outfile<<x[num_cells+1]<<'\t'<<data[num_cells+1].u1<<'\t'<<data[num_cells+1].u2<<'\t'<<data[num_cells+1].u3<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<pressure[num_cells+1]<<'\t'<<data[num_cells+1].u2/data[num_cells+1].u1<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<phi[num_cells+1]<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<endl;
+        outfile<<base->x_i12[num_cells+1]<<'\t'<<u[num_cells+1].u1<<'\t'<<u[num_cells+1].u2<<'\t'<<u[num_cells+1].u3<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<pressure[num_cells+1]<<'\t'<<u[num_cells+1].u2/u[num_cells+1].u1<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<base->phi[num_cells+1]<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<endl;
    
-        cout<<"Sucessfully written file "<<filename<<" with smoothed gravity = "<<rs_at_moment<<" at time "<<globalTime<<" and dt="<<dt<<endl;
+        cout<<"Sucessfully written file "<<filename<<" for species = "<<name<<" at time "<<base->globalTime<<" and dt="<<base->dt<<endl;
     }
     else cout << "Unable to open file" << filename << endl; 
     outfile.close();

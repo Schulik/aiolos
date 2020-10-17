@@ -48,6 +48,18 @@ const double Rho_ref = 1e-20;
 
 const double cflfactor = 0.9;
 
+
+////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+//
+//  Functions
+//
+////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+
 //
 // Functions mimicking certain numpy functionalities
 //
@@ -137,18 +149,35 @@ enum class EOS_internal_energy_type {
     thermal = 0, constant = 1, tabulated = 2, supernova = 3, user=4
 };
 
-class species {
-    
-    
-    
-    
-};
+std::vector<AOS> init_AOS(int num);
+vector<string> stringsplit(const string& str, const string& delim);
+
+template<typename T>
+simulation_parameter<T> read_parameter_from_file(string, string, int);
+
+template<typename T>
+simulation_parameter<T> read_parameter_from_file(string, string, int, T defaul);
 
 
 
-class hydro_run
+class c_Species;
+
+
+////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+//
+//  CLASS SIMULATION
+//
+////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+
+
+class c_Sim
 {
-    
+public:   
     ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     //
     //  Control variables
@@ -156,10 +185,12 @@ class hydro_run
     ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     string simname;
-    int boundaries_number;
+    
+    int num_species;
+    std::vector<c_Species> species;
+    
     int problem_number;
     int debug;
-    int solver;
     int use_self_gravity;
     int use_linear_gravity;
     int use_rad_fluxes;
@@ -167,17 +198,15 @@ class hydro_run
     int init_geometry;
     
     Geometry geometry ;
-    BoundaryType boundary_left ;
-    BoundaryType boundary_right ;
-    EOS_pressure_type eos_pressure_type;
-    EOS_internal_energy_type eos_internal_energy_type;
     
+
     ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     //
     //  Numerical
     //
     ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+    
     std::vector<double>dx;
     double domain_min, domain_max;
     int num_cells;
@@ -187,16 +216,17 @@ class hydro_run
     std::vector<double> x_i12;  		//The cell mid positions
     std::vector<double> surf;
     std::vector<double> vol;
+    std::vector<double> omegaplus;
+    std::vector<double> omegaminus;
+    std::vector<double> source_pressure_prefactor_left;
+    std::vector<double> source_pressure_prefactor_right;
 
     double dt;
     double cflfactor;
     double t_max;
     double globalTime;
-    std::vector<double> timesteps;
-    std::vector<double> timesteps_cs;
-    std::vector<double> finalstep;
     double output_time;
-    double snd_crs_time;
+    double max_snd_crs_time;
     int steps;
     int timecount;
     
@@ -211,26 +241,111 @@ class hydro_run
     double rs;
     double rs_at_moment = 0 ;
     double rs_time;
-    int    init_static_atmosphere;
+    
+    std::vector<double> phi;            //Parabolic Variables: gravitational potential
+    std::vector<double> enclosed_mass;
+    
 
     ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     //
-    // Simulation data: Variables per species
+    // Variables for different scenarios
+    //
+    ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    
+    
+    double mdot;
+    double T_increment;
+    
+    ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    //
+    // Functions
+    //
+    ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    
+    //
+    // Init
+    //
+    
+    void initialize_gravitational_potential();
+    
+    //
+    // Utilities
+    //
+    double get_max_soundspeed();
+    double get_cfl_timestep();
+    
+    //
+    // Source terms
+    //
+    
+    //Gravity
+    void init_grav_pot();
+    void update_mass_and_pot();
+    double get_phi_grav(double &r, double &mass);
+    
+    
+public:
+    
+    c_Sim() {};
+    c_Sim(string parameter_filename, string species_filename, int debug=0);
+    ~c_Sim();
+    
+    void execute(); //Main loop
+    void set_debug(int);
+    void set_suppress_warnings(int j) {suppress_warnings = j;}
+    
+    int get_num_cells() {return num_cells; }
+};
+
+
+////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+//
+//  CLASS SPECIES
+//
+////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class c_Species
+{
+public:
+    
+    c_Sim *base;
+    
+    ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    //
+    //  Numerical
     //
     ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+    string name;
+    int this_species_index;
+    int boundaries_number;
+    BoundaryType boundary_left;
+    BoundaryType boundary_right;
+    EOS_pressure_type eos_pressure_type;
+    EOS_internal_energy_type eos_internal_energy_type;
+    int num_cells;
+    int debug;
+
+    ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    //
+    // Physics variables
+    //
+    ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    
+    double mass_amu;
+    double initial_fraction;
+    
     std::vector<AOS> u;              //Conserved hyperbolic variables: density, mass flux, energy density
     std::vector<AOS> source;         // Gravitational source term
     std::vector<AOS> source_pressure;// Geometric source term
     std::vector<AOS> flux;
-    std::vector<double> phi;            //Parabolic Variables: gravitational potential
-    std::vector<double> enclosed_mass;
-    std::vector<double> omegaplus;
-    std::vector<double> omegaminus;
-    std::vector<double> source_pressure_prefactor_left;
-    std::vector<double> source_pressure_prefactor_right;
     
-    double const_T;
+    double const_T_space;
     double const_gamma_adiabat;
     double const_cv;
     double const_opacity;
@@ -240,6 +355,11 @@ class hydro_run
     // Primitives and other helper quantities
     //
     ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    
+    std::vector<double> timesteps;
+    std::vector<double> timesteps_cs;
+    std::vector<double> finalstep;
+    double snd_crs_time;
     
     std::vector<double> cs;         //Speed of sound array
     std::vector<double> pressure;   
@@ -262,95 +382,59 @@ class hydro_run
     std::vector<std::vector<double> > tab_e_x;
     std::vector<std::vector<double> > tab_e_y;
     
+    
     ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     //
-    // Variables for different scenarios
+    // Init and scenarios
     //
     ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    
+    int  init_static_atmosphere;
+    
+    //Wave tests
+    int    USE_WAVE;
+    double WAVE_AMPLITUDE;
+    double WAVE_PERIOD;
     
     //Shock tube tests
     double SHOCK_TUBE_MID = 0.3;
     AOS SHOCK_TUBE_UL, SHOCK_TUBE_UR; //For problem_number==1
     AOS BACKGROUND_U;                 //For problem_number==2
     
+    //Initial temperature profile
     double TEMPERATURE_BUMP_STRENGTH = 1.;
-    
-    int    USE_WAVE;
-    double WAVE_AMPLITUDE;
-    double WAVE_PERIOD;
-    
-    double mdot;
-    double T_increment;
-    
-    ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    //
-    // Functions
-    //
-    ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    
-    //
-    // Init
-    //
     
     void initialize_shock_tube_test(const AOS &left,const AOS &right); //For Problem 1
     void initialize_background(const AOS &state); //For problem 2
     void initialize_default_test();
     void initialize_space_test(AOS background);
     void initialize_custom_setup();
-    //void initialize_hydrostatic_atmosphere();
-    void initialize_hydrostatic_atmosphere_nonuniform();
-    //void initialize_hydrostatic_atmosphere_nonuniformSph();
-    void initialize_gravitational_potential();
+    void initialize_hydrostatic_atmosphere();
     
+    ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     //
-    // Utilities
+    // Physics computations
     //
-    double get_phi_grav(); //Returns the value of the gravitational potential at a position
-    double get_max_soundspeed();
-    double get_cfl_timestep();
-    void compute_pressure();
-    void print_AOS_component_tofile(const std::vector<double>& x, 
-                                    const std::vector<AOS>& data,
-                                    const std::vector<AOS>& fluxes,
-                                    int timestepnumber);
-    
-    
-    //
-    // Boundaries
-    //
-    void add_wave(double time, double tmax, double amplitude);
-    
-    void apply_boundary_left();
-    void apply_boundary_right();
-    void user_boundary_left();
-    void user_boundary_right();
-
-    void user_initial_conditions();
-
-    //
-    // Source terms
-    //
-    
-    //Gravity
-    void init_grav_pot();
-    double get_p_hydrostatic(AOS &u, double &phi_l, double &phi_r, const int &i);
-    double get_p_hydrostatic_nonuniform(const int &i, const int &plusminus);
-    double get_phi_grav(double &r, double &mass);
-    void update_mass_and_pot();
-    AOS source_grav(AOS &u, int &j);
-    
-    //Radiation
-    void update_radiation();
-    AOS source_radflux(int i);
+    ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     
     // 
-    // Riemann solver
+    // Riemann solver and source functions
     //
-    //double get_wave_speeds(AOS &input_vec, const double &sign, const int &j);
-    AOS analytic_flux(AOS &input_vec, const int &j);
+    double get_p_hydrostatic(AOS &u, double &phi_l, double &phi_r, const int &i);
+    double get_p_hydrostatic_nonuniform(const int &i, const int &plusminus);
     
+    AOS analytic_flux(AOS &input_vec, const int &j);
     AOS hll_flux (AOS &leftvalue, AOS &rightvalue, const int &jleft, const int &jright);
     AOS hllc_flux(AOS &leftvalue, AOS &rightvalue, const int &jleft, const int &jright);
+    void compute_pressure(); // Computes all other primitives as well!
+    AOS source_grav(AOS &u, int &j);
+    
+    //
+    // Radiation
+    //
+    int use_rad_fluxes;
+    void update_radiation();
+    AOS source_radflux(int i);
     
     //
     // Equations of state
@@ -368,23 +452,36 @@ class hydro_run
     double interpolated_values_on_eos_p_grid(double dens, double eint);
     double interpolated_values_on_eos_eint_grid(double dens, double temperature);
     
-public:
+    //
+    // Boundaries
+    //
+    void add_wave(double time, double tmax, double amplitude);
     
-    hydro_run(string, double debug=0);
-    ~hydro_run();
+    void apply_boundary_left();
+    void apply_boundary_right();
+    void user_boundary_left();
+    void user_boundary_right();
+
+    void user_initial_conditions();
     
-    void execute(); //Main loop
+    ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    //
+    // File operations etc.
+    //
+    ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    
+    int suppress_warnings;
+    void print_AOS_component_tofile(int timestepnumber);
+    
+    void read_species_data(string filename, int species_index);
     void set_debug(int);
-    void set_suppress_warnings(int j) {suppress_warnings = j;}
+    void set_suppress_warnings(int j) {suppress_warnings = j;}    
+    
+    //c_Species();
+    c_Species(c_Sim *base_simulation, string filename, string species_filename, int species_index, int debug=0);
+    ~c_Species();
+    void execute();
+    
 };
-
-std::vector<AOS> init_AOS(int num);
-vector<string> stringsplit(const string& str, const string& delim);
-
-template<typename T>
-simulation_parameter<T> read_parameter_from_file(string, string, int);
-
-template<typename T>
-simulation_parameter<T> read_parameter_from_file(string, string, int, T defaul);
 
 #endif//_AIOLOS_MAIN_H

@@ -17,7 +17,7 @@
     //
     // takes: r as array
     //
-    void hydro_run::init_grav_pot() {
+    void c_Sim::init_grav_pot() {
         
         for(int i = 1; i <= num_cells; i++) {
             enclosed_mass[i] = planet_mass;      //No self-gravity
@@ -34,7 +34,9 @@
     //
     // takes: r as array
     //    
-    void hydro_run::update_mass_and_pot() {
+    void c_Sim::update_mass_and_pot() {
+        
+        double species_dens_sum;
         
         if(debug >= 3)
             cout<<"In update mass. "<<endl;
@@ -50,8 +52,14 @@
                     cout<<"In update mass, last element."<<endl;
             }
             
+            //TODO: PUTIN loop over all species densities
+            species_dens_sum = 0.;
+            for(int s = 0; s < num_species; s++)
+                species_dens_sum += species[s].u[i].u1;
+        
             
-            enclosed_mass[i] = enclosed_mass[i-1] +  4. * 3.141592 * (pow(x_i[i],3.)-pow(x_i[i-1],3.) )/3. * u[i].u1; //Straightfoward integration of the poisson eqn
+            
+            enclosed_mass[i] = enclosed_mass[i-1] +  4. * 3.141592 * (pow(x_i[i],3.)-pow(x_i[i-1],3.) )/3. * species_dens_sum; //Straightfoward integration of the poisson eqn
             
             if (use_self_gravity == 1) 
                 phi[i]           = get_phi_grav(x_i12[i], enclosed_mass[i]);
@@ -71,7 +79,7 @@
     //
     // Options: linear gravity and 1/r gravity with gravitational smoothing from Klahr&Kley 2006
     //
-    double hydro_run::get_phi_grav(double &r, double &mass) {
+    double c_Sim::get_phi_grav(double &r, double &mass) {
         
         //
         // Deepening the potential if needed
@@ -97,40 +105,7 @@
             
         }
             
-    }
-
-    
-    //
-    // p_hydrostatic - hydrostatic reconstruction, computes pressure difference between current pressure and hydrostatic state, after Eq. 16 in KM2016
-    //
-    // takes:
-    // returns:
-    //
-    double hydro_run::get_p_hydrostatic(AOS &u, double &phi_l, double &phi_r,const int &i) {
-        
-        double ptemp    = (gamma_adiabat[i]-1.)*(u.u3  - 0.5* u.u2*u.u2 / u.u1 );
-        double pfinal   = pressure[i] - 0.5 * u.u1 * (phi_l - phi_r);
-        
-        //if self.debug > 2:
-         //   print(" In P_HYDROSTATIC : phi_l-phi_r = " + repr(phi_l) + "-" + repr(phi_r) + " p,pfinal = " + repr([p,pfinal]))
-
-        if (pfinal < 0.) {
-            if(suppress_warnings == 0) {
-                char a;
-                cout<<"Warning: Negative pressure computed and replaced in cell "<<i<<" at time= "<<globalTime<<" iter = "<<steps<<endl;
-                cout<<" cell "<<i;
-                cout<<" u =  "<<u.u1<<"/"<<u.u2<<"/"<<u.u3;
-                cout<<" phil-phir "<<(phi_l-phi_r)<<" p= "<<pressure[i]<< " ptemp= "<<ptemp<<" pfinal= "<<pfinal<<endl;
-                cin>>a;
-            }
-                
-            return pressure[i];
-        }
-            
-        return pfinal;
-    }
-    
-    
+    }    
     
     //
     // p_hydrostatic_nonuniform - hydrostatic reconstruction, after Eq. A.4 in KM2016
@@ -138,14 +113,14 @@
     // takes:
     // returns:
     //
-    double hydro_run::get_p_hydrostatic_nonuniform(const int &i, const int &plusminus) {
+    double c_Species::get_p_hydrostatic_nonuniform(const int &i, const int &plusminus) {
         
         double pfinal;
     
         if(plusminus == -1) {
-                pfinal = pressure[i] - dx[i] * omegaplus[i] * u[i].u1 * (phi[i-1] - phi[i]) / (dx[i-1] + dx[i]);
+                pfinal = pressure[i] - base->dx[i] * base->omegaplus[i] * u[i].u1 * (base->phi[i-1] - base->phi[i]) / (base->dx[i-1] + base->dx[i]);
         } else {
-                pfinal = pressure[i] - dx[i] * omegaminus[i] * u[i].u1 * (phi[i+1] - phi[i]) / (dx[i+1] + dx[i]);
+                pfinal = pressure[i] - base->dx[i] * base->omegaminus[i] * u[i].u1 * (base->phi[i+1] - base->phi[i]) / (base->dx[i+1] + base->dx[i]);
         }
             
         //if self.debug > 2:
@@ -153,10 +128,10 @@
 
         if (pfinal < 0.) {
             if(suppress_warnings == 0) {
-                cout<<"Warning: Negative pressure computed and replaced in nonuniform cell "<<i<<" at time= "<<globalTime<<" iter = "<<steps<<endl;
+                cout<<"Warning: Negative pressure computed and replaced in nonuniform cell "<<i<<" at time= "<<base->globalTime<<" iter = "<<base->steps<<endl;
                 cout<<" cell "<<i<<" case /pm = "<<plusminus<<endl;
                 cout<<" u =  "<<u[i].u1<<"/"<<u[i].u2<<"/"<<u[i].u3<<endl;
-                cout<<" phil-phir "<<(phi[i+plusminus] - phi[i])<<" p= "<<pressure[i]<<" pfinal= "<<pfinal<<endl;
+                cout<<" phil-phir "<<(base->phi[i+plusminus] - base->phi[i])<<" p= "<<pressure[i]<<" pfinal= "<<pfinal<<endl;
                 char a ;
                 cin>>a;
             }
@@ -173,7 +148,7 @@
     // takes:   state vector of rho,rhou,E, (hence R^vars) position (\in R^1)  and makes gravity, coriolis force or whatever from it 
     // returns: vector \in R^vars
     //
-    AOS hydro_run::source_grav(AOS &u, int &j) {
+    AOS c_Species::source_grav(AOS &u, int &j) {
         
         //if self.debug > 2:
         //    print(" In SOURCE_GRAV: phileft, phiright = " + repr([phileft, phiright]))
@@ -183,10 +158,10 @@
         // because omegas cannot be defined in those cells, without defining spacing for the ghost cells, which I dont want to do
         //
         if(j==1 || j==num_cells ) 
-            return AOS(0, u.u1, u.u2) * (-1.) * (phi[j+1] - phi[j-1]) / (x_i12[j+1] - x_i12[j-1]); 
+            return AOS(0, u.u1, u.u2) * (-1.) * (base->phi[j+1] - base->phi[j-1]) / (base->x_i12[j+1] - base->x_i12[j-1]); 
         else {
             
-            return AOS(0, u.u1, u.u2) * (-1.) * ( omegaplus[j] * (phi[j] - phi[j-1]) / (dx[j] + dx[j-1]) + omegaminus[j] * (phi[j+1] - phi[j]) / (dx[j+1] + dx[j]) );
+            return AOS(0, u.u1, u.u2) * (-1.) * ( base->omegaplus[j] * (base->phi[j] - base->phi[j-1]) / (base->dx[j] + base->dx[j-1]) + base->omegaminus[j] * (base->phi[j+1] - base->phi[j]) / (base->dx[j+1] + base->dx[j]) );
             
         }
         
@@ -200,7 +175,7 @@
         //
         ///////////////////////////////////////////////////////////
         
-    void hydro_run::update_radiation() {
+    void c_Species::update_radiation() {
         
         //
         // Update opacities in case thats needed.
@@ -212,33 +187,10 @@
         opticaldepth[num_cells-1] = 1e-6; // Some start value for the top of the atmosphere. TODO: Improve this into some physically motivated estiamte.
         
         for(int i = num_cells-2; i>=0; i--)  {
-            opticaldepth[i] = opticaldepth[i+1] + opacity[i] * u[i].u1 * (x_i12[i+1] - x_i12[i]);
+            opticaldepth[i] = opticaldepth[i+1] + opacity[i] * u[i].u1 * (base->x_i12[i+1] - base->x_i12[i]);
             
             radiative_flux[i] = pow(temperature[i], 4.) / ( 3./4. * ( 2./3. + opticaldepth[i]) ); //Hubeny 1990 relation with zero scattering
             
         }
         
     }
-
-    
-    
-    
-    /*
-     * THIS FUNCTION IS NOW IN COVID19 QUARANTINE BECAUSE ITS UTTER GARBAGE AND NOT USEFUEL
-     * IT IS BAD AND WHOEVER WROTE IT SHOULD FEEL BAD
-     * 
-     * 
-     * 
-    //
-    // This function calculates from the radiative fluxes the new internal energy, so that the total energy doesn't explode.
-    // Or at least that's the intetion'
-    //
-        
-    AOS hydro_run::source_radflux(int i) {
-        
-        double temp_eint = u[i].u3 - radiative_flux[i]; //Or something better.
-        
-        return AOS(0.,0.,temp_eint);
-    }
-
-    */
