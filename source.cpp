@@ -194,3 +194,36 @@
         }
         
     }
+
+    
+    
+        ///////////////////////////////////////////////////////////
+        //
+        // Chapter on frictional momentum exchange
+        //
+        //
+        ///////////////////////////////////////////////////////////
+        
+    void c_Sim::compute_friction_step() {
+        
+        //Dummy function so far
+        /*
+        
+        if(num_species == 2) {
+
+            //Apply analytic solutions ...
+        
+        }
+        else {
+            
+            //Build friction matrix
+            
+            //Iterate
+            
+            for(int s = 0; s < num_species; s++)
+                //Add results to momenta to obtain new momenta
+            
+        }
+        */
+        
+    }

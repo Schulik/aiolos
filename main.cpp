@@ -24,15 +24,17 @@ int main(int argc, char** argv)
     string speciesfile;
     int debug;
     int suppress_warnings_global = 0;
-    cout<<"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~";
-    cout<<"Welcome to AIOLOS! May a gentle breeze lead your way home. argc="<<argc<<endl;
-    cout<<"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~";
+    cout<<endl<<"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"<<endl;
+          cout<<"~~~ Welcome to AIOLOS! May a gentle breeze lead your way home."<<endl;
+          cout<<"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"<<endl;
     
     //
     // Loop through all args, in order to find the name of the parameter file (KEY), debug options etc.
     //
     cout<<std::scientific;
-    cout<<"Use -par name.par to give key parameters to the executable."<<endl;
+    cout<<"Use -par name.par to let the program know the name of the required parameter file."<<endl;
+    cout<<"Use -spc name.spc to let the program know the name of the required species file."<<endl;
+    cout<<"Optional command line parametrs: -debug <int>, for debug level; -war <int>, for suppressing warnings."<<endl;
     
     int parameterfile_found = 0;
     int speciesfile_found   = 0;
@@ -82,7 +84,7 @@ int main(int argc, char** argv)
     
     try {
 
-        cout<<"In main, construction of simulation is about to start."<<endl;
+        cout<<endl<<"In main, construction of simulation is about to start."<<endl;
        
         //Main simulation class object, is initialized with the simulation parameters from a file
         c_Sim simulation1(simulationname, speciesfile, debug);

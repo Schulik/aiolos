@@ -34,10 +34,12 @@ PARI_DOMAIN_MIN         3.e-3
 PARI_DOMAIN_MAX         10.
 PARI_TIME_DT            1e-3
 PARI_CFLFACTOR          1.0
-PARI_TIME_TMAX          4.41e-1
-PARI_TIME_OUTPUT        6.e-1
+PARI_TIME_TMAX          2.01e-1
+PARI_TIME_OUTPUT        5.e0
 
-WAVE_USE 0
+#Scenarios
+TEMPERATURE_BUMP_STRENGTH 0.
+WAVE_USE     0
 
 #Physical parameters
 PARI_PLANET_POS         0.

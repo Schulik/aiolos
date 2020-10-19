@@ -27,60 +27,64 @@ c_Sim::c_Sim(string filename, string speciesfile, int debug) {
         type_of_grid     = read_parameter_from_file<int>(filename,"PARI_GRID_TYPE", debug).value;
         domain_min       = read_parameter_from_file<double>(filename,"PARI_DOMAIN_MIN", debug).value;
         domain_max       = read_parameter_from_file<double>(filename,"PARI_DOMAIN_MAX", debug).value;
+        geometry = read_parameter_from_file<Geometry>(filename, "PARI_GEOMETRY", debug, Geometry::cartesian).value;
         
-        cout<<"pos1"<<endl;
-        cout<<"log10(domain_min) = "<<log10f(domain_min)<<endl;\
-        cout<<"log10(domain_max) = "<<log10f(domain_max)<<endl;
-        cout<<"cells per decade = "<<cells_per_decade<<endl;
+        if(debug > 0) cout<<"Init pos1."<<endl;
         
-        if(type_of_grid == 0)
+        if(type_of_grid == 0) {
             num_cells        = (int)((domain_max - domain_min)/dx0);
+            cout<<"Domain specifics:  "<<domain_min<<" | . . . "<<num_cells<<" uniform cells . . . | "<<domain_max<<endl;
+        }
         else {
             num_cells        = (int) ( (log10f(domain_max) - log10f(domain_min)) * cells_per_decade );
             dx0              = domain_min;
+            cout<<"Domain specifics:  "<<domain_min<<" | . .  .  "<<num_cells<<" nonuniform cells .       .             .     | "<<domain_max<<endl;
         }
-            
-        //num_cells must always be read in pretty early, as all other memory allocations in this function depend on it.
-        //Note-to-self: Don't change the order of read_parameter_from_file commands.
         
-        dt          = read_parameter_from_file<double>(filename,"PARI_TIME_DT", debug).value;
-        cflfactor   = read_parameter_from_file<double>(filename,"PARI_CFLFACTOR", debug).value;
+        //
+        // Check that cell number looks fine. Shoutout if its not.
+        //
+        if( !(num_cells > 0 && num_cells < 999999) )
+            cout<<"WARNING! Something seems wrong with the number of cells required. num_cells = "<<num_cells<<endl;
+            
+        if(debug > 0) cout<<"Init pos2."<<endl;
+        
+        //dt          = read_parameter_from_file<double>(filename,"PARI_TIME_DT", debug).value;
+        cflfactor   = read_parameter_from_file<double>(filename,"PARI_CFLFACTOR", debug, 1.).value;
         t_max       = read_parameter_from_file<double>(filename,"PARI_TIME_TMAX", debug).value;
         output_time = read_parameter_from_file<double>(filename,"PARI_TIME_OUTPUT", debug).value; 
         globalTime = 0.0;    
         timecount = 0;
         
-        cout<<"pos2, cell number = "<<num_cells<<endl;
+        if(debug > 0) cout<<"Init pos3."<<endl;
     
         ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         //
         //    Control parameters for users
         //
         ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        //In main, execution is about to start.
 
         simname = filename;
         
         //cout<<"Pos2"<<endl;
         problem_number    = read_parameter_from_file<int>(filename,"PARI_PROBLEM_NUMBER", debug).value;
-        //cout<<"Pos3"<<endl;
- 
-        
-        use_self_gravity  = read_parameter_from_file<int>(filename,"PARI_SELF_GRAV_SWITCH", debug).value;
-        use_linear_gravity= read_parameter_from_file<int>(filename,"PARI_LINEAR_GRAV", debug).value;
-        use_rad_fluxes    = read_parameter_from_file<int>(filename,"PARI_USE_RADIATION", debug).value;
+        use_self_gravity  = read_parameter_from_file<int>(filename,"PARI_SELF_GRAV_SWITCH", debug, 0).value;
+        use_linear_gravity= read_parameter_from_file<int>(filename,"PARI_LINEAR_GRAV", debug, 0).value;
+        use_rad_fluxes    = read_parameter_from_file<int>(filename,"PARI_USE_RADIATION", debug, 0).value;
+        if(problem_number==2) {
+            
+            planet_mass     = read_parameter_from_file<double>(filename,"PARI_PLANET_MASS", debug, 1).value; //in Earth masses
+            planet_position = read_parameter_from_file<double>(filename,"PARI_PLANET_POS", debug, 0.).value;  //inside the simulation domain
+            rs              = read_parameter_from_file<double>(filename,"PARI_SMOOTHING_LENGTH", debug, 0.).value; //Gravitational smoothing length in hill 
+            rs_time         = read_parameter_from_file<double>(filename,"PARI_SMOOTHING_TIME", debug, 0.).value; //Time until we reach rs starting at rs_at_moment
+            rs_at_moment    = 0.2;
+            
+        }
         
         if(use_self_gravity)
             cout<<"WARNING: Self-gravity switched ON !!!"<<endl;
-        else
-            cout<<"Self-gravity switched OFF."<<endl;
         
-        //  Boundaries explained:
-        //	1 = Inflow left, fixed wall right boundaries
-        //	2 = Outflow on both ends
-        //	3 = Inflow left, outflow right
-        //finalplotnumber = 1
-        //solver = 0;
+        if(debug > 0) cout<<"Init pos4."<<endl;
         
         ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         //
@@ -88,8 +92,6 @@ c_Sim::c_Sim(string filename, string speciesfile, int debug) {
         //
         ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-        cout<<"pos3"<<endl;
-        
         x_i        = np_zeros(num_cells+1);		//The cell boundaries
         x_i12      = np_zeros(num_cells+2);		//The cell mid positions
         surf       = np_zeros(num_cells+1);     // intercell surfaces
@@ -99,8 +101,10 @@ c_Sim::c_Sim(string filename, string speciesfile, int debug) {
         omegaminus = np_zeros(num_cells+2);
         source_pressure_prefactor_left    = np_zeros(num_cells+2);
         source_pressure_prefactor_right   = np_zeros(num_cells+2);
+        enclosed_mass   = np_zeros(num_cells+2);
+        phi             = np_zeros(num_cells+2);
         
-        cout<<"pos4"<<endl;
+        if(debug > 0) cout<<"Init pos5."<<endl;
         
         //
         // Compute cell wall boundaries
@@ -123,7 +127,7 @@ c_Sim::c_Sim(string filename, string speciesfile, int debug) {
             
             //Assign the last boundary as domain maximum as long as nonuniform grid is in the test-phase
             domain_max = x_i[num_cells];
-            cout<<"We have a DOMAIN MAX = "<<domain_max<<endl;
+            cout<<"We have a changed DOMAIN MAX = "<<domain_max<<endl;
                 
         }
         //Uniform grid
@@ -134,9 +138,10 @@ c_Sim::c_Sim(string filename, string speciesfile, int debug) {
             }
         }
        
-        //Compute inter-sphere surfaces
-        // Read geometry from file:
-        geometry = read_parameter_from_file<Geometry>(filename, "PARI_GEOMETRY", debug, Geometry::cartesian).value;
+        //
+        // Surfaces and volumes for all geometries
+        //
+        
         switch (geometry) {
             case Geometry::cartesian:
                 cout<<"Initializing cartesian geometry."<<endl;
@@ -188,11 +193,30 @@ c_Sim::c_Sim(string filename, string speciesfile, int debug) {
         dx[0] = dx[1];
         dx[num_cells+1] = dx[num_cells] + (dx[num_cells] - dx[num_cells-1]);
         
-        cout<<" FIRST AND LAST DX = "<<dx[0]<<" / "<<dx[num_cells+1]<<endl;
-        
         //Ghost cells
         x_i12[0]           = domain_min - (x_i12[1] - x_i[0]);
         x_i12[num_cells+1] = domain_max + (x_i[num_cells] - x_i12[num_cells]); 
+        
+        //
+        // Grid generation done. Now do a few simple checks on the generated grid values
+        //TODO: Expand this with a few more sensible tests, NaN checks etc.
+        
+        int all_grid_ok = 1, broken_index;
+        double broken_value;
+        for(int i = 0; i <= num_cells+1; i++)
+            if( dx[i] < 0 ) {
+                all_grid_ok = 0;
+                broken_index = i;
+                broken_value = dx[i];
+            }
+        
+        
+        if(debug > 0) cout<<"Init pos6."<<endl;
+        if(!all_grid_ok) {
+            cout<<"WARNING! Problem with grid values. Example broken value, dx["<<broken_index<<"]="<<broken_value<<endl;
+            cout<<" FIRST AND LAST DX = "<<dx[0]<<" / "<<dx[num_cells+1]<<endl;
+        }
+            
         
         //
         //Computing the metric factors for 2nd order non-uniform differentials
@@ -215,24 +239,21 @@ c_Sim::c_Sim(string filename, string speciesfile, int debug) {
             source_pressure_prefactor_right[i] = (surf[i]  /vol[i] - 1./dx[i]); 
         }
         
+        if(debug > 0) {
+                cout<<"DEBUGLEVEL 1: Samples of generated grid values"<<endl;
+                cout<<"First cell coordinates: |<--"<<x_i[0]<<" // "<<x_i12[0]<<" // "<<x_i[1]<<"-->|"<<endl;
+                cout<<"Last cell coordinates:  |<--"<<x_i[num_cells-1]<<" // "<<x_i12[num_cells-1]<<" // "<<x_i[num_cells]<<"-->|"<<endl;
+        } 
+        
+        
+        if(debug > 0) cout<<"Init pos7."<<endl;
+        
         //
         //
         // Initialize gravity first without any species. Hydrostatic construction needs gravity to start.
         //
         //
-        if(problem_number==2) {
-            
-            planet_mass     = read_parameter_from_file<double>(filename,"PARI_PLANET_MASS", debug).value; //in Earth masses
-            planet_position = read_parameter_from_file<double>(filename,"PARI_PLANET_POS", debug).value;  //inside the simulation domain
-            rs              = read_parameter_from_file<double>(filename,"PARI_SMOOTHING_LENGTH", debug).value; //Gravitational smoothing length in hill 
-            rs_time         = read_parameter_from_file<double>(filename,"PARI_SMOOTHING_TIME", debug).value; //Time until we reach rs starting at rs_at_moment
-            rs_at_moment    = 0.2;
-            
-        }
-
-            
-        enclosed_mass   = np_zeros(num_cells+2);
-        phi             = np_zeros(num_cells+2);  //Parabolic Variables: gravitational potential
+        
         init_grav_pot();
         
         //
@@ -240,21 +261,19 @@ c_Sim::c_Sim(string filename, string speciesfile, int debug) {
         // Create and initialize the species
         //
         //
-        num_species = read_parameter_from_file<int>(filename,"PARI_NUM_SPECIES", debug).value;
+        num_species = read_parameter_from_file<int>(filename,"PARI_NUM_SPECIES", debug, 1).value;
         
-        
-        cout<<"Before species setup, num_cells="<<num_cells<<" x0="<<x_i[0]<<endl;
-        //species     = std::vector<c_Species>(num_species);
+        if(debug > 0) cout<<"Init pos8 with num_species = "<<num_species<<endl;
         
         species.reserve(num_species);
         
         for(int s = 0; s < num_species; s++) {
-            species.push_back(c_Species(this, filename, speciesfile, s, debug));
+            species.push_back(c_Species(this, filename, speciesfile, s, debug)); // Here we call the c_Species constructor
         }
         
         //
         //
-        // After successful init, compute all base quantities and determine first timestep
+        // After successful init, compute all primitive quantities and determine first timestep
         //
         //
         
@@ -263,6 +282,7 @@ c_Sim::c_Sim(string filename, string speciesfile, int debug) {
         
         dt = get_cfl_timestep();
         
+        if(debug > 0) cout<<"Final init pos9."<<endl;
 }
 
 
@@ -281,22 +301,53 @@ c_Species::c_Species(c_Sim *base_simulation, string filename, string species_fil
         base               = base_simulation;
         this_species_index = species_index;
         num_cells          = base->num_cells;
-                
+        debug              = debug;
+        
+        if(debug > 0) cout<<"        Species["<<species_index<<"] debug pos 1."<<endl;
+        
         ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         //
         // Physical
         //
         ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         
-        read_species_data(species_filename, species_index);
+        boundary_left  = read_parameter_from_file<BoundaryType>(filename,"PARI_BOUND_TYPE_LEFT", debug, BoundaryType::fixed).value;
+        boundary_right = read_parameter_from_file<BoundaryType>(filename,"PARI_BOUND_TYPE_RIGHT", debug, BoundaryType::fixed).value;
+        const_T_space  = read_parameter_from_file<double>(filename,"PARI_CONST_TEMP", debug, 1.).value;
+        TEMPERATURE_BUMP_STRENGTH = read_parameter_from_file<double>(filename,"TEMPERATURE_BUMP_STRENGTH", debug, 0.).value; 
         
-        cout<<"After read speacies. cels="<<num_cells<<" this->cels"<<base->get_num_cells()<<" csim::numcells"<<base->num_cells<<endl;
-        cout<<" x[0]="<<base->x_i[0]<<endl;
+        //
+        // Determine which equation of states we are using
+        //
+        eos_pressure_type       = EOS_pressure_type::adiabatic;       //Read parameter from...
+        eos_internal_energy_type = EOS_internal_energy_type::thermal;
         
-        u               = init_AOS(num_cells+2); //{ np_ones(num_cells*3);   //Conserved hyperbolic variables: density, mass flux, energy density
+        if(debug > 0) cout<<"        Species["<<species_index<<"] debug pos 2."<<endl;
         
-        source          = init_AOS(num_cells+2);  //Parabolic Variables: gravitational potential
-        source_pressure = init_AOS(num_cells+2);  //Parabolic Variables: gravitational potential
+        //Read EOS specifications from file
+        if(eos_pressure_type == EOS_pressure_type::tabulated) 
+            read_tabulated_eos_data_pressure("eos_pressure.input");
+            
+        if(eos_internal_energy_type == EOS_internal_energy_type::tabulated) 
+            read_tabulated_eos_data_eint("eos_internal_energy.input");
+        
+        if(base->use_rad_fluxes == 1)
+            const_opacity   = read_parameter_from_file<double>(filename,"PARI_CONST_OPAC", debug, 1.).value;
+        
+        
+        //
+        // //This provides important stuff like, const_cv, const_gamma_adiabat for this species
+        //
+        if(debug > 0) cout<<"        Species["<<species_index<<"] debug pos 3."<<endl;
+        read_species_data(species_filename, species_index); 
+        if(debug > 0) cout<<"        Species["<<species_index<<"] debug pos 4."<<endl;
+        
+        //cout<<"After read speacies. cels="<<num_cells<<" this->cels"<<base->get_num_cells()<<" csim::numcells"<<base->num_cells<<endl;
+        //cout<<" x[0]="<<base->x_i[0]<<endl;
+        
+        u               = init_AOS(num_cells+2); //Conserved hyperbolic variables: density, mass flux, energy density
+        source          = init_AOS(num_cells+2);  
+        source_pressure = init_AOS(num_cells+2);
         flux            = init_AOS(num_cells+1);
         
         const_T_space = 1.; //Yet another parameter?
@@ -307,38 +358,6 @@ c_Species::c_Species(c_Sim *base_simulation, string filename, string species_fil
         temperature    = np_somevalue(num_cells+2, const_T_space);
         opticaldepth   = np_zeros(num_cells+2);
         radiative_flux = np_zeros(num_cells+1);
-        
-        boundary_left  = read_parameter_from_file<BoundaryType>(filename,"PARI_BOUND_TYPE_LEFT", debug).value;
-        boundary_right = read_parameter_from_file<BoundaryType>(filename,"PARI_BOUND_TYPE_RIGHT", debug).value;
-        
-        cout<<"boundaries used in species["<<name<<"]: "<<boundary_left<<" / "<<boundary_right<<endl;
-        
-        
-        //
-        // Determine which equation of states we are using
-        //
-        eos_pressure_type       = EOS_pressure_type::adiabatic;       //Read parameter from...
-        eos_internal_energy_type = EOS_internal_energy_type::thermal;
-        
-        //Read EOS specifications from file
-        if(eos_pressure_type == EOS_pressure_type::tabulated) {
-            
-            //Read in data into tab_p;
-            read_tabulated_eos_data_pressure("eos_pressure.input");
-            
-        }
-        if(eos_internal_energy_type == EOS_internal_energy_type::tabulated) {
-            
-            //Read in data into tab_p;
-            read_tabulated_eos_data_eint("eos_internal_energy.input");
-        }
-        
-        
-        //////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        //
-        // Last thing to do: Initialize derived quantities
-        //
-        //////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         
         pressure        = np_zeros(num_cells+2); //Those helper quantities are also defined on the ghost cells, so they get +2
         pressure_l      = np_zeros(num_cells+2); 
@@ -351,28 +370,29 @@ c_Species::c_Species(c_Sim *base_simulation, string filename, string species_fil
         timesteps_cs = np_zeros(num_cells+2);	
         finalstep    = np_zeros(num_cells+2);
         
-        if(debug > 0) {
-                cout<<"DEBUGLEVEL 1: Samples of generated values"<<endl;
-                //cout<<"rho[0], v[0], e[0] = "<<u[0]<<" "<<u[num_cells]<<" "<<u[2*num_cells]<<endl;
-                cout<<"First cell coordinates: |<--"<<base->x_i[0]<<" // "<<base->x_i12[0]<<" // "<<base->x_i[1]<<"-->|"<<endl;
-                cout<<"Last cell coordinates:  |<--"<<base->x_i[num_cells-1]<<" // "<<base->x_i12[num_cells-1]<<" // "<<base->x_i[num_cells]<<"-->|"<<endl;
-                cout<<"Value of gamma: "<<gamma_adiabat[num_cells]<<endl;
-        } 
+        if(debug > 0) cout<<"         Boundaries used in species["<<name<<"]: "<<boundary_left<<" / "<<boundary_right<<endl;
+        
+        
+        //////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        //
+        // Initialize/readin parameters
+        //
+        //////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         
         //
         // Problem 1: two states, left and right, separated at a mid-position
         //
         if(base->problem_number == 1) {
             
-            double u1l = read_parameter_from_file<double>(filename,"PARI_INIT_DATA_U1L", debug).value;
-            double u2l = read_parameter_from_file<double>(filename,"PARI_INIT_DATA_U2L", debug).value;
-            double u3l = read_parameter_from_file<double>(filename,"PARI_INIT_DATA_U3L", debug).value;
+            double u1l = read_parameter_from_file<double>(filename,"PARI_INIT_DATA_U1L", debug, 1.).value;
+            double u2l = read_parameter_from_file<double>(filename,"PARI_INIT_DATA_U2L", debug, 0.).value;
+            double u3l = read_parameter_from_file<double>(filename,"PARI_INIT_DATA_U3L", debug, 1.).value;
             
-            double u1r = read_parameter_from_file<double>(filename,"PARI_INIT_DATA_U1R", debug).value;
-            double u2r = read_parameter_from_file<double>(filename,"PARI_INIT_DATA_U2R", debug).value;
-            double u3r = read_parameter_from_file<double>(filename,"PARI_INIT_DATA_U3R", debug).value;
+            double u1r = read_parameter_from_file<double>(filename,"PARI_INIT_DATA_U1R", debug, 1.).value;
+            double u2r = read_parameter_from_file<double>(filename,"PARI_INIT_DATA_U2R", debug, 0.).value;
+            double u3r = read_parameter_from_file<double>(filename,"PARI_INIT_DATA_U3R", debug, 0.1).value;
             
-            SHOCK_TUBE_MID = read_parameter_from_file<double>(filename,"PARI_INIT_SHOCK_MID", debug).value;
+            SHOCK_TUBE_MID = read_parameter_from_file<double>(filename,"PARI_INIT_SHOCK_MID", debug, 0.5).value;
             
             //Conversion from shock tube parameters (given as dens, velocity, pressure) to conserved variables (dens, momentum, internal energy)
             SHOCK_TUBE_UL = AOS(u1l, u1l*u2l, 0.5*u1l*u2l*u2l + u3l/(gamma_adiabat[0]-1.) );
@@ -380,33 +400,26 @@ c_Species::c_Species(c_Sim *base_simulation, string filename, string species_fil
             
             initialize_shock_tube_test(SHOCK_TUBE_UL, SHOCK_TUBE_UR);
             
-            if(debug > 0) 
-                cout<<"Successfully initialized problem 1."<<endl;
+            if(debug > 0) cout<<"        Species["<<species_index<<"] initialized problem 1."<<endl;
         }
         //
         // Problem 2: A constant background state, with a planet embedded into it, free to evolve as physics dictates
         //
         else if(base->problem_number == 2) {
             
-            cout<<"Problem 2 pos0."<<endl;
+            double u1 = read_parameter_from_file<double>(filename,"PARI_INIT_DATA_U1", debug, 1.).value;
+            double u2 = read_parameter_from_file<double>(filename,"PARI_INIT_DATA_U2", debug, 0.).value;
+            double u3 = read_parameter_from_file<double>(filename,"PARI_INIT_DATA_U3", debug, 1.).value;
             
-            double u1 = read_parameter_from_file<double>(filename,"PARI_INIT_DATA_U1", debug).value;
-            double u2 = read_parameter_from_file<double>(filename,"PARI_INIT_DATA_U2", debug).value;
-            double u3 = read_parameter_from_file<double>(filename,"PARI_INIT_DATA_U3", debug).value;
+            init_static_atmosphere = read_parameter_from_file<int>(filename,"PARI_INIT_STATIC", debug, 1).value; //Yesno, isothermal at the moment
             
-            cout<<"Problem 2 pos1."<<endl;
-            
-            
-            init_static_atmosphere = read_parameter_from_file<int>(filename,"PARI_INIT_STATIC", debug).value; //Yesno, isothermal at the moment
-            
-            cout<<"Problem 2 pos2."<<endl;
+            if(debug > 0) cout<<"        Species["<<species_index<<"] problem 2 init, pos 1."<<endl;
             
             //Conversion from shock tube parameters (given as dens, velocity, pressure) to conserved variables (dens, momentum, internal energy)
             //BACKGROUND_U = AOS(u1, u1*u2, 0.5*u1*u2*u2 + u3/(gamma_adiabat[0]-1.) );
             
             BACKGROUND_U = AOS(u1 * initial_fraction, u1*u2 * initial_fraction, 0.5*u1*u2*u2 * initial_fraction  + u3/(gamma_adiabat[0]-1.) );
 
-     
             /* mdot boundaries
              * needs fixing... Should just be specified as a BoundaryType::fixed boundary
             if(boundaries_number == 3) {
@@ -422,18 +435,7 @@ c_Species::c_Species(c_Sim *base_simulation, string filename, string species_fil
             }
             */
             
-            
-            if(use_rad_fluxes==1)
-                const_opacity   = read_parameter_from_file<double>(filename,"PARI_CONST_OPAC", debug).value;
-            else
-                const_opacity   = 1.;
-        
-            
-            
-            cout<<"Problem 2 pos3."<<endl;
-            
             initialize_background(BACKGROUND_U);
-            
             
             //
             // If we want to initialize a hydrostatic atmosphere, then we overwrite the so far given density/pressure data and set every velocity to 0
@@ -442,8 +444,7 @@ c_Species::c_Species(c_Sim *base_simulation, string filename, string species_fil
                 initialize_hydrostatic_atmosphere();
             }
 
-            if(debug > 0) 
-                cout<<"Successfully initialized problem 2."<<endl;
+            if(debug > 0) cout<<"        Species["<<species_index<<"] initialized problem 2."<<endl;
         }
         else 
             initialize_default_test();
@@ -455,10 +456,8 @@ c_Species::c_Species(c_Sim *base_simulation, string filename, string species_fil
             WAVE_PERIOD    = read_parameter_from_file<double>(filename,"WAVE_PERIOD", debug).value; 
         }
         
-        // TEMPERATURE_BUMP_STRENGTH = read_parameter_from_file<double>(filename,"TEMPERATURE_BUMP_STRENGTH", debug).value; 
         
-        if(debug > 0)
-            cout<<"Ended init."<<endl;
+        if(debug > 0) cout<<"Ended init in species"<<species_index<<endl;
     
 }
 
@@ -466,7 +465,7 @@ c_Species::c_Species(c_Sim *base_simulation, string filename, string species_fil
 
 void c_Species::initialize_hydrostatic_atmosphere() {
     
-    cout<<"ATTENTION: Initializing nonuniform hydrostatic atmosphere and overwriting prior initial values."<<endl;
+    if(debug > 0) cout<<"            ATTENTION: Initializing hydrostatic construction for species "<<name<<" and overwriting prior initial values."<<endl;
     
     long double temp_rhofinal;
     long double factor_inner, factor_outer;
@@ -491,9 +490,8 @@ void c_Species::initialize_hydrostatic_atmosphere() {
             //temperature[i] = 100.;
         
             //Add temperature bumps and troughs
-            //temperature[i] += TEMPERATURE_BUMP_STRENGTH * 4.  * exp( - pow(base->x_i12[i] - 1.e-1 ,2.) / (0.1) );
-            
-            //temperature[i] -= TEMPERATURE_BUMP_STRENGTH * 15. * exp( - pow(base->x_i12[i] - 7.e-3 ,2.) / (1.5e-3) );
+            temperature[i] += TEMPERATURE_BUMP_STRENGTH * 4.  * exp( - pow(base->x_i12[i] - 1.e-1 ,2.) / (0.1) );
+            temperature[i] -= TEMPERATURE_BUMP_STRENGTH * 15. * exp( - pow(base->x_i12[i] - 7.e-3 ,2.) / (1.5e-3) );
 
     }
     
@@ -523,11 +521,17 @@ void c_Species::initialize_hydrostatic_atmosphere() {
         if(temp_rhofinal < 0) {
             char a;
             cout.precision(16);
-            cout<<"NEGATIVE DENSITY IN INIT STATIC i="<<i<<endl;
-            cout<<"In hydostatic init: factor_outer/metric_outer = "<< factor_outer / metric_outer << " factor_inner/metric_inner = "<< factor_inner / metric_inner <<endl;
-            cout<<"factor_outer+metric_outer = "<< (factor_outer + metric_outer) << " factor_inner-metric_inner = "<<( factor_inner - metric_inner) <<endl;
-            cout<<"metric_outer = "<< metric_outer << " metric_inner = "<<metric_inner <<endl;
-            cout<<"factor_outer = "<< factor_outer << " factor_inner = "<<factor_inner <<endl;
+            cout<<"NEGATIVE DENSITY IN INIT HYDROSTATIC i="<<i<<endl;
+            if((factor_inner - metric_inner) < 0) {
+                
+                cout<<"     Negative denominator detected. Product (gamma-1)*cv*T_inner is too small for chosen discretization."<<endl;
+                
+            }
+            cout<<endl;
+            cout<<"     metric_outer = "<< metric_outer << " metric_inner = "<<metric_inner <<endl;
+            cout<<"     factor_outer = "<< factor_outer << " factor_inner = "<<factor_inner <<endl;
+            cout<<"     factor_outer+metric_outer = "<< (factor_outer + metric_outer) << " factor_inner-metric_inner = "<<( factor_inner - metric_inner) <<endl;
+            cout<<"     RATIO = "<< ((factor_outer + metric_outer)/ (factor_inner - metric_inner)) <<endl;
             //cout<<"In hydostatic init: factor_dens = "<< (2.* factor_outer / delta_phi + 1.) / (2. * factor_inner / delta_phi - 1.) <<endl;
             cout<<"Ratio of densities inner/outer = "<< temp_rhofinal/u[i+1].u1 <<endl;
             cout<<"Ratio of temperatures inner/outer = "<<T_inner/T_outer<<" t_inner ="<<T_inner<<" t_outer ="<<T_outer<<endl;
@@ -536,10 +540,10 @@ void c_Species::initialize_hydrostatic_atmosphere() {
             //tempgrad2 = ((gamma_adiabat-1.)*cv*T_outer + 0.5 * delta_phi) * u[i+1].u1 - ((gamma_adiabat-1.)*cv*T_inner  + 0.5 * delta_phi ) * u[i].u1 ;
             //residual = (gamma_adiabat-1.)*cv*u[i+1].u1*T_outer - (gamma_adiabat-1.)*cv*u[i].u1*T_inner  + 0.5 * (u[i].u1 + u[i+1].u1) * delta_phi;
             //cout<<"pressure diff "<<(gamma_adiabat-1.)*u[i+1].u3 - (gamma_adiabat-1.)*(u[i].u3)<<endl;
-            cout<<"pressure diff "<<( ((gamma_adiabat[i+1]-1.)*cv[i+1]*u[i+1].u1*T_outer - (gamma_adiabat[i]-1.)*cv[i]*u[i].u1*T_inner)/base->dx[i])<<endl;
+            //cout<<"pressure diff "<<( ((gamma_adiabat[i+1]-1.)*cv[i+1]*u[i+1].u1*T_outer - (gamma_adiabat[i]-1.)*cv[i]*u[i].u1*T_inner)/base->dx[i])<<endl;
             //cout<<"density sum with potential "<<(0.5 * (u[i].u1 + u[i+1].u1) * delta_phi/dx[i])<<endl;
-            cout<<"density diff "<<(u[i].u1 - u[i+1].u1)<<endl;
-            cout<<"density sum " <<(u[i].u1 + u[i+1].u1)<<endl;
+            //cout<<"density diff "<<(u[i].u1 - u[i+1].u1)<<endl;
+            //cout<<"density sum " <<(u[i].u1 + u[i+1].u1)<<endl;
             //cout<<"residual = "<<residual<<endl;
             
             //cout<<"residual2 = "<<residual<<endl;
@@ -551,7 +555,9 @@ void c_Species::initialize_hydrostatic_atmosphere() {
         }
     }
     
-    cout<<"Ended hydrostatic construction."<<endl;
+    
+    cout<<"            Ended hydrostatic construction for species "<<name<<endl;
+    //TODO:Give some measure if hydrostatic construction was also successful, and give warning if not.
 
 }
 
@@ -561,7 +567,7 @@ void c_Species::initialize_hydrostatic_atmosphere() {
 //
 void c_Species::initialize_default_test() {
     
-    cout<<"Initialized default simulation."<<endl;
+    if(debug > 0) cout<<"            Initialized default simulation."<<endl;
     
     for(int i=0; i<=num_cells+1; i++) 
         u[i] = AOS(1,1,1);
@@ -573,7 +579,7 @@ void c_Species::initialize_default_test() {
 //
 void c_Species::initialize_shock_tube_test(const AOS &leftval,const AOS &rightval) {
     
-    cout<<"Initialized shock tube test."<<endl;
+    if(debug > 0) cout<<"            Initialized shock tube test."<<endl;
     
     for(int i=0; i<=num_cells+1; i++) {
         
@@ -589,7 +595,7 @@ void c_Species::initialize_shock_tube_test(const AOS &leftval,const AOS &rightva
 //
 void c_Species::initialize_background(const AOS &background) {
     
-    cout<<"Initialized constant background state. state = "<<background.u1<<" "<<background.u2<<" "<<background.u3<<endl;
+    if(debug > 0) cout<<"            Initialized constant background state. state = "<<background.u1<<" "<<background.u2<<" "<<background.u3<<endl;
     
     for(int i=0; i<=num_cells+1; i++) 
         u[i] = background;

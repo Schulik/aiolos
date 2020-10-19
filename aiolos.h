@@ -291,6 +291,7 @@ public:
     ~c_Sim();
     
     void execute(); //Main loop
+    void compute_friction_step(); 
     void set_debug(int);
     void set_suppress_warnings(int j) {suppress_warnings = j;}
     

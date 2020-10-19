@@ -136,7 +136,7 @@ void c_Species::read_species_data(string filename, int species_index) {
     //simulation_parameter tmp_parameter = {"NaN",0,0.,0,"NaN"};
     int found = 0;
     
-    cout<<"    In read species Pos1"<<endl;
+    if(debug > 0) cout<<"          In read species Pos1"<<endl;
     
     while(std::getline( file, line )) {
     
@@ -177,7 +177,7 @@ void c_Species::read_species_data(string filename, int species_index) {
     
     file.close();
     
-    cout<<"Leaving species readin now. Bye!"<<endl;
+    if(debug > 0) cout<<"         Leaving species readin now. Bye!"<<endl;
 }
 
 
@@ -257,6 +257,7 @@ simulation_parameter<T> read_parameter_from_file(string filename, string variabl
         if (e.count == 0) {
             parameter.name = variablename ;
             parameter.value = default_ ;
+            cout<<"WARNING: Parameter "<<variablename<<" not found in "<<filename<<". Assigning default value of "<<default_<<endl;
         }
         else
             throw ; // re-throw because we can't help with duplicated parameters
@@ -267,7 +268,7 @@ simulation_parameter<T> read_parameter_from_file(string filename, string variabl
 
 
 template simulation_parameter<bool>  read_parameter_from_file(string, string, int, bool);
-template simulation_parameter<int> read_parameter_from_file(string, string, int, int);
+template simulation_parameter<int>   read_parameter_from_file(string, string, int, int);
 template simulation_parameter<double> read_parameter_from_file(string, string, int, double);
 template simulation_parameter<string> read_parameter_from_file(string, string, int, string);
 
@@ -327,7 +328,7 @@ void c_Species::print_AOS_component_tofile(int timestepnumber) {
         //Print right ghost stuff
         outfile<<base->x_i12[num_cells+1]<<'\t'<<u[num_cells+1].u1<<'\t'<<u[num_cells+1].u2<<'\t'<<u[num_cells+1].u3<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<pressure[num_cells+1]<<'\t'<<u[num_cells+1].u2/u[num_cells+1].u1<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<base->phi[num_cells+1]<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<endl;
    
-        cout<<"Sucessfully written file "<<filename<<" for species = "<<name<<" at time "<<base->globalTime<<" and dt="<<base->dt<<endl;
+        cout<<"    Sucessfully written file "<<filename<<" for species = "<<name<<" at time "<<base->globalTime<<" and dt="<<base->dt<<endl;
     }
     else cout << "Unable to open file" << filename << endl; 
     outfile.close();

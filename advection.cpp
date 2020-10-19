@@ -18,7 +18,7 @@ void c_Sim::execute() {
     const int maxsteps = 1e9;
     //double pressure_temp;
         
-    cout<<"Beginning main loop with num_cells="<<num_cells<<" and timestep="<<dt<<" cflfacotr="<<cflfactor<<" and num_species = "<<num_species<<endl;
+    cout<<endl<<"Beginning main loop with num_cells="<<num_cells<<" and timestep="<<dt<<" cflfacotr="<<cflfactor<<" and num_species = "<<num_species<<endl;
     if(num_species == 0) 
         cout<<"WARNING: No species specified! I cannot work like that."<<endl;
     
@@ -70,10 +70,13 @@ void c_Sim::execute() {
          }
          
         //
-        // Do a timestep on the entire grid for all species
+        // Do all explicit and implicit operations for one timestep on the entire grid for all species
         //
         for(int s = 0; s < num_species; s++)
             species[s].execute();
+        
+        if(num_species > 2)
+            compute_friction_step(); 
         
         globalTime += dt;
         steps++;
@@ -81,7 +84,7 @@ void c_Sim::execute() {
         if(steps==1)
             cout<<"Initial sound crossing time = "<<max_snd_crs_time<<endl;
         
-        if(debug >= 1)
+        if(debug > 1)
             cout<<"timestep in execute()="<<dt<<" stepnum "<<steps<<" totaltime"<<globalTime<<endl;
         
     
