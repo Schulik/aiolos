@@ -28,7 +28,8 @@ c_Sim::c_Sim(string filename, string speciesfile, int debug) {
         domain_min       = read_parameter_from_file<double>(filename,"PARI_DOMAIN_MIN", debug).value;
         domain_max       = read_parameter_from_file<double>(filename,"PARI_DOMAIN_MAX", debug).value;
         geometry = read_parameter_from_file<Geometry>(filename, "PARI_GEOMETRY", debug, Geometry::cartesian).value;
-                
+        order = read_parameter_from_file<IntegrationType>(filename, "PARI_ORDER", debug, IntegrationType::second_order).value;
+
         if(type_of_grid == 0) {
             num_cells        = (int)((domain_max - domain_min)/dx0);
             cout<<"Domain specifics:  "<<domain_min<<" | . . . "<<num_cells<<" uniform cells . . . | "<<domain_max<<endl;
@@ -283,7 +284,7 @@ c_Sim::c_Sim(string filename, string speciesfile, int debug) {
         //
         
         for(int s = 0; s < num_species; s++)
-            species[s].compute_pressure();
+            species[s].compute_pressure(species[s].u);
         
         dt = get_cfl_timestep();
         
@@ -350,6 +351,8 @@ c_Species::c_Species(c_Sim *base_simulation, string filename, string species_fil
         
         
         u               = init_AOS(num_cells+2); //Conserved hyperbolic variables: density, mass flux, energy density
+        dudt[0]         = init_AOS(num_cells+2);
+        dudt[1]         = init_AOS(num_cells+2);
         source          = init_AOS(num_cells+2);  
         source_pressure = init_AOS(num_cells+2);
         flux            = init_AOS(num_cells+1);
@@ -603,11 +606,11 @@ void c_Species::initialize_background(const AOS &background) {
 }
 
 
-void c_Species::apply_boundary_left() {
+void c_Species::apply_boundary_left(std::vector<AOS>& u) {
     double E_kinetic, pressure_active, pressure_bound ;
     switch(boundary_left) {
         case BoundaryType::user:
-            user_boundary_left();
+            user_boundary_left(u);
             break;
         case BoundaryType::open:
             u[0]            = u[1]; 
@@ -633,11 +636,12 @@ void c_Species::apply_boundary_left() {
     }
 }
 
-void c_Species::apply_boundary_right() {
+void c_Species::apply_boundary_right(std::vector<AOS>& u) {
     double E_kinetic, pressure_active, pressure_bound ;
     switch(boundary_right) {
         case BoundaryType::user:
-            user_boundary_right();
+            user_boundary_right(u);
+            user_boundary_right(u);
             break;
         case BoundaryType::open:
             u[num_cells+1]    = u[num_cells]; 
@@ -666,8 +670,7 @@ void c_Species::apply_boundary_right() {
 //
 // Creates a wave at the inner boundary supposedly propagating upwards in the gravity well
 //
-void c_Species::add_wave(double globalTime, double WAVE_PERIOD, double WAVE_AMPLITUDE)  {
-    
+void c_Species::add_wave(std::vector<AOS>& u, double globalTime)  {
     
     u[0].u2 = u[0].u1 * WAVE_AMPLITUDE * std::sin(12.*M_PI*globalTime/WAVE_PERIOD);
     u[1].u2 = u[0].u2;

@@ -274,7 +274,7 @@ template simulation_parameter<string> read_parameter_from_file(string, string, i
 
 template simulation_parameter<Geometry> read_parameter_from_file(string, string, int, Geometry);
 template simulation_parameter<BoundaryType> read_parameter_from_file(string, string, int, BoundaryType);
-
+template simulation_parameter<IntegrationType> read_parameter_from_file(string, string, int, IntegrationType);
 
 //Print 2 
 void c_Species::print_AOS_component_tofile(int timestepnumber) {

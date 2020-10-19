@@ -3,14 +3,14 @@
 
 #include "aiolos.h"
 
-void c_Species::user_boundary_left() {
+void c_Species::user_boundary_left(std::vector<AOS>& u) {
     throw std::runtime_error(
         "hydro::user_boundary_left() not implemented. You must provide this "
         "method if you want to use user defined boundaries.") ;
 }
 
 
-void c_Species::user_boundary_right() {
+void c_Species::user_boundary_right(std::vector<AOS>& u) {
     throw std::runtime_error(
         "hydro::user_boundary_right() not implemented. You must provide this "
         "method if you want to use user defined boundaries.") ;

@@ -219,7 +219,7 @@ def setup_riemann_solver(param_file):
 
 def plot_riemann_solution(par_num):
     param_file = 'shock_tube{}.par'.format(par_num)
-    snap_file = 'shock_tube{}_t-666.dat'.format(par_num)
+    snap_file = 'shock_tube{}_H2_t-666.dat'.format(par_num)
 
     #Get the Riemann problem
     exact = setup_riemann_solver(param_file)

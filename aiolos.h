@@ -13,6 +13,8 @@
 #include "advection.h"
 #include "source.h"
 
+#include "enum.h"
+
 using namespace std;
 
 //
@@ -90,6 +92,20 @@ struct AOS {
     {
     }
     
+    AOS& operator+=(const AOS& a) {
+        u1 += a.u1 ;
+        u2 += a.u2 ;
+        u3 += a.u3 ;
+        return *this ;
+    }
+
+    AOS& operator-=(const AOS& a) {
+        u1 -= a.u1 ;
+        u2 -= a.u2 ;
+        u3 -= a.u3 ;
+        return *this ;
+    }
+
     // addop. doesn't modify object. therefore const.
     AOS operator+(const AOS& a) const
     {
@@ -112,42 +128,6 @@ struct AOS {
  
 }; 
 
-enum class Geometry {
-    cartesian = 0, cylindrical = 1, spherical = 2
-} ;
-
-inline std::istream& operator>>(std::istream& is, Geometry& obj) {
-    std::underlying_type<Geometry>::type tmp ;
-    is >> tmp ;
-    obj = static_cast<Geometry>(tmp) ;
-    return is ;
-}
-inline std::ostream& operator<<(std::ostream& os, Geometry obj) {
-    os << static_cast<std::underlying_type<Geometry>::type>(obj) ;
-    return os ;
-}
-
-enum class BoundaryType {
-    user = 0, open = 1, reflecting = 2, fixed = 3, periodic = 4,
-} ;
-inline std::istream& operator>>(std::istream& is, BoundaryType& obj) {
-    std::underlying_type<BoundaryType>::type tmp ;
-    is >> tmp ;
-    obj = static_cast<BoundaryType>(tmp) ;
-    return is ;
-}
-inline std::ostream& operator<<(std::ostream& os, BoundaryType obj) {
-    os << static_cast<std::underlying_type<BoundaryType>::type>(obj) ;
-    return os ;
-}
-
-enum class EOS_pressure_type {
-    adiabatic = 0, polytropic = 1, tabulated = 2, supernova = 3, user=4
-};
-
-enum class EOS_internal_energy_type {
-    thermal = 0, constant = 1, tabulated = 2, supernova = 3, user=4
-};
 
 std::vector<AOS> init_AOS(int num);
 vector<string> stringsplit(const string& str, const string& delim);
@@ -156,7 +136,7 @@ template<typename T>
 simulation_parameter<T> read_parameter_from_file(string, string, int);
 
 template<typename T>
-simulation_parameter<T> read_parameter_from_file(string, string, int, T defaul);
+simulation_parameter<T> read_parameter_from_file(string, string, int, T);
 
 
 
@@ -229,6 +209,8 @@ public:
     double max_snd_crs_time;
     int steps;
     int timecount;
+
+    IntegrationType order ;
     
     ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     //
@@ -341,10 +323,12 @@ public:
     double mass_amu;
     double initial_fraction;
     
-    std::vector<AOS> u;              //Conserved hyperbolic variables: density, mass flux, energy density
+    std::vector<AOS> u;              // Conserved hyperbolic variables: density, mass flux, energy density
+    std::vector<AOS> dudt[2];        // Time derivative of u at each stage ;      
     std::vector<AOS> source;         // Gravitational source term
     std::vector<AOS> source_pressure;// Geometric source term
     std::vector<AOS> flux;
+
     
     double const_T_space;
     double const_gamma_adiabat;
@@ -427,14 +411,14 @@ public:
     AOS analytic_flux(AOS &input_vec, const int &j);
     AOS hll_flux (AOS &leftvalue, AOS &rightvalue, const int &jleft, const int &jright);
     AOS hllc_flux(AOS &leftvalue, AOS &rightvalue, const int &jleft, const int &jright);
-    void compute_pressure(); // Computes all other primitives as well!
+    void compute_pressure(std::vector<AOS>& u); // Computes all other primitives as well!
     AOS source_grav(AOS &u, int &j);
     
     //
     // Radiation
     //
     int use_rad_fluxes;
-    void update_radiation();
+    void update_radiation(std::vector<AOS>& u);
     AOS source_radflux(int i);
     
     //
@@ -456,12 +440,12 @@ public:
     //
     // Boundaries
     //
-    void add_wave(double time, double tmax, double amplitude);
+    void add_wave(std::vector<AOS>& u, double time);
     
-    void apply_boundary_left();
-    void apply_boundary_right();
-    void user_boundary_left();
-    void user_boundary_right();
+    void apply_boundary_left(std::vector<AOS>& u);
+    void apply_boundary_right(std::vector<AOS>& u);
+    void user_boundary_left(std::vector<AOS>& u);
+    void user_boundary_right(std::vector<AOS>& u);
 
     void user_initial_conditions();
     
@@ -481,7 +465,7 @@ public:
     //c_Species();
     c_Species(c_Sim *base_simulation, string filename, string species_filename, int species_index, int debug=0);
     ~c_Species();
-    void execute();
+    void execute(std::vector<AOS>& u, std::vector<AOS>& dudt);
     
 };
 

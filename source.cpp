@@ -175,7 +175,7 @@
         //
         ///////////////////////////////////////////////////////////
         
-    void c_Species::update_radiation() {
+    void c_Species::update_radiation(std::vector<AOS>& u) {
         
         //
         // Update opacities in case thats needed.
@@ -205,6 +205,12 @@
         ///////////////////////////////////////////////////////////
         
     void c_Sim::compute_friction_step() {
+
+        // Just do the basic update here
+        for(int s=0; s < num_species; s++) {
+            for(int j=0; j < num_cells+1; j++)
+                species[s].u[j] = species[s].u[j] + species[s].dudt[0][j]*dt ;
+        }
         
         //Dummy function so far
         /*
