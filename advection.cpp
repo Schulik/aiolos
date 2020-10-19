@@ -18,9 +18,9 @@ void c_Sim::execute() {
     const int maxsteps = 1e9;
     //double pressure_temp;
         
-    cout<<endl<<"Beginning main loop with num_cells="<<num_cells<<" and timestep="<<dt<<" cflfacotr="<<cflfactor<<" and num_species = "<<num_species<<endl;
+    cout<<endl<<"Beginning main loop with num_cells="<<num_cells<<" and timestep="<<dt<<" cflfactor="<<cflfactor<<" and num_species = "<<num_species<<endl;
     if(num_species == 0) 
-        cout<<"WARNING: No species specified! I cannot work like that."<<endl;
+        throw std::invalid_argument("WARNING: No species specified! I cannot work like that.") ;
     
     ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~////
     //                                                                         //
@@ -116,7 +116,7 @@ void c_Sim::execute() {
 
 void c_Species::execute() {
     
-        if(use_rad_fluxes==1)
+        if(base->use_rad_fluxes==1)
             update_radiation();
         
         //
@@ -209,7 +209,7 @@ void c_Species::execute() {
         if(debug >= 2)
             cout<<" Before updating rad fluxes... ";
         
-        if(use_rad_fluxes) {
+        if(base->use_rad_fluxes) {
             for(int j=1; j<=num_cells; j++) {
                 u[j].u3 = u[j].u3 + (radiative_flux[j-1] - radiative_flux[j]); //Dummy physics for now
             }

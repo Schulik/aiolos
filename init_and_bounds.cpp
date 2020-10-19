@@ -28,9 +28,7 @@ c_Sim::c_Sim(string filename, string speciesfile, int debug) {
         domain_min       = read_parameter_from_file<double>(filename,"PARI_DOMAIN_MIN", debug).value;
         domain_max       = read_parameter_from_file<double>(filename,"PARI_DOMAIN_MAX", debug).value;
         geometry = read_parameter_from_file<Geometry>(filename, "PARI_GEOMETRY", debug, Geometry::cartesian).value;
-        
-        if(debug > 0) cout<<"Init pos1."<<endl;
-        
+                
         if(type_of_grid == 0) {
             num_cells        = (int)((domain_max - domain_min)/dx0);
             cout<<"Domain specifics:  "<<domain_min<<" | . . . "<<num_cells<<" uniform cells . . . | "<<domain_max<<endl;
@@ -44,10 +42,13 @@ c_Sim::c_Sim(string filename, string speciesfile, int debug) {
         //
         // Check that cell number looks fine. Shoutout if its not.
         //
-        if( !(num_cells > 0 && num_cells < 999999) )
-            cout<<"WARNING! Something seems wrong with the number of cells required. num_cells = "<<num_cells<<endl;
+        if( !(num_cells > 0 && num_cells < 999999) ) {
+            std::stringstream err ;
+            err<<"WARNING! Something seems wrong with the number of cells required. num_cells = "<<num_cells<<endl;
+            throw std::invalid_argument(err.str()) ;
+        }
             
-        if(debug > 0) cout<<"Init pos2."<<endl;
+        if(debug > 0) cout<<"Init: Finished reading grid parameters."<<endl;
         
         //dt          = read_parameter_from_file<double>(filename,"PARI_TIME_DT", debug).value;
         cflfactor   = read_parameter_from_file<double>(filename,"PARI_CFLFACTOR", debug, 1.).value;
@@ -56,8 +57,8 @@ c_Sim::c_Sim(string filename, string speciesfile, int debug) {
         globalTime = 0.0;    
         timecount = 0;
         
-        if(debug > 0) cout<<"Init pos3."<<endl;
-    
+        if(debug > 0) cout<<"Init: Finished reading time parameters."<<endl;
+
         ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         //
         //    Control parameters for users
@@ -66,7 +67,6 @@ c_Sim::c_Sim(string filename, string speciesfile, int debug) {
 
         simname = filename;
         
-        //cout<<"Pos2"<<endl;
         problem_number    = read_parameter_from_file<int>(filename,"PARI_PROBLEM_NUMBER", debug).value;
         use_self_gravity  = read_parameter_from_file<int>(filename,"PARI_SELF_GRAV_SWITCH", debug, 0).value;
         use_linear_gravity= read_parameter_from_file<int>(filename,"PARI_LINEAR_GRAV", debug, 0).value;
@@ -79,12 +79,15 @@ c_Sim::c_Sim(string filename, string speciesfile, int debug) {
             rs_time         = read_parameter_from_file<double>(filename,"PARI_SMOOTHING_TIME", debug, 0.).value; //Time until we reach rs starting at rs_at_moment
             rs_at_moment    = 0.2;
             
+        } else {
+            planet_mass = planet_position = rs = rs_time = 0 ;
+            rs_at_moment = 0.2 ;
         }
         
         if(use_self_gravity)
             cout<<"WARNING: Self-gravity switched ON !!!"<<endl;
         
-        if(debug > 0) cout<<"Init pos4."<<endl;
+        if(debug > 0) cout<<"Init: Finished reading gravity parameters"<<endl;
         
         ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         //
@@ -104,7 +107,7 @@ c_Sim::c_Sim(string filename, string speciesfile, int debug) {
         enclosed_mass   = np_zeros(num_cells+2);
         phi             = np_zeros(num_cells+2);
         
-        if(debug > 0) cout<<"Init pos5."<<endl;
+        if(debug > 0) cout<<"Init: Setup grid memory"<<endl;
         
         //
         // Compute cell wall boundaries
@@ -211,10 +214,12 @@ c_Sim::c_Sim(string filename, string speciesfile, int debug) {
             }
         
         
-        if(debug > 0) cout<<"Init pos6."<<endl;
+        if(debug > 0) cout<<"Init: Finished grid setup"<<endl;
         if(!all_grid_ok) {
-            cout<<"WARNING! Problem with grid values. Example broken value, dx["<<broken_index<<"]="<<broken_value<<endl;
-            cout<<" FIRST AND LAST DX = "<<dx[0]<<" / "<<dx[num_cells+1]<<endl;
+            std::stringstream err ;
+            err <<"WARNING! Problem with grid values. Example broken value, dx["<<broken_index<<"]="<<broken_value<<endl;
+            err<<" FIRST AND LAST DX = "<<dx[0]<<" / "<<dx[num_cells+1]<<endl;
+            throw std::runtime_error(err.str()) ;
         }
             
         
@@ -246,7 +251,7 @@ c_Sim::c_Sim(string filename, string speciesfile, int debug) {
         } 
         
         
-        if(debug > 0) cout<<"Init pos7."<<endl;
+        if(debug > 0) cout<<"Init: Setup metric factors"<<endl;
         
         //
         //
@@ -263,7 +268,7 @@ c_Sim::c_Sim(string filename, string speciesfile, int debug) {
         //
         num_species = read_parameter_from_file<int>(filename,"PARI_NUM_SPECIES", debug, 1).value;
         
-        if(debug > 0) cout<<"Init pos8 with num_species = "<<num_species<<endl;
+        if(debug > 0) cout<<"Init: About to setup species with num_species = "<<num_species<<endl;
         
         species.reserve(num_species);
         
@@ -282,7 +287,7 @@ c_Sim::c_Sim(string filename, string speciesfile, int debug) {
         
         dt = get_cfl_timestep();
         
-        if(debug > 0) cout<<"Final init pos9."<<endl;
+        if(debug > 0) cout<<"Init: Finished Init."<<endl;
 }
 
 
@@ -301,9 +306,9 @@ c_Species::c_Species(c_Sim *base_simulation, string filename, string species_fil
         base               = base_simulation;
         this_species_index = species_index;
         num_cells          = base->num_cells;
-        debug              = debug;
+        this->debug        = debug;
         
-        if(debug > 0) cout<<"        Species["<<species_index<<"] debug pos 1."<<endl;
+        if(debug > 0) cout<<"        Species["<<species_index<<"] Init: Begin"<<endl;
         
         ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         //
@@ -322,8 +327,9 @@ c_Species::c_Species(c_Sim *base_simulation, string filename, string species_fil
         eos_pressure_type       = EOS_pressure_type::adiabatic;       //Read parameter from...
         eos_internal_energy_type = EOS_internal_energy_type::thermal;
         
-        if(debug > 0) cout<<"        Species["<<species_index<<"] debug pos 2."<<endl;
-        
+        if(debug > 0) cout<<"        Species["<<species_index<<"] Init: Finished reading boundaries."<<endl;
+        if(debug > 0) cout<<"         Boundaries used in species["<<name<<"]: "<<boundary_left<<" / "<<boundary_right<<endl;
+
         //Read EOS specifications from file
         if(eos_pressure_type == EOS_pressure_type::tabulated) 
             read_tabulated_eos_data_pressure("eos_pressure.input");
@@ -338,20 +344,16 @@ c_Species::c_Species(c_Sim *base_simulation, string filename, string species_fil
         //
         // //This provides important stuff like, const_cv, const_gamma_adiabat for this species
         //
-        if(debug > 0) cout<<"        Species["<<species_index<<"] debug pos 3."<<endl;
+        if(debug > 0) cout<<"        Species["<<species_index<<"] Init: Reading species data..."<<endl;
         read_species_data(species_filename, species_index); 
-        if(debug > 0) cout<<"        Species["<<species_index<<"] debug pos 4."<<endl;
+        if(debug > 0) cout<<"        Species["<<species_index<<"] Init: Done reading species data."<<endl;
         
-        //cout<<"After read speacies. cels="<<num_cells<<" this->cels"<<base->get_num_cells()<<" csim::numcells"<<base->num_cells<<endl;
-        //cout<<" x[0]="<<base->x_i[0]<<endl;
         
         u               = init_AOS(num_cells+2); //Conserved hyperbolic variables: density, mass flux, energy density
         source          = init_AOS(num_cells+2);  
         source_pressure = init_AOS(num_cells+2);
         flux            = init_AOS(num_cells+1);
-        
-        const_T_space = 1.; //Yet another parameter?
-        
+                
         gamma_adiabat  = np_somevalue(num_cells+2, const_gamma_adiabat);
         cv             = np_somevalue(num_cells+2, const_cv);
         opacity        = np_somevalue(num_cells+2, const_opacity);
@@ -370,7 +372,6 @@ c_Species::c_Species(c_Sim *base_simulation, string filename, string species_fil
         timesteps_cs = np_zeros(num_cells+2);	
         finalstep    = np_zeros(num_cells+2);
         
-        if(debug > 0) cout<<"         Boundaries used in species["<<name<<"]: "<<boundary_left<<" / "<<boundary_right<<endl;
         
         
         //////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -457,7 +458,7 @@ c_Species::c_Species(c_Sim *base_simulation, string filename, string species_fil
         }
         
         
-        if(debug > 0) cout<<"Ended init in species"<<species_index<<endl;
+        if(debug > 0) cout<<"        Species["<<species_index<<"]: Init done."<<endl;
     
 }
 
