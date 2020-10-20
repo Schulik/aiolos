@@ -32,7 +32,7 @@ PARI_CELLS_PER_DECADE   20.
 PARI_DOMAIN_MIN         1.e-4
 PARI_DOMAIN_MAX         10.
 PARI_TIME_DT            1e-3
-PARI_CFLFACTOR          1.0
+PARI_CFLFACTOR          0.9
 PARI_TIME_TMAX          1.01e-1
 PARI_TIME_OUTPUT        1.e-2
 

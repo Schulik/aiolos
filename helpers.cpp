@@ -29,19 +29,18 @@ double c_Sim::get_cfl_timestep() {
         for(int i=1; i<=num_cells; i++) {
             
             //Computing the inverse timesteps first
-            species[s].timesteps[i]    = std::abs(species[s].u[i].u2 / species[s].u[i].u1 / dx[i]); 
-            species[s].timesteps_cs[i] = std::abs(species[s].cs[i] / dx[i]);
-            species[s].finalstep[i]    = std::sqrt(species[s].timesteps[i]*species[s].timesteps[i] + species[s].timesteps_cs[i] * species[s].timesteps_cs[i]);
+            species[s].timesteps[i]    = std::abs(species[s].prim[i].speed / dx[i]); 
+            species[s].timesteps_cs[i] = species[s].prim[i].sound_speed / dx[i];
+            species[s].finalstep[i]    = species[s].timesteps[i] + species[s].timesteps_cs[i] ;
             
-            //cout<<" timestep["<<i<<"]="<<timesteps[i]<<endl;
-            species[s].snd_crs_time += 2.* dx[i] / species[s].cs[i];
+            species[s].snd_crs_time += 2.* dx[i] / species[s].prim[i].sound_speed ;
             
-            if (species[s].finalstep[i] > minstep)
-                minstep = species[s].finalstep[i];  
+            minstep = std::max(minstep, species[s].finalstep[i]) ;
         }
+        max_snd_crs_time = std::max(max_snd_crs_time, species[s].snd_crs_time) ;
     }
     //Invert and apply CFL secutiry factor
-    minstep = cflfactor * 0.4 / minstep;
+    minstep = cflfactor / minstep;
     
     //Check if the simulation step is too large (e.g. when v=0 in most of the domain), then make the step artificially smaller
     if ( minstep > t_max)
@@ -63,6 +62,8 @@ double c_Sim::get_cfl_timestep() {
 std::vector<AOS> init_AOS(int num) {   
     return std::vector<AOS>(num);
 }
+
+//
 
 //
 // Return a 1-D array of zeroes, identical to the numpy function
@@ -149,14 +150,14 @@ void c_Species::read_species_data(string filename, int species_index) {
                 
                 found = 1;
                 
-                this->name                = stringlist[2];
-                this->mass_amu            = std::stod(stringlist[3]);
-                this->const_cv            = std::stod(stringlist[4]);
-                this->const_gamma_adiabat = std::stod(stringlist[5]);
-                this->initial_fraction    = std::stod(stringlist[6]);
+                this->name             = stringlist[2];
+                this->mass_amu         = std::stod(stringlist[3]);
+                this->cv               = std::stod(stringlist[4]);
+                this->gamma_adiabat    = std::stod(stringlist[5]);
+                this->initial_fraction = std::stod(stringlist[6]);
                 
                 if(debug > 0)
-                    cout<<"Found species called "<<name<<" with a mass of "<<mass_amu<<" cv "<<const_cv<<" gamma "<<const_gamma_adiabat<<" and zeta_0 = "<<initial_fraction<<endl;
+                    cout<<"Found species called "<<name<<" with a mass of "<<mass_amu<<" cv "<<cv<<" gamma "<<gamma_adiabat<<" and zeta_0 = "<<initial_fraction<<endl;
                 
             }
 
@@ -309,7 +310,7 @@ void c_Species::print_AOS_component_tofile(int timestepnumber) {
         double hydrostat = 0., hydrostat2 = 0., hydrostat3 = 0.;
         
         //Print left ghost stuff
-        outfile<<base->x_i12[0]<<'\t'<<u[0].u1<<'\t'<<u[0].u2<<'\t'<<u[0].u3<<'\t'<<flux[0].u1<<'\t'<<flux[0].u2<<'\t'<<flux[0].u3<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<pressure[0]<<'\t'<<u[0].u2/u[0].u1<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<base->phi[0]<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<endl;
+        outfile<<base->x_i12[0]<<'\t'<<u[0].u1<<'\t'<<u[0].u2<<'\t'<<u[0].u3<<'\t'<<flux[0].u1<<'\t'<<flux[0].u2<<'\t'<<flux[0].u3<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<prim[0].pres<<'\t'<<u[0].u2/u[0].u1<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<base->phi[0]<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<endl;
         
         //Print the domain
         for(int i=1; i<=num_cells; i++) {
@@ -322,11 +323,11 @@ void c_Species::print_AOS_component_tofile(int timestepnumber) {
             
             //flux[i] - flux[i+1] + source[i]
             
-            outfile<<base->x_i12[i]<<'\t'<<u[i].u1<<'\t'<<u[i].u2<<'\t'<<u[i].u3<<'\t'<<flux[i].u1<<'\t'<<flux[i].u2<<'\t'<<flux[i].u3<<'\t'<<((flux[i-1].u1 - flux[i].u1)/base->dx[i] + source[i].u1)<<'\t'<<((flux[i-1].u2 - flux[i].u2)/base->dx[i] + source[i].u2)<<'\t'<<((flux[i-1].u3 - flux[i].u3)/base->dx[i] + source[i].u3)<<'\t'<<pressure[i]<<'\t'<<u[i].u2/u[i].u1<<'\t'<<internal_energy[i] <<'\t'<<timesteps[i]<<'\t'<<base->phi[i]<<'\t'<<timesteps_cs[i]<<'\t'<<opticaldepth[i]<<'\t'<<hydrostat<<'\t'<<hydrostat2<<'\t'<<hydrostat3<<'\t'<<base->enclosed_mass[i]<<endl;
+            outfile<<base->x_i12[i]<<'\t'<<u[i].u1<<'\t'<<u[i].u2<<'\t'<<u[i].u3<<'\t'<<flux[i].u1<<'\t'<<flux[i].u2<<'\t'<<flux[i].u3<<'\t'<<((flux[i-1].u1 - flux[i].u1)/base->dx[i] + source[i].u1)<<'\t'<<((flux[i-1].u2 - flux[i].u2)/base->dx[i] + source[i].u2)<<'\t'<<((flux[i-1].u3 - flux[i].u3)/base->dx[i] + source[i].u3)<<'\t'<<prim[i].pres<<'\t'<<u[i].u2/u[i].u1<<'\t'<<prim[i].internal_energy <<'\t'<<timesteps[i]<<'\t'<<base->phi[i]<<'\t'<<timesteps_cs[i]<<'\t'<<opticaldepth[i]<<'\t'<<hydrostat<<'\t'<<hydrostat2<<'\t'<<hydrostat3<<'\t'<<base->enclosed_mass[i]<<endl;
         }
         
         //Print right ghost stuff
-        outfile<<base->x_i12[num_cells+1]<<'\t'<<u[num_cells+1].u1<<'\t'<<u[num_cells+1].u2<<'\t'<<u[num_cells+1].u3<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<pressure[num_cells+1]<<'\t'<<u[num_cells+1].u2/u[num_cells+1].u1<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<base->phi[num_cells+1]<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<endl;
+        outfile<<base->x_i12[num_cells+1]<<'\t'<<u[num_cells+1].u1<<'\t'<<u[num_cells+1].u2<<'\t'<<u[num_cells+1].u3<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<prim[num_cells+1].pres<<'\t'<<u[num_cells+1].u2/u[num_cells+1].u1<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<base->phi[num_cells+1]<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<endl;
    
         cout<<"    Sucessfully written file "<<filename<<" for species = "<<name<<" at time "<<base->globalTime<<" and dt="<<base->dt<<endl;
     }

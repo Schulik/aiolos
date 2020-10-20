@@ -1,3 +1,5 @@
+#include <cassert>
+
 #include "aiolos.h"
 
 
@@ -113,33 +115,17 @@
     // takes:
     // returns:
     //
-    double c_Species::get_p_hydrostatic_nonuniform(const int &i, AOS& u, const int &plusminus) {
+    double c_Species::get_dp_hydrostatic_nonuniform(const int &i, const int &plusminus) {
         
-        double pfinal;
+        double dp_final;
     
         if(plusminus == -1) {
-                pfinal = pressure[i] - base->dx[i] * base->omegaplus[i] * u.u1 * (base->phi[i-1] - base->phi[i]) / (base->dx[i-1] + base->dx[i]);
+                dp_final = - base->dx[i] * base->omegaplus[i] * (base->phi[i-1] - base->phi[i]) / (base->dx[i-1] + base->dx[i]);
         } else {
-                pfinal = pressure[i] - base->dx[i] * base->omegaminus[i] * u.u1 * (base->phi[i+1] - base->phi[i]) / (base->dx[i+1] + base->dx[i]);
+                dp_final = - base->dx[i] * base->omegaminus[i] * (base->phi[i+1] - base->phi[i]) / (base->dx[i+1] + base->dx[i]);
         }
             
-        //if self.debug > 2:
-         //   print(" In P_HYDROSTATIC : phi_l-phi_r = " + repr(phi_l) + "-" + repr(phi_r) + " p,pfinal = " + repr([p,pfinal]))
-
-        if (pfinal < 0.) {
-            if(suppress_warnings == 0) {
-                cout<<"Warning: Negative pressure computed and replaced in nonuniform cell "<<i<<" at time= "<<base->globalTime<<" iter = "<<base->steps<<endl;
-                cout<<" cell "<<i<<" case /pm = "<<plusminus<<endl;
-                cout<<" u =  "<<u.u1<<"/"<<u.u2<<"/"<<u.u3<<endl;
-                cout<<" phil-phir "<<(base->phi[i+plusminus] - base->phi[i])<<" p= "<<pressure[i]<<" pfinal= "<<pfinal<<endl;
-                char a ;
-                cin>>a;
-            }
-                
-            return pressure[i];
-        }
-            
-        return pfinal;
+        return dp_final;
     }
 
     //
@@ -157,13 +143,12 @@
         // The last regular cells get the uniform grid treatment
         // because omegas cannot be defined in those cells, without defining spacing for the ghost cells, which I dont want to do
         //
-        if(j==0 || j==num_cells+1) 
-            return AOS(0, u.u1, u.u2) * (-1.) * (base->phi[j+1] - base->phi[j-1]) / (base->x_i12[j+1] - base->x_i12[j-1]); 
-        else {
-            
-            return AOS(0, u.u1, u.u2) * (-1.) * ( base->omegaplus[j] * (base->phi[j] - base->phi[j-1]) / (base->dx[j] + base->dx[j-1]) + base->omegaminus[j] * (base->phi[j+1] - base->phi[j]) / (base->dx[j+1] + base->dx[j]) );
-            
-        }
+        assert(j > 0 && j <= num_cells) ;
+
+        double dphidr_p = (base->phi[j] - base->phi[j-1]) / (base->dx[j] + base->dx[j-1]) ;
+        double dphidr_m = (base->phi[j+1] - base->phi[j]) / (base->dx[j+1] + base->dx[j]) ;
+
+        return AOS(0, u.u1, u.u2) * (-1.) * ( base->omegaplus[j] * dphidr_p  + base->omegaminus[j] * dphidr_m);
         
     }
 
@@ -184,14 +169,16 @@
         //   opacity = some_function(density, temperature);
         //}
         
+        
         opticaldepth[num_cells-1] = 1e-6; // Some start value for the top of the atmosphere. TODO: Improve this into some physically motivated estiamte.
         
         for(int i = num_cells-2; i>=0; i--)  {
             opticaldepth[i] = opticaldepth[i+1] + opacity[i] * u[i].u1 * (base->x_i12[i+1] - base->x_i12[i]);
             
-            radiative_flux[i] = pow(temperature[i], 4.) / ( 3./4. * ( 2./3. + opticaldepth[i]) ); //Hubeny 1990 relation with zero scattering
+            radiative_flux[i] = pow(prim[i].temperature, 4.) / ( 3./4. * ( 2./3. + opticaldepth[i]) ); //Hubeny 1990 relation with zero scattering
             
         }
+        
         
     }
 

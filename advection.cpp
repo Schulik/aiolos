@@ -157,6 +157,7 @@ void c_Species::execute(std::vector<AOS>& u_in, std::vector<AOS>& dudt) {
             cout<<"Done."<<endl<<" Before compute pressure... ";
         
         compute_pressure(u_in);
+        reconstruct_edge_states() ;
         
         if(debug >= 2)
             cout<<"Done. Starting fluxes."<<endl;
@@ -166,7 +167,7 @@ void c_Species::execute(std::vector<AOS>& u_in, std::vector<AOS>& dudt) {
         //
         for(int j=0; j <= num_cells; j++) {
             
-            flux[j] = hllc_flux(u_in[j], u_in[j+1], j, j+1); //Everything else is taken into account by the right flux
+            flux[j] = hllc_flux(j); //Everything else is taken into account by the right flux
 
             /*if(j==2) {
                 char alp;ms are which form of objects which have a velocity standard deviation comparable to their m
@@ -187,7 +188,8 @@ void c_Species::execute(std::vector<AOS>& u_in, std::vector<AOS>& dudt) {
         
         for(int j=1; j<=num_cells; j++) {
             source[j]          = source_grav(u_in[j], j);
-            source_pressure[j] = AOS(0, -(base->source_pressure_prefactor_left[j] * pressure_l[j] - base->source_pressure_prefactor_right[j] * pressure_r[j])  ,0); 
+            source_pressure[j] = AOS(0, -(base->source_pressure_prefactor_left[j] * prim_l[j].pres - 
+                                          base->source_pressure_prefactor_right[j] * prim_r[j].pres)  ,0); 
         }
         
         
@@ -213,8 +215,8 @@ void c_Species::execute(std::vector<AOS>& u_in, std::vector<AOS>& dudt) {
                 
                 cout<<"Al*Fl - Ar*Fr = "<<((flux[j-1].u2 * base->surf[j-1] - flux[j].u2 * base->surf[j]) /base->vol[j])<<endl;
                 cout<<"Al*Fl - Ar*Fr + sP = "<<((flux[j-1].u2 * base->surf[j-1] - flux[j].u2 * base->surf[j]) / base->vol[j] + source_pressure[j].u2)<<endl;
-                cout<<"dP/dr = "<<((pressure_l[j] - pressure_r[j])/base->dx[j])<<endl;
-                cout<<"dP/dr + S = "<<((pressure_l[j] - pressure_r[j])/base->dx[j] + source[j].u2)<<endl;
+                cout<<"dP/dr = "<<((prim_l[j].pres - prim_r[j].pres)/base->dx[j])<<endl;
+                cout<<"dP/dr + S = "<<((prim_l[j].pres - prim_r[j].pres)/base->dx[j] + source[j].u2)<<endl;
                 cout<<endl;
                 cout<<"Al*Fl - Ar*Fr + s = "<<((flux[j-1].u2 * base->surf[j-1] - flux[j].u2 * base->surf[j]) / base->vol[j] + (source[j].u2))<<endl;
                 cout<<"Al*Fl - Ar*Fr + s + sP = "<<((flux[j-1].u2 * base->surf[j-1] - flux[j].u2 * base->surf[j]) / base->vol[j] + (source[j].u2 +source_pressure[j].u2))<<endl;
@@ -236,59 +238,61 @@ void c_Species::execute(std::vector<AOS>& u_in, std::vector<AOS>& dudt) {
     
 } 
 
-AOS c_Species::hllc_flux(AOS &leftval, AOS &rightval, const int &jleft, const int& jright) 
+AOS c_Species::hllc_flux(int j) 
 {
+    int jleft = j, jright = j+1;
     AOS flux;
     
     //Speed of gas
-    double ul = speed[jleft]; 
-    double ur = speed[jright];
+    double ul = prim_r[jleft].speed;  
+    double ur = prim_l[jright].speed; 
     
-    double pl = pressure_r[jleft];  
-    double pr = pressure_l[jright]; 
+    double pl = prim_r[jleft].pres;  
+    double pr = prim_l[jright].pres; 
     
+    double dl = prim_r[jleft].density;  
+    double dr = prim_l[jright].density;
+
+    double mom_l = dl*ul ;
+    double mom_r = dr*ur ;
+
+    double El = dl*prim_r[jleft].internal_energy + 0.5*mom_l*ul ;
+    double Er = dr*prim_l[jright].internal_energy + 0.5*mom_r*ur ;
+
     //Speed of shocks
-    double SL = ul - std::sqrt(gamma_adiabat[jleft]*pl/leftval.u1);
-    double SR = ur + std::sqrt(gamma_adiabat[jright]*pr/rightval.u1);
+    double SL = ul - prim_r[jleft].sound_speed ;
+    double SR = ur + prim_l[jright].sound_speed ;
+
+
     
     //Intermediate values in the star region, equations 10.30 -10.39 in Toro
-    double SS     = ( pr-pl+leftval.u2*(SL - ul)-rightval.u2*(SR-ur) )/(leftval.u1*(SL - ul)-rightval.u1*(SR-ur) );
+    double SS     = ( pr-pl+mom_l*(SL - ul)-mom_r*(SR-ur) )/(dl*(SL - ul)-dr*(SR-ur) );
     
     if ((SL <= 0) &&  (SS >= 0)) {
-        
-        AOS FL         = AOS (leftval.u2, leftval.u2 * ul  + pl, ul * (leftval.u3 + pl) );
-        double comp3_L = leftval.u3/leftval.u1 + (SS-ul)*(SS + pl/(leftval.u1*(SL-ul)));
-        AOS US_L       = AOS(1,SS, comp3_L) * leftval.u1  * (SL - ul)/(SL-SS);
-        AOS FS_L       = FL + (US_L - leftval)  * SL;    
+        AOS FL         = AOS (mom_l, mom_l * ul + pl, ul * (El + pl) );
+        double comp3_L = El/dl + (SS-ul)*(SS + pl/(dl*(SL-ul)));
+        AOS US_L       = AOS(1,SS, comp3_L) * dl * (SL - ul)/(SL-SS);
+        AOS FS_L       = FL + (US_L - AOS(dl, mom_l, El))  * SL;    
            
         flux = FS_L;
     }
     else if ((SS <= 0) && (SR >= 0)) {
         
-        AOS FR         = AOS (rightval.u2,rightval.u2 * ur + pr, ur * (rightval.u3+ pr) );
-        double comp3_R = rightval.u3/rightval.u1 + (SS-ur)*(SS + pr/(rightval.u1*(SR-ur)));
-        AOS US_R       = AOS(1,SS, comp3_R) * rightval.u1 * (SR - ur)/(SR-SS);
-        AOS FS_R       = FR + (US_R - rightval) * SR;
+        AOS FR         = AOS (mom_r, mom_r * ur + pr, ur * (Er + pr) );
+        double comp3_R = Er/dr + (SS-ur)*(SS + pr/(dr*(SR-ur)));
+        AOS US_R       = AOS(1,SS, comp3_R) * dr * (SR - ur)/(SR-SS);
+        AOS FS_R       = FR + (US_R - AOS(dr, mom_r, Er)) * SR;
         
         flux = FS_R;
     }
     else if (SL >= 0) {
-        AOS FL = AOS (leftval.u2, leftval.u2 * ul  + pl, ul * (leftval.u3 + pl) );
+        AOS FL = AOS (mom_l, mom_l * ul + pl, ul * (El + pl) );
         flux = FL;
     }
     else if (SR <= 0) {
-        AOS FR = AOS (rightval.u2,rightval.u2 * ur + pr, ur * (rightval.u3 + pr) );
+        AOS FR = AOS(mom_r, mom_r * ur + pr, ur * (Er + pr) );
         flux = FR;
     }
     return flux;
 }
 
-
-
-
-AOS c_Species::analytic_flux(AOS &input_vec, const int &j) {
-     
-    return AOS (input_vec.u2, 
-                input_vec.u2*input_vec.u2/input_vec.u1 + pressure[j], 
-                input_vec.u2/input_vec.u1 * (input_vec.u3 + pressure[j]) );
-}
