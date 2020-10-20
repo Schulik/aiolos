@@ -4,6 +4,7 @@
 #include <iostream>
 #include <fstream>
 #include <sstream>
+#include <memory>
 #include <new>
 #include <exception>
 #include <string>
@@ -14,6 +15,7 @@
 #include "source.h"
 
 #include "enum.h"
+#include "eos.h"
 
 using namespace std;
 
@@ -128,6 +130,15 @@ struct AOS {
  
 }; 
 
+struct AOS_prim {
+    AOS_prim(double d=0, double s=0, double p=0, double cs=0, double u=0, double T=0)
+        : density(d), speed(s), pres(p), 
+          sound_speed(cs), internal_energy(u), temperature(T)
+    { } ;
+    double density, speed, pres ;
+    double sound_speed, internal_energy, temperature;
+} ;
+
 
 std::vector<AOS> init_AOS(int num);
 vector<string> stringsplit(const string& str, const string& delim);
@@ -194,6 +205,7 @@ public:
     int type_of_grid;       //0 = cartesian, 1 = log
     std::vector<double> x_i;    		//The cell boundaries
     std::vector<double> x_i12;  		//The cell mid positions
+    std::vector<double> x_iVC;         // Volumetric centres
     std::vector<double> surf;
     std::vector<double> vol;
     std::vector<double> omegaplus;
@@ -309,8 +321,6 @@ public:
     int boundaries_number;
     BoundaryType boundary_left;
     BoundaryType boundary_right;
-    EOS_pressure_type eos_pressure_type;
-    EOS_internal_energy_type eos_internal_energy_type;
     int num_cells;
     int debug;
 
@@ -332,8 +342,6 @@ public:
 
     
     double const_T_space;
-    double const_gamma_adiabat;
-    double const_cv;
     double const_opacity;
     
     ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -346,27 +354,13 @@ public:
     std::vector<double> timesteps_cs;
     std::vector<double> finalstep;
     double snd_crs_time;
-    
-    std::vector<double> cs;         //Speed of sound array
-    std::vector<double> pressure;   
-    std::vector<double> pressure_l; //reconstructed pressures left  
-    std::vector<double> pressure_r; //reconstructed pressures right  
-    std::vector<double> internal_energy;
-    std::vector<double> speed;
+
+    std::vector<AOS_prim> prim ;
+    std::vector<AOS_prim> prim_l ; // Reconstructed left/ right edges
+    std::vector<AOS_prim> prim_r ;
     std::vector<double> opticaldepth;
     std::vector<double> opacity;
-    std::vector<double> temperature;
     std::vector<double> radiative_flux;
-    std::vector<double> cv;
-    std::vector<double> gamma_adiabat;           //ratio of specific heats
-    
-    std::vector<std::vector<double> > tab_p; //Dummy for tabulated pressure
-    std::vector<std::vector<double> > tab_p_x;
-    std::vector<std::vector<double> > tab_p_y;
-    
-    std::vector<std::vector<double> > tab_e; //Dummy for tabulated pressure
-    std::vector<std::vector<double> > tab_e_x;
-    std::vector<std::vector<double> > tab_e_y;
     
     
     ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -406,14 +400,16 @@ public:
     // 
     // Riemann solver and source functions
     //
-    double get_p_hydrostatic(AOS &u, double &phi_l, double &phi_r, const int &i);
-    double get_p_hydrostatic_nonuniform(const int &i, const int &plusminus);
+    double get_dp_hydrostatic(const int &i, const int &plusminus) ;
+    void reconstruct_edge_states() ;
     
-    AOS analytic_flux(AOS &input_vec, const int &j);
-    AOS hll_flux (AOS &leftvalue, AOS &rightvalue, const int &jleft, const int &jright);
-    AOS hllc_flux(AOS &leftvalue, AOS &rightvalue, const int &jleft, const int &jright);
-    void compute_pressure(std::vector<AOS>& u); // Computes all other primitives as well!
+    AOS hllc_flux(int);
     AOS source_grav(AOS &u, int &j);
+
+    void compute_pressure(std::vector<AOS>& u) {
+        eos->compute_primitive(&(u[0]), &(prim[0]), num_cells+2) ;    
+        eos->compute_auxillary(&(prim[0]), num_cells+2);
+    }
     
     //
     // Radiation
@@ -425,18 +421,8 @@ public:
     //
     // Equations of state
     //
-    double eos_pressure(double density, double eint, int i);
-    double eos_eint    (double density, double temperature, int i);
-    
-    //TODO: Add inversion relations for EOS, like compute_density_from_p_and_T
-    
-    double eos_p_user(double density, double eint);
-    double eos_e_user(double density, double temperature);
-    
-    void   read_tabulated_eos_data_pressure(string filename);
-    void   read_tabulated_eos_data_eint    (string filename);
-    double interpolated_values_on_eos_p_grid(double dens, double eint);
-    double interpolated_values_on_eos_eint_grid(double dens, double temperature);
+    double cv, gamma_adiabat ;
+    EOS_Base* eos ;
     
     //
     // Boundaries

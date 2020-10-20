@@ -104,8 +104,9 @@ c_Sim::c_Sim(string filename, string speciesfile, int debug) {
         // Increment num cells so that we have enough space for the ghosts
         num_cells += 2*(num_ghosts-1) ;
 
-        x_i        = np_zeros(num_cells+1);		//The cell boundaries
-        x_i12      = np_zeros(num_cells+2);		//The cell mid positions
+        x_i        = np_zeros(num_cells+1);		// The cell boundaries
+        x_i12      = np_zeros(num_cells+2);		// The cell mid positions
+        x_iVC      = np_zeros(num_cells+2);		// The cell volumetric centres
         surf       = np_zeros(num_cells+1);     // intercell surfaces
         vol        = np_zeros(num_cells+2);     // cell volumes
         dx         = np_zeros(num_cells+2);
@@ -143,11 +144,21 @@ c_Sim::c_Sim(string filename, string speciesfile, int debug) {
                 x_i[i] = x_i[i-1] + dx0;
             }
         }
+
        
         //
-        // Surfaces and volumes for all geometries
+        // Differences, surfaces and volumes for all geometries
         //
         
+        //Differences
+        for(int i=1; i<num_cells+1; i++) {
+            dx[i]  = x_i[i]-x_i[i-1];
+        }
+        // Ghost dxs: valid for linear or log grids
+        dx[0] = dx[1]*dx[1]/dx[2] ;
+        dx[num_cells+1] = dx[num_cells]*dx[num_cells]/dx[num_cells-1];
+
+        // Surface areas
         switch (geometry) {
             case Geometry::cartesian:
                 cout<<"Initializing cartesian geometry."<<endl;
@@ -169,18 +180,31 @@ c_Sim::c_Sim(string filename, string speciesfile, int debug) {
                 break;
         }
         
-        //Compute shell volumes
-        for(int i=1; i<num_cells+1; i++) {
+        //Compute shell volumes / voluemtric centres
+        for(int i=0; i<=num_cells+1; i++) {
+            double xl, xr ;
+            if (i < num_cells)
+                xr = x_i[i];
+            else
+                xr = x_i[i-1] + dx[i];
+            
+            if (i > 0)
+                xl = x_i[i-1];
+            else
+                xl = x_i[0] - dx[0] ;
+
             switch (geometry) {          
             case Geometry::cartesian:
-                vol[i] = x_i[i] - x_i[i-1] ;
+                vol[i] = xr - xl ;
+                x_iVC[i] = (xr*xr - xl*xl) / (2*vol[i]) ;
                 break;
             case Geometry::cylindrical:
-                vol[i] = M_PI * (x_i[i]*x_i[i] - x_i[i-1]*x_i[i-1]);
+                vol[i] = M_PI * (xr*xr - xl*xl);
+                x_iVC[i] = 2 * M_PI * (xr*xr*xr - xl*xl*xl) / (3*vol[i]) ;
                 break;
             case Geometry::spherical:
-                vol[i] = (4*M_PI/3) * 
-                    (x_i[i]*x_i[i]*x_i[i] - x_i[i-1]*x_i[i-1]*x_i[i-1]);
+                vol[i] = (4*M_PI/3) * (xr*xr*xr - xl*xl*xl);
+                x_iVC[i] = (4*M_PI) * (xr*xr*xr*xr - xl*xl*xl*xl) / (4*vol[i]) ;
                 break;
             }
         }
@@ -190,14 +214,7 @@ c_Sim::c_Sim(string filename, string speciesfile, int debug) {
         for(int i=1; i<num_cells+1; i++) {
             x_i12[i] = 0.5 * (x_i[i] + x_i[i-1]);
         }
-        
-        //Differences
-        for(int i=1; i<num_cells+1; i++) {
-            dx[i]  = x_i[i]-x_i[i-1];
-        }
-        //Ghost dxs, those have only to be generated such that hydrostatic eq is preserved, they don't have to be physical
-        dx[0] = dx[1]*dx[1]/dx[2] ;
-        dx[num_cells+1] = dx[num_cells]*dx[num_cells]/dx[num_cells-1];
+    
         
         //Ghost cells
         x_i12[0]           = x_i[0] - dx[0]/2 ;
@@ -324,21 +341,10 @@ c_Species::c_Species(c_Sim *base_simulation, string filename, string species_fil
         const_T_space  = read_parameter_from_file<double>(filename,"PARI_CONST_TEMP", debug, 1.).value;
         TEMPERATURE_BUMP_STRENGTH = read_parameter_from_file<double>(filename,"TEMPERATURE_BUMP_STRENGTH", debug, 0.).value; 
         
-        //
-        // Determine which equation of states we are using
-        //
-        eos_pressure_type       = EOS_pressure_type::adiabatic;       //Read parameter from...
-        eos_internal_energy_type = EOS_internal_energy_type::thermal;
-        
+
         if(debug > 0) cout<<"        Species["<<species_index<<"] Init: Finished reading boundaries."<<endl;
         if(debug > 0) cout<<"         Boundaries used in species["<<name<<"]: "<<boundary_left<<" / "<<boundary_right<<endl;
 
-        //Read EOS specifications from file
-        if(eos_pressure_type == EOS_pressure_type::tabulated) 
-            read_tabulated_eos_data_pressure("eos_pressure.input");
-            
-        if(eos_internal_energy_type == EOS_internal_energy_type::tabulated) 
-            read_tabulated_eos_data_eint("eos_internal_energy.input");
         
         if(base->use_rad_fluxes == 1)
             const_opacity   = read_parameter_from_file<double>(filename,"PARI_CONST_OPAC", debug, 1.).value;
@@ -358,20 +364,22 @@ c_Species::c_Species(c_Sim *base_simulation, string filename, string species_fil
         source          = init_AOS(num_cells+2);  
         source_pressure = init_AOS(num_cells+2);
         flux            = init_AOS(num_cells+1);
-                
-        gamma_adiabat  = np_somevalue(num_cells+2, const_gamma_adiabat);
-        cv             = np_somevalue(num_cells+2, const_cv);
+
+        //
+        // Determine which equation of states we are using
+        //
+        eos = new Adiabatic_EOS(gamma_adiabat, cv) ;
+
         opacity        = np_somevalue(num_cells+2, const_opacity);
-        temperature    = np_somevalue(num_cells+2, const_T_space);
         opticaldepth   = np_zeros(num_cells+2);
         radiative_flux = np_zeros(num_cells+1);
-        
-        pressure        = np_zeros(num_cells+2); //Those helper quantities are also defined on the ghost cells, so they get +2
-        pressure_l      = np_zeros(num_cells+2); 
-        pressure_r      = np_zeros(num_cells+2); 
-        internal_energy = np_zeros(num_cells+2);
-        speed           = np_zeros(num_cells+2);
-        cs              = np_zeros(num_cells+2);
+
+       
+
+        prim   = std::vector<AOS_prim>(num_cells+2); //Those helper quantities are also defined on the ghost cells, so they get +2
+        prim_l = std::vector<AOS_prim>(num_cells+2);
+        prim_r = std::vector<AOS_prim>(num_cells+2);
+
         
         timesteps    = np_zeros(num_cells+2);		    
         timesteps_cs = np_zeros(num_cells+2);	
@@ -401,8 +409,11 @@ c_Species::c_Species(c_Sim *base_simulation, string filename, string species_fil
             SHOCK_TUBE_MID = read_parameter_from_file<double>(filename,"PARI_INIT_SHOCK_MID", debug, 0.5).value;
             
             //Conversion from shock tube parameters (given as dens, velocity, pressure) to conserved variables (dens, momentum, internal energy)
-            SHOCK_TUBE_UL = AOS(u1l, u1l*u2l, 0.5*u1l*u2l*u2l + u3l/(gamma_adiabat[0]-1.) );
-            SHOCK_TUBE_UR = AOS(u1r, u1r*u2r, 0.5*u1r*u2r*u2r + u3r/(gamma_adiabat[num_cells]-1.));
+            AOS_prim pl(u1l, u2l, u3l) ;
+            eos->compute_conserved(&pl, &SHOCK_TUBE_UL, 1) ;
+
+            AOS_prim pr(u1r, u2r, u3r) ;
+            eos->compute_conserved(&pr, &SHOCK_TUBE_UR, 1) ;
             
             initialize_shock_tube_test(SHOCK_TUBE_UL, SHOCK_TUBE_UR);
             
@@ -423,8 +434,8 @@ c_Species::c_Species(c_Sim *base_simulation, string filename, string species_fil
             
             //Conversion from shock tube parameters (given as dens, velocity, pressure) to conserved variables (dens, momentum, internal energy)
             //BACKGROUND_U = AOS(u1, u1*u2, 0.5*u1*u2*u2 + u3/(gamma_adiabat[0]-1.) );
-            
-            BACKGROUND_U = AOS(u1 * initial_fraction, u1*u2 * initial_fraction, 0.5*u1*u2*u2 * initial_fraction  + u3/(gamma_adiabat[0]-1.) );
+            AOS_prim p(u1 * initial_fraction, u2, u3) ;
+            eos->compute_conserved(&p, &BACKGROUND_U, 1) ;
 
             /* mdot boundaries
              * needs fixing... Should just be specified as a BoundaryType::fixed boundary
@@ -495,12 +506,12 @@ void c_Species::initialize_hydrostatic_atmosphere() {
     //
     for(int i=num_cells+1; i>=0; i--) {
             //temperature[i] = planet_mass / x_i12[i] / (cv * gamma_adiabat) + 1.;
-            temperature[i] = - 1.0 * base->phi[i] / (cv[i] * gamma_adiabat[i]) + const_T_space;
+            prim[i].temperature = - 1.0 * base->phi[i] / (cv * gamma_adiabat) + const_T_space;
             //temperature[i] = 100.;
         
             //Add temperature bumps and troughs
-            temperature[i] += TEMPERATURE_BUMP_STRENGTH * 4.  * exp( - pow(base->x_i12[i] - 1.e-1 ,2.) / (0.1) );
-            temperature[i] -= TEMPERATURE_BUMP_STRENGTH * 15. * exp( - pow(base->x_i12[i] - 7.e-3 ,2.) / (1.5e-3) );
+            prim[i].temperature += TEMPERATURE_BUMP_STRENGTH * 4.  * exp( - pow(base->x_i12[i] - 1.e-1 ,2.) / (0.1) );
+            prim[i].temperature -= TEMPERATURE_BUMP_STRENGTH * 15. * exp( - pow(base->x_i12[i] - 7.e-3 ,2.) / (1.5e-3) );
 
     }
     
@@ -510,17 +521,17 @@ void c_Species::initialize_hydrostatic_atmosphere() {
         //
         // Construct next density as to fulfil the hydrostatic condition
         //
-        T_outer = temperature[i+1];
-        T_inner = temperature[i];  
+        T_outer = prim[i+1].temperature ;
+        T_inner = prim[i].temperature ;
 
-        factor_outer = (gamma_adiabat[i+1]-1.) * cv[i+1] * T_outer; //TODO: Replace with T_outer for non-isothermal EOS
-        factor_inner = (gamma_adiabat[i]  -1.) * cv[i]   * T_inner; //TODO: Replace with T_inner for non-isothermal EOS
+        factor_outer = (gamma_adiabat-1.) * cv * T_outer; //TODO: Replace with T_outer for non-isothermal EOS
+        factor_inner = (gamma_adiabat-1.) * cv * T_inner; //TODO: Replace with T_inner for non-isothermal EOS
         metric_outer = (base->phi[i+1] - base->phi[i]) * base->omegaplus[i+1] * base->dx[i+1] / (base->dx[i+1] + base->dx[i]);
         metric_inner = (base->phi[i+1] - base->phi[i]) * base->omegaminus[i]  * base->dx[i]   / (base->dx[i+1] + base->dx[i]);
         
         temp_rhofinal = u[i+1].u1 * (factor_outer + metric_outer) / (factor_inner - metric_inner);
         
-        u[i] = AOS(temp_rhofinal, 0., cv[i] * temp_rhofinal * T_inner) ;
+        u[i] = AOS(temp_rhofinal, 0., cv * temp_rhofinal * T_inner) ;
         
         //
         // Debug info
@@ -544,20 +555,7 @@ void c_Species::initialize_hydrostatic_atmosphere() {
             //cout<<"In hydostatic init: factor_dens = "<< (2.* factor_outer / delta_phi + 1.) / (2. * factor_inner / delta_phi - 1.) <<endl;
             cout<<"Ratio of densities inner/outer = "<< temp_rhofinal/u[i+1].u1 <<endl;
             cout<<"Ratio of temperatures inner/outer = "<<T_inner/T_outer<<" t_inner ="<<T_inner<<" t_outer ="<<T_outer<<endl;
-            cout<<"Ratio of pressures inner/outer = "<<cv[i] * temp_rhofinal * T_inner /u[i+1].u3<<endl;
-            //tempgrad = (gamma_adiabat-1.)*cv*u[i+1].u1*T_outer - (gamma_adiabat-1.)*cv*u[i].u1*T_inner  + 0.5 * (u[i].u1 + u[i+1].u1) * delta_phi;
-            //tempgrad2 = ((gamma_adiabat-1.)*cv*T_outer + 0.5 * delta_phi) * u[i+1].u1 - ((gamma_adiabat-1.)*cv*T_inner  + 0.5 * delta_phi ) * u[i].u1 ;
-            //residual = (gamma_adiabat-1.)*cv*u[i+1].u1*T_outer - (gamma_adiabat-1.)*cv*u[i].u1*T_inner  + 0.5 * (u[i].u1 + u[i+1].u1) * delta_phi;
-            //cout<<"pressure diff "<<(gamma_adiabat-1.)*u[i+1].u3 - (gamma_adiabat-1.)*(u[i].u3)<<endl;
-            //cout<<"pressure diff "<<( ((gamma_adiabat[i+1]-1.)*cv[i+1]*u[i+1].u1*T_outer - (gamma_adiabat[i]-1.)*cv[i]*u[i].u1*T_inner)/base->dx[i])<<endl;
-            //cout<<"density sum with potential "<<(0.5 * (u[i].u1 + u[i+1].u1) * delta_phi/dx[i])<<endl;
-            //cout<<"density diff "<<(u[i].u1 - u[i+1].u1)<<endl;
-            //cout<<"density sum " <<(u[i].u1 + u[i+1].u1)<<endl;
-            //cout<<"residual = "<<residual<<endl;
-            
-            //cout<<"residual2 = "<<residual<<endl;
-            //cout<<"sum of hydrostatic gradients = "<<tempgrad<<endl;
-            //cout<<"sum2 of hydrostatic gradients = "<<tempgrad2<<endl;
+            cout<<"Ratio of pressures inner/outer = "<<cv * temp_rhofinal * T_inner /u[i+1].u3<<endl;
             cout<<"Resulting density == "<<temp_rhofinal<<endl;
             cout<<" density before "<<u[i+1].u1<<endl;
             cin>>a;
@@ -612,7 +610,6 @@ void c_Species::initialize_background(const AOS &background) {
 
 
 void c_Species::apply_boundary_left(std::vector<AOS>& u) {
-    double E_kinetic, pressure_active, pressure_bound, dphi ;
     int num_ghosts = base->num_ghosts;
     int Ncell = num_cells - 2*(num_ghosts-1) ; // Correct for fact we increased num_cells
     switch(boundary_left) {
@@ -621,15 +618,13 @@ void c_Species::apply_boundary_left(std::vector<AOS>& u) {
             break;
         case BoundaryType::open:
             for (int i=num_ghosts; i > 0; i--) {
-                u[i-1]            = u[i]; 
-                E_kinetic       = 0.5 * u[i].u2 * u[i].u2 / u[i].u1 ;
-                pressure_active = (gamma_adiabat[i]-1.) * (u[i].u3 - E_kinetic);
-                // Hydrostatic pressure extrapolation 
-                dphi = (base->phi[i] - base->phi[i-1]) / (base->dx[i] + base->dx[i-1]) ;
+                AOS_prim prim ;
+                eos->compute_primitive(&u[i],&prim, 1) ;
+                double dphi = (base->phi[i] - base->phi[i-1]) / (base->dx[i-1] + base->dx[i]) ;
                 dphi *= (base->omegaplus[i]*base->dx[i] + base->omegaminus[i-1]*base->dx[i-1]) ;
-                pressure_bound = pressure_active +  u[i].u1 * dphi ;
-                pressure_bound = std::max(pressure_bound, 0.0) ;
-                u[i-1].u3        = pressure_bound/(gamma_adiabat[i-1]-1.) + E_kinetic ;
+                prim.pres = prim.pres + prim.density * dphi ;
+                prim.pres    = std::max( prim.pres, 0.0) ;
+                eos->compute_conserved(&prim, &u[i-1], 1) ;
             }
             break ;
         case BoundaryType::reflecting:
@@ -656,7 +651,6 @@ void c_Species::apply_boundary_left(std::vector<AOS>& u) {
 }
 
 void c_Species::apply_boundary_right(std::vector<AOS>& u) {
-    double E_kinetic, pressure_active, pressure_bound, dphi ;
     int num_ghosts = base->num_ghosts;
     int Ncell = num_cells - 2*(num_ghosts-1) ;
     switch(boundary_right) {
@@ -665,15 +659,13 @@ void c_Species::apply_boundary_right(std::vector<AOS>& u) {
             break;
         case BoundaryType::open:
             for (int i=Ncell+num_ghosts; i < Ncell+2*num_ghosts; i++) {
-                u[i]    = u[i-1]; 
-                E_kinetic         = 0.5 * u[i-1].u2 * u[i-1].u2 / u[i-1].u1 ;
-                pressure_active   = (gamma_adiabat[i-1]-1.) * (u[i-1].u3 - E_kinetic);
-                // Hydrostatic pressure extrapolation 
-                dphi = (base->phi[i] - base->phi[i-1]) / (base->dx[i-1] + base->dx[i]) ;
+                AOS_prim prim ;
+                eos->compute_primitive(&u[i-1],&prim, 1) ;
+                double dphi = (base->phi[i] - base->phi[i-1]) / (base->dx[i-1] + base->dx[i]) ;
                 dphi *= (base->omegaplus[i]*base->dx[i] + base->omegaminus[i-1]*base->dx[i-1]) ;
-                pressure_bound = pressure_active -  u[i-1].u1 * dphi ;
-                pressure_bound    = std::max(pressure_bound, 0.0) ;
-                u[i].u3 = pressure_bound / (gamma_adiabat[i]-1.) + E_kinetic ;
+                prim.pres = prim.pres -  prim.density * dphi ;
+                prim.pres    = std::max( prim.pres, 0.0) ;
+                eos->compute_conserved(&prim, &u[i], 1) ;
             }
             break ;
         case BoundaryType::reflecting:
@@ -708,8 +700,10 @@ void c_Species::add_wave(std::vector<AOS>& u, double globalTime)  {
     u[1].u2 = u[0].u2;
     
 }
-c_Sim::~c_Sim() {
-    //Empty
+c_Sim::~c_Sim() {    
+    // Delete EOSs, note here, not c_Species.
+    for (int i=0; i < num_species; i++) 
+        delete species[i].eos ;
 }
 
 c_Species::~c_Species() {
