@@ -42,13 +42,13 @@ void c_Species::reconstruct_edge_states() {
 
     // Step 2: Add 2nd order slope-limited correction
     IntegrationType order = base->order ;
-    if (order != IntegrationType::first_order) {
+    if (order == IntegrationType::second_order) {
         const std::vector<double>& 
             x_i = base->x_i, 
             x_iVC = base->x_iVC,
             dx = base->dx ;
        
-        for (int i=1; i < num_cells; i++) {
+        for (int i=1; i <= num_cells; i++) {
             double dp_l = 
                 prim[ i ].density * get_dp_hydrostatic_nonuniform( i ,  -1) -
                 prim[i-1].density * get_dp_hydrostatic_nonuniform(i-1,  +1) ;
@@ -56,42 +56,37 @@ void c_Species::reconstruct_edge_states() {
                 prim[ i ].density * get_dp_hydrostatic_nonuniform( i ,  +1) -
                 prim[i+1].density * get_dp_hydrostatic_nonuniform(i+1,  -1) ;
         
-            if (order == IntegrationType::second_order) {
-                // Non-uniform grid factors
-                double cF = (x_iVC[i+1] - x_iVC[i]) / (x_i[i] - x_iVC[i]) ;
-                double cB = (x_iVC[i] - x_iVC[i-1]) / (x_iVC[i] - x_i[i-1]) ;
+            // Non-uniform grid factors
+            double cF = (x_iVC[i+1] - x_iVC[i]) / (x_i[i] - x_iVC[i]) ;
+            double cB = (x_iVC[i] - x_iVC[i-1]) / (x_iVC[i] - x_i[i-1]) ;
 
-                // Pressure perturbation
-                double slope ;
-                slope = MonotonizedCentralSlope(
-                    prim[i-1].pres - dp_l, prim[i].pres, prim[i+1].pres - dp_r, cF, cB) ;
+            // Pressure perturbation
+            double slope ;
+            slope = MonotonizedCentralSlope(
+                prim[i-1].pres - dp_l, prim[i].pres, prim[i+1].pres - dp_r, cF, cB) ;
 
-                prim_l[i].pres += slope * (x_i[i-1] - x_iVC[i]) / dx[i] ; 
-                prim_r[i].pres += slope * (x_i[ i ] - x_iVC[i]) / dx[i] ;
-    
+            prim_l[i].pres += slope * (x_i[i-1] - x_iVC[i]) / dx[i] ; 
+            prim_r[i].pres += slope * (x_i[ i ] - x_iVC[i]) / dx[i] ;
 
-                // Density
-                slope = MonotonizedCentralSlope(
-                    prim[i-1].density, prim[i].density, prim[i+1].density, cF, cB) ;
 
-                prim_l[i].density += slope * (x_i[i-1] - x_iVC[i]) / dx[i] ; 
-                prim_r[i].density += slope * (x_i[ i ] - x_iVC[i]) / dx[i] ;
+            // Density
+            slope = MonotonizedCentralSlope(
+                prim[i-1].density, prim[i].density, prim[i+1].density, cF, cB) ;
 
-                // Speed
-                slope = MonotonizedCentralSlope(
-                    prim[i-1].speed, prim[i].speed, prim[i+1].speed, cF, cB) ;
+            prim_l[i].density += slope * (x_i[i-1] - x_iVC[i]) / dx[i] ; 
+            prim_r[i].density += slope * (x_i[ i ] - x_iVC[i]) / dx[i] ;
 
-                prim_l[i].speed += slope * (x_i[i-1] - x_iVC[i]) / dx[i] ; 
-                prim_r[i].speed += slope * (x_i[ i ] - x_iVC[i]) / dx[i] ;
-                
-                if ((prim_l[i].pres < 0) || (prim_r[i].pres < 0) || 
-                    (prim_l[i].density < 0) || (prim_r[i].density < 0))
-                    prim_l[i] = prim_r[i] = prim[i] ;
+            // Speed
+            slope = MonotonizedCentralSlope(
+                prim[i-1].speed, prim[i].speed, prim[i+1].speed, cF, cB) ;
 
-            } else 
-            if (order == IntegrationType::WENO) {
+            prim_l[i].speed += slope * (x_i[i-1] - x_iVC[i]) / dx[i] ; 
+            prim_r[i].speed += slope * (x_i[ i ] - x_iVC[i]) / dx[i] ;
+            
+            if ((prim_l[i].pres < 0) || (prim_r[i].pres < 0) || 
+                (prim_l[i].density < 0) || (prim_r[i].density < 0))
+                prim_l[i] = prim_r[i] = prim[i] ;
 
-            }
         }
     }
 
