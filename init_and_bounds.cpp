@@ -28,7 +28,7 @@ c_Sim::c_Sim(string filename, string speciesfile, int debug) {
         domain_min       = read_parameter_from_file<double>(filename,"PARI_DOMAIN_MIN", debug).value;
         domain_max       = read_parameter_from_file<double>(filename,"PARI_DOMAIN_MAX", debug).value;
         geometry = read_parameter_from_file<Geometry>(filename, "PARI_GEOMETRY", debug, Geometry::cartesian).value;
-        order = read_parameter_from_file<IntegrationType>(filename, "PARI_ORDER", debug, IntegrationType::second_order).value;
+        order = read_parameter_from_file<IntegrationType>(filename, "PARI_ORDER", debug, IntegrationType::first_order).value;
 
         if(type_of_grid == 0) {
             num_cells        = (int)((domain_max - domain_min)/dx0);
@@ -119,15 +119,9 @@ c_Sim::c_Sim(string filename, string speciesfile, int debug) {
 
             double dlogx = pow(10.,1./cells_per_decade);
             
-            x_i[1] = x_i[0] * dlogx;
-            x_i[2] = x_i[1] + (x_i[1] - x_i[0]);
-            
-            for(int i=3; i< num_cells-1; i++) {
+            for(int i=1; i<= num_cells; i++) {
                 x_i[i]   = x_i[i-1] * dlogx;
             }
-            double dxlast = x_i[num_cells-2] - x_i[num_cells-3];
-            x_i[num_cells-1] = x_i[num_cells-2] + dxlast;
-            x_i[num_cells]   = x_i[num_cells-1] + dxlast;
             
             //Assign the last boundary as domain maximum as long as nonuniform grid is in the test-phase
             domain_max = x_i[num_cells];
@@ -186,7 +180,7 @@ c_Sim::c_Sim(string filename, string speciesfile, int debug) {
         //Compute cell mid positions. Ghost cells also have mid positions in order to balance their pressure gradients
         // but need to be calculated after this loop
         for(int i=1; i<num_cells+1; i++) {
-            x_i12[i] = (0.5 * (x_i[i] + x_i[i-1]) );
+            x_i12[i] = 0.5 * (x_i[i] + x_i[i-1]);
         }
         
         //Differences
@@ -194,12 +188,12 @@ c_Sim::c_Sim(string filename, string speciesfile, int debug) {
             dx[i]  = x_i[i]-x_i[i-1];
         }
         //Ghost dxs, those have only to be generated such that hydrostatic eq is preserved, they don't have to be physical
-        dx[0] = dx[1];
-        dx[num_cells+1] = dx[num_cells] + (dx[num_cells] - dx[num_cells-1]);
+        dx[0] = dx[1]*dx[1]/dx[2] ;
+        dx[num_cells+1] = dx[num_cells]*dx[num_cells]/dx[num_cells-1];
         
         //Ghost cells
-        x_i12[0]           = domain_min - (x_i12[1] - x_i[0]);
-        x_i12[num_cells+1] = domain_max + (x_i[num_cells] - x_i12[num_cells]); 
+        x_i12[0]           = domain_min - dx[0]/2 ;
+        x_i12[num_cells+1] = domain_max + dx[num_cells+1]/2; 
         
         //
         // Grid generation done. Now do a few simple checks on the generated grid values
@@ -234,11 +228,11 @@ c_Sim::c_Sim(string filename, string speciesfile, int debug) {
             omegaplus[i]  = 2. * (dx[i+1] + dx[i]) / (dx[i-1] + 2. * dx[i] + dx[i+1]);
         }
         //Ghost metric factors, those have only to be generated such that hydrostatic eq is preserved, they don't have to be physical
-        omegaminus[0] = omegaminus[1];
-        omegaplus[0]  = omegaplus[1];
+        omegaminus[0] = 2*omegaminus[1] - omegaminus[2] ;
+        omegaplus[0]  = 2*omegaplus[1] - omegaplus[2];
         
-        omegaminus[num_cells+1] = omegaminus[num_cells] + (omegaminus[num_cells] - omegaminus[num_cells-1]);
-        omegaplus[num_cells+1]  = omegaplus[num_cells]  + (omegaplus[num_cells] - omegaplus[num_cells-1]);
+        omegaminus[num_cells+1] = 2*omegaminus[num_cells] - omegaminus[num_cells-1];
+        omegaplus[num_cells+1]  = 2*omegaplus[num_cells] - omegaplus[num_cells-1];
         
         for(int i=1; i<num_cells+1; i++) {
             source_pressure_prefactor_left[i]  = (surf[i-1]/vol[i] - 1./dx[i]); 
@@ -608,6 +602,7 @@ void c_Species::initialize_background(const AOS &background) {
 
 void c_Species::apply_boundary_left(std::vector<AOS>& u) {
     double E_kinetic, pressure_active, pressure_bound ;
+    double dphi ;
     switch(boundary_left) {
         case BoundaryType::user:
             user_boundary_left(u);
@@ -617,7 +612,10 @@ void c_Species::apply_boundary_left(std::vector<AOS>& u) {
             E_kinetic       = 0.5 * u[1].u2 * u[1].u2 / u[1].u1 ;
             pressure_active = (gamma_adiabat[1]-1.) * (u[1].u3 - E_kinetic);
             // Hydrostatic pressure extrapolation 
-            pressure_bound = pressure_active - u[1].u1 * (base->phi[0] - base->phi[1]) ;
+            //pressure_bound = pressure_active - u[1].u1 * (base->phi[0] - base->phi[1]) ;
+            dphi = (base->phi[1] - base->phi[0]) / (base->dx[1] + base->dx[0]) ;
+            dphi *= (base->omegaplus[1]*base->dx[1] + base->omegaminus[0]*base->dx[0]) ;
+            pressure_bound = pressure_active +  u[1].u1 * dphi ;
             pressure_bound = std::max(pressure_bound, 0.0) ;
             u[0].u3        = pressure_bound/(gamma_adiabat[0]-1.) + E_kinetic ;
             break ;
@@ -638,6 +636,8 @@ void c_Species::apply_boundary_left(std::vector<AOS>& u) {
 
 void c_Species::apply_boundary_right(std::vector<AOS>& u) {
     double E_kinetic, pressure_active, pressure_bound ;
+    double dphi ;
+
     switch(boundary_right) {
         case BoundaryType::user:
             user_boundary_right(u);
@@ -648,7 +648,10 @@ void c_Species::apply_boundary_right(std::vector<AOS>& u) {
             E_kinetic         = 0.5 * u[num_cells].u2 * u[num_cells].u2 / u[num_cells].u1 ;
             pressure_active   = (gamma_adiabat[num_cells]-1.) * (u[num_cells].u3 - E_kinetic);
             // Hydrostatic pressure extrapolation 
-            pressure_bound    = pressure_active - u[num_cells].u1 * (base->phi[num_cells+1] - base->phi[num_cells]) ;
+            //pressure_bound    = pressure_active - u[num_cells].u1 * (base->phi[num_cells+1] - base->phi[num_cells]) ;
+            dphi = (base->phi[num_cells+1] - base->phi[num_cells]) / (base->dx[num_cells] + base->dx[num_cells+1]) ;
+            dphi *= (base->omegaplus[num_cells+1]*base->dx[num_cells+1] + base->omegaminus[num_cells]*base->dx[num_cells]) ;
+            pressure_bound = pressure_active -  u[num_cells].u1 * dphi ;
             pressure_bound    = std::max(pressure_bound, 0.0) ;
             u[num_cells+1].u3 = pressure_bound / (gamma_adiabat[num_cells+1]-1.) + E_kinetic ;
             break ;

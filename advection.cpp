@@ -85,9 +85,6 @@ void c_Sim::execute() {
             // 2nd step evaluated at t+dt
             globalTime += dt ;
 
-            for(int s = 0; s < num_species; s++)
-                species[s].compute_pressure(species[s].u);
-
             if(use_self_gravity==1)
                 update_mass_and_pot();
 
@@ -167,10 +164,7 @@ void c_Species::execute(std::vector<AOS>& u_in, std::vector<AOS>& dudt) {
         //
         // Step 2: Compute fluxes and sources
         //
-        for(int j=1; j <= num_cells; j++) {
-            
-            if(j==1) 
-                flux[0] = hllc_flux(u_in[j-1], u_in[j], j-1, j); //Flux with ghost cell on left
+        for(int j=0; j <= num_cells; j++) {
             
             flux[j] = hllc_flux(u_in[j], u_in[j+1], j, j+1); //Everything else is taken into account by the right flux
 
