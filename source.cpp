@@ -157,7 +157,7 @@
         // The last regular cells get the uniform grid treatment
         // because omegas cannot be defined in those cells, without defining spacing for the ghost cells, which I dont want to do
         //
-        if(j==1 || j==num_cells ) 
+        if(j==0 || j==num_cells+1) 
             return AOS(0, u.u1, u.u2) * (-1.) * (base->phi[j+1] - base->phi[j-1]) / (base->x_i12[j+1] - base->x_i12[j-1]); 
         else {
             

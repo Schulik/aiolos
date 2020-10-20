@@ -211,6 +211,7 @@ public:
     int timecount;
 
     IntegrationType order ;
+    int num_ghosts ;
     
     ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     //

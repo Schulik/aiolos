@@ -108,6 +108,9 @@ int main(int argc, char** argv)
     {
         std::cerr << "bad_alloc caught in main simulation block: " << ba.what() <<endl;
     }
+    catch(std::exception &e) {
+        cout << e.what() << endl;
+    }
     catch(...) {
         cout<<"Unknown error in initialization of main variables!"<<endl;
     }
