@@ -21,7 +21,7 @@
 // Compute pressure: The most important function for all kinds of applications inside the code.
 //                   Is also the location of the equation of state (EOS). This should be the only instance in the code where P and the conserved variables are connected.
 //
-void c_Species::compute_pressure() {
+void c_Species::compute_pressure(std::vector<AOS>& u) {
     
     //Pressure now defined also on ghost cells, so that the analytic fluxes can be computed there
     for(int i=0;i<=num_cells+1;i++) {

@@ -21,7 +21,7 @@
 bool run_test(std::string test_name, int suppress_warn=1, int debug=0) {
       
     try {
-        hydro_run test(test_name, debug);
+        c_Sim test(test_name, "test_files/hydrogen.spc", debug) ;
         test.set_suppress_warnings(suppress_warn);
 
         test.execute(); 

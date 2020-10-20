@@ -18,9 +18,9 @@ void c_Sim::execute() {
     const int maxsteps = 1e9;
     //double pressure_temp;
         
-    cout<<endl<<"Beginning main loop with num_cells="<<num_cells<<" and timestep="<<dt<<" cflfacotr="<<cflfactor<<" and num_species = "<<num_species<<endl;
+    cout<<endl<<"Beginning main loop with num_cells="<<num_cells<<" and timestep="<<dt<<" cflfactor="<<cflfactor<<" and num_species = "<<num_species<<endl;
     if(num_species == 0) 
-        cout<<"WARNING: No species specified! I cannot work like that."<<endl;
+        throw std::invalid_argument("WARNING: No species specified! I cannot work like that.") ;
     
     ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~////
     //                                                                         //
@@ -30,7 +30,7 @@ void c_Sim::execute() {
     for (globalTime = 0; (globalTime < t_max) && (steps < maxsteps); ) {
         
         for(int s = 0; s < num_species; s++)
-            species[s].compute_pressure();
+            species[s].compute_pressure(species[s].u);
         
         dt = get_cfl_timestep();
         
@@ -41,6 +41,7 @@ void c_Sim::execute() {
         if(debug >= 2)
             cout<<"Beginning timestep "<<steps<<endl;
         
+
         if(use_self_gravity==1)
             update_mass_and_pot();
         
@@ -73,12 +74,34 @@ void c_Sim::execute() {
         // Do all explicit and implicit operations for one timestep on the entire grid for all species
         //
         for(int s = 0; s < num_species; s++)
-            species[s].execute();
+            species[s].execute(species[s].u, species[s].dudt[0]);
         
-        if(num_species > 2)
-            compute_friction_step(); 
+        compute_friction_step(); 
+
+        if (order == IntegrationType::first_order) {
+            globalTime += dt ;
+        }
+        else if (order == IntegrationType::second_order) {
+            // 2nd step evaluated at t+dt
+            globalTime += dt ;
+
+            for(int s = 0; s < num_species; s++)
+                species[s].compute_pressure(species[s].u);
+
+            if(use_self_gravity==1)
+                update_mass_and_pot();
+
+            for(int s = 0; s < num_species; s++)
+                species[s].execute(species[s].u, species[s].dudt[1]);
+
+            for(int s = 0; s < num_species; s++)
+                for(int j = 0; j < num_cells+2; j++) {
+                    species[s].u[j] += (species[s].dudt[1][j] -  species[s].dudt[0][j])*dt / 2 ; 
+                }
+
+            //compute_friction_step(); 
+        }
         
-        globalTime += dt;
         steps++;
         
         if(steps==1)
@@ -114,21 +137,21 @@ void c_Sim::execute() {
 // Species::execute: This species very own riemann solution, before its modified globally by applying frictional forces
 //
 
-void c_Species::execute() {
+void c_Species::execute(std::vector<AOS>& u_in, std::vector<AOS>& dudt) {
     
-        if(use_rad_fluxes==1)
-            update_radiation();
+        if(base->use_rad_fluxes==1)
+            update_radiation(u_in);
         
         //
         // Step 1: Boundary values
         //
         //
   
-        apply_boundary_left() ;
-        apply_boundary_right() ;
+        apply_boundary_left(u_in) ;
+        apply_boundary_right(u_in) ;
         
         if(USE_WAVE==1) 
-                add_wave(base->globalTime, WAVE_PERIOD, WAVE_AMPLITUDE);
+            add_wave(u_in, base->globalTime);
         
         //if(steps==0)
         //    cout<<" initial ghost momentum after start: "<<left_ghost.u2<<endl;
@@ -136,7 +159,7 @@ void c_Species::execute() {
         if(debug >= 2)
             cout<<"Done."<<endl<<" Before compute pressure... ";
         
-        compute_pressure();
+        compute_pressure(u_in);
         
         if(debug >= 2)
             cout<<"Done. Starting fluxes."<<endl;
@@ -147,9 +170,9 @@ void c_Species::execute() {
         for(int j=1; j <= num_cells; j++) {
             
             if(j==1) 
-                flux[0] = hllc_flux(u[j-1], u[j], j-1, j); //Flux with ghost cell on left
+                flux[0] = hllc_flux(u_in[j-1], u_in[j], j-1, j); //Flux with ghost cell on left
             
-            flux[j] = hllc_flux(u[j], u[j+1], j, j+1); //Everything else is taken into account by the right flux
+            flux[j] = hllc_flux(u_in[j], u_in[j+1], j, j+1); //Everything else is taken into account by the right flux
 
             /*if(j==2) {
                 char alp;ms are which form of objects which have a velocity standard deviation comparable to their m
@@ -169,7 +192,7 @@ void c_Species::execute() {
             cout<<"Done. Starting sources."<<endl;
         
         for(int j=1; j<=num_cells; j++) {
-            source[j]          = source_grav(u[j], j);
+            source[j]          = source_grav(u_in[j], j);
             source_pressure[j] = AOS(0, -(base->source_pressure_prefactor_left[j] * pressure_l[j] - base->source_pressure_prefactor_right[j] * pressure_r[j])  ,0); 
         }
         
@@ -180,7 +203,7 @@ void c_Species::execute() {
         
         //#pragma omp simd
         for(int j=1; j<=num_cells; j++) {
-            u[j] = u[j] + (flux[j-1] * base->surf[j-1] - flux[j] * base->surf[j]) * base->dt / base->vol[j] + (source[j] + source_pressure[j]) * base->dt;
+            dudt[j] = (flux[j-1] * base->surf[j-1] - flux[j] * base->surf[j]) / base->vol[j] + (source[j] + source_pressure[j]) ;
             
             if( (debug > 0) && ( j==1 || j==num_cells || j==(num_cells/2) )) {
                 char alpha;
@@ -209,9 +232,9 @@ void c_Species::execute() {
         if(debug >= 2)
             cout<<" Before updating rad fluxes... ";
         
-        if(use_rad_fluxes) {
+        if(base->use_rad_fluxes) {
             for(int j=1; j<=num_cells; j++) {
-                u[j].u3 = u[j].u3 + (radiative_flux[j-1] - radiative_flux[j]); //Dummy physics for now
+                dudt[j].u3 = (radiative_flux[j-1] - radiative_flux[j]); //Dummy physics for now
             }
         }
         
