@@ -33,9 +33,9 @@ void c_Species::compute_pressure(std::vector<AOS>& u) {
         //TODO: Eliminate all other references in the code where the pressure is not computed via the EOS!
         
         if(i > 0)
-            pressure_l[i]      = get_p_hydrostatic_nonuniform(i,  -1);
+            pressure_l[i]      = get_p_hydrostatic_nonuniform(i, u[i],  -1);
         if(i < num_cells+1)
-            pressure_r[i]      = get_p_hydrostatic_nonuniform(i,  +1);
+            pressure_r[i]      = get_p_hydrostatic_nonuniform(i, u[i],  +1);
         
         internal_energy[i] = u[i].u3 / u[i].u1 - 0.5 * speed[i] * speed[i];
         temperature[i]     = internal_energy[i] / cv[i];

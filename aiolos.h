@@ -407,7 +407,7 @@ public:
     // Riemann solver and source functions
     //
     double get_p_hydrostatic(AOS &u, double &phi_l, double &phi_r, const int &i);
-    double get_p_hydrostatic_nonuniform(const int &i, const int &plusminus);
+    double get_p_hydrostatic_nonuniform(const int &i, AOS&, const int &plusminus);
     
     AOS analytic_flux(AOS &input_vec, const int &j);
     AOS hll_flux (AOS &leftvalue, AOS &rightvalue, const int &jleft, const int &jright);

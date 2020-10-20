@@ -113,14 +113,14 @@
     // takes:
     // returns:
     //
-    double c_Species::get_p_hydrostatic_nonuniform(const int &i, const int &plusminus) {
+    double c_Species::get_p_hydrostatic_nonuniform(const int &i, AOS& u, const int &plusminus) {
         
         double pfinal;
     
         if(plusminus == -1) {
-                pfinal = pressure[i] - base->dx[i] * base->omegaplus[i] * u[i].u1 * (base->phi[i-1] - base->phi[i]) / (base->dx[i-1] + base->dx[i]);
+                pfinal = pressure[i] - base->dx[i] * base->omegaplus[i] * u.u1 * (base->phi[i-1] - base->phi[i]) / (base->dx[i-1] + base->dx[i]);
         } else {
-                pfinal = pressure[i] - base->dx[i] * base->omegaminus[i] * u[i].u1 * (base->phi[i+1] - base->phi[i]) / (base->dx[i+1] + base->dx[i]);
+                pfinal = pressure[i] - base->dx[i] * base->omegaminus[i] * u.u1 * (base->phi[i+1] - base->phi[i]) / (base->dx[i+1] + base->dx[i]);
         }
             
         //if self.debug > 2:
@@ -130,7 +130,7 @@
             if(suppress_warnings == 0) {
                 cout<<"Warning: Negative pressure computed and replaced in nonuniform cell "<<i<<" at time= "<<base->globalTime<<" iter = "<<base->steps<<endl;
                 cout<<" cell "<<i<<" case /pm = "<<plusminus<<endl;
-                cout<<" u =  "<<u[i].u1<<"/"<<u[i].u2<<"/"<<u[i].u3<<endl;
+                cout<<" u =  "<<u.u1<<"/"<<u.u2<<"/"<<u.u3<<endl;
                 cout<<" phil-phir "<<(base->phi[i+plusminus] - base->phi[i])<<" p= "<<pressure[i]<<" pfinal= "<<pfinal<<endl;
                 char a ;
                 cin>>a;
