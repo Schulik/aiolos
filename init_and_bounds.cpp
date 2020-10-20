@@ -28,7 +28,12 @@ c_Sim::c_Sim(string filename, string speciesfile, int debug) {
         domain_min       = read_parameter_from_file<double>(filename,"PARI_DOMAIN_MIN", debug).value;
         domain_max       = read_parameter_from_file<double>(filename,"PARI_DOMAIN_MAX", debug).value;
         geometry = read_parameter_from_file<Geometry>(filename, "PARI_GEOMETRY", debug, Geometry::cartesian).value;
-        order = read_parameter_from_file<IntegrationType>(filename, "PARI_ORDER", debug, IntegrationType::first_order).value;
+        order = read_parameter_from_file<IntegrationType>(filename, "PARI_ORDER", debug, IntegrationType::second_order).value;
+
+        if (order == IntegrationType::first_order)
+            num_ghosts = 1 ;
+        else 
+            num_ghosts = 2 ;
 
         if(type_of_grid == 0) {
             num_cells        = (int)((domain_max - domain_min)/dx0);
@@ -95,6 +100,9 @@ c_Sim::c_Sim(string filename, string speciesfile, int debug) {
         // Simulation data: Grid and variables
         //
         ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        
+        // Increment num cells so that we have enough space for the ghosts
+        num_cells += 2*(num_ghosts-1) ;
 
         x_i        = np_zeros(num_cells+1);		//The cell boundaries
         x_i12      = np_zeros(num_cells+2);		//The cell mid positions
@@ -114,11 +122,11 @@ c_Sim::c_Sim(string filename, string speciesfile, int debug) {
         // Compute cell wall boundaries
         //         First and last two cells near boundaries are uniform
         //
-        x_i[0] = domain_min;
         if(type_of_grid==1) {
 
             double dlogx = pow(10.,1./cells_per_decade);
             
+            x_i[0] = domain_min / std::pow(dlogx, (num_ghosts-1)) ;
             for(int i=1; i<= num_cells; i++) {
                 x_i[i]   = x_i[i-1] * dlogx;
             }
@@ -130,7 +138,7 @@ c_Sim::c_Sim(string filename, string speciesfile, int debug) {
         }
         //Uniform grid
         else {
-            num_cells = (int)((domain_max-domain_min)/dx0);
+            x_i[0] = domain_min - dx0*(num_ghosts-1) ;
             for(int i=1; i<= num_cells; i++) {
                 x_i[i] = x_i[i-1] + dx0;
             }
@@ -192,8 +200,8 @@ c_Sim::c_Sim(string filename, string speciesfile, int debug) {
         dx[num_cells+1] = dx[num_cells]*dx[num_cells]/dx[num_cells-1];
         
         //Ghost cells
-        x_i12[0]           = domain_min - dx[0]/2 ;
-        x_i12[num_cells+1] = domain_max + dx[num_cells+1]/2; 
+        x_i12[0]           = x_i[0] - dx[0]/2 ;
+        x_i12[num_cells+1] = x_i[num_cells] + dx[num_cells+1]/2; 
         
         //
         // Grid generation done. Now do a few simple checks on the generated grid values
@@ -454,6 +462,9 @@ c_Species::c_Species(c_Sim *base_simulation, string filename, string species_fil
             WAVE_PERIOD    = read_parameter_from_file<double>(filename,"WAVE_PERIOD", debug).value; 
         }
         
+        // Apply boundary conditions
+        apply_boundary_left(u) ;
+        apply_boundary_right(u) ;
         
         if(debug > 0) cout<<"        Species["<<species_index<<"]: Init done."<<endl;
     
@@ -601,71 +612,89 @@ void c_Species::initialize_background(const AOS &background) {
 
 
 void c_Species::apply_boundary_left(std::vector<AOS>& u) {
-    double E_kinetic, pressure_active, pressure_bound ;
-    double dphi ;
+    double E_kinetic, pressure_active, pressure_bound, dphi ;
+    int num_ghosts = base->num_ghosts;
+    int Ncell = num_cells - 2*(num_ghosts-1) ; // Correct for fact we increased num_cells
     switch(boundary_left) {
         case BoundaryType::user:
             user_boundary_left(u);
             break;
         case BoundaryType::open:
-            u[0]            = u[1]; 
-            E_kinetic       = 0.5 * u[1].u2 * u[1].u2 / u[1].u1 ;
-            pressure_active = (gamma_adiabat[1]-1.) * (u[1].u3 - E_kinetic);
-            // Hydrostatic pressure extrapolation 
-            //pressure_bound = pressure_active - u[1].u1 * (base->phi[0] - base->phi[1]) ;
-            dphi = (base->phi[1] - base->phi[0]) / (base->dx[1] + base->dx[0]) ;
-            dphi *= (base->omegaplus[1]*base->dx[1] + base->omegaminus[0]*base->dx[0]) ;
-            pressure_bound = pressure_active +  u[1].u1 * dphi ;
-            pressure_bound = std::max(pressure_bound, 0.0) ;
-            u[0].u3        = pressure_bound/(gamma_adiabat[0]-1.) + E_kinetic ;
+            for (int i=num_ghosts; i > 0; i--) {
+                u[i-1]            = u[i]; 
+                E_kinetic       = 0.5 * u[i].u2 * u[i].u2 / u[i].u1 ;
+                pressure_active = (gamma_adiabat[i]-1.) * (u[i].u3 - E_kinetic);
+                // Hydrostatic pressure extrapolation 
+                dphi = (base->phi[i] - base->phi[i-1]) / (base->dx[i] + base->dx[i-1]) ;
+                dphi *= (base->omegaplus[i]*base->dx[i] + base->omegaminus[i-1]*base->dx[i-1]) ;
+                pressure_bound = pressure_active +  u[i].u1 * dphi ;
+                pressure_bound = std::max(pressure_bound, 0.0) ;
+                u[i-1].u3        = pressure_bound/(gamma_adiabat[i-1]-1.) + E_kinetic ;
+            }
             break ;
         case BoundaryType::reflecting:
-            u[0]     = u[1]; 
-            u[0].u2 *= -1;
-            base->phi[0]   = base->phi[1] ;
+            for (int i=0; i < num_ghosts; i++) {
+                int igh =  num_ghosts-1 -i;
+                int iact = num_ghosts   +i;
+                u[igh]     = u[iact]; 
+                u[igh].u2 *= -1;
+                base->phi[igh]   = base->phi[iact] ;
+            }
             break;
         case BoundaryType::fixed:
-            u[0]     = SHOCK_TUBE_UL;
+            for (int i=0; i < num_ghosts; i++)
+                u[i]     = SHOCK_TUBE_UL;
             break;
         case BoundaryType::periodic:
-            u[0]     = u[num_cells];
-            base->phi[0]   = base->phi[num_cells] ;
+            for (int i=0; i < num_ghosts; i++) {
+                int iact = Ncell + num_ghosts +i;
+                u[i] = u[iact];
+                base->phi[i]   = base->phi[iact] ;
+            }
             break;
     }
 }
 
 void c_Species::apply_boundary_right(std::vector<AOS>& u) {
-    double E_kinetic, pressure_active, pressure_bound ;
-    double dphi ;
-
+    double E_kinetic, pressure_active, pressure_bound, dphi ;
+    int num_ghosts = base->num_ghosts;
+    int Ncell = num_cells - 2*(num_ghosts-1) ;
     switch(boundary_right) {
         case BoundaryType::user:
             user_boundary_right(u);
-            user_boundary_right(u);
             break;
         case BoundaryType::open:
-            u[num_cells+1]    = u[num_cells]; 
-            E_kinetic         = 0.5 * u[num_cells].u2 * u[num_cells].u2 / u[num_cells].u1 ;
-            pressure_active   = (gamma_adiabat[num_cells]-1.) * (u[num_cells].u3 - E_kinetic);
-            // Hydrostatic pressure extrapolation 
-            //pressure_bound    = pressure_active - u[num_cells].u1 * (base->phi[num_cells+1] - base->phi[num_cells]) ;
-            dphi = (base->phi[num_cells+1] - base->phi[num_cells]) / (base->dx[num_cells] + base->dx[num_cells+1]) ;
-            dphi *= (base->omegaplus[num_cells+1]*base->dx[num_cells+1] + base->omegaminus[num_cells]*base->dx[num_cells]) ;
-            pressure_bound = pressure_active -  u[num_cells].u1 * dphi ;
-            pressure_bound    = std::max(pressure_bound, 0.0) ;
-            u[num_cells+1].u3 = pressure_bound / (gamma_adiabat[num_cells+1]-1.) + E_kinetic ;
+            for (int i=Ncell+num_ghosts; i < Ncell+2*num_ghosts; i++) {
+                u[i]    = u[i-1]; 
+                E_kinetic         = 0.5 * u[i-1].u2 * u[i-1].u2 / u[i-1].u1 ;
+                pressure_active   = (gamma_adiabat[i-1]-1.) * (u[i-1].u3 - E_kinetic);
+                // Hydrostatic pressure extrapolation 
+                dphi = (base->phi[i] - base->phi[i-1]) / (base->dx[i-1] + base->dx[i]) ;
+                dphi *= (base->omegaplus[i]*base->dx[i] + base->omegaminus[i-1]*base->dx[i-1]) ;
+                pressure_bound = pressure_active -  u[i-1].u1 * dphi ;
+                pressure_bound    = std::max(pressure_bound, 0.0) ;
+                u[i].u3 = pressure_bound / (gamma_adiabat[i]-1.) + E_kinetic ;
+            }
             break ;
         case BoundaryType::reflecting:
-            u[num_cells+1]     = u[num_cells]; 
-            u[num_cells+1].u2 *= -1;
-            base->phi[num_cells+1]   = base->phi[num_cells] ; //TODO: This will be called many times, too many!
+            for (int i=0; i < num_ghosts; i++) {
+                int iact = Ncell + num_ghosts-1 -i ;
+                int igh = Ncell + num_ghosts +i;
+                u[igh]     = u[iact]; 
+                u[igh].u2 *= -1;
+                base->phi[igh]   = base->phi[iact] ; //TODO: This will be called many times, too many!
+            }
             break;
         case BoundaryType::fixed:
-            u[num_cells+1]     = SHOCK_TUBE_UR;
+            for (int i=Ncell+ num_ghosts; i < Ncell+2*num_ghosts; i++)
+                u[i]     = SHOCK_TUBE_UR;
             break;
         case BoundaryType::periodic:
-            u[num_cells+1]     = u[1];
-            base->phi[num_cells+1]   = base->phi[1] ; //TODO: This will be called too many times!
+            for (int i=Ncell+num_ghosts; i < Ncell+2*num_ghosts; i++) {
+                int iact = num_ghosts + i;
+                u[i]     = u[iact];
+                base->phi[i]   = base->phi[iact] ; //TODO: This will be called too many times!
+            }
             break;
     }
 }
