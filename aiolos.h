@@ -400,8 +400,7 @@ public:
     // 
     // Riemann solver and source functions
     //
-    double get_p_hydrostatic(AOS &u, double &phi_l, double &phi_r, const int &i);
-    double get_dp_hydrostatic_nonuniform(const int &i, const int &plusminus);
+    double get_dp_hydrostatic(const int &i, const int &plusminus) ;
     void reconstruct_edge_states() ;
     
     AOS hllc_flux(int);

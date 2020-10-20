@@ -115,7 +115,7 @@
     // takes:
     // returns:
     //
-    double c_Species::get_dp_hydrostatic_nonuniform(const int &i, const int &plusminus) {
+    double c_Species::get_dp_hydrostatic(const int &i, const int &plusminus) {
         
         double dp_final;
     
