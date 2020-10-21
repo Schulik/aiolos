@@ -1,0 +1,41 @@
+#
+# Parameterfile for atmosphere simulations
+# Do not use tabs, only white spaces as value separators
+#
+
+#Control parameters
+PARI_PROBLEM_NUMBER     3
+#
+# Problem numbers explained: shock_tube, no grav = 1, planet with grav = 2
+#
+
+OUTPUT_FILENAME         test_files/soundwave_128
+
+PARI_SELF_GRAV_SWITCH   0
+PARI_LINEAR_GRAV        0
+PARI_DEBUGLEVEL         1
+PARI_INIT_STATIC        1
+PARI_ORDER              2
+PARI_GEOMETRY	        0
+
+#Numerical parameters
+PARI_BOUND_TYPE_LEFT    4
+PARI_BOUND_TYPE_RIGHT   4
+PARI_DOMAIN_DX          7.8125e-3
+PARI_GRID_TYPE          0
+PARI_DOMAIN_MIN         0.
+PARI_DOMAIN_MAX         1.
+PARI_TIME_DT            1e-3
+PARI_CFLFACTOR          0.9
+PARI_TIME_TMAX          3.0
+PARI_TIME_OUTPUT        3.0
+
+#Physical parameters
+PARI_PLANET_POS         0.
+PARI_PLANET_MASS        0.
+PARI_SMOOTHING_LENGTH   1e-3
+PARI_SMOOTHING_TIME     0.0
+PARI_GAMMA              1.4
+PARI_USE_RADIATION      0
+PARI_CONST_OPAC         1.
+PARI_CONST_CV           1.

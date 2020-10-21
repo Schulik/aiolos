@@ -22,8 +22,6 @@ c_Sim::c_Sim(string filename, string speciesfile, int debug) {
         //
         ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         double dx0;
-        dx0              = read_parameter_from_file<double>(filename,"PARI_DOMAIN_DX", debug).value;
-        cells_per_decade = read_parameter_from_file<double>(filename,"PARI_CELLS_PER_DECADE", debug).value;
         type_of_grid     = read_parameter_from_file<int>(filename,"PARI_GRID_TYPE", debug).value;
         domain_min       = read_parameter_from_file<double>(filename,"PARI_DOMAIN_MIN", debug).value;
         domain_max       = read_parameter_from_file<double>(filename,"PARI_DOMAIN_MAX", debug).value;
@@ -36,10 +34,12 @@ c_Sim::c_Sim(string filename, string speciesfile, int debug) {
             num_ghosts = 2 ;
 
         if(type_of_grid == 0) {
+            dx0              = read_parameter_from_file<double>(filename,"PARI_DOMAIN_DX", debug).value;
             num_cells        = (int)((domain_max - domain_min)/dx0);
             cout<<"Domain specifics:  "<<domain_min<<" | . . . "<<num_cells<<" uniform cells . . . | "<<domain_max<<endl;
         }
         else {
+            cells_per_decade = read_parameter_from_file<double>(filename,"PARI_CELLS_PER_DECADE", debug).value;
             num_cells        = (int) ( (log10f(domain_max) - log10f(domain_min)) * cells_per_decade );
             dx0              = domain_min;
             cout<<"Domain specifics:  "<<domain_min<<" | . .  .  "<<num_cells<<" nonuniform cells .       .             .     | "<<domain_max<<endl;
@@ -463,6 +463,9 @@ c_Species::c_Species(c_Sim *base_simulation, string filename, string species_fil
 
             if(debug > 0) cout<<"        Species["<<species_index<<"] initialized problem 2."<<endl;
         }
+        else if (base->problem_number == 3) {
+            initialize_sound_wave() ;
+        }
         else 
             initialize_default_test();
         
@@ -608,6 +611,25 @@ void c_Species::initialize_background(const AOS &background) {
         u[i] = background;
 }
 
+//
+void c_Species::initialize_sound_wave() {
+
+    double amp = 1e-6 ;
+    double rho0 = 1.0 ;
+    double cs = 1.0 * (base->domain_max - base->domain_min) ;
+    double p0 = rho0*cs*cs/(gamma_adiabat) ;
+
+
+    for(int i=0; i<=num_cells+1; i++) {
+        double kx = 2*M_PI * (i - base->num_ghosts) / double(num_cells - 2*(base->num_ghosts-1)) ;
+        double f = amp * std::sin(kx) ;
+
+        AOS_prim p (rho0 *(1 + f), cs*f, p0*(1 + gamma_adiabat*f)) ;
+        eos->compute_conserved(&p, &u[i], 1) ;
+    }
+
+}
+
 
 void c_Species::apply_boundary_left(std::vector<AOS>& u) {
     int num_ghosts = base->num_ghosts;
@@ -642,7 +664,7 @@ void c_Species::apply_boundary_left(std::vector<AOS>& u) {
             break;
         case BoundaryType::periodic:
             for (int i=0; i < num_ghosts; i++) {
-                int iact = Ncell + num_ghosts +i;
+                int iact = Ncell + i;
                 u[i] = u[iact];
                 base->phi[i]   = base->phi[iact] ;
             }
@@ -683,7 +705,7 @@ void c_Species::apply_boundary_right(std::vector<AOS>& u) {
             break;
         case BoundaryType::periodic:
             for (int i=Ncell+num_ghosts; i < Ncell+2*num_ghosts; i++) {
-                int iact = num_ghosts + i;
+                int iact = i - Ncell;
                 u[i]     = u[iact];
                 base->phi[i]   = base->phi[iact] ; //TODO: This will be called too many times!
             }

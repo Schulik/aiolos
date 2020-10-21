@@ -1,3 +1,4 @@
+#include <iomanip>
 #include <sstream>
 #include <stdexcept>
 #include "aiolos.h"
@@ -302,7 +303,8 @@ void c_Species::print_AOS_component_tofile(int timestepnumber) {
         cout<<"Trying to open file "<<filename<<endl;
     
     ofstream outfile(filename, ios::out);
-    
+    outfile << std::setprecision(15) ;
+
     if (outfile.is_open())
     {
         //outfile.precision(16);

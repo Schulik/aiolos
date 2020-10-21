@@ -33,6 +33,7 @@ void c_Sim::execute() {
             species[s].compute_pressure(species[s].u);
         
         dt = get_cfl_timestep();
+        dt = std::min(dt, t_max - globalTime) ;
         
         //
         // Step 0: Update gravity. Important for self-gravity and time-dependent smoothing length

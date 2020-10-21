@@ -390,6 +390,7 @@ public:
     void initialize_space_test(AOS background);
     void initialize_custom_setup();
     void initialize_hydrostatic_atmosphere();
+    void initialize_sound_wave();
     
     ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     //

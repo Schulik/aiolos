@@ -45,8 +45,14 @@ int main()
     count += !run_test("test_files/shock_tube6.par") ;
     count += !run_test("test_files/shock_tube7.par") ;
 
+    count += !run_test("test_files/soundwave_32.par") ;
+    count += !run_test("test_files/soundwave_64.par") ;
+    count += !run_test("test_files/soundwave_128.par") ;
+    count += !run_test("test_files/soundwave_256.par") ;
+
     count += !run_test("test_files/planet_cartesian.par") ;
     count += !run_test("test_files/planet_spherical.par") ;
+
     
     return count ;
 }

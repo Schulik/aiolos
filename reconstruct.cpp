@@ -2,11 +2,11 @@
 #include "aiolos.h"
 
 double MonotonizedCentralSlope(double ql, double qm, double qr, 
-                                      double cF=2, double cB=2) {
+                               double cF=2, double cB=2, double dxF=1, double dxB=1) {
     // From Mignone's reconstruction paper
 
-    double dF = (qr - qm);
-    double dB = (qm - ql);
+    double dF = (qr - qm) / dxF ;
+    double dB = (qm - ql) / dxB ;
 
     if (dF*dB < 0)
         return 0 ;
@@ -60,28 +60,31 @@ void c_Species::reconstruct_edge_states() {
             double cF = (x_iVC[i+1] - x_iVC[i]) / (x_i[i] - x_iVC[i]) ;
             double cB = (x_iVC[i] - x_iVC[i-1]) / (x_iVC[i] - x_i[i-1]) ;
 
+            double dxF = (x_iVC[i+1] - x_iVC[i]) ;
+            double dxB = (x_iVC[i] - x_iVC[i-1]) ;
+
             // Pressure perturbation
             double slope ;
             slope = MonotonizedCentralSlope(
-                prim[i-1].pres - dp_l, prim[i].pres, prim[i+1].pres - dp_r, cF, cB) ;
+                prim[i-1].pres - dp_l, prim[i].pres, prim[i+1].pres - dp_r, cF, cB, dxF, dxB) ;
 
-            prim_l[i].pres += slope * (x_i[i-1] - x_iVC[i]) / dx[i] ; 
-            prim_r[i].pres += slope * (x_i[ i ] - x_iVC[i]) / dx[i] ;
+            prim_l[i].pres += slope * (x_i[i-1] - x_iVC[i]) ; 
+            prim_r[i].pres += slope * (x_i[ i ] - x_iVC[i]) ;
 
 
             // Density
             slope = MonotonizedCentralSlope(
-                prim[i-1].density, prim[i].density, prim[i+1].density, cF, cB) ;
+                prim[i-1].density, prim[i].density, prim[i+1].density, cF, cB, dxF, dxB) ;
 
-            prim_l[i].density += slope * (x_i[i-1] - x_iVC[i]) / dx[i] ; 
-            prim_r[i].density += slope * (x_i[ i ] - x_iVC[i]) / dx[i] ;
+            prim_l[i].density += slope * (x_i[i-1] - x_iVC[i]) ; 
+            prim_r[i].density += slope * (x_i[ i ] - x_iVC[i]) ;
 
             // Speed
             slope = MonotonizedCentralSlope(
-                prim[i-1].speed, prim[i].speed, prim[i+1].speed, cF, cB) ;
+                prim[i-1].speed, prim[i].speed, prim[i+1].speed, cF, cB, dxF, dxB) ;
 
-            prim_l[i].speed += slope * (x_i[i-1] - x_iVC[i]) / dx[i] ; 
-            prim_r[i].speed += slope * (x_i[ i ] - x_iVC[i]) / dx[i] ;
+            prim_l[i].speed += slope * (x_i[i-1] - x_iVC[i]) ; 
+            prim_r[i].speed += slope * (x_i[ i ] - x_iVC[i]) ;
             
             if ((prim_l[i].pres < 0) || (prim_r[i].pres < 0) || 
                 (prim_l[i].density < 0) || (prim_r[i].density < 0))
