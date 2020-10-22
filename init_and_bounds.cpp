@@ -476,14 +476,14 @@ void c_Species::initialize_hydrostatic_atmosphere() {
     
     if(debug > 0) cout<<"            ATTENTION: Initializing hydrostatic construction for species "<<name<<" and overwriting prior initial values."<<endl;
     
-    long double temp_rhofinal;
-    long double factor_inner, factor_outer;
+    double temp_rhofinal;
+    double factor_inner, factor_outer;
     //long double factor_grav;
     //long double delta_phi;
-    long double T_inner;
-    long double T_outer;
-    long double metric_inner;
-    long double metric_outer;
+    double T_inner;
+    double T_outer;
+    double metric_inner;
+    double metric_outer;
     //
     // Start with the outermost cell and build up a hydrostatic atmosphere
     // Fulfilling KKM16, Eqn. 17
@@ -513,8 +513,12 @@ void c_Species::initialize_hydrostatic_atmosphere() {
         T_outer = prim[i+1].temperature ;
         T_inner = prim[i].temperature ;
 
-        factor_outer = (gamma_adiabat-1.) * cv * T_outer; //TODO: Replace with T_outer for non-isothermal EOS
-        factor_inner = (gamma_adiabat-1.) * cv * T_inner; //TODO: Replace with T_inner for non-isothermal EOS
+        factor_outer = (gamma_adiabat-1.) * cv * T_outer; 
+        factor_inner = (gamma_adiabat-1.) * cv * T_inner; 
+        
+        eos->get_p_over_rho_analytic(&T_outer, &factor_outer);
+        eos->get_p_over_rho_analytic(&T_inner, &factor_inner);
+        
         metric_outer = (base->phi[i+1] - base->phi[i]) * base->omegaplus[i+1] * base->dx[i+1] / (base->dx[i+1] + base->dx[i]);
         metric_inner = (base->phi[i+1] - base->phi[i]) * base->omegaminus[i]  * base->dx[i]   / (base->dx[i+1] + base->dx[i]);
         

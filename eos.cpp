@@ -30,6 +30,17 @@ void Adiabatic_EOS::compute_auxillary(AOS_prim* prim, int num_cells) const {
     }
 }
 
+void Adiabatic_EOS::get_p_over_rho_analytic(const double* temperature, double* returnval) const {
+    
+    *returnval = *temperature * (_gamma-1.) * _cv ;
+}
+
+void Adiabatic_EOS::get_p_from_rhoT(const double* density,const double* temperature, double* pressure) const {
+    
+    *pressure = *density * *temperature * (_gamma-1.) * _cv;
+    
+}
+
 /////
 ///// Polytropic Equation of state
 /////
@@ -55,4 +66,15 @@ void Polytropic_EOS::compute_auxillary(AOS_prim* prim, int num_cells) const {
         prim[i].sound_speed = std::sqrt(_gamma*(_gamma-1)*prim[i].internal_energy) ;
         prim[i].temperature = prim[i].internal_energy / _cv ;
     }
+}
+
+void Polytropic_EOS::get_p_over_rho_analytic(const double* temperature, double* returnval) const {
+    
+    *returnval = 0. *  *temperature;
+}
+
+void Polytropic_EOS::get_p_from_rhoT(const double* density,const double* temperature, double* pressure) const {
+    
+    *pressure = *density * *temperature * 0.;
+    
 }

@@ -11,7 +11,9 @@ class EOS_Base {
     virtual void compute_primitive(const AOS*, AOS_prim*, int) const = 0;
     virtual void compute_conserved(const AOS_prim*, AOS*, int) const = 0 ;
     virtual void compute_auxillary(AOS_prim*, int) const = 0;
-
+    virtual void get_p_over_rho_analytic(const double*, double*) const = 0;
+    virtual void get_p_from_rhoT(const double*,const double*, double*) const = 0;
+    
     // Base classes must have virtual destructors
     virtual ~EOS_Base(){} ; 
 } ;
@@ -26,7 +28,9 @@ class Adiabatic_EOS final: public EOS_Base {
     void compute_primitive(const AOS*, AOS_prim*, int) const ;
     void compute_conserved(const AOS_prim*, AOS*, int) const ;
     void compute_auxillary(AOS_prim*, int) const ;
-
+    void get_p_over_rho_analytic(const double*, double*) const ;
+    void get_p_from_rhoT(const double*,const double*, double*) const;
+    
   private:
     double _gamma, _cv ;
 } ;
@@ -41,7 +45,9 @@ class Polytropic_EOS final: public EOS_Base {
     void compute_primitive(const AOS*, AOS_prim*, int) const ;
     void compute_conserved(const AOS_prim*, AOS*, int) const ;
     void compute_auxillary(AOS_prim*, int) const ;
-
+    void get_p_over_rho_analytic(const double*, double*) const ;
+    void get_p_from_rhoT(const double*,const double*, double*) const;
+    
   private:
     double _gamma, _cv, _K0 ;
 } ;
