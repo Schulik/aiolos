@@ -11,6 +11,7 @@
 #include <vector>
 #include <math.h>
 #include <type_traits>
+#include <gsl/gsl_sf_lambert.h>
 #include "advection.h"
 #include "source.h"
 
@@ -247,7 +248,7 @@ public:
     //
     ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     
-    
+    int init_wind;
     double mdot;
     double T_increment;
     
@@ -323,6 +324,7 @@ public:
     BoundaryType boundary_right;
     int num_cells;
     int debug;
+    
 
     ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     //
@@ -339,7 +341,10 @@ public:
     std::vector<AOS> source;         // Gravitational source term
     std::vector<AOS> source_pressure;// Geometric source term
     std::vector<AOS> flux;
-
+    std::vector<double> u_analytic;
+    
+    double density_excess;
+    double bondi_radius;
     
     double const_T_space;
     double const_opacity;
@@ -391,6 +396,7 @@ public:
     void initialize_custom_setup();
     void initialize_hydrostatic_atmosphere();
     void initialize_sound_wave();
+    void compute_analytic_slution();
     
     ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     //

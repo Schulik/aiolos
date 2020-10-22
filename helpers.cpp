@@ -53,6 +53,9 @@ double c_Sim::get_cfl_timestep() {
 
 
 
+
+
+
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 //
 // Helper functions
@@ -156,6 +159,8 @@ void c_Species::read_species_data(string filename, int species_index) {
                 this->cv               = std::stod(stringlist[4]);
                 this->gamma_adiabat    = std::stod(stringlist[5]);
                 this->initial_fraction = std::stod(stringlist[6]);
+                if(base->init_wind==1) 
+                    this->density_excess   = std::stod(stringlist[7]);
                 
                 if(debug > 0)
                     cout<<"Found species called "<<name<<" with a mass of "<<mass_amu<<" cv "<<cv<<" gamma "<<gamma_adiabat<<" and zeta_0 = "<<initial_fraction<<endl;
@@ -280,7 +285,13 @@ template simulation_parameter<IntegrationType> read_parameter_from_file(string, 
 
 //Print 2 
 void c_Species::print_AOS_component_tofile(int timestepnumber) {
-                                              
+                           
+    //
+    // If we are computing winds, compute the analytic solution for outputting it
+    //
+    if(base->init_wind==1) 
+        compute_analytic_slution();
+    
     // Choose a sensible default output name
     string filename ;
     {
@@ -325,7 +336,7 @@ void c_Species::print_AOS_component_tofile(int timestepnumber) {
             
             //flux[i] - flux[i+1] + source[i]
             
-            outfile<<base->x_i12[i]<<'\t'<<u[i].u1<<'\t'<<u[i].u2<<'\t'<<u[i].u3<<'\t'<<flux[i].u1<<'\t'<<flux[i].u2<<'\t'<<flux[i].u3<<'\t'<<((flux[i-1].u1 - flux[i].u1)/base->dx[i] + source[i].u1)<<'\t'<<((flux[i-1].u2 - flux[i].u2)/base->dx[i] + source[i].u2)<<'\t'<<((flux[i-1].u3 - flux[i].u3)/base->dx[i] + source[i].u3)<<'\t'<<prim[i].pres<<'\t'<<u[i].u2/u[i].u1<<'\t'<<prim[i].internal_energy <<'\t'<<timesteps[i]<<'\t'<<base->phi[i]<<'\t'<<timesteps_cs[i]<<'\t'<<opticaldepth[i]<<'\t'<<hydrostat<<'\t'<<hydrostat2<<'\t'<<hydrostat3<<'\t'<<base->enclosed_mass[i]<<endl;
+            outfile<<base->x_i12[i]<<'\t'<<u[i].u1<<'\t'<<u[i].u2<<'\t'<<u[i].u3<<'\t'<<flux[i].u1<<'\t'<<flux[i].u2<<'\t'<<flux[i].u3<<'\t'<<((flux[i-1].u1 - flux[i].u1)/base->dx[i] + source[i].u1)<<'\t'<<((flux[i-1].u2 - flux[i].u2)/base->dx[i] + source[i].u2)<<'\t'<<((flux[i-1].u3 - flux[i].u3)/base->dx[i] + source[i].u3)<<'\t'<<prim[i].pres<<'\t'<<u[i].u2/u[i].u1<<'\t'<<prim[i].internal_energy <<'\t'<<timesteps[i]<<'\t'<<base->phi[i]<<'\t'<<timesteps_cs[i]<<'\t'<<opticaldepth[i]<<'\t'<<u_analytic[i]<<'\t'<<hydrostat2<<'\t'<<hydrostat3<<'\t'<<base->enclosed_mass[i]<<endl;
         }
         
         //Print right ghost stuff
@@ -338,3 +349,36 @@ void c_Species::print_AOS_component_tofile(int timestepnumber) {
     
  
 }
+
+
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+//
+// Compute analytic solution to the wind problem
+//
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+void c_Species::compute_analytic_slution() {
+    
+    cout<<"In compute_analytic_solution."<<endl;
+    
+    for(int i=1;i<=num_cells;i++) {
+        
+        double press  = prim[i].pres;  
+        double cs     = prim[num_cells].sound_speed;
+        bondi_radius  = base->planet_mass/(2.*cs*cs);
+        double rrc    = base->x_i12[i]/bondi_radius;
+        double D      = pow(rrc,-4.) * std::exp(4.*(1.-1./rrc)-1. );
+        
+        if(base->x_i12[i] < bondi_radius) {
+            u_analytic[i] = cs * std::sqrt( - gsl_sf_lambert_W0(-D) ); 
+        }
+        else {
+            
+            u_analytic[i] = cs * std::sqrt( - gsl_sf_lambert_Wm1(-D) ); 
+        }
+    
+    
+    }
+    
+}
+

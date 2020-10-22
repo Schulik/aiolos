@@ -1,7 +1,7 @@
 CXX = g++ -std=c++17
 CPPFLAGS =      # put pre-processor settings (-I, -D, etc) here
 CXXFLAGS = -Wall -Wextra #-pg or -g put compiler settings here
-LDFLAGS = -lm -flto      # put linker settings here
+LDFLAGS = -lgsl -lgslcblas -lm -flto      # put linker settings here
 BFLAGS = -I. -O3 -g -flto #-pg or -g
 
 PROBLEM=default

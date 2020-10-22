@@ -77,6 +77,7 @@ c_Sim::c_Sim(string filename, string speciesfile, int debug) {
         use_self_gravity  = read_parameter_from_file<int>(filename,"PARI_SELF_GRAV_SWITCH", debug, 0).value;
         use_linear_gravity= read_parameter_from_file<int>(filename,"PARI_LINEAR_GRAV", debug, 0).value;
         use_rad_fluxes    = read_parameter_from_file<int>(filename,"PARI_USE_RADIATION", debug, 0).value;
+        init_wind         = read_parameter_from_file<int>(filename,"PARI_INIT_WIND", debug, 0).value;
         if(problem_number==2) {
             
             planet_mass     = read_parameter_from_file<double>(filename,"PARI_PLANET_MASS", debug, 1).value; //in Earth masses
@@ -373,7 +374,7 @@ c_Species::c_Species(c_Sim *base_simulation, string filename, string species_fil
         opacity        = np_somevalue(num_cells+2, const_opacity);
         opticaldepth   = np_zeros(num_cells+2);
         radiative_flux = np_zeros(num_cells+1);
-
+        u_analytic     = np_zeros(num_cells+2);
        
 
         prim   = std::vector<AOS_prim>(num_cells+2); //Those helper quantities are also defined on the ghost cells, so they get +2
@@ -434,23 +435,8 @@ c_Species::c_Species(c_Sim *base_simulation, string filename, string species_fil
             
             //Conversion from shock tube parameters (given as dens, velocity, pressure) to conserved variables (dens, momentum, internal energy)
             //BACKGROUND_U = AOS(u1, u1*u2, 0.5*u1*u2*u2 + u3/(gamma_adiabat[0]-1.) );
-            AOS_prim p(u1 * initial_fraction, u2, u3) ;
-            eos->compute_conserved(&p, &BACKGROUND_U, 1) ;
-
-            /* mdot boundaries
-             * needs fixing... Should just be specified as a BoundaryType::fixed boundary
-            if(boundaries_number == 3) {
-                mdot = read_parameter_from_file<double>(filename,"ACCRETION_RATE", debug).value; //Accretion rate in numerical units
-    
-                double rho0 = BACKGROUND_U.u1;
-                double e0   = BACKGROUND_U.u3 - 0.5 * BACKGROUND_U.u2 * BACKGROUND_U.u2 / rho0;
-    
-                SHOCK_TUBE_UR = AOS(rho0, -mdot, e0 + 0.5 * mdot * mdot / rho0 );
-
-                boundary_left = BoundaryType::reflecting ;
-                boundary_right = BoundaryType::fixed ;
-            }
-            */
+            AOS_prim p(u1 * initial_fraction, u2, u3);
+            eos->compute_conserved(&p, &BACKGROUND_U, 1);
             
             initialize_background(BACKGROUND_U);
             
@@ -511,7 +497,7 @@ void c_Species::initialize_hydrostatic_atmosphere() {
             //temperature[i] = planet_mass / x_i12[i] / (cv * gamma_adiabat) + 1.;
             prim[i].temperature = - 1.0 * base->phi[i] / (cv * gamma_adiabat) + const_T_space;
             //temperature[i] = 100.;
-        
+            
             //Add temperature bumps and troughs
             prim[i].temperature += TEMPERATURE_BUMP_STRENGTH * 4.  * exp( - pow(base->x_i12[i] - 1.e-1 ,2.) / (0.1) );
             prim[i].temperature -= TEMPERATURE_BUMP_STRENGTH * 15. * exp( - pow(base->x_i12[i] - 7.e-3 ,2.) / (1.5e-3) );
@@ -564,9 +550,33 @@ void c_Species::initialize_hydrostatic_atmosphere() {
             cin>>a;
         }
     }
+  
+    compute_pressure(u);
+    
+    //
+    // Apply multiplicators for over/underdensities just below and above the sonic point
+    //
+    if(base->init_wind==1) {
+        double csi              = prim[1].sound_speed;
+        double smoothed_factor;
+        bondi_radius = base->planet_mass / (pow(csi,2.)); //Most restrictive sonic point, as we are not quite isothermal
+    
+        for( int i = 1; i < num_cells + 1; i++) {
+            smoothed_factor = density_excess * (1./(1.+std::exp(-(base->x_i12[i] - bondi_radius)/(0.01 * bondi_radius )) ) ); 
+            
+            u[i].u1 = u[i].u1 * (1. + smoothed_factor);
+            
+            u[i].u3 = u[i].u3 * (1. + smoothed_factor);
+            if(i==1)
+                cout<<"In initwind: First smoothed factor = "<<smoothed_factor<<endl;
+        }
+        
+        cout<<"            Ended hydrostatic construction for species "<<name<<", last smoothed factor was "<<smoothed_factor<<" while  density_excess="<<density_excess<<" r_b="<<bondi_radius<<endl;
+    }
+    else
+        cout<<"            Ended hydrostatic construction for species "<<name<<endl;
     
     
-    cout<<"            Ended hydrostatic construction for species "<<name<<endl;
     //TODO:Give some measure if hydrostatic construction was also successful, and give warning if not.
 
 }

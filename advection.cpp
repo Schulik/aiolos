@@ -263,8 +263,6 @@ AOS c_Species::hllc_flux(int j)
     //Speed of shocks
     double SL = ul - prim_r[jleft].sound_speed ;
     double SR = ur + prim_l[jright].sound_speed ;
-
-
     
     //Intermediate values in the star region, equations 10.30 -10.39 in Toro
     double SS     = ( pr-pl+mom_l*(SL - ul)-mom_r*(SR-ur) )/(dl*(SL - ul)-dr*(SR-ur) );
