@@ -4,10 +4,14 @@ CXXFLAGS = -Wall -Wextra #-pg or -g put compiler settings here
 LDFLAGS = -lm -flto      # put linker settings here
 BFLAGS = -I. -O3 -g -flto #-pg or -g
 
+PROBLEM=default
+
 ##SRC = main.cpp advection.cpp source.cpp
 SRC = $(wildcard *.cpp)
+SRC += problems/$(PROBLEM).cpp
 OBJ = $(SRC:.cpp=.o)
 INC = $(SRC:.cpp=.h)
+
 
 TEST_OBJ = $(subst main.o, test_files/main.o, $(OBJ))
 
@@ -32,4 +36,4 @@ tests: $(TEST_OBJ) makefile aiolos.h
 	cd test_files ; python test_steady_state.py
 
 clean:
-	rm *.o test_files/*.o
+	rm -f *.o test_files/*.o problems/*.o
