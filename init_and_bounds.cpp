@@ -56,10 +56,11 @@ c_Sim::c_Sim(string filename, string speciesfile, int debug) {
             
         if(debug > 0) cout<<"Init: Finished reading grid parameters."<<endl;
         
-        //dt          = read_parameter_from_file<double>(filename,"PARI_TIME_DT", debug).value;
+        
         cflfactor   = read_parameter_from_file<double>(filename,"PARI_CFLFACTOR", debug, 1.).value;
         t_max       = read_parameter_from_file<double>(filename,"PARI_TIME_TMAX", debug).value;
         output_time = read_parameter_from_file<double>(filename,"PARI_TIME_OUTPUT", debug).value; 
+        monitor_time = read_parameter_from_file<double>(filename,"PARI_TIME_DT", debug).value;
         globalTime = 0.0;    
         timecount = 0;
         
@@ -78,6 +79,13 @@ c_Sim::c_Sim(string filename, string speciesfile, int debug) {
         use_linear_gravity= read_parameter_from_file<int>(filename,"PARI_LINEAR_GRAV", debug, 0).value;
         use_rad_fluxes    = read_parameter_from_file<int>(filename,"PARI_USE_RADIATION", debug, 0).value;
         init_wind         = read_parameter_from_file<int>(filename,"PARI_INIT_WIND", debug, 0).value;
+        alpha_collision   = read_parameter_from_file<int>(filename,"PARI_ALPHA_COLL", debug, 0).value;
+        
+        if(problem_number == 2)
+            monitor_output_index = num_cells/2; //TODO: Replace with index of sonic radius for dominant species?
+        else
+            monitor_output_index = 1;
+        
         if(problem_number==2) {
             
             planet_mass     = read_parameter_from_file<double>(filename,"PARI_PLANET_MASS", debug, 1).value; //in Earth masses
@@ -408,6 +416,13 @@ c_Species::c_Species(c_Sim *base_simulation, string filename, string species_fil
             double u3r = read_parameter_from_file<double>(filename,"PARI_INIT_DATA_U3R", debug, 0.1).value;
             
             SHOCK_TUBE_MID = read_parameter_from_file<double>(filename,"PARI_INIT_SHOCK_MID", debug, 0.5).value;
+            
+            //If we test friction, set species=2 velocity to zero
+            if(base->num_species == 2 && species_index == 1) {
+                u2l = 0.;
+                u2r = 0.;
+            }
+            
             
             //Conversion from shock tube parameters (given as dens, velocity, pressure) to conserved variables (dens, momentum, internal energy)
             AOS_prim pl(u1l, u2l, u3l) ;

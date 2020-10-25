@@ -15,6 +15,7 @@ void c_Sim::execute() {
      
     steps = 0;
     double output_counter = 0;
+    double monitor_counter= 0;
     const int maxsteps = 1e9;
     //double pressure_temp;
         
@@ -54,12 +55,14 @@ void c_Sim::execute() {
         // zeroth output has the initialized conserved values, but already the first fluxes.
         //
         
-        //TODO: DO for all species...
          if(steps==0) {
-             for(int s=0; s<num_species; s++)
+             for(int s=0; s<num_species; s++) {
                 species[s].print_AOS_component_tofile((int) output_counter);
-             
-             output_counter+=1.;
+                species[s].print_monitor();
+            }
+                
+             monitor_counter+=1.;
+             output_counter +=1.;
          }
          if(globalTime > output_counter*output_time){
              if(debug >= 1)
@@ -70,14 +73,29 @@ void c_Sim::execute() {
              
              output_counter+=1.; 
          }
+         if(globalTime > monitor_counter*monitor_time) {
+             for(int s=0; s<num_species; s++) 
+                species[s].print_monitor();
+            
+             monitor_counter += 1.;
+        }
          
+        ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~////
         //
+        // Proper start
         // Do all explicit and implicit operations for one timestep on the entire grid for all species
         //
+        ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~////
         for(int s = 0; s < num_species; s++)
             species[s].execute(species[s].u, species[s].dudt[0]);
         
-        compute_friction_step(); 
+        // Just do the basic update here
+        for(int s=0; s < num_species; s++) {
+            for(int j=0; j < num_cells+1; j++)
+                species[s].u[j] = species[s].u[j] + species[s].dudt[0][j]*dt ;
+        }
+        
+        //compute_friction_step(); 
 
         if (order == IntegrationType::first_order) {
             globalTime += dt ;
@@ -95,6 +113,7 @@ void c_Sim::execute() {
             for(int s = 0; s < num_species; s++)
                 for(int j = 0; j < num_cells+2; j++) {
                     species[s].u[j] += (species[s].dudt[1][j] -  species[s].dudt[0][j])*dt / 2 ; 
+                    
                 }
 
             //compute_friction_step(); 
@@ -115,8 +134,11 @@ void c_Sim::execute() {
     //Print successful end result
     cout<<"Finished at time="<<globalTime<<" after steps="<<steps<<" with num_cells="<<num_cells<<endl;
     
-    for(int s=0; s<num_species; s++)
+    for(int s=0; s<num_species; s++) {
         species[s].print_AOS_component_tofile(-666);
+        species[s].print_monitor();
+    }
+        
 }
 
 
@@ -168,7 +190,7 @@ void c_Species::execute(std::vector<AOS>& u_in, std::vector<AOS>& dudt) {
         //
         for(int j=0; j <= num_cells; j++) {
             
-            flux[j] = hllc_flux(j); //Everything else is taken into account by the right flux
+            flux[j] = hllc_flux(j); 
 
             /*if(j==2) {
                 char alp;ms are which form of objects which have a velocity standard deviation comparable to their m

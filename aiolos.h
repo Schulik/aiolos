@@ -219,9 +219,11 @@ public:
     double t_max;
     double globalTime;
     double output_time;
+    double monitor_time;
     double max_snd_crs_time;
     int steps;
     int timecount;
+    int monitor_output_index;
 
     IntegrationType order ;
     int num_ghosts ;
@@ -251,6 +253,7 @@ public:
     int init_wind;
     double mdot;
     double T_increment;
+    double alpha_collision;
     
     ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     //
@@ -451,6 +454,7 @@ public:
     
     int suppress_warnings;
     void print_AOS_component_tofile(int timestepnumber);
+    void print_monitor();
     
     void read_species_data(string filename, int species_index);
     void set_debug(int);

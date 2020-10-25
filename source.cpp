@@ -194,17 +194,51 @@
     void c_Sim::compute_friction_step() {
 
         // Just do the basic update here
-        for(int s=0; s < num_species; s++) {
-            for(int j=0; j < num_cells+1; j++)
-                species[s].u[j] = species[s].u[j] + species[s].dudt[0][j]*dt ;
-        }
+        //for(int s=0; s < num_species; s++) {
+        //    for(int j=0; j < num_cells+1; j++)
+        //        species[s].u[j] = species[s].u[j] + species[s].dudt[0][j]*dt ;
+        //}
         
-        //Dummy function so far
-        /*
         
         if(num_species == 2) {
+            
+            if(debug > 0) cout<<"in friction, pos1"<<endl;
 
             //Apply analytic solutions ...
+            double alpha=0, eps=0, f1=0, f2=0;
+            double v1b=0, v2b=0, v1a=0, v2a=0, dv1=0, dv2=0;
+            
+            for(int j=0; j <= num_cells+1; j++){
+                
+                v1b = species[0].prim[j].speed;
+                v2b = species[1].prim[j].speed;
+                
+                alpha = alpha_collision; // (f[0]+f[1])/(mu0*f[0]+mu1*f[1]) * k_b T/(m_i * b_i)
+                eps   = species[0].u[j].u1 / species[1].u[j].u1;
+                f1    = 1. + dt*eps*alpha - dt*dt*alpha*alpha*eps;
+                f2    = dt*alpha / (1. + dt * alpha);
+                
+                v2a    = (v2b + v1b * f2 ) / f1;
+                v1a    = v1b - (v2a - v2b) / eps;
+                
+                species[0].prim[j].speed = v1a;
+                species[1].prim[j].speed = v2a;
+            }
+            
+            if(debug > 0) cout<<"in friction, pos2"<<endl;
+            
+            for(int s=0; s<num_species; s++)
+                species[s].eos->compute_conserved(&(species[s].prim[0]), &(species[s].u[0]), num_cells+2);        
+            
+            if(debug > 0) {
+                char a;
+                double dekin1 = 0.5*species[0].u[num_cells+1].u1 * (v1a - v1b) * (v1a - v1b) ; 
+                double dekin2 = 0.5*species[1].u[num_cells+1].u1 * (v2a - v2b) * (v2a - v2b) ;
+                double dvrel1 = (v1a - v1b)/v1b;
+                double dvrel2 = (v2a - v2b)/v2b;
+                cout<<"Relative differences in velocities 1/2 = "<<dvrel1<<" / "<<dvrel2<<" differences in Ekin = "<<dekin1<<" / "<<dekin2<<endl;
+                cin>>a;
+            }
         
         }
         else {
@@ -213,10 +247,10 @@
             
             //Iterate
             
-            for(int s = 0; s < num_species; s++)
+            //for(int s = 0; s < num_species; s++)
                 //Add results to momenta to obtain new momenta
             
         }
-        */
+        
         
     }

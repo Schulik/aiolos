@@ -347,9 +347,54 @@ void c_Species::print_AOS_component_tofile(int timestepnumber) {
     else cout << "Unable to open file" << filename << endl; 
     outfile.close();
     
+    
  
 }
 
+void c_Species::print_monitor() {
+
+    
+    //
+    //
+    // Open and write into the monitor file - the file monitoring quantitiess as function of time, not space
+    //
+    //
+    
+    string filename2 ;
+    {
+        stringstream filenamedummy;
+        string truncated_name = stringsplit(base->simname,".")[0];
+        //filenamedummy<<"monitor_"<<"_"<<truncated_name<<"_"<<name<<".dat"; //Do we want one monitor per species or one for all? I guess it depends.
+        filenamedummy<<"monitor_"<<truncated_name<<".dat";
+        filename2 = filenamedummy.str() ;
+    }
+    
+    //
+    // Delete old file if we start a new one
+    //
+    if(base->steps==0 && this_species_index == 0) 
+        ofstream monitor(filename2);
+        
+    ofstream monitor(filename2, std::ios_base::app);
+    monitor << std::setprecision(15);
+    
+    if(monitor.is_open()){
+        
+        if(this_species_index==0)
+            monitor<<base->globalTime<<'\t';
+        
+        monitor<<prim[base->monitor_output_index].speed<<'\t';
+        
+        if(this_species_index==base->num_species-1)
+            monitor<<endl;
+    }
+    else cout << "Unable to open file" << filename2 << endl;
+    monitor.close();
+    
+    
+    
+    
+}
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 //
