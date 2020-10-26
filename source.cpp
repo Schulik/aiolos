@@ -213,12 +213,13 @@
                 v1b = species[0].prim[j].speed;
                 v2b = species[1].prim[j].speed;
                 
-                alpha = alpha_collision; // (f[0]+f[1])/(mu0*f[0]+mu1*f[1]) * k_b T/(m_i * b_i)
+                alpha = alpha_collision*(x_i12[j]/1e-2); // (f[0]+f[1])/(mu0*f[0]+mu1*f[1]) * k_b T/(m_i * b_i)
                 eps   = species[0].u[j].u1 / species[1].u[j].u1;
-                f1    = 1. + dt*eps*alpha - dt*dt*alpha*alpha*eps;
-                f2    = dt*alpha / (1. + dt * alpha);
+                f1    = (1. + dt*alpha)/(1. + dt*alpha*(1.+eps)) ;
+                f2    = dt*alpha*eps / (1. + dt * alpha);
+                //f2    = 1. / (1. + 1./ (dt * alpha));
                 
-                v2a    = (v2b + v1b * f2 ) / f1;
+                v2a    = (v2b + v1b * f2 ) * f1;
                 v1a    = v1b - (v2a - v2b) / eps;
                 
                 species[0].prim[j].speed = v1a;

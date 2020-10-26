@@ -28,6 +28,8 @@ c_Sim::c_Sim(string filename, string speciesfile, int debug) {
         geometry = read_parameter_from_file<Geometry>(filename, "PARI_GEOMETRY", debug, Geometry::cartesian).value;
         order = read_parameter_from_file<IntegrationType>(filename, "PARI_ORDER", debug, IntegrationType::second_order).value;
 
+        if(debug > 0) cout<<"Using integration order "<<order<<" while second order would be "<<IntegrationType::second_order<<endl;
+        
         if (order == IntegrationType::first_order)
             num_ghosts = 1 ;
         else 
@@ -79,7 +81,7 @@ c_Sim::c_Sim(string filename, string speciesfile, int debug) {
         use_linear_gravity= read_parameter_from_file<int>(filename,"PARI_LINEAR_GRAV", debug, 0).value;
         use_rad_fluxes    = read_parameter_from_file<int>(filename,"PARI_USE_RADIATION", debug, 0).value;
         init_wind         = read_parameter_from_file<int>(filename,"PARI_INIT_WIND", debug, 0).value;
-        alpha_collision   = read_parameter_from_file<int>(filename,"PARI_ALPHA_COLL", debug, 0).value;
+        alpha_collision   = read_parameter_from_file<double>(filename,"PARI_ALPHA_COLL", debug, 0).value;
         
         if(problem_number == 2)
             monitor_output_index = num_cells/2; //TODO: Replace with index of sonic radius for dominant species?
@@ -413,16 +415,17 @@ c_Species::c_Species(c_Sim *base_simulation, string filename, string species_fil
             
             double u1r = read_parameter_from_file<double>(filename,"PARI_INIT_DATA_U1R", debug, 1.).value;
             double u2r = read_parameter_from_file<double>(filename,"PARI_INIT_DATA_U2R", debug, 0.).value;
-            double u3r = read_parameter_from_file<double>(filename,"PARI_INIT_DATA_U3R", debug, 0.1).value;
+            double u3r = read_parameter_from_file<double>(filename,"PARI_INIT_DATA_U3R", debug, 1.).value;
             
             SHOCK_TUBE_MID = read_parameter_from_file<double>(filename,"PARI_INIT_SHOCK_MID", debug, 0.5).value;
             
-            //If we test friction, set species=2 velocity to zero
-            if(base->num_species == 2 && species_index == 1) {
-                u2l = 0.;
-                u2r = 0.;
+             //If we test friction, set species=2 velocity to zero
+            if(base->num_species == 2) {
+                u2l = density_excess;
+                u2r = density_excess;
             }
-            
+            u1l = initial_fraction * u1l;
+            u1r = initial_fraction * u1r;
             
             //Conversion from shock tube parameters (given as dens, velocity, pressure) to conserved variables (dens, momentum, internal energy)
             AOS_prim pl(u1l, u2l, u3l) ;
@@ -511,7 +514,7 @@ void c_Species::initialize_hydrostatic_atmosphere() {
     for(int i=num_cells+1; i>=0; i--) {
             //temperature[i] = planet_mass / x_i12[i] / (cv * gamma_adiabat) + 1.;
             prim[i].temperature = - 1.0 * base->phi[i] / (cv * gamma_adiabat) + const_T_space;
-            //temperature[i] = 100.;
+            //prim[i].temperature = 100.;
             
             //Add temperature bumps and troughs
             prim[i].temperature += TEMPERATURE_BUMP_STRENGTH * 4.  * exp( - pow(base->x_i12[i] - 1.e-1 ,2.) / (0.1) );
@@ -545,7 +548,7 @@ void c_Species::initialize_hydrostatic_atmosphere() {
         // Debug info
         // 
         //if( (i==20 || i== num_cells-20) && debug >= 0) {
-        //if( i>0 ) {
+        //if( i==300 ) {
         if(temp_rhofinal < 0) {
             char a;
             cout.precision(16);
@@ -561,11 +564,11 @@ void c_Species::initialize_hydrostatic_atmosphere() {
             cout<<"     factor_outer+metric_outer = "<< (factor_outer + metric_outer) << " factor_inner-metric_inner = "<<( factor_inner - metric_inner) <<endl;
             cout<<"     RATIO = "<< ((factor_outer + metric_outer)/ (factor_inner - metric_inner)) <<endl;
             //cout<<"In hydostatic init: factor_dens = "<< (2.* factor_outer / delta_phi + 1.) / (2. * factor_inner / delta_phi - 1.) <<endl;
-            cout<<"Ratio of densities inner/outer = "<< temp_rhofinal/u[i+1].u1 <<endl;
-            cout<<"Ratio of temperatures inner/outer = "<<T_inner/T_outer<<" t_inner ="<<T_inner<<" t_outer ="<<T_outer<<endl;
-            cout<<"Ratio of pressures inner/outer = "<<cv * temp_rhofinal * T_inner /u[i+1].u3<<endl;
-            cout<<"Resulting density == "<<temp_rhofinal<<endl;
-            cout<<" density before "<<u[i+1].u1<<endl;
+            cout<<"     Ratio of densities inner/outer = "<< temp_rhofinal/u[i+1].u1 <<endl;
+            cout<<"     Ratio of temperatures inner/outer = "<<T_inner/T_outer<<" t_inner ="<<T_inner<<" t_outer ="<<T_outer<<endl;
+            cout<<"     Ratio of pressures inner/outer = "<<cv * temp_rhofinal * T_inner /u[i+1].u3<<endl;
+            cout<<"     Resulting density == "<<temp_rhofinal<<endl;
+            cout<<"     density before "<<u[i+1].u1<<endl;
             cin>>a;
         }
     }
@@ -576,7 +579,7 @@ void c_Species::initialize_hydrostatic_atmosphere() {
     // Apply multiplicators for over/underdensities just below and above the sonic point
     //
     if(base->init_wind==1) {
-        double csi              = prim[1].sound_speed;
+        double csi              = prim[num_cells-1].sound_speed;
         double smoothed_factor;
         bondi_radius = base->planet_mass / (pow(csi,2.)); //Most restrictive sonic point, as we are not quite isothermal
     

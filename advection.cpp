@@ -30,8 +30,9 @@ void c_Sim::execute() {
     ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~////
     for (globalTime = 0; (globalTime < t_max) && (steps < maxsteps); ) {
         
-        for(int s = 0; s < num_species; s++)
-            species[s].compute_pressure(species[s].u);
+        if(steps==0)
+            for(int s = 0; s < num_species; s++)
+                species[s].compute_pressure(species[s].u);
         
         dt = get_cfl_timestep();
         dt = std::min(dt, t_max - globalTime) ;
@@ -116,8 +117,13 @@ void c_Sim::execute() {
                     
                 }
 
-            //compute_friction_step(); 
+            
         }
+        
+        for(int s = 0; s < num_species; s++)
+            species[s].compute_pressure(species[s].u);
+        
+        compute_friction_step(); 
         
         steps++;
         
@@ -224,25 +230,25 @@ void c_Species::execute(std::vector<AOS>& u_in, std::vector<AOS>& dudt) {
         for(int j=1; j<=num_cells; j++) {
             dudt[j] = (flux[j-1] * base->surf[j-1] - flux[j] * base->surf[j]) / base->vol[j] + (source[j] + source_pressure[j]) ;
             
-            if( (debug > 0) && ( j==1 || j==num_cells || j==(num_cells/2) )) {
+            if( (debug > 1) && ( j==1 || j==num_cells || j==(num_cells/2) )) {
                 char alpha;
                 cout<<"Debuggin fluxes in cell i= "<<j<<endl; 
-                cout<<"fl.u1 = "<<flux[j-1].u1<<": fr.u1 = "<<flux[j].u1<<endl;
-                cout<<"fl.u2 = "<<flux[j-1].u2<<": fr.u2 = "<<flux[j].u2<<endl;
-                cout<<"fl.u3 = "<<flux[j-1].u3<<": fr.u3 = "<<flux[j].u3<<endl;
-                cout<<"Cartesian fluxes: Fl-Fr+s = "<<((flux[j-1].u2 - flux[j].u2)/base->dx[j] + source[j].u2)<<endl;
-                cout<<"D_surface/volume="<<(0.5*(base->surf[j]-base->surf[j-1])/base->vol[j])<<" vs. 1/dx="<<(1./base->dx[j])<<endl;
+                cout<<"     fl.u1 = "<<flux[j-1].u1<<": fr.u1 = "<<flux[j].u1<<endl;
+                cout<<"     fl.u2 = "<<flux[j-1].u2<<": fr.u2 = "<<flux[j].u2<<endl;
+                cout<<"     fl.u3 = "<<flux[j-1].u3<<": fr.u3 = "<<flux[j].u3<<endl;
+                cout<<"     Cartesian fluxes: Fl-Fr+s = "<<((flux[j-1].u2 - flux[j].u2)/base->dx[j] + source[j].u2)<<endl;
+                cout<<"     D_surface/volume="<<(0.5*(base->surf[j]-base->surf[j-1])/base->vol[j])<<" vs. 1/dx="<<(1./base->dx[j])<<endl;
                 cout<<endl;
-                cout<<"s = "<<source[j].u2<<endl;
-                cout<<"sP = "<<source_pressure[j].u2<<endl;
+                cout<<"     s = "<<source[j].u2<<endl;
+                cout<<"     sP = "<<source_pressure[j].u2<<endl;
                 
-                cout<<"Al*Fl - Ar*Fr = "<<((flux[j-1].u2 * base->surf[j-1] - flux[j].u2 * base->surf[j]) /base->vol[j])<<endl;
-                cout<<"Al*Fl - Ar*Fr + sP = "<<((flux[j-1].u2 * base->surf[j-1] - flux[j].u2 * base->surf[j]) / base->vol[j] + source_pressure[j].u2)<<endl;
-                cout<<"dP/dr = "<<((prim_l[j].pres - prim_r[j].pres)/base->dx[j])<<endl;
-                cout<<"dP/dr + S = "<<((prim_l[j].pres - prim_r[j].pres)/base->dx[j] + source[j].u2)<<endl;
+                cout<<"     Al*Fl - Ar*Fr = "<<((flux[j-1].u2 * base->surf[j-1] - flux[j].u2 * base->surf[j]) /base->vol[j])<<endl;
+                cout<<"     Al*Fl - Ar*Fr + sP = "<<((flux[j-1].u2 * base->surf[j-1] - flux[j].u2 * base->surf[j]) / base->vol[j] + source_pressure[j].u2)<<endl;
+                cout<<"     dP/dr = "<<((prim_l[j].pres - prim_r[j].pres)/base->dx[j])<<endl;
+                cout<<"     dP/dr + S = "<<((prim_l[j].pres - prim_r[j].pres)/base->dx[j] + source[j].u2)<<endl;
                 cout<<endl;
-                cout<<"Al*Fl - Ar*Fr + s = "<<((flux[j-1].u2 * base->surf[j-1] - flux[j].u2 * base->surf[j]) / base->vol[j] + (source[j].u2))<<endl;
-                cout<<"Al*Fl - Ar*Fr + s + sP = "<<((flux[j-1].u2 * base->surf[j-1] - flux[j].u2 * base->surf[j]) / base->vol[j] + (source[j].u2 +source_pressure[j].u2))<<endl;
+                cout<<"     Al*Fl - Ar*Fr + s = "<<((flux[j-1].u2 * base->surf[j-1] - flux[j].u2 * base->surf[j]) / base->vol[j] + (source[j].u2))<<endl;
+                cout<<"     Al*Fl - Ar*Fr + s + sP = "<<((flux[j-1].u2 * base->surf[j-1] - flux[j].u2 * base->surf[j]) / base->vol[j] + (source[j].u2 +source_pressure[j].u2))<<endl;
                 cin>>alpha;
             }
         }
