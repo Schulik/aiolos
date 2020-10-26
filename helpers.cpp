@@ -50,12 +50,6 @@ double c_Sim::get_cfl_timestep() {
     return minstep;
 }
 
-
-
-
-
-
-
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 //
 // Helper functions
@@ -91,6 +85,13 @@ std::vector<double> np_somevalue(int size, double set_value) {
 
      return std::vector<double>(size, set_value) ;
 
+}
+
+double delta_ij(int i, int j) {
+    if(i==j)
+        return 1.;
+    else 
+        return 0.;
 }
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

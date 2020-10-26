@@ -22,7 +22,7 @@ c_Sim::c_Sim(string filename, string speciesfile, int debug) {
         //
         ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         double dx0;
-        type_of_grid     = read_parameter_from_file<int>(filename,"PARI_GRID_TYPE", debug).value;
+        type_of_grid     = read_parameter_from_file<int>(filename,"PARI_GRID_TYPE", debug, 0).value;
         domain_min       = read_parameter_from_file<double>(filename,"PARI_DOMAIN_MIN", debug).value;
         domain_max       = read_parameter_from_file<double>(filename,"PARI_DOMAIN_MAX", debug).value;
         geometry = read_parameter_from_file<Geometry>(filename, "PARI_GEOMETRY", debug, Geometry::cartesian).value;
@@ -82,6 +82,7 @@ c_Sim::c_Sim(string filename, string speciesfile, int debug) {
         use_rad_fluxes    = read_parameter_from_file<int>(filename,"PARI_USE_RADIATION", debug, 0).value;
         init_wind         = read_parameter_from_file<int>(filename,"PARI_INIT_WIND", debug, 0).value;
         alpha_collision   = read_parameter_from_file<double>(filename,"PARI_ALPHA_COLL", debug, 0).value;
+        friction_solver   = read_parameter_from_file<int>(filename,"FRICTION_SOLVER", debug, 0).value;
         
         if(problem_number == 2)
             monitor_output_index = num_cells/2; //TODO: Replace with index of sonic radius for dominant species?
@@ -319,6 +320,22 @@ c_Sim::c_Sim(string filename, string speciesfile, int debug) {
         dt = get_cfl_timestep();
         
         if(debug > 0) cout<<"Init: Finished Init."<<endl;
+        
+        //
+        // Matrix init via Eigen
+        //
+        if(num_species > 1 && friction_solver == 1) {
+            friction_matrix_T   = Eigen::MatrixXd::Zero(num_species, num_species);
+            friction_matrix_M   = Eigen::MatrixXd::Zero(num_species, num_species);
+            friction_coefficients = Eigen::MatrixXd::Zero(num_species, num_species);
+            identity_matrix     = Eigen::MatrixXd::Identity(num_species, num_species);
+            friction_vec_input  = Eigen::VectorXd(num_species);
+            friction_vec_output = Eigen::VectorXd(num_species);
+            //friction_vec_input  = Eigen::MatrixXd::Zero(num_species, 1);
+            //friction_vec_output = Eigen::MatrixXd::Zero(num_species, 1);
+                
+        }
+        
 }
 
 
@@ -385,18 +402,14 @@ c_Species::c_Species(c_Sim *base_simulation, string filename, string species_fil
         opticaldepth   = np_zeros(num_cells+2);
         radiative_flux = np_zeros(num_cells+1);
         u_analytic     = np_zeros(num_cells+2);
-       
 
         prim   = std::vector<AOS_prim>(num_cells+2); //Those helper quantities are also defined on the ghost cells, so they get +2
         prim_l = std::vector<AOS_prim>(num_cells+2);
         prim_r = std::vector<AOS_prim>(num_cells+2);
-
         
         timesteps    = np_zeros(num_cells+2);		    
         timesteps_cs = np_zeros(num_cells+2);	
         finalstep    = np_zeros(num_cells+2);
-        
-        
         
         //////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         //
@@ -420,7 +433,7 @@ c_Species::c_Species(c_Sim *base_simulation, string filename, string species_fil
             SHOCK_TUBE_MID = read_parameter_from_file<double>(filename,"PARI_INIT_SHOCK_MID", debug, 0.5).value;
             
              //If we test friction, set species=2 velocity to zero
-            if(base->num_species == 2) {
+            if(base->num_species == 2 || base->friction_solver == 1) {
                 u2l = density_excess;
                 u2r = density_excess;
             }

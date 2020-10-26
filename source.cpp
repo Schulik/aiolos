@@ -200,7 +200,8 @@
         //}
         
         
-        if(num_species == 2) {
+        
+        if(num_species == 2 && friction_solver == 0) {
             
             if(debug > 0) cout<<"in friction, pos1"<<endl;
 
@@ -213,7 +214,7 @@
                 v1b = species[0].prim[j].speed;
                 v2b = species[1].prim[j].speed;
                 
-                alpha = alpha_collision*(x_i12[j]/1e-2); // (f[0]+f[1])/(mu0*f[0]+mu1*f[1]) * k_b T/(m_i * b_i)
+                alpha = alpha_collision; //*(1e-2/x_i12[j]); // (f[0]+f[1])/(mu0*f[0]+mu1*f[1]) * k_b T/(m_i * b_i)
                 eps   = species[0].u[j].u1 / species[1].u[j].u1;
                 f1    = (1. + dt*alpha)/(1. + dt*alpha*(1.+eps)) ;
                 f2    = dt*alpha*eps / (1. + dt * alpha);
@@ -242,14 +243,87 @@
             }
         
         }
-        else {
+        else if(num_species > 1 && friction_solver == 1) {
             
-            //Build friction matrix
+            //friction_matrix_T   = Eigen::ArrayXXf::Zero(num_species, num_species);
+            //friction_matrix_M   = Eigen::ArrayXXf::Zero(num_species, num_species);
+            //friction_vec_input  = Eigen::ArrayXXf::Zero(num_species, 1);
+            //friction_vec_output = Eigen::ArrayXXf::Zero(num_species, 1);
             
-            //Iterate
+            for(int j=0; j <= num_cells+1; j++){
+                
+                if(debug > 0) cout<<"In friction, just starting cell ="<<j<<endl;
+                
+                // Construct input vector consisting of old velocities
+                for(int si=0; si<num_species; si++)
+                    friction_vec_input(si) = species[si].prim[j].speed;
+                
+                if(debug > 0) cout<<"    Before friciton coeffs."<<endl;
+                
+                // Compute or set friction coefficients
+//                 friction_coefficients = Eigen::MatrixXd::Constant(num_species, num_species, alpha_collision); 
+                
+                for(int si=0; si<num_species; si++) 
+                    for(int sj=0; sj<num_species; sj++)
+                    {
+                       if(si==sj)
+                           friction_coefficients(si,sj) = 0.;
+                       else if(si > sj)
+                           friction_coefficients(si,sj) = alpha_collision;
+                       else
+                           friction_coefficients(si,sj) = alpha_collision  * species[sj].u[j].u1 / species[si].u[j].u1 ;
+                        
+                    }
+                
+                if(debug >= 0 && j==0 && steps == 0) cout<<"    Computed coefficient matrix ="<<endl<<friction_coefficients<<endl;
+                if(debug >= 0 && j==0 && steps == 0) cout<<"    velocities ="<<endl<<friction_vec_input<<endl;
+                if(debug >= 0 && j==0 && steps == 0) cout<<"    velocities[0] = "<<friction_vec_input(0)<<endl;
+                if(debug >= 0 && j==0 && steps == 0) cout<<"    rho[0] = "<<species[0].u[j].u1<<endl;
+                
+                // Build friction matrices
+                for(int si=0; si<num_species; si++) 
+                    for(int sj=0; sj<num_species; sj++)
+                    {
+                        friction_matrix_M(si,sj) = - friction_coefficients(si,sj)*(1.-delta_ij(si,sj));
+                        
+                        for(int k=0; k<num_species; k++)
+                            if(k != si)
+                                friction_matrix_M(si,sj) += friction_coefficients(si,k) * delta_ij(si,sj);
+                    }
+                    
+                if(debug >= 0 && j==0 && steps == 1) cout<<"    Final M ="<<endl<<friction_matrix_M<<endl;
+                if(debug >= 0 && j==0 && steps == 1) cout<<"    ALPHA12 ="<<friction_coefficients(0,1)<<endl;
+                if(debug >= 0 && j==0 && steps == 1) cout<<"    alpha21 ="<<friction_coefficients(1,0)<<endl;
+                
+                if(debug >= 0 && j==0 && steps == 1) cout<<"    M*v ="<<endl<<friction_matrix_M*friction_vec_input<<endl;
+                
+                // Build total matrix
+                friction_matrix_T   = identity_matrix + friction_matrix_M * dt;
+                
+                if(debug >= 0 && j==0 && steps == 1) cout<<"    Final T ="<<endl<<friction_matrix_T<<endl;
+                
+                // Iterate
+                friction_vec_output = friction_matrix_T.inverse() * friction_vec_input;
+                
+                if(debug >= 0 && j==0 && steps == 1) cout<<"    Final T inverse ="<<endl<<friction_matrix_T.inverse()<<endl;
+                
+                if(debug >= 0 && j==0 && steps == 1) cout<<"    v output ="<<endl<<friction_vec_output<<endl;
+                
+                if(debug > 0) {
+                    cout<<"    Before final asignment."<<endl;
+                    char a;
+                    cin>>a;
+                }
+                
+                
+                for(int si=0; si<num_species; si++) {
+                    species[si].prim[j].speed = friction_vec_output(si);
+                }
+                    
+            }
             
-            //for(int s = 0; s < num_species; s++)
-                //Add results to momenta to obtain new momenta
+            for(int si=0; si<num_species; si++) 
+                species[si].eos->compute_conserved(&(species[si].prim[0]), &(species[si].u[0]), num_cells+2);        
             
         }
         

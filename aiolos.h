@@ -12,6 +12,8 @@
 #include <math.h>
 #include <type_traits>
 #include <gsl/gsl_sf_lambert.h>
+#include <Eigen/Dense>
+#include <Eigen/LU>
 #include "advection.h"
 #include "source.h"
 
@@ -64,6 +66,7 @@ const double cflfactor = 0.9;
 ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+double delta_ij(int i, int j);
 
 //
 // Functions mimicking certain numpy functionalities
@@ -243,6 +246,14 @@ public:
     std::vector<double> phi;            //Parabolic Variables: gravitational potential
     std::vector<double> enclosed_mass;
     
+    int friction_solver;
+    
+    Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> friction_matrix_T;
+    Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> friction_matrix_M;
+    Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> identity_matrix;
+    Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> friction_coefficients;
+    Eigen::Matrix<double, Eigen::Dynamic, 1>              friction_vec_input;
+    Eigen::Matrix<double, Eigen::Dynamic, 1>              friction_vec_output;
 
     ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     //
