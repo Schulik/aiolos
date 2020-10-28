@@ -328,14 +328,22 @@ c_Sim::c_Sim(string filename, string speciesfile, int debug) {
             friction_matrix_T   = Eigen::MatrixXd::Zero(num_species, num_species);
             friction_matrix_M   = Eigen::MatrixXd::Zero(num_species, num_species);
             friction_coefficients = Eigen::MatrixXd::Zero(num_species, num_species);
+            friction_coeff_mask = Eigen::MatrixXd::Constant(num_species, num_species, 1.);
             identity_matrix     = Eigen::MatrixXd::Identity(num_species, num_species);
             friction_vec_input  = Eigen::VectorXd(num_species);
             friction_vec_output = Eigen::VectorXd(num_species);
-            //friction_vec_input  = Eigen::MatrixXd::Zero(num_species, 1);
-            //friction_vec_output = Eigen::MatrixXd::Zero(num_species, 1);
-                
+            friction_dEkin      = Eigen::VectorXd(num_species);
         }
         
+        //
+        // Punch holes in the coefficient mask for the dust species, so they don't feel each other
+        //
+        for(int si=0; si < num_species; si++)
+            for(int sj=0; sj < num_species; sj++) 
+                if(species[si].is_dust_like == 1 && species[sj].is_dust_like == 1) {
+                    friction_coeff_mask(si,sj) = 0.;
+                    friction_coeff_mask(sj,si) = 0.;
+                }
 }
 
 
@@ -373,14 +381,14 @@ c_Species::c_Species(c_Sim *base_simulation, string filename, string species_fil
         if(debug > 0) cout<<"        Species["<<species_index<<"] Init: Finished reading boundaries."<<endl;
         if(debug > 0) cout<<"         Boundaries used in species["<<name<<"]: "<<boundary_left<<" / "<<boundary_right<<endl;
 
-        
         if(base->use_rad_fluxes == 1)
             const_opacity   = read_parameter_from_file<double>(filename,"PARI_CONST_OPAC", debug, 1.).value;
         
-        
+        ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         //
-        // //This provides important stuff like, const_cv, const_gamma_adiabat for this species
+        // //Readin species file, const_cv, const_gamma_adiabat for this species
         //
+        ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         if(debug > 0) cout<<"        Species["<<species_index<<"] Init: Reading species data..."<<endl;
         read_species_data(species_filename, species_index); 
         if(debug > 0) cout<<"        Species["<<species_index<<"] Init: Done reading species data."<<endl;
@@ -394,9 +402,24 @@ c_Species::c_Species(c_Sim *base_simulation, string filename, string species_fil
         flux            = init_AOS(num_cells+1);
 
         //
-        // Determine which equation of states we are using
+        // Determine which equation of states we are using, and assign thermodynamic variables
         //
-        eos = new Adiabatic_EOS(gamma_adiabat, cv) ;
+        
+        //Gas species
+        if(is_dust_like == 0) {
+            cv            = 0.5 * degrees_of_freedom * Rgas_fake / mass_amu; 
+            gamma_adiabat = (degrees_of_freedom + 2.)/ degrees_of_freedom;
+            eos           = new Adiabatic_EOS(gamma_adiabat, cv, mass_amu) ;
+        }
+        //Dust species
+        else {
+            cv            = degrees_of_freedom;
+            gamma_adiabat = 1.4;                //TODO: Delete this once we have a better dust EOS
+            mass_amu      = 1. * mass_amu;      //TODO: Replace this with more sensible computation of dust mass based on solid density and size
+            eos           = new Adiabatic_EOS(gamma_adiabat, cv, mass_amu) ;
+        }
+        
+        if(debug >= 0) cout<<"        Species["<<species_index<<"] got a gamma_adiabatic = "<<gamma_adiabat<<" and cv = "<<cv<<endl;
 
         opacity        = np_somevalue(num_cells+2, const_opacity);
         opticaldepth   = np_zeros(num_cells+2);
@@ -413,7 +436,7 @@ c_Species::c_Species(c_Sim *base_simulation, string filename, string species_fil
         
         //////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         //
-        // Initialize/readin parameters
+        // Initialize/readin scenario parameters
         //
         //////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         
@@ -509,11 +532,10 @@ void c_Species::initialize_hydrostatic_atmosphere() {
     
     double temp_rhofinal;
     double factor_inner, factor_outer;
-    //long double factor_grav;
-    //long double delta_phi;
     double T_inner;
     double T_outer;
     double metric_inner;
+    double residual;
     double metric_outer;
     //
     // Start with the outermost cell and build up a hydrostatic atmosphere
@@ -525,7 +547,7 @@ void c_Species::initialize_hydrostatic_atmosphere() {
     // First, initialize (adiabatic) temperature
     //
     for(int i=num_cells+1; i>=0; i--) {
-            //temperature[i] = planet_mass / x_i12[i] / (cv * gamma_adiabat) + 1.;
+            
             prim[i].temperature = - 1.0 * base->phi[i] / (cv * gamma_adiabat) + const_T_space;
             //prim[i].temperature = 100.;
             
@@ -544,8 +566,8 @@ void c_Species::initialize_hydrostatic_atmosphere() {
         T_outer = prim[i+1].temperature ;
         T_inner = prim[i].temperature ;
 
-        factor_outer = (gamma_adiabat-1.) * cv * T_outer; 
-        factor_inner = (gamma_adiabat-1.) * cv * T_inner; 
+        //factor_outer = (gamma_adiabat-1.) * cv * T_outer; 
+        //factor_inner = (gamma_adiabat-1.) * cv * T_inner; 
         
         eos->get_p_over_rho_analytic(&T_outer, &factor_outer);
         eos->get_p_over_rho_analytic(&T_inner, &factor_inner);
@@ -563,6 +585,7 @@ void c_Species::initialize_hydrostatic_atmosphere() {
         //if( (i==20 || i== num_cells-20) && debug >= 0) {
         //if( i==300 ) {
         if(temp_rhofinal < 0) {
+            
             char a;
             cout.precision(16);
             cout<<"NEGATIVE DENSITY IN INIT HYDROSTATIC i="<<i<<endl;
@@ -688,9 +711,9 @@ void c_Species::apply_boundary_left(std::vector<AOS>& u) {
                 AOS_prim prim ;
                 eos->compute_primitive(&u[i],&prim, 1) ;
                 double dphi = (base->phi[i] - base->phi[i-1]) / (base->dx[i-1] + base->dx[i]) ;
-                dphi *= (base->omegaplus[i]*base->dx[i] + base->omegaminus[i-1]*base->dx[i-1]) ;
-                prim.pres = prim.pres + prim.density * dphi ;
-                prim.pres    = std::max( prim.pres, 0.0) ;
+                dphi       *= (base->omegaplus[i]*base->dx[i] + base->omegaminus[i-1]*base->dx[i-1]) ;
+                prim.pres   = prim.pres + prim.density * dphi ;
+                prim.pres   = std::max( prim.pres, 0.0) ;
                 eos->compute_conserved(&prim, &u[i-1], 1) ;
             }
             break ;

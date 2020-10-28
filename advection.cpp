@@ -56,11 +56,11 @@ void c_Sim::execute() {
         // zeroth output has the initialized conserved values, but already the first fluxes.
         //
         
-         if(steps==0) {
+         if(steps==0 || steps==1) {
              for(int s=0; s<num_species; s++) {
                 species[s].print_AOS_component_tofile((int) output_counter);
-                species[s].print_monitor();
             }
+            print_monitor((int)monitor_counter);
                 
              monitor_counter+=1.;
              output_counter +=1.;
@@ -75,8 +75,7 @@ void c_Sim::execute() {
              output_counter+=1.; 
          }
          if(globalTime > monitor_counter*monitor_time) {
-             for(int s=0; s<num_species; s++) 
-                species[s].print_monitor();
+            print_monitor(steps);
             
              monitor_counter += 1.;
         }
@@ -96,7 +95,7 @@ void c_Sim::execute() {
                 species[s].u[j] = species[s].u[j] + species[s].dudt[0][j]*dt ;
         }
         
-        //compute_friction_step(); 
+        
 
         if (order == IntegrationType::first_order) {
             globalTime += dt ;
@@ -123,7 +122,8 @@ void c_Sim::execute() {
         for(int s = 0; s < num_species; s++)
             species[s].compute_pressure(species[s].u);
         
-        compute_friction_step(); 
+        if(alpha_collision > 0)
+            compute_friction_step(); 
         
         steps++;
         
@@ -140,10 +140,9 @@ void c_Sim::execute() {
     //Print successful end result
     cout<<"Finished at time="<<globalTime<<" after steps="<<steps<<" with num_cells="<<num_cells<<endl;
     
-    for(int s=0; s<num_species; s++) {
-        species[s].print_AOS_component_tofile(-666);
-        species[s].print_monitor();
-    }
+    for(int s=0; s<num_species; s++) 
+        species[s].print_AOS_component_tofile(-1);
+    print_monitor(-1);
         
 }
 

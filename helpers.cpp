@@ -157,14 +157,14 @@ void c_Species::read_species_data(string filename, int species_index) {
                 
                 this->name             = stringlist[2];
                 this->mass_amu         = std::stod(stringlist[3]);
-                this->cv               = std::stod(stringlist[4]);
+                this->degrees_of_freedom = std::stod(stringlist[4]);
                 this->gamma_adiabat    = std::stod(stringlist[5]);
                 this->initial_fraction = std::stod(stringlist[6]);
-                if(base->init_wind==1) 
-                    this->density_excess   = std::stod(stringlist[7]);
+                this->density_excess   = std::stod(stringlist[7]);
+                this->is_dust_like     = std::stod(stringlist[8]);
                 
                 if(debug > 0)
-                    cout<<"Found species called "<<name<<" with a mass of "<<mass_amu<<" cv "<<cv<<" gamma "<<gamma_adiabat<<" and zeta_0 = "<<initial_fraction<<endl;
+                    cout<<"Found species called "<<name<<" with a mass of "<<mass_amu<<" dof "<<degrees_of_freedom<<" gamma "<<gamma_adiabat<<" and zeta_0 = "<<initial_fraction<<endl;
                 
             }
 
@@ -290,8 +290,8 @@ void c_Species::print_AOS_component_tofile(int timestepnumber) {
     //
     // If we are computing winds, compute the analytic solution for outputting it
     //
-    if(base->init_wind==1) 
-        compute_analytic_slution();
+    if(base->init_wind==1 && base->problem_number == 2) 
+        compute_analytic_solution();
     
     // Choose a sensible default output name
     string filename ;
@@ -321,7 +321,7 @@ void c_Species::print_AOS_component_tofile(int timestepnumber) {
     {
         //outfile.precision(16);
         
-        double hydrostat = 0., hydrostat2 = 0., hydrostat3 = 0.;
+        double hydrostat2 = 0., hydrostat3 = 0.;
         
         //Print left ghost stuff
         outfile<<base->x_i12[0]<<'\t'<<u[0].u1<<'\t'<<u[0].u2<<'\t'<<u[0].u3<<'\t'<<flux[0].u1<<'\t'<<flux[0].u2<<'\t'<<flux[0].u3<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<prim[0].pres<<'\t'<<u[0].u2/u[0].u1<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<base->phi[0]<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<endl;
@@ -329,7 +329,7 @@ void c_Species::print_AOS_component_tofile(int timestepnumber) {
         //Print the domain
         for(int i=1; i<=num_cells; i++) {
             
-            hydrostat = flux[i-1].u2/base->dx[i] ; //hydrostat2 + hydrostat3 ; 
+            //hydrostat = flux[i-1].u2/base->dx[i] ; //hydrostat2 + hydrostat3 ; 
             hydrostat2 = flux[i].u2/base->dx[i];//pressure[i+1] - pressure[i];
             hydrostat3 = source[i].u2;//0.5 * (u[i].u1 + u[i+1].u1) * (phi[i+1] - phi[i]);
             
@@ -352,8 +352,29 @@ void c_Species::print_AOS_component_tofile(int timestepnumber) {
  
 }
 
-void c_Species::print_monitor() {
+void c_Sim::print_monitor(int num_steps) {
 
+    //
+    //
+    // First compute the volumetric sum of all initial conserved quantities
+    //
+    //
+    if(num_steps==0) {
+        initial_monitored_quantities.u1_tot = 0.;
+        initial_monitored_quantities.u2_tot = 0.;
+        initial_monitored_quantities.u3_tot = 0.;
+        
+        for(int i=2; i<num_cells-1; i++)
+            for(int s=0; s<num_species; s++) {
+                initial_monitored_quantities.u1_tot += species[s].u[i].u1 * vol[i];
+                initial_monitored_quantities.u2_tot += species[s].u[i].u2 * vol[i];
+                initial_monitored_quantities.u3_tot += species[s].u[i].u3 * vol[i];
+            }
+        
+        
+        
+        
+    }
     
     //
     //
@@ -364,8 +385,7 @@ void c_Species::print_monitor() {
     string filename2 ;
     {
         stringstream filenamedummy;
-        string truncated_name = stringsplit(base->simname,".")[0];
-        //filenamedummy<<"monitor_"<<"_"<<truncated_name<<"_"<<name<<".dat"; //Do we want one monitor per species or one for all? I guess it depends.
+        string truncated_name = stringsplit(simname,".")[0];
         filenamedummy<<"monitor_"<<truncated_name<<".dat";
         filename2 = filenamedummy.str() ;
     }
@@ -373,27 +393,47 @@ void c_Species::print_monitor() {
     //
     // Delete old file if we start a new one
     //
-    if(base->steps==0 && this_species_index == 0) 
+    if(steps==0) 
         ofstream monitor(filename2);
         
     ofstream monitor(filename2, std::ios_base::app);
-    monitor << std::setprecision(15);
+    monitor << std::setprecision(24);
     
     if(monitor.is_open()){
         
-        if(this_species_index==0)
-            monitor<<base->globalTime<<'\t';
+        //
+        // Compute conserved quantities on entire domain over all species 
+        //
+        monitored_quantities.u1_tot = 0.;
+        monitored_quantities.u2_tot = 0.;
+        monitored_quantities.u3_tot = 0.;
         
-        monitor<<prim[base->monitor_output_index].speed<<'\t';
+        for(int i=2; i<num_cells-1; i++)
+            for(int s=0; s<num_species; s++) {
+                monitored_quantities.u1_tot += species[s].u[i].u1 * vol[i];
+                monitored_quantities.u2_tot += species[s].u[i].u2 * vol[i];
+                monitored_quantities.u3_tot += species[s].u[i].u3 * vol[i];
+            }
         
-        if(this_species_index==base->num_species-1)
-            monitor<<endl;
+        //
+        // Print the stuff
+        //
+        
+        monitor<<globalTime<<'\t'<<dt<<'\t'<<monitored_quantities.u1_tot/initial_monitored_quantities.u1_tot<<'\t'<<monitored_quantities.u2_tot/initial_monitored_quantities.u2_tot<<'\t'<<monitored_quantities.u3_tot/initial_monitored_quantities.u3_tot<<'\t';
+        
+        for(int s=0; s<num_species; s++)
+            monitor<<species[s].prim[1].speed<<'\t';
+        
+        for(int s=0; s<num_species; s++)
+            monitor<<species[s].prim[1].internal_energy<<'\t';
+        
+        monitor<<endl;
     }
     else cout << "Unable to open file" << filename2 << endl;
     monitor.close();
     
-    
-    
+    if(num_steps == -1) 
+        cout<<"Finished writing monitor_file "<<filename2<<endl;
     
 }
 
@@ -403,24 +443,25 @@ void c_Species::print_monitor() {
 //
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-void c_Species::compute_analytic_slution() {
+void c_Species::compute_analytic_solution() {
     
     //cout<<"In compute_analytic_solution."<<endl;
     
     for(int i=1;i<=num_cells;i++) {
         
-        double press  = prim[i].pres;  
-        double cs     = prim[num_cells].sound_speed;
-        bondi_radius  = base->planet_mass/(2.*cs*cs);
+        if(prim[num_cells].sound_speed < 0)
+            cout<<"Negative sound speed in compute analytic!"<<endl;
+        
+        bondi_radius  = base->planet_mass/(2.*prim[num_cells].sound_speed*prim[num_cells].sound_speed);
         double rrc    = base->x_i12[i]/bondi_radius;
         double D      = pow(rrc,-4.) * std::exp(4.*(1.-1./rrc)-1. );
         
         if(base->x_i12[i] < bondi_radius) {
-            u_analytic[i] = cs * std::sqrt( - gsl_sf_lambert_W0(-D) ); 
+            u_analytic[i] = prim[num_cells].sound_speed * std::sqrt( - gsl_sf_lambert_W0(-D) ); 
         }
         else {
             
-            u_analytic[i] = cs * std::sqrt( - gsl_sf_lambert_Wm1(-D) ); 
+            u_analytic[i] = prim[num_cells].sound_speed * std::sqrt( - gsl_sf_lambert_Wm1(-D) ); 
         }
     
     

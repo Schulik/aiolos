@@ -33,6 +33,8 @@ const int TYPE_STRING = 2;
 const double G        = 6.678e-8; //cgs units
 const double pi       = 3.141592;
 const double navo     = 6e23; // particles per mole
+const double Rgas     = 8.31446261815324e7;  //erg/K/mole
+const double Rgas_fake = 1.;
 const double sigma    = 5.67e-5;   //erg cm-2 s-1 K-4
 const double kb       = 1.38e-16;  //erg/K
 const double km       = 1e5; //kilometers in cm
@@ -135,14 +137,21 @@ struct AOS {
 }; 
 
 struct AOS_prim {
-    AOS_prim(double d=0, double s=0, double p=0, double cs=0, double u=0, double T=0)
+    AOS_prim(double d=0, double s=0, double p=0, double cs=0, double u=0, double T=0, double n=0)
         : density(d), speed(s), pres(p), 
-          sound_speed(cs), internal_energy(u), temperature(T)
+          sound_speed(cs), internal_energy(u), temperature(T), number_density(n)
     { } ;
     double density, speed, pres ;
-    double sound_speed, internal_energy, temperature;
+    double sound_speed, internal_energy, temperature, number_density;
 } ;
 
+struct Monitored_Quantities {
+    
+    Monitored_Quantities(double u1=0, double u2=0, double u3=0)
+        : u1_tot(u1), u2_tot(u2), u3_tot(u3)
+    { } ;
+    double u1_tot, u2_tot, u3_tot;
+} ;
 
 std::vector<AOS> init_AOS(int num);
 vector<string> stringsplit(const string& str, const string& delim);
@@ -153,7 +162,7 @@ simulation_parameter<T> read_parameter_from_file(string, string, int);
 template<typename T>
 simulation_parameter<T> read_parameter_from_file(string, string, int, T);
 
-
+void update_cons_prim_after_friction(AOS* cons, AOS_prim* prim, double dEkin, double newv, double mass, double gamma, double cv);
 
 class c_Species;
 
@@ -247,13 +256,17 @@ public:
     std::vector<double> enclosed_mass;
     
     int friction_solver;
+    Monitored_Quantities monitored_quantities;
+    Monitored_Quantities initial_monitored_quantities;
     
     Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> friction_matrix_T;
     Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> friction_matrix_M;
     Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> identity_matrix;
     Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> friction_coefficients;
+    Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> friction_coeff_mask;
     Eigen::Matrix<double, Eigen::Dynamic, 1>              friction_vec_input;
     Eigen::Matrix<double, Eigen::Dynamic, 1>              friction_vec_output;
+    Eigen::Matrix<double, Eigen::Dynamic, 1>              friction_dEkin;
 
     ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     //
@@ -287,13 +300,14 @@ public:
     //
     // Source terms
     //
+    void compute_friction_step(); 
     
     //Gravity
     void init_grav_pot();
     void update_mass_and_pot();
     double get_phi_grav(double &r, double &mass);
     
-    
+    void print_monitor(int i);
 public:
     
     c_Sim() {};
@@ -301,7 +315,7 @@ public:
     ~c_Sim();
     
     void execute(); //Main loop
-    void compute_friction_step(); 
+    
     void set_debug(int);
     void set_suppress_warnings(int j) {suppress_warnings = j;}
     
@@ -362,6 +376,7 @@ public:
     
     double const_T_space;
     double const_opacity;
+    int    is_dust_like;
     
     ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     //
@@ -410,7 +425,7 @@ public:
     void initialize_custom_setup();
     void initialize_hydrostatic_atmosphere();
     void initialize_sound_wave();
-    void compute_analytic_slution();
+    void compute_analytic_solution();
     
     ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     //
@@ -442,7 +457,9 @@ public:
     //
     // Equations of state
     //
-    double cv, gamma_adiabat ;
+    double cv;            //Specific heat capacity. Has to be computed from molar heat capacity (from degrees of freedom) and molecular mass
+    double gamma_adiabat; 
+    double degrees_of_freedom;
     EOS_Base* eos ;
     
     //
@@ -465,7 +482,6 @@ public:
     
     int suppress_warnings;
     void print_AOS_component_tofile(int timestepnumber);
-    void print_monitor();
     
     void read_species_data(string filename, int species_index);
     void set_debug(int);
