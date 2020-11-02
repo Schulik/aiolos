@@ -1,6 +1,6 @@
 #ifndef _AIOLOS_MAIN_H_
 #define _AIOLOS_MAIN_H_
-#define NUM_SPECIES_ACT 4
+#define NUM_SPECIES_ACT 48
 
 #include <iostream>
 #include <fstream>
@@ -275,7 +275,7 @@ public:
     Eigen::Matrix<double, Eigen::Dynamic, 1>              friction_vec_output;
     Eigen::Matrix<double, Eigen::Dynamic, 1>              friction_dEkin;
     Eigen::Matrix<double, Eigen::Dynamic, 1>              unity_vector;
-
+    Eigen::PartialPivLU<Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic>> LU;
     Eigen::Matrix<double, Eigen::Dynamic, 1> alphas_sample;
     Eigen::Matrix<double, Eigen::Dynamic, 1> alphas_sample3;
     
@@ -289,6 +289,7 @@ public:
     Eigen::Matrix<double, NUM_SPECIES_ACT, NUM_SPECIES_ACT, Eigen::RowMajor> friction_matrix_M3;
     Eigen::Matrix<double, NUM_SPECIES_ACT, NUM_SPECIES_ACT, Eigen::RowMajor> friction_matrix_T3;
     Eigen::Matrix<double, NUM_SPECIES_ACT, NUM_SPECIES_ACT, Eigen::RowMajor> identity_matrix3;
+    Eigen::PartialPivLU<Eigen::Matrix<double, NUM_SPECIES_ACT, NUM_SPECIES_ACT>> LU3;
     Eigen::Matrix<double, NUM_SPECIES_ACT, 1> unity_vector3;
     
     ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

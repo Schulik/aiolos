@@ -419,13 +419,15 @@ void c_Sim::compute_friction_numerical_dynamic() {
                     else
                            friction_coefficients(si,sj) = friction_coeff_mask(si,sj) * alpha_local  * dens_vector(sj) / dens_vector(si) ;
                     
+                    if(si==0 && sj==3 && j==7 && steps == 1)
+                        cout<<"    si/sj=0/3, alpha_local = "<<alpha_local<<" friction_coeff = "<<friction_coefficients(si,sj)<<" dens ratio "<<(dens_vector(sj) / dens_vector(si))<<endl;
                     //if(friction_coefficients(si,sj) < 1e-20)
                     //    friction_coefficients(si,sj) = 0.;
                     }
                     
                 }
                 
-                if(debug >= 1 && j==0 && steps == 0) cout<<"    Computed coefficient matrix ="<<endl<<friction_coefficients<<endl;
+                if(debug >= 0 && j==7 && steps == 1) cout<<"    Computed coefficient matrix ="<<endl<<friction_coefficients<<endl;
                 if(debug >= 1 && j==0 && steps == 0) cout<<"    velocities ="<<endl<<friction_vec_input<<endl;
                 if(debug >= 1 && j==0 && steps == 0) cout<<"    velocities[0] = "<<friction_vec_input(0)<<endl;
                 if(debug >= 1 && j==0 && steps == 0) cout<<"    rho[0] = "<<species[0].u[j].u1<<endl;
@@ -433,12 +435,21 @@ void c_Sim::compute_friction_numerical_dynamic() {
                 friction_matrix_M   = (friction_coefficients * unity_vector).asDiagonal();
                 friction_matrix_M  -= friction_coefficients;
                 friction_matrix_T   = identity_matrix + friction_matrix_M * dt;
-                //if(debug >= 0 && j==7 && steps == 1) cout<<"    T = "<<friction_matrix_T<<endl;
-                friction_matrix_T   = friction_matrix_T.inverse();
-                //if(debug >= 0 && j==7 && steps == 1) cout<<"    T.inv = "<<friction_matrix_T<<endl;
-                friction_vec_output = friction_matrix_T * friction_vec_input;
-                //if(debug >= 0 && j==7 && steps == 1) cout<<"    v_inp = "<<friction_vec_input<<endl;
-                //if(debug >= 0 && j==7 && steps == 1) cout<<"    v_out = "<<friction_vec_output<<endl;
+                if(debug >= 0 && j==7 && steps == 1) cout<<"    T = "<<friction_matrix_T<<endl;
+                
+                //friction_vec_output = friction_matrix_T.partialPivLu().solve(friction_vec_input) ;
+                LU.compute(friction_matrix_T) ;
+                friction_vec_output = LU.solve(friction_vec_input);
+                //friction_matrix_T   = friction_matrix_T.inverse();
+                //friction_vec_output = friction_matrix_T * friction_vec_input;
+                
+                //friction_vec_output = friction_matrix_T.partialPivLu().solve(friction_vec_input) ;
+                
+                if(debug >= 0 && j==7 && steps == 1) cout<<"    T.inv = "<<friction_matrix_T<<endl;
+                
+                
+                if(debug >= 0 && j==7 && steps == 1) cout<<"    v_inp = "<<friction_vec_input<<endl;
+                if(debug >= 0 && j==7 && steps == 1) cout<<"    v_out = "<<friction_vec_output<<endl;
                 
                 //*/
                 // Update new speed and internal energy
@@ -452,11 +463,18 @@ void c_Sim::compute_friction_numerical_dynamic() {
                     
                     for(int sj=0; sj<num_species; sj++) {
                         
-                        temp += dt * friction_coefficients(si,sj) * (species[sj].mass_amu/(species[sj].mass_amu+species[si].mass_amu))  * pow( friction_vec_output(si) - friction_vec_output(sj), 2.);
+                        double tempsj = dt * friction_coefficients(si,sj) * (species[sj].mass_amu/(species[sj].mass_amu+species[si].mass_amu))  * pow( friction_vec_output(si) - friction_vec_output(sj), 2.);
+                        
+                        if(si != sj)
+                            temp += tempsj;
+                        
+                        if(debug >= 0 && j==6 && steps == 1) cout<<"    e+tmpsj = "<<tempsj<<" at j = "<<j<<" for species si = "<<si<<" sj = "<<sj<<" dv = "<<friction_vec_output(si) - friction_vec_output(sj)<<" coeff = "<<friction_coefficients(si,sj)<<endl;
+                        
+                        if(debug >= 0 && j==7 && steps == 1) cout<<"    e+tmpsj = "<<tempsj<<" at j = "<<j<<" for species si = "<<si<<" sj = "<<sj<<" dv = "<<friction_vec_output(si) - friction_vec_output(sj)<<" coeff = "<<friction_coefficients(si,sj)<<endl;
                     }
                     species[si].prim[j].internal_energy += temp;
                     
-                    //if(debug >= 0 && j==7 && steps == 1 && ) cout<<"    e+tmp = "<<temp<<endl;
+                    
                     //
                     // Update scheme 2
                     //
@@ -536,12 +554,15 @@ void c_Sim::compute_friction_numerical_dynamic() {
                     
                 if(debug > 1) cout<<"    in friction 8, j = "<<j<<" before inverse, T = "<<endl<<friction_matrix_T3<<endl<<" M = "<<endl<<friction_matrix_M3<<endl<<" A = "<<endl<<friction_coefficients3<<endl<<" v input = "<<friction_vec_input3<<endl;
                     
-                friction_vec_output3.noalias() = friction_matrix_T3.inverse().eval() * friction_vec_input3;
+                //friction_vec_output3.noalias() = friction_matrix_T3.inverse().eval() * friction_vec_input3;
                 //friction_matrix_T3   = friction_matrix_T3.inverse().eval();
                 //friction_vec_output3.noalias() = friction_matrix_T3 * friction_vec_input3;
                 //friction_vec_output3 = friction_matrix_T3 * friction_vec_input3;
-                friction_vec_output3           = friction_vec_input3;
-                    
+                //friction_vec_output3           = friction_vec_input3;
+                
+                LU3.compute(friction_matrix_T3) ;
+                friction_vec_output3 = LU3.solve(friction_vec_input3);
+                
                 for(int si=0; si<num_species; si++) {
                     double temp = 0;
                     
