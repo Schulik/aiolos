@@ -115,15 +115,20 @@ void c_Sim::execute() {
                     species[s].u[j] += (species[s].dudt[1][j] -  species[s].dudt[0][j])*dt / 2 ; 
                     
                 }
-
-            
         }
         
         for(int s = 0; s < num_species; s++)
             species[s].compute_pressure(species[s].u);
         
-        if(alpha_collision > 0)
-            compute_friction_step(); 
+        if(alpha_collision > 0 && num_species > 1) {
+            if(friction_solver == 0)
+                compute_friction_analytical(); 
+            else if(friction_solver == 1) 
+                compute_friction_numerical_static();
+            else
+                compute_friction_numerical_dynamic();
+                //compute_friction_numerical_sparse();
+        }
         
         steps++;
         
@@ -230,7 +235,7 @@ void c_Species::execute(std::vector<AOS>& u_in, std::vector<AOS>& dudt) {
             dudt[j] = (flux[j-1] * base->surf[j-1] - flux[j] * base->surf[j]) / base->vol[j] + (source[j] + source_pressure[j]) ;
             
             if( (debug > 1) && ( j==1 || j==num_cells || j==(num_cells/2) )) {
-                char alpha;
+                //char alpha;
                 cout<<"Debuggin fluxes in cell i= "<<j<<endl; 
                 cout<<"     fl.u1 = "<<flux[j-1].u1<<": fr.u1 = "<<flux[j].u1<<endl;
                 cout<<"     fl.u2 = "<<flux[j-1].u2<<": fr.u2 = "<<flux[j].u2<<endl;
@@ -248,7 +253,7 @@ void c_Species::execute(std::vector<AOS>& u_in, std::vector<AOS>& dudt) {
                 cout<<endl;
                 cout<<"     Al*Fl - Ar*Fr + s = "<<((flux[j-1].u2 * base->surf[j-1] - flux[j].u2 * base->surf[j]) / base->vol[j] + (source[j].u2))<<endl;
                 cout<<"     Al*Fl - Ar*Fr + s + sP = "<<((flux[j-1].u2 * base->surf[j-1] - flux[j].u2 * base->surf[j]) / base->vol[j] + (source[j].u2 +source_pressure[j].u2))<<endl;
-                cin>>alpha;
+                //cin>>alpha;
             }
         }
         

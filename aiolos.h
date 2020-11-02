@@ -1,5 +1,6 @@
 #ifndef _AIOLOS_MAIN_H_
 #define _AIOLOS_MAIN_H_
+#define NUM_SPECIES_ACT 4
 
 #include <iostream>
 #include <fstream>
@@ -12,6 +13,7 @@
 #include <math.h>
 #include <type_traits>
 #include <gsl/gsl_sf_lambert.h>
+#include <Eigen/Core>
 #include <Eigen/Dense>
 #include <Eigen/LU>
 #include "advection.h"
@@ -19,6 +21,8 @@
 
 #include "enum.h"
 #include "eos.h"
+
+
 
 using namespace std;
 
@@ -200,6 +204,7 @@ public:
     int use_rad_fluxes;
     int suppress_warnings;
     int init_geometry;
+    char collision_model;
     
     Geometry geometry ;
     
@@ -259,15 +264,33 @@ public:
     Monitored_Quantities monitored_quantities;
     Monitored_Quantities initial_monitored_quantities;
     
-    Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> friction_matrix_T;
-    Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> friction_matrix_M;
-    Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> identity_matrix;
-    Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> friction_coefficients;
-    Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> friction_coeff_mask;
+    Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> friction_matrix_T;
+    Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> friction_matrix_M;
+    Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> identity_matrix;
+    Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> friction_coefficients;
+    Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> friction_coeff_mask;
+    Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> dens_vector2;
+    Eigen::Matrix<double, Eigen::Dynamic, 1>              dens_vector1;
     Eigen::Matrix<double, Eigen::Dynamic, 1>              friction_vec_input;
     Eigen::Matrix<double, Eigen::Dynamic, 1>              friction_vec_output;
     Eigen::Matrix<double, Eigen::Dynamic, 1>              friction_dEkin;
+    Eigen::Matrix<double, Eigen::Dynamic, 1>              unity_vector;
 
+    Eigen::Matrix<double, Eigen::Dynamic, 1> alphas_sample;
+    Eigen::Matrix<double, Eigen::Dynamic, 1> alphas_sample3;
+    
+    Eigen::Matrix<double, NUM_SPECIES_ACT, 1> dens_vector3;
+    Eigen::Matrix<double, NUM_SPECIES_ACT, 1> numdens_vector3;
+    Eigen::Matrix<double, NUM_SPECIES_ACT, 1> mass_vector3;
+    Eigen::Matrix<double, NUM_SPECIES_ACT, 1> friction_vec_input3;
+    Eigen::Matrix<double, NUM_SPECIES_ACT, 1> friction_vec_output3;
+    Eigen::Matrix<double, NUM_SPECIES_ACT, NUM_SPECIES_ACT, Eigen::RowMajor> friction_coefficients3;
+    Eigen::Matrix<double, NUM_SPECIES_ACT, NUM_SPECIES_ACT, Eigen::RowMajor> friction_coeff_mask3;
+    Eigen::Matrix<double, NUM_SPECIES_ACT, NUM_SPECIES_ACT, Eigen::RowMajor> friction_matrix_M3;
+    Eigen::Matrix<double, NUM_SPECIES_ACT, NUM_SPECIES_ACT, Eigen::RowMajor> friction_matrix_T3;
+    Eigen::Matrix<double, NUM_SPECIES_ACT, NUM_SPECIES_ACT, Eigen::RowMajor> identity_matrix3;
+    Eigen::Matrix<double, NUM_SPECIES_ACT, 1> unity_vector3;
+    
     ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     //
     // Variables for different scenarios
@@ -300,7 +323,10 @@ public:
     //
     // Source terms
     //
-    void compute_friction_step(); 
+    void compute_friction_analytical(); 
+    void compute_friction_numerical_dynamic(); 
+    void compute_friction_numerical_static(); 
+    void compute_friction_numerical_sparse(); 
     
     //Gravity
     void init_grav_pot();

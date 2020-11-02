@@ -14,6 +14,9 @@
 
 c_Sim::c_Sim(string filename, string speciesfile, int debug) {
 
+    
+        if(debug > 0) cout<<"Init position 0."<<endl;
+        
         this->debug = debug ;
         
         ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -82,6 +85,7 @@ c_Sim::c_Sim(string filename, string speciesfile, int debug) {
         use_rad_fluxes    = read_parameter_from_file<int>(filename,"PARI_USE_RADIATION", debug, 0).value;
         init_wind         = read_parameter_from_file<int>(filename,"PARI_INIT_WIND", debug, 0).value;
         alpha_collision   = read_parameter_from_file<double>(filename,"PARI_ALPHA_COLL", debug, 0).value;
+        collision_model   = read_parameter_from_file<char>(filename,"PARI_COLL_MODEL", debug, 'C').value;
         friction_solver   = read_parameter_from_file<int>(filename,"FRICTION_SOLVER", debug, 0).value;
         
         if(problem_number == 2)
@@ -297,8 +301,11 @@ c_Sim::c_Sim(string filename, string speciesfile, int debug) {
         //
         // Create and initialize the species
         //
+        // 
+        // !!!!IMPORTANT CHANGE HERE TO NUM_SPECIES_ACT
         //
-        num_species = read_parameter_from_file<int>(filename,"PARI_NUM_SPECIES", debug, 1).value;
+        //num_species = read_parameter_from_file<int>(filename,"PARI_NUM_SPECIES", debug, 1).value;
+        num_species = NUM_SPECIES_ACT;
         
         if(debug > 0) cout<<"Init: About to setup species with num_species = "<<num_species<<endl;
         
@@ -324,7 +331,13 @@ c_Sim::c_Sim(string filename, string speciesfile, int debug) {
         //
         // Matrix init via Eigen
         //
-        if(num_species > 1 && friction_solver == 1) {
+        identity_matrix3 = Eigen::MatrixXd::Identity(NUM_SPECIES_ACT, NUM_SPECIES_ACT);
+        unity_vector3    = Eigen::VectorXd::Ones(num_species);
+        
+        alphas_sample  = Eigen::VectorXd::Zero(num_cells+2);
+        alphas_sample3 = Eigen::VectorXd::Zero(num_cells+2);
+        
+        if(num_species > 1 && friction_solver == 2) {
             friction_matrix_T   = Eigen::MatrixXd::Zero(num_species, num_species);
             friction_matrix_M   = Eigen::MatrixXd::Zero(num_species, num_species);
             friction_coefficients = Eigen::MatrixXd::Zero(num_species, num_species);
@@ -333,6 +346,25 @@ c_Sim::c_Sim(string filename, string speciesfile, int debug) {
             friction_vec_input  = Eigen::VectorXd(num_species);
             friction_vec_output = Eigen::VectorXd(num_species);
             friction_dEkin      = Eigen::VectorXd(num_species);
+            unity_vector        = Eigen::VectorXd::Ones(num_species);
+            dens_vector2        = Eigen::MatrixXd(num_species, num_cells+2);
+        }
+        //else if(num_species > 1 && friction_solver == 2) {
+            /*
+            friction_matrix_T   = Eigen::MatrixXd::Zero(num_species*num_cells, num_species*num_cells);
+            friction_matrix_M   = Eigen::MatrixXd::Zero(num_species*num_cells, num_species*num_cells);
+            friction_coefficients = Eigen::MatrixXd::Zero(num_species*num_cells, num_species*num_cells);
+            friction_coeff_mask = Eigen::MatrixXd::Constant(num_species*num_cells, num_species*num_cells, 1.);
+            identity_matrix     = Eigen::MatrixXd::Identity(num_species*num_cells, num_species*num_cells);
+            friction_vec_input  = Eigen::VectorXd(num_species*num_cells);
+            friction_vec_output = Eigen::VectorXd(num_species*num_cells);
+//            friction_dEkin      = Eigen::VectorXd(num_species*num_cells);
+            unity_vector        = Eigen::VectorXd::Ones(num_species*num_cells);
+            dens_vector1        = Eigen::VectorXd(num_species * num_cells);
+            */
+        //}
+        else {
+            friction_coeff_mask = Eigen::MatrixXd::Constant(num_species, num_species, 1.);
         }
         
         //
@@ -456,7 +488,7 @@ c_Species::c_Species(c_Sim *base_simulation, string filename, string species_fil
             SHOCK_TUBE_MID = read_parameter_from_file<double>(filename,"PARI_INIT_SHOCK_MID", debug, 0.5).value;
             
              //If we test friction, set species=2 velocity to zero
-            if(base->num_species == 2 || base->friction_solver == 1) {
+            if(base->num_species > 1) {
                 u2l = density_excess;
                 u2r = density_excess;
             }
@@ -472,7 +504,7 @@ c_Species::c_Species(c_Sim *base_simulation, string filename, string species_fil
             
             initialize_shock_tube_test(SHOCK_TUBE_UL, SHOCK_TUBE_UR);
             
-            if(debug > 0) cout<<"        Species["<<species_index<<"] initialized problem 1."<<endl;
+            if(debug > 0) cout<<"        Species["<<species_index<<"] initialized problem 1. with left primitives ="<<pl.density<<" /"<<pl.speed<<" init atmo "<<init_static_atmosphere  <<" density excess"<<density_excess<<endl;
         }
         //
         // Problem 2: A constant background state, with a planet embedded into it, free to evolve as physics dictates
@@ -535,7 +567,7 @@ void c_Species::initialize_hydrostatic_atmosphere() {
     double T_inner;
     double T_outer;
     double metric_inner;
-    double residual;
+    //double residual;
     double metric_outer;
     //
     // Start with the outermost cell and build up a hydrostatic atmosphere

@@ -74,7 +74,7 @@ std::vector<double> np_zeros(int size) {
 //
 // Return a 1-D array of one, identical to the numpy function
 //
-std::vector<double> nnp_ones(int size) {
+std::vector<double> np_ones(int size) {
 
     return std::vector<double>(size, 1.0) ;
 }
@@ -278,6 +278,7 @@ simulation_parameter<T> read_parameter_from_file(string filename, string variabl
 template simulation_parameter<bool>  read_parameter_from_file(string, string, int, bool);
 template simulation_parameter<int>   read_parameter_from_file(string, string, int, int);
 template simulation_parameter<double> read_parameter_from_file(string, string, int, double);
+template simulation_parameter<char> read_parameter_from_file(string, string, int, char);
 template simulation_parameter<string> read_parameter_from_file(string, string, int, string);
 
 template simulation_parameter<Geometry> read_parameter_from_file(string, string, int, Geometry);
@@ -337,7 +338,7 @@ void c_Species::print_AOS_component_tofile(int timestepnumber) {
             
             //flux[i] - flux[i+1] + source[i]
             
-            outfile<<base->x_i12[i]<<'\t'<<u[i].u1<<'\t'<<u[i].u2<<'\t'<<u[i].u3<<'\t'<<flux[i].u1<<'\t'<<flux[i].u2<<'\t'<<flux[i].u3<<'\t'<<((flux[i-1].u1 - flux[i].u1)/base->dx[i] + source[i].u1)<<'\t'<<((flux[i-1].u2 - flux[i].u2)/base->dx[i] + source[i].u2)<<'\t'<<((flux[i-1].u3 - flux[i].u3)/base->dx[i] + source[i].u3)<<'\t'<<prim[i].pres<<'\t'<<u[i].u2/u[i].u1<<'\t'<<prim[i].internal_energy <<'\t'<<timesteps[i]<<'\t'<<base->phi[i]<<'\t'<<prim[i].sound_speed<<'\t'<<opticaldepth[i]<<'\t'<<u_analytic[i]<<'\t'<<hydrostat2<<'\t'<<hydrostat3<<'\t'<<base->enclosed_mass[i]<<endl;
+            outfile<<base->x_i12[i]<<'\t'<<u[i].u1<<'\t'<<u[i].u2<<'\t'<<u[i].u3<<'\t'<<flux[i].u1<<'\t'<<flux[i].u2<<'\t'<<flux[i].u3<<'\t'<<((flux[i-1].u1 - flux[i].u1)/base->dx[i] + source[i].u1)<<'\t'<<((flux[i-1].u2 - flux[i].u2)/base->dx[i] + source[i].u2)<<'\t'<<((flux[i-1].u3 - flux[i].u3)/base->dx[i] + source[i].u3)<<'\t'<<prim[i].pres<<'\t'<<u[i].u2/u[i].u1<<'\t'<<prim[i].internal_energy <<'\t'<<timesteps[i]<<'\t'<<base->phi[i]<<'\t'<<prim[i].sound_speed<<'\t'<<opticaldepth[i]<<'\t'<<u_analytic[i]<<'\t'<<base->alphas_sample(i)<<'\t'<<hydrostat3<<'\t'<<base->enclosed_mass[i]<<endl;
         }
         
         //Print right ghost stuff
@@ -419,8 +420,10 @@ void c_Sim::print_monitor(int num_steps) {
         // Print the stuff
         //
         
+        //Cols 1-5
         monitor<<globalTime<<'\t'<<dt<<'\t'<<monitored_quantities.u1_tot/initial_monitored_quantities.u1_tot<<'\t'<<monitored_quantities.u2_tot/initial_monitored_quantities.u2_tot<<'\t'<<monitored_quantities.u3_tot/initial_monitored_quantities.u3_tot<<'\t';
         
+        //Starting with col 6
         for(int s=0; s<num_species; s++)
             monitor<<species[s].prim[1].speed<<'\t';
         
