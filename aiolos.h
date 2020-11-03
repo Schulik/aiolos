@@ -1,6 +1,6 @@
 #ifndef _AIOLOS_MAIN_H_
 #define _AIOLOS_MAIN_H_
-#define NUM_SPECIES_ACT 48
+#define NUM_SPECIES_ACT 4
 
 #include <iostream>
 #include <fstream>
@@ -463,7 +463,19 @@ public:
     // 
     // Riemann solver and source functions
     //
-    double get_dp_hydrostatic(const int &i, const int &plusminus) ;
+    double get_dp_hydrostatic(const int &i, const int &plusminus) const {
+        
+        double dp_final;
+    
+        if(plusminus == -1) {
+                dp_final = - base->dx[i] * base->omegaplus[i] * (base->phi[i-1] - base->phi[i]) / (base->dx[i-1] + base->dx[i]);
+        } else {
+                dp_final = - base->dx[i] * base->omegaminus[i] * (base->phi[i+1] - base->phi[i]) / (base->dx[i+1] + base->dx[i]);
+        }
+            
+        return dp_final;
+    }
+
     void reconstruct_edge_states() ;
     
     AOS hllc_flux(int);

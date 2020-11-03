@@ -109,25 +109,7 @@
             
     }    
     
-    //
-    // p_hydrostatic_nonuniform - hydrostatic reconstruction, after Eq. A.4 in KM2016
-    //
-    // takes:
-    // returns:
-    //
-    double c_Species::get_dp_hydrostatic(const int &i, const int &plusminus) {
-        
-        double dp_final;
     
-        if(plusminus == -1) {
-                dp_final = - base->dx[i] * base->omegaplus[i] * (base->phi[i-1] - base->phi[i]) / (base->dx[i-1] + base->dx[i]);
-        } else {
-                dp_final = - base->dx[i] * base->omegaminus[i] * (base->phi[i+1] - base->phi[i]) / (base->dx[i+1] + base->dx[i]);
-        }
-            
-        return dp_final;
-    }
-
     //
     // source_grav - numerical source function, after Eq. 11 in KM2016
     //                        
