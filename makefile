@@ -1,8 +1,25 @@
-CXX = g++ -std=c++17
-CPPFLAGS =      # put pre-processor settings (-I, -D, etc) here
-CXXFLAGS = -Wall -Wextra -march=native #-pg or -g put compiler settings here
-LDFLAGS = -lgsl -lgslcblas -lm -flto      # put linker settings here
-BFLAGS = -I. -O3 -flto -g #-pg or -g
+
+ifeq ($(SYSTEM), intel)
+CXX = icpc -std=c++17
+CPPFLAGS =  -I/usr/include/eigen3    # put pre-processor settings (-I, -D, etc) here
+CXXFLAGS = -Wall -Wextra -xHost #-pg or -g put compiler settings here
+LDFLAGS = -lgsl -lgslcblas -lm      # put linker settings here
+BFLAGS = -I. -O3 -g #or -g
+else 
+ifeq ($(SYSTEM), clang)
+CXX = clang++ -std=c++17 
+CPPFLAGS =   -I/usr/include/eigen3   # put pre-processor settings (-I, -D, etc) here
+CXXFLAGS = -Wall -Wextra -march=native  #-pg or -g put compiler settings here
+LDFLAGS = -lgsl -lgslcblas -lm      # put linker settings here
+BFLAGS = -I. -O3 -g #or -g
+else
+CXX = g++ -std=c++17 
+CPPFLAGS =   -I/usr/include/eigen3   # put pre-processor settings (-I, -D, etc) here
+CXXFLAGS = -Wall -Wextra -march=native  #-pg or -g put compiler settings here
+LDFLAGS = -lgsl -lgslcblas -lm      # put linker settings here
+BFLAGS = -I. -O3 -g #or -g
+endif
+endif
 
 PROBLEM=default
 
@@ -17,12 +34,8 @@ TEST_OBJ = $(subst main.o, test_files/main.o, $(OBJ))
 
 
 
-#euler_hllc: $(OBJ)
-#	$(CXX) -o $@ $(OBJ) $(CXXFLAGS) $(LDFLAGS) $(BFLAGS)
-
 aiolos: $(OBJ) makefile
 	$(CXX) -o $@ $(OBJ) $(CXXFLAGS) $(LDFLAGS)
-	#./$@
 
 %.o: %.cpp makefile aiolos.h
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< $(BFLAGS) -o $@ 

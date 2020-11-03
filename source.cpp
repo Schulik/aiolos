@@ -1,5 +1,7 @@
-#include <cassert>
+#define EIGEN_RUNTIME_NO_MALLOC
 
+
+#include <cassert>
 #include "aiolos.h"
 
 
@@ -355,15 +357,14 @@
 // Friction solver 2
 //
 void c_Sim::compute_friction_numerical_dynamic() {
-        
+
+    Eigen::internal::set_is_malloc_allowed(false) ;
+         
     if(debug > 0) cout<<"in numerical, dense friction, num_species = "<<num_species<<endl;
             
     double alpha_local;
     double coll_b;
-    Eigen::VectorXd dens_vector(num_species);
-    Eigen::VectorXd numdens_vector(num_species);
-    Eigen::VectorXd mass_vector(num_species);
-    
+
     for(int j=0; j <= num_cells+1; j++){
                 
         for(int si=0; si<num_species; si++) {
@@ -414,22 +415,13 @@ void c_Sim::compute_friction_numerical_dynamic() {
                 if(debug >= 1 && j==0 && steps == 0) cout<<"    velocities[0] = "<<friction_vec_input(0)<<endl;
                 if(debug >= 1 && j==0 && steps == 0) cout<<"    rho[0] = "<<species[0].u[j].u1<<endl;
                 
-                friction_matrix_M   = (friction_coefficients * unity_vector).asDiagonal();
-                friction_matrix_M  -= friction_coefficients;
-                friction_matrix_T   = identity_matrix + friction_matrix_M * dt;
-                if(debug >= 0 && j==7 && steps == 1) cout<<"    T = "<<friction_matrix_T<<endl;
+                friction_matrix_T = identity_matrix - friction_coefficients * dt;
+                friction_matrix_T.diagonal().noalias() += dt * (friction_coefficients * unity_vector);
                 
-                //friction_vec_output = friction_matrix_T.partialPivLu().solve(friction_vec_input) ;
                 LU.compute(friction_matrix_T) ;
-                friction_vec_output = LU.solve(friction_vec_input);
-                //friction_matrix_T   = friction_matrix_T.inverse();
-                //friction_vec_output = friction_matrix_T * friction_vec_input;
+                friction_vec_output.noalias() = LU.solve(friction_vec_input);
                 
-                //friction_vec_output = friction_matrix_T.partialPivLu().solve(friction_vec_input) ;
-                
-                if(debug >= 0 && j==7 && steps == 1) cout<<"    T.inv = "<<friction_matrix_T<<endl;
-                
-                
+                if(debug >= 0 && j==7 && steps == 1) cout<<"    T = "<<friction_matrix_T<<endl;
                 if(debug >= 0 && j==7 && steps == 1) cout<<"    v_inp = "<<friction_vec_input<<endl;
                 if(debug >= 0 && j==7 && steps == 1) cout<<"    v_out = "<<friction_vec_output<<endl;
                 
@@ -444,15 +436,7 @@ void c_Sim::compute_friction_numerical_dynamic() {
                     double temp = 0;
                     
                     for(int sj=0; sj<num_species; sj++) {
-                        
-                        double tempsj = dt * friction_coefficients(si,sj) * (species[sj].mass_amu/(species[sj].mass_amu+species[si].mass_amu))  * pow( friction_vec_output(si) - friction_vec_output(sj), 2.);
-                        
-                        if(si != sj)
-                            temp += tempsj;
-                        
-                        if(debug >= 0 && j==6 && steps == 1) cout<<"    e+tmpsj = "<<tempsj<<" at j = "<<j<<" for species si = "<<si<<" sj = "<<sj<<" dv = "<<friction_vec_output(si) - friction_vec_output(sj)<<" coeff = "<<friction_coefficients(si,sj)<<endl;
-                        
-                        if(debug >= 0 && j==7 && steps == 1) cout<<"    e+tmpsj = "<<tempsj<<" at j = "<<j<<" for species si = "<<si<<" sj = "<<sj<<" dv = "<<friction_vec_output(si) - friction_vec_output(sj)<<" coeff = "<<friction_coefficients(si,sj)<<endl;
+                        temp += dt * friction_coefficients(si,sj) * (species[sj].mass_amu/(species[sj].mass_amu+species[si].mass_amu))  * pow( friction_vec_output(si) - friction_vec_output(sj), 2.);
                     }
                     species[si].prim[j].internal_energy += temp;
                     

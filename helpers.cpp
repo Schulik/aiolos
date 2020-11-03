@@ -275,15 +275,25 @@ simulation_parameter<T> read_parameter_from_file(string filename, string variabl
 }
 
 
+
+
 template simulation_parameter<bool>  read_parameter_from_file(string, string, int, bool);
+template simulation_parameter<bool>  read_parameter_from_file(string, string, int);
 template simulation_parameter<int>   read_parameter_from_file(string, string, int, int);
+template simulation_parameter<int>   read_parameter_from_file(string, string, int);
 template simulation_parameter<double> read_parameter_from_file(string, string, int, double);
+template simulation_parameter<double> read_parameter_from_file(string, string, int);
 template simulation_parameter<char> read_parameter_from_file(string, string, int, char);
+template simulation_parameter<char> read_parameter_from_file(string, string, int);
 template simulation_parameter<string> read_parameter_from_file(string, string, int, string);
+template simulation_parameter<string> read_parameter_from_file(string, string, int);
 
 template simulation_parameter<Geometry> read_parameter_from_file(string, string, int, Geometry);
+template simulation_parameter<Geometry> read_parameter_from_file(string, string, int);
 template simulation_parameter<BoundaryType> read_parameter_from_file(string, string, int, BoundaryType);
+template simulation_parameter<BoundaryType> read_parameter_from_file(string, string, int);
 template simulation_parameter<IntegrationType> read_parameter_from_file(string, string, int, IntegrationType);
+template simulation_parameter<IntegrationType> read_parameter_from_file(string, string, int);
 
 //Print 2 
 void c_Species::print_AOS_component_tofile(int timestepnumber) {

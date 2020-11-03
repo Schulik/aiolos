@@ -348,6 +348,10 @@ c_Sim::c_Sim(string filename, string speciesfile, int debug) {
             friction_dEkin      = Eigen::VectorXd(num_species);
             unity_vector        = Eigen::VectorXd::Ones(num_species);
             dens_vector2        = Eigen::MatrixXd(num_species, num_cells+2);
+            LU = decltype(LU)(num_species) ;
+            dens_vector = Eigen::VectorXd(num_species);
+            numdens_vector = Eigen::VectorXd(num_species);
+            mass_vector = Eigen::VectorXd(num_species);
         }
         //else if(num_species > 1 && friction_solver == 2) {
             /*
