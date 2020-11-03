@@ -1,25 +1,22 @@
 
 ifeq ($(SYSTEM), intel)
 CXX = icpc -std=c++17
-CPPFLAGS =  -I/usr/include/eigen3    # put pre-processor settings (-I, -D, etc) here
-CXXFLAGS = -Wall -Wextra -xHost #-pg or -g put compiler settings here
-LDFLAGS = -lgsl -lgslcblas -lm      # put linker settings here
+CXXFLAGS = -Wall -Wextra -xHost -ipo #-pg or -g put compiler settings here
 BFLAGS = -I. -O3 -g #or -g
 else 
 ifeq ($(SYSTEM), clang)
 CXX = clang++ -std=c++17 
-CPPFLAGS =   -I/usr/include/eigen3   # put pre-processor settings (-I, -D, etc) here
-CXXFLAGS = -Wall -Wextra -march=native  #-pg or -g put compiler settings here
-LDFLAGS = -lgsl -lgslcblas -lm      # put linker settings here
+CXXFLAGS = -Wall -Wextra -march=native -lto  #-pg or -g put compiler settings here
 BFLAGS = -I. -O3 -g #or -g
 else
 CXX = g++ -std=c++17 
-CPPFLAGS =   -I/usr/include/eigen3   # put pre-processor settings (-I, -D, etc) here
-CXXFLAGS = -Wall -Wextra -march=native  #-pg or -g put compiler settings here
-LDFLAGS = -lgsl -lgslcblas -lm      # put linker settings here
+CXXFLAGS = -Wall -Wextra -march=native -lto  #-pg or -g put compiler settings here
 BFLAGS = -I. -O3 -g #or -g
 endif
 endif
+CPPFLAGS =  -I/usr/include/eigen3 -DNDEBUG    # put pre-processor settings (-I, -D, etc) here
+LDFLAGS = -lgsl -lgslcblas -lm      # put linker settings here
+
 
 PROBLEM=default
 
