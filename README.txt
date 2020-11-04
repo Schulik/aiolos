@@ -13,3 +13,16 @@ file, e.g. "problems/my_problem.cpp". These can then be compiled into aiolos
 via:
 
     make PROBLEM=my_problem
+
+
+Fixed number of species
+
+By default, aiolos is compiled in a flexible mode that can run problesm with any
+number of input species. However, a significant (10-20%) speed up can be
+realised if the number of species is restricted at compile time. This can be
+done via:
+
+     make PROBLEM=my_problem NUM_SPECIES=4
+
+where the "4" refers to a target of 4 species total.
+
