@@ -1,6 +1,5 @@
 #ifndef _AIOLOS_MAIN_H_
 #define _AIOLOS_MAIN_H_
-#define NUM_SPECIES_ACT 48
 
 #include <iostream>
 #include <fstream>
@@ -22,6 +21,9 @@
 #include "enum.h"
 #include "eos.h"
 
+#ifndef NUM_SPECIES
+#define NUM_SPECIES Eigen::Dynamic
+#endif
 
 
 using namespace std;
@@ -264,36 +266,24 @@ public:
     Monitored_Quantities monitored_quantities;
     Monitored_Quantities initial_monitored_quantities;
     
-    Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> friction_matrix_T;
-    Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> friction_matrix_M;
-    Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> identity_matrix;
-    Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> friction_coefficients;
-    Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> friction_coeff_mask;
-    Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> dens_vector2;
-    Eigen::Matrix<double, Eigen::Dynamic, 1>              dens_vector1;
-    Eigen::Matrix<double, Eigen::Dynamic, 1>              friction_vec_input;
-    Eigen::Matrix<double, Eigen::Dynamic, 1>              friction_vec_output;
-    Eigen::Matrix<double, Eigen::Dynamic, 1>              friction_dEkin;
-    Eigen::Matrix<double, Eigen::Dynamic, 1>              unity_vector;
-    Eigen::PartialPivLU<Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>> LU;
-    Eigen::Matrix<double, Eigen::Dynamic, 1> alphas_sample;
-    Eigen::Matrix<double, Eigen::Dynamic, 1> alphas_sample3;
-    Eigen::VectorXd dens_vector;
-    Eigen::VectorXd numdens_vector;
-    Eigen::VectorXd mass_vector;
-    
-    Eigen::Matrix<double, NUM_SPECIES_ACT, 1> dens_vector3;
-    Eigen::Matrix<double, NUM_SPECIES_ACT, 1> numdens_vector3;
-    Eigen::Matrix<double, NUM_SPECIES_ACT, 1> mass_vector3;
-    Eigen::Matrix<double, NUM_SPECIES_ACT, 1> friction_vec_input3;
-    Eigen::Matrix<double, NUM_SPECIES_ACT, 1> friction_vec_output3;
-    Eigen::Matrix<double, NUM_SPECIES_ACT, NUM_SPECIES_ACT, Eigen::RowMajor> friction_coefficients3;
-    Eigen::Matrix<double, NUM_SPECIES_ACT, NUM_SPECIES_ACT, Eigen::RowMajor> friction_coeff_mask3;
-    Eigen::Matrix<double, NUM_SPECIES_ACT, NUM_SPECIES_ACT, Eigen::RowMajor> friction_matrix_M3;
-    Eigen::Matrix<double, NUM_SPECIES_ACT, NUM_SPECIES_ACT, Eigen::RowMajor> friction_matrix_T3;
-    Eigen::Matrix<double, NUM_SPECIES_ACT, NUM_SPECIES_ACT, Eigen::RowMajor> identity_matrix3;
-    Eigen::PartialPivLU<Eigen::Matrix<double, NUM_SPECIES_ACT, NUM_SPECIES_ACT, Eigen::RowMajor>> LU3;
-    Eigen::Matrix<double, NUM_SPECIES_ACT, 1> unity_vector3;
+    using Matrix_t = Eigen::Matrix<double, NUM_SPECIES,NUM_SPECIES, Eigen::RowMajor>;
+    using Vector_t = Eigen::Matrix<double, NUM_SPECIES, 1>;
+    Matrix_t friction_matrix_T;
+    Matrix_t identity_matrix;
+    Matrix_t friction_coefficients;
+    Matrix_t friction_coeff_mask;
+    Vector_t friction_vec_input;
+    Vector_t friction_vec_output;
+    Vector_t friction_dEkin;
+    Vector_t unity_vector;
+    Eigen::PartialPivLU<Matrix_t> LU;
+    Vector_t dens_vector;
+    Vector_t numdens_vector;
+    Vector_t mass_vector;
+
+    Eigen::VectorXd alphas_sample;
+
+
     
     ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     //
@@ -328,8 +318,7 @@ public:
     // Source terms
     //
     void compute_friction_analytical(); 
-    void compute_friction_numerical_dynamic(); 
-    void compute_friction_numerical_static(); 
+    void compute_friction_numerical(); 
     void compute_friction_numerical_sparse(); 
     
     //Gravity

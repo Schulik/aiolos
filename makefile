@@ -6,19 +6,22 @@ BFLAGS = -I. -O3 -g #or -g
 else 
 ifeq ($(SYSTEM), clang)
 CXX = clang++ -std=c++17 
-CXXFLAGS = -Wall -Wextra -march=native -lto  #-pg or -g put compiler settings here
+CXXFLAGS = -Wall -Wextra -march=native -flto  #-pg or -g put compiler settings here
 BFLAGS = -I. -O3 -g #or -g
 else
 CXX = g++ -std=c++17 
-CXXFLAGS = -Wall -Wextra -march=native -lto  #-pg or -g put compiler settings here
+CXXFLAGS = -Wall -Wextra -march=native -flto  #-pg or -g put compiler settings here
 BFLAGS = -I. -O3 -g #or -g
 endif
 endif
-CPPFLAGS =  -I/usr/include/eigen3 -DNDEBUG    # put pre-processor settings (-I, -D, etc) here
-LDFLAGS = -lgsl -lgslcblas -lm      # put linker settings here
+CPPFLAGS = -I/usr/include/eigen3 -DNDEBUG # put pre-processor settings (-I, -D, etc) here
+LDFLAGS = -lgsl -lgslcblas -lm # put linker settings here
 
 
 PROBLEM=default
+NUM_SPECIES=Eigen::Dynamic
+
+CPPFLAGS += -DNUM_SPECIES=$(NUM_SPECIES)
 
 ##SRC = main.cpp advection.cpp source.cpp
 SRC = $(wildcard *.cpp)

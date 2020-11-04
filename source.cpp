@@ -356,7 +356,7 @@
 //
 // Friction solver 2
 //
-void c_Sim::compute_friction_numerical_dynamic() {
+void c_Sim::compute_friction_numerical() {
 
     Eigen::internal::set_is_malloc_allowed(false) ;
          
@@ -366,12 +366,12 @@ void c_Sim::compute_friction_numerical_dynamic() {
     double coll_b;
 
     for(int j=0; j <= num_cells+1; j++){
-                
+
         for(int si=0; si<num_species; si++) {
-                    friction_vec_input(si) = species[si].prim[j].speed;
-                    dens_vector(si)        =  species[si].u[j].u1; 
-                    numdens_vector(si)     =  species[si].prim[j].number_density; 
-                    mass_vector(si)        =  species[si].mass_amu;
+                friction_vec_input(si) = species[si].prim[j].speed;
+                dens_vector(si)        =  species[si].u[j].u1; 
+                numdens_vector(si)     =  species[si].prim[j].number_density; 
+                mass_vector(si)        =  species[si].mass_amu;
             }
         
         
@@ -401,11 +401,6 @@ void c_Sim::compute_friction_numerical_dynamic() {
                            friction_coefficients(si,sj) = friction_coeff_mask(si,sj) * alpha_local;
                     else
                            friction_coefficients(si,sj) = friction_coeff_mask(si,sj) * alpha_local  * dens_vector(sj) / dens_vector(si) ;
-                    
-                    if(si==0 && sj==3 && j==7 && steps == 1)
-                        cout<<"    si/sj=0/3, alpha_local = "<<alpha_local<<" friction_coeff = "<<friction_coefficients(si,sj)<<" dens ratio "<<(dens_vector(sj) / dens_vector(si))<<endl;
-                    //if(friction_coefficients(si,sj) < 1e-20)
-                    //    friction_coefficients(si,sj) = 0.;
                     }
                     
                 }
@@ -460,97 +455,7 @@ void c_Sim::compute_friction_numerical_dynamic() {
             }
     
 }
-    
-//
-// Friction solver 1
-//
 
-//EIGEN_DONT_INLINE 
- void c_Sim::compute_friction_numerical_static() {
-        
-    if(debug > 0) cout<<"in numerical, dense friction8, num_species = "<<num_species<<endl;
-    
-    //if(num_species==12) {
-        double alpha_local;
-        double coll_b;
-        
-        for(int j=1; j <= num_cells; j++){
-                    
-                for(int si=0; si<num_species; si++) {
-                        friction_vec_input3(si) = species[si].prim[j].speed;
-                        dens_vector3(si)        =  species[si].u[j].u1; 
-                        numdens_vector3(si)     =  species[si].prim[j].number_density; 
-                        mass_vector3(si)        =  species[si].mass_amu;
-                }
-                
-                    
-                for(int si=0; si<num_species; si++) 
-                    for(int sj=0; sj<num_species; sj++)
-                    {
-                        
-                        if(collision_model == 'C') {
-                            alpha_local = alpha_collision;
-                        }
-                        else {
-                            coll_b      = 1./(1.4142*numdens_vector3(sj));     // Update this, if charged species collide
-                            alpha_local = (numdens_vector3(si) + numdens_vector3(sj))/(numdens_vector3(si)*mass_vector3(sj) + numdens_vector3(si)*mass_vector3(sj) );
-                            alpha_local *= kb * species[si].prim[j].temperature /(mass_vector3(si) * coll_b);
-                        }
-                        
-                        
-                        if(si==0 && sj == 1)
-                            alphas_sample(j) = alpha_local;
-                            
-                        if(si==sj)
-                            friction_coefficients3(si,sj) = 0.;
-                        else if(si > sj)
-                            friction_coefficients3(si,sj) = friction_coeff_mask(si,sj) * alpha_local;
-                        else
-                            friction_coefficients3(si,sj) = friction_coeff_mask(si,sj) * alpha_local  * dens_vector3(sj) / dens_vector3(si);
-                    }
-                    
-                if(debug > 0) cout<<"   before matrix operations. "<<endl;
-                    
-                //friction_matrix_M = friction_coefficients.rowwise().sum().asDiagonal();
-                friction_matrix_M3   = (friction_coefficients3 * unity_vector3).asDiagonal();
-                friction_matrix_M3  -= friction_coefficients3;
-                    
-                friction_matrix_T3   = identity_matrix3;
-                friction_matrix_T3  += dt * friction_matrix_M3 ;
-                    
-                if(debug > 1) cout<<"    in friction 8, j = "<<j<<" before inverse, T = "<<endl<<friction_matrix_T3<<endl<<" M = "<<endl<<friction_matrix_M3<<endl<<" A = "<<endl<<friction_coefficients3<<endl<<" v input = "<<friction_vec_input3<<endl;
-                    
-                //friction_vec_output3.noalias() = friction_matrix_T3.inverse().eval() * friction_vec_input3;
-                //friction_matrix_T3   = friction_matrix_T3.inverse().eval();
-                //friction_vec_output3.noalias() = friction_matrix_T3 * friction_vec_input3;
-                //friction_vec_output3 = friction_matrix_T3 * friction_vec_input3;
-                //friction_vec_output3           = friction_vec_input3;
-                
-                LU3.compute(friction_matrix_T3) ;
-                friction_vec_output3 = LU3.solve(friction_vec_input3);
-                
-                for(int si=0; si<num_species; si++) {
-                    double temp = 0;
-                    
-                    for(int sj=0; sj<num_species; sj++) {
-                        temp += dt * friction_coefficients3(si,sj) * (species[sj].mass_amu/(species[sj].mass_amu+species[si].mass_amu))  * pow( friction_vec_output3(si) - friction_vec_output3(sj), 2.);
-                    }
-                    species[si].prim[j].internal_energy += temp;
-                }
-            
-            
-        } //End radial loop
-            //
-            // Update scheme 1
-            //
-            for(int si=0; si<num_species; si++) {
-                species[si].eos->update_p_from_eint(&(species[si].prim[0]), num_cells+2);
-                species[si].eos->compute_conserved(&(species[si].prim[0]), &(species[si].u[0]), num_cells+2);        
-            }
-        
-    //}
-    
-}
     
     
         ///////////////////////////////////////////////////////////
@@ -600,22 +505,14 @@ void c_Sim::compute_friction_numerical_dynamic() {
                 if(debug >= 1 && j==0 && steps == 0) cout<<"    velocities[0] = "<<friction_vec_input(0)<<endl;
                 if(debug >= 1 && j==0 && steps == 0) cout<<"    rho[0] = "<<species[0].u[j].u1<<endl;
                 
-                //Eigen::MatrixXd friction_matrix_M2(num_species,num_species);
-                //friction_matrix_M = friction_coefficients.rowwise().sum().asDiagonal();
-                friction_matrix_M = (friction_coefficients * unity_vector).asDiagonal();
-                friction_matrix_M.noalias()          -= friction_coefficients;
-                
-                if(debug >= 1 && j==0 && steps == 1) {
-                    cout<<"    Final M ="<<endl<<friction_matrix_M<<endl;
-                    //cout<<"    Final M2 ="<<endl<<friction_matrix_M2<<endl;
-                }
+                // Build total matrix
+                friction_matrix_T = identity_matrix - friction_coefficients * dt;
+                friction_matrix_T.diagonal().noalias() += dt * (friction_coefficients * unity_vector);
                     
                 if(debug >= 1 && j==0 && steps == 1) cout<<"    ALPHA12 ="<<friction_coefficients(0,1)<<endl;
                 if(debug >= 1 && j==0 && steps == 1) cout<<"    alpha21 ="<<friction_coefficients(1,0)<<endl;
-                if(debug >= 1 && j==0 && steps == 1) cout<<"    M*v ="<<endl<<friction_matrix_M*friction_vec_input<<endl;
                 
                 // Build total matrix
-                friction_matrix_T.noalias()           = identity_matrix + friction_matrix_M * dt;
                 
                 if(debug >= 1 && j==0 && steps == 1) cout<<"    Final T ="<<endl<<friction_matrix_T<<endl;
                 
