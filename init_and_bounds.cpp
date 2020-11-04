@@ -304,9 +304,17 @@ c_Sim::c_Sim(string filename, string speciesfile, int debug) {
         // 
         // !!!!IMPORTANT CHANGE HERE TO NUM_SPECIES_ACT
         //
-        //num_species = read_parameter_from_file<int>(filename,"PARI_NUM_SPECIES", debug, 1).value;
-        num_species = NUM_SPECIES_ACT;
-        
+        num_species = read_parameter_from_file<int>(filename,"PARI_NUM_SPECIES", debug, 1).value;
+
+        if (NUM_SPECIES != Eigen::Dynamic && num_species != NUM_SPECIES) {
+            std::stringstream err ;
+            err << "Error: You compiled aiolois with a different number of species requested"
+                << " to that requested in the parameter file.\n You must recompile with either: "
+                << " 1) a dynamic number of species (default) or 2) the correct number of species";
+            throw std::invalid_argument(err.str()) ;
+        }
+
+
         if(debug > 0) cout<<"Init: About to setup species with num_species = "<<num_species<<endl;
         
         species.reserve(num_species);
@@ -327,48 +335,32 @@ c_Sim::c_Sim(string filename, string speciesfile, int debug) {
         dt = get_cfl_timestep();
         
         if(debug > 0) cout<<"Init: Finished Init."<<endl;
-        
         //
         // Matrix init via Eigen
         //
-        identity_matrix3 = Eigen::MatrixXd::Identity(NUM_SPECIES_ACT, NUM_SPECIES_ACT);
-        unity_vector3    = Eigen::VectorXd::Ones(num_species);
-        
+
+        if(debug > 0) cout<<"Init: Setting up friction workspace."<<endl;
+
+
         alphas_sample  = Eigen::VectorXd::Zero(num_cells+2);
-        alphas_sample3 = Eigen::VectorXd::Zero(num_cells+2);
         
-        if(num_species > 1 && friction_solver == 2) {
-            friction_matrix_T   = Eigen::MatrixXd::Zero(num_species, num_species);
-            friction_matrix_M   = Eigen::MatrixXd::Zero(num_species, num_species);
-            friction_coefficients = Eigen::MatrixXd::Zero(num_species, num_species);
-            friction_coeff_mask = Eigen::MatrixXd::Constant(num_species, num_species, 1.);
-            identity_matrix     = Eigen::MatrixXd::Identity(num_species, num_species);
-            friction_vec_input  = Eigen::VectorXd(num_species);
-            friction_vec_output = Eigen::VectorXd(num_species);
-            friction_dEkin      = Eigen::VectorXd(num_species);
-            unity_vector        = Eigen::VectorXd::Ones(num_species);
-            dens_vector2        = Eigen::MatrixXd(num_species, num_cells+2);
-            LU = decltype(LU)(num_species) ;
-            dens_vector = Eigen::VectorXd(num_species);
-            numdens_vector = Eigen::VectorXd(num_species);
-            mass_vector = Eigen::VectorXd(num_species);
+        if(num_species > 1) {
+            friction_matrix_T     = Matrix_t::Zero(num_species, num_species);
+            friction_coefficients = Matrix_t::Zero(num_species, num_species);
+            friction_coeff_mask   = Matrix_t::Ones(num_species, num_species);
+            friction_vec_input    = Vector_t(num_species);
+            friction_vec_output   = Vector_t(num_species);
+            friction_dEkin        = Vector_t(num_species);
+            dens_vector           = Vector_t(num_species);
+            numdens_vector        = Vector_t(num_species);
+            mass_vector           = Vector_t(num_species);
+
+            identity_matrix       = Matrix_t::Identity(num_species, num_species);
+            unity_vector          = Vector_t::Ones(num_species);
+            LU                    = decltype(LU)(num_species) ;
         }
-        //else if(num_species > 1 && friction_solver == 2) {
-            /*
-            friction_matrix_T   = Eigen::MatrixXd::Zero(num_species*num_cells, num_species*num_cells);
-            friction_matrix_M   = Eigen::MatrixXd::Zero(num_species*num_cells, num_species*num_cells);
-            friction_coefficients = Eigen::MatrixXd::Zero(num_species*num_cells, num_species*num_cells);
-            friction_coeff_mask = Eigen::MatrixXd::Constant(num_species*num_cells, num_species*num_cells, 1.);
-            identity_matrix     = Eigen::MatrixXd::Identity(num_species*num_cells, num_species*num_cells);
-            friction_vec_input  = Eigen::VectorXd(num_species*num_cells);
-            friction_vec_output = Eigen::VectorXd(num_species*num_cells);
-//            friction_dEkin      = Eigen::VectorXd(num_species*num_cells);
-            unity_vector        = Eigen::VectorXd::Ones(num_species*num_cells);
-            dens_vector1        = Eigen::VectorXd(num_species * num_cells);
-            */
-        //}
         else {
-            friction_coeff_mask = Eigen::MatrixXd::Constant(num_species, num_species, 1.);
+            friction_coeff_mask = Matrix_t::Ones(num_species, num_species);
         }
         
         //

@@ -123,10 +123,8 @@ void c_Sim::execute() {
         if(alpha_collision > 0 && num_species > 1) {
             if(friction_solver == 0)
                 compute_friction_analytical(); 
-            else if(friction_solver == 1) 
-                compute_friction_numerical_static();
             else
-                compute_friction_numerical_dynamic();
+                compute_friction_numerical();
                 //compute_friction_numerical_sparse();
         }
         
