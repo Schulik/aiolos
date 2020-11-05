@@ -4,39 +4,35 @@
 #
 
 #Control parameters
-PARI_PROBLEM_NUMBER     1
+PARI_PROBLEM_NUMBER     3
 #
 # Problem numbers explained: shock_tube, no grav = 1, planet with grav = 2
 #
-PARI_INIT_DATA_SWITCH   1
-PARI_INIT_DATA_U1L      1.4
-PARI_INIT_DATA_U2L      0.
-PARI_INIT_DATA_U3L      1.
-PARI_INIT_DATA_U1R      1.
-PARI_INIT_DATA_U2R      0.
-PARI_INIT_DATA_U3R      1.
-PARI_INIT_SHOCK_MID     0.5
-PARI_NUM_SPECIES        1
 
-OUTPUT_FILENAME         test_files/shock_tube6
+OUTPUT_FILENAME         test_files/dustywave_stiff
 
 PARI_SELF_GRAV_SWITCH   0
 PARI_LINEAR_GRAV        0
 PARI_DEBUGLEVEL         1
 PARI_INIT_STATIC        1
+PARI_ORDER              2
+PARI_GEOMETRY	        0
+PARI_NUM_SPECIES        2
+PARI_ALPHA_COLL	        1.0e5
+PARI_COLL_MODEL	        C
+FRICTION_SOLVER	        1
 
 #Numerical parameters
-PARI_BOUND_TYPE_LEFT    3
-PARI_BOUND_TYPE_RIGHT   3
-PARI_DOMAIN_DX          1e-2
+PARI_BOUND_TYPE_LEFT    4
+PARI_BOUND_TYPE_RIGHT   4
+PARI_DOMAIN_DX          7.8125e-3
 PARI_GRID_TYPE          0
-PARI_CELLS_PER_DECADE   20.
 PARI_DOMAIN_MIN         0.
 PARI_DOMAIN_MAX         1.
 PARI_TIME_DT            1e-3
-PARI_CFLFACTOR          0.9
-PARI_TIME_TMAX          0.012
-PARI_TIME_OUTPUT        0.012
+PARI_CFLFACTOR          0.8
+PARI_TIME_TMAX          3.0
+PARI_TIME_OUTPUT        3.0
 
 #Physical parameters
 PARI_PLANET_POS         0.
@@ -44,9 +40,6 @@ PARI_PLANET_MASS        0.
 PARI_SMOOTHING_LENGTH   1e-3
 PARI_SMOOTHING_TIME     0.0
 PARI_GAMMA              1.4
-ACCRETION_RATE          1.e-1
-PARI_CONST_TEMP         1.
-PARI_TEMP_INCR          1.e-8
 PARI_USE_RADIATION      0
 PARI_CONST_OPAC         1.
 PARI_CONST_CV           1.

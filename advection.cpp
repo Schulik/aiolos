@@ -196,22 +196,13 @@ void c_Species::execute(std::vector<AOS>& u_in, std::vector<AOS>& dudt) {
         //
         // Step 2: Compute fluxes and sources
         //
-        for(int j=0; j <= num_cells; j++) {
-            
-            flux[j] = hllc_flux(j); 
-
-            /*if(j==2) {
-                char alp;ms are which form of objects which have a velocity standard deviation comparable to their m
-                cout<<"flux[0]="<<flux[0].u1<<" / "<<flux[0].u2<<" / "<<flux[0].u3<<endl;
-                cout<<"flux[1]="<<flux[1].u1<<" / "<<flux[1].u2<<" / "<<flux[1].u3<<endl;
-                //cout<<"flux[2]="<<flux[2].u1<<" / "<<flux[2].u2<<" / "<<flux[2].u3<<endl;
-                
-                cout<<"u[0]="<<u[0].u1<<" / "<<u[0].u2<<" / "<<u[0].u3<<endl;
-                cout<<"u[1]="<<u[1].u1<<" / "<<u[1].u2<<" / "<<u[1].u3<<endl;
-                cout<<"u[2]="<<u[2].u1<<" / "<<u[2].u2<<" / "<<u[2].u3<<endl;
-                cout<<"phi[0,1,2]="<<phi[0]<<" / "<<phi[1]<<" / "<<phi[2]<<endl;
-                cin>>alp;
-            }*/
+        if (not is_dust_like) {
+            for(int j=0; j <= num_cells; j++)
+                flux[j] = hllc_flux(j); 
+        }
+        else {
+            for(int j=0; j <= num_cells; j++)
+                flux[j] = dust_flux(j);     
         }
         
         if(debug >= 2)
@@ -325,3 +316,35 @@ AOS c_Species::hllc_flux(int j)
     return flux;
 }
 
+
+// Riemann problem for (almost) pressure-less dust following Leveque (2004), Pelanti & Leveque (2006)
+AOS c_Species::dust_flux(int j) 
+{
+    AOS_prim Wl = prim_r[j] ;
+    AOS_prim Wr = prim_l[j+1] ;
+
+
+
+    // Case 1: Vacuum central state, no flux
+    if (Wl.speed < 0 && Wr.speed > 0)
+        return AOS(0,0,0) ;
+
+    // Case 2: delta-shock with speed SS
+    double R = std::sqrt(Wr.density/Wl.density) ;
+    double SS = (Wl.speed + R*Wr.speed) / (1 + R) ;
+
+    auto flux = [](const AOS_prim& W) {
+        double mom = W.density * W.speed ;
+        double en = W.density*(W.internal_energy + 0.5*W.speed*W.speed) ;
+
+        return AOS(mom, W.speed*mom, W.speed*(en + W.pres)) ;
+    } ;
+
+    if (SS > 0) {
+        return flux(Wl) ;
+    } else if (SS < 0) {
+        return flux(Wr) ;
+    } else {
+        return (flux(Wl) + flux(Wr)) * 0.5 ;
+    }
+}

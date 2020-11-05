@@ -471,6 +471,7 @@ public:
     void reconstruct_edge_states() ;
     
     AOS hllc_flux(int);
+    AOS dust_flux(int) ;
     AOS source_grav(AOS &u, int &j);
 
     void compute_pressure(std::vector<AOS>& u) {

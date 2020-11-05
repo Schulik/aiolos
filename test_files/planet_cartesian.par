@@ -18,6 +18,7 @@ PARI_SELF_GRAV_SWITCH   0
 PARI_LINEAR_GRAV        0
 PARI_DEBUGLEVEL         1
 PARI_INIT_STATIC        1
+PARI_NUM_SPECIES        1
 
 OUTPUT_FILENAME         test_files/planet_cartesian
 
