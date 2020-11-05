@@ -717,7 +717,7 @@ void c_Species::initialize_sound_wave() {
 
 
     for(int i=0; i<=num_cells+1; i++) {
-        double kx = 2*M_PI * (i - base->num_ghosts) / double(num_cells - 2*(base->num_ghosts-1)) ;
+        double kx = 2*M_PI * (i+0.5 - base->num_ghosts) / double(num_cells - 2*(base->num_ghosts-1)) ;
         double f = amp * std::sin(kx) ;
 
         AOS_prim p (rho0 *(1 + f), cs*f, p0*(1 + gamma_adiabat*f)) ;

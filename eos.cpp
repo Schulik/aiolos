@@ -25,7 +25,7 @@ void Adiabatic_EOS::compute_conserved(const AOS_prim* prim, AOS* cons, int num_c
 void Adiabatic_EOS::compute_auxillary(AOS_prim* prim, int num_cells) const {
     for (int i=0; i < num_cells; i++) {
         prim[i].number_density  = prim[i].density / _mass ;
-        prim[i].internal_energy = prim[i].pres/(prim[i].density*(_gamma-1)) ;
+        prim[i].internal_energy = (prim[i].pres/prim[i].density)/(_gamma-1) ;
         prim[i].sound_speed = std::sqrt(_gamma*(_gamma-1)*prim[i].internal_energy) ;
         prim[i].temperature = prim[i].internal_energy / _cv ;
     }

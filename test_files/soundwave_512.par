@@ -9,7 +9,7 @@ PARI_PROBLEM_NUMBER     3
 # Problem numbers explained: shock_tube, no grav = 1, planet with grav = 2
 #
 
-OUTPUT_FILENAME         test_files/soundwave_32
+OUTPUT_FILENAME         test_files/soundwave_512
 
 PARI_SELF_GRAV_SWITCH   0
 PARI_LINEAR_GRAV        0
@@ -21,7 +21,7 @@ PARI_GEOMETRY	        0
 #Numerical parameters
 PARI_BOUND_TYPE_LEFT    4
 PARI_BOUND_TYPE_RIGHT   4
-PARI_DOMAIN_DX          0.03125
+PARI_DOMAIN_DX          1.953125e-3
 PARI_GRID_TYPE          0
 PARI_DOMAIN_MIN         0.
 PARI_DOMAIN_MAX         1.
