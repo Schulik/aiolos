@@ -38,9 +38,9 @@ if __name__ == "__main__":
     check_steady_state("shock_tube6_H2", [0,0,0])
     check_steady_state("shock_tube7_H2", [4.9e-4, 4.9e-4, 0])
 
-    check_steady_state("soundwave_32_H2", [2.36e-7,]*3)
-    check_steady_state("soundwave_64_H2", [1.19e-7,]*3)
-    check_steady_state("soundwave_128_H2",[3.11e-8,]*3)
+    check_steady_state("soundwave_32_H2", [3.20e-7,]*3)
+    check_steady_state("soundwave_64_H2", [1.26e-7,]*3)
+    check_steady_state("soundwave_128_H2",[3.23e-8,]*3)
     check_steady_state("soundwave_256_H2",[9.1e-9,]*3)
 
     check_steady_state("planet_cartesian_H2", [1.5e-12, 6.2e-14, 7.6e-11])
