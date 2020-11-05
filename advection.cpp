@@ -91,7 +91,7 @@ void c_Sim::execute() {
         
         // Just do the basic update here
         for(int s=0; s < num_species; s++) {
-            for(int j=0; j < num_cells+1; j++)
+            for(int j=0; j < num_cells+2; j++)
                 species[s].u[j] = species[s].u[j] + species[s].dudt[0][j]*dt ;
         }
         

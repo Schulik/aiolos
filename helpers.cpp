@@ -442,7 +442,7 @@ void c_Sim::print_monitor(int num_steps) {
         
         monitor<<endl;
     }
-    else cout << "Unable to open file" << filename2 << endl;
+    else if (num_steps == 0) cout << "WARNING: Unable to open file " << filename2 << endl;
     monitor.close();
     
     if(num_steps == -1) 
