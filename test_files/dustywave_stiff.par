@@ -16,11 +16,11 @@ PARI_LINEAR_GRAV        0
 PARI_DEBUGLEVEL         1
 PARI_INIT_STATIC        1
 PARI_ORDER              2
-PARI_GEOMETRY	        0
+PARI_GEOMETRY           0
 PARI_NUM_SPECIES        2
-PARI_ALPHA_COLL	        1.0e5
-PARI_COLL_MODEL	        C
-FRICTION_SOLVER	        1
+PARI_ALPHA_COLL         1.0e5
+PARI_COLL_MODEL         C
+FRICTION_SOLVER         1
 
 #Numerical parameters
 PARI_BOUND_TYPE_LEFT    4
