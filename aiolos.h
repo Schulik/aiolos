@@ -81,7 +81,6 @@ template<typename T>
 struct simulation_parameter {
     string name;
     T value ;
-    string svalue;
 };
 
 //
