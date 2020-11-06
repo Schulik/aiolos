@@ -24,19 +24,23 @@ double MonotonizedCentralSlope(double ql, double qm, double qr,
 
 void c_Species::reconstruct_edge_states() {
 
+    const bool is_gas = !is_dust_like ;
+
     // Step 1:
     //   1st order hydrostatic reconstruction
     for (int i=0; i <= num_cells+1; i++) {
         prim_r[i] = prim_l[i] = prim[i] ;
 
-        if(i > 0)
-            prim_l[i].pres = prim[i].pres + prim[i].density * get_dp_hydrostatic(i,  -1);
-        if(i <= num_cells)
-            prim_r[i].pres = prim[i].pres + prim[i].density * get_dp_hydrostatic(i,  +1);
+        if (is_gas) {
+            if(i > 0)
+                prim_l[i].pres = prim[i].pres + prim[i].density * get_dp_hydrostatic(i,  -1);
+            if(i <= num_cells)
+                prim_r[i].pres = prim[i].pres + prim[i].density * get_dp_hydrostatic(i,  +1);
 
-        // TODO: add warning?
-        if (prim_l[i].pres < 0 || prim_r[i].pres < 0) {
-            prim_l[i] = prim_r[i] = prim[i] ;
+            // TODO: add warning?
+            if (prim_l[i].pres < 0 || prim_r[i].pres < 0) {
+                prim_l[i] = prim_r[i] = prim[i] ;
+            }
         }
     }
 
@@ -49,12 +53,15 @@ void c_Species::reconstruct_edge_states() {
             dx = base->dx ;
        
         for (int i=1; i <= num_cells; i++) {
-            double dp_l = 
-                prim[ i ].density * get_dp_hydrostatic( i ,  -1) -
-                prim[i-1].density * get_dp_hydrostatic(i-1,  +1) ;
-            double dp_r = 
-                prim[ i ].density * get_dp_hydrostatic( i ,  +1) -
-                prim[i+1].density * get_dp_hydrostatic(i+1,  -1) ;
+            double dp_l = 0, dp_r = 0 ;
+            if (is_gas) {
+                dp_l = 
+                    prim[ i ].density * get_dp_hydrostatic( i ,  -1) -
+                    prim[i-1].density * get_dp_hydrostatic(i-1,  +1) ;
+                dp_r = 
+                    prim[ i ].density * get_dp_hydrostatic( i ,  +1) -
+                    prim[i+1].density * get_dp_hydrostatic(i+1,  -1) ;
+            }
         
             // Non-uniform grid factors
             double cF = (x_iVC[i+1] - x_iVC[i]) / (x_i[i] - x_iVC[i]) ;

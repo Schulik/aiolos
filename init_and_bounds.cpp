@@ -443,14 +443,13 @@ c_Species::c_Species(c_Sim *base_simulation, string filename, string species_fil
         if(is_dust_like == 0) {
             cv            = 0.5 * degrees_of_freedom * Rgas_fake / mass_amu; 
             gamma_adiabat = (degrees_of_freedom + 2.)/ degrees_of_freedom;
-            eos           = new Adiabatic_EOS(gamma_adiabat, cv, mass_amu) ;
+            eos           = new IdealGas_EOS(degrees_of_freedom, cv, mass_amu) ;
         }
         //Dust species
         else {
-            cv            = degrees_of_freedom;
-            gamma_adiabat = 1.4;                //TODO: Delete this once we have a better dust EOS
-            mass_amu      = 1. * mass_amu;      //TODO: Replace this with more sensible computation of dust mass based on solid density and size
-            eos           = new Adiabatic_EOS(gamma_adiabat, cv, mass_amu) ;
+            cv            = 1.5 * Rgas_fake / mass_amu ; // 3 Degrees of freedom per atom (high T limit of debye theory)
+            gamma_adiabat = (degrees_of_freedom + 2.)/ degrees_of_freedom; // Total degrees of freedom per grain
+            eos           = new IdealGas_EOS(degrees_of_freedom, cv, mass_amu) ;
         }
         
         if(debug >= 0) cout<<"        Species["<<species_index<<"] got a gamma_adiabatic = "<<gamma_adiabat<<" and cv = "<<cv<<endl;
@@ -497,7 +496,7 @@ c_Species::c_Species(c_Sim *base_simulation, string filename, string species_fil
             u1l = initial_fraction * u1l;
             u1r = initial_fraction * u1r;
             
-            //Conversion from shock tube parameters (given as dens, velocity, pressure) to conserved variables (dens, momentum, internal energy)
+            // Conversion from shock tube parameters (given as dens, velocity, pressure) to conserved variables (dens, momentum, internal energy)
             AOS_prim pl(u1l, u2l, u3l) ;
             eos->compute_conserved(&pl, &SHOCK_TUBE_UL, 1) ;
 
@@ -726,13 +725,16 @@ void c_Species::initialize_background(const AOS &background) {
 void c_Species::initialize_sound_wave() {
 
     double amp = 1e-6 ;
-    double rho0 = 1.0 ;
+    double rho0 = 1.0 * initial_fraction ;
     double cs = 1.0 * (base->domain_max - base->domain_min) ;
     double p0 = rho0*cs*cs/(gamma_adiabat) ;
 
+    // Assume gas is H2
+    if (is_dust_like)
+        p0 *= 2 / mass_amu ;
 
     for(int i=0; i<=num_cells+1; i++) {
-        double kx = 2*M_PI * (i - base->num_ghosts) / double(num_cells - 2*(base->num_ghosts-1)) ;
+        double kx = 2*M_PI * (i+0.5 - base->num_ghosts) / double(num_cells - 2*(base->num_ghosts-1)) ;
         double f = amp * std::sin(kx) ;
 
         AOS_prim p (rho0 *(1 + f), cs*f, p0*(1 + gamma_adiabat*f)) ;

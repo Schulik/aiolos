@@ -49,7 +49,11 @@ int main()
     count += !run_test("test_files/soundwave_64.par") ;
     count += !run_test("test_files/soundwave_128.par") ;
     count += !run_test("test_files/soundwave_256.par") ;
+    count += !run_test("test_files/soundwave_512.par") ;
 
+    count += !run_test("test_files/dustywave_nonstiff.par") ;
+    count += !run_test("test_files/dustywave_stiff.par") ;
+    
     count += !run_test("test_files/planet_cartesian.par") ;
     count += !run_test("test_files/planet_spherical.par") ;
 

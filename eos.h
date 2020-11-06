@@ -19,11 +19,11 @@ class EOS_Base {
     virtual ~EOS_Base(){} ; 
 } ;
 
-class Adiabatic_EOS final: public EOS_Base {
+class IdealGas_EOS final: public EOS_Base {
 
   public:
-    Adiabatic_EOS(double gamma, double cv, double mass) 
-      : _gamma(gamma), _cv(cv), _mass(mass)
+    IdealGas_EOS(double dof, double cv, double mass) 
+      : _gamma_m1(2./dof), _cv(cv), _mass(mass)
     { } ;
 
     void compute_primitive(const AOS*, AOS_prim*, int) const ;
@@ -34,7 +34,7 @@ class Adiabatic_EOS final: public EOS_Base {
     void get_p_from_rhoT(const double*,const double*, double*) const;
     
   private:
-    double _gamma, _cv, _mass ;
+    double _gamma_m1, _cv, _mass ;
 } ;
 
 class Polytropic_EOS final: public EOS_Base {
