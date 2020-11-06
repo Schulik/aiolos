@@ -80,8 +80,59 @@ def plot_dusty_shock():
 
     f.savefig(os.path.join('plots/dusty_shock.png'))
 
-    return f
-        
+    return plt
+
+
+def check_dusty_shock(L1s=None):
+    param_file = 'dusty_shock.par'
+    gas_file = 'dusty_shock_H2_t-1.dat'
+    dust_file = 'dusty_shock_Dust_t-1.dat'
+
+    #Get the Riemann problem
+    exact = setup_riemann_solver(param_file)
+
+    gas = load_aiolos_snap(gas_file)
+    dust = load_aiolos_snap(dust_file)
+
+    params = load_aiolos_params(param_file)
+    x0 = float(params['PARI_INIT_SHOCK_MID'])
+    t  = float(params['PARI_TIME_TMAX'])
+
+    x = gas['x']
+    xa = x - x0
+    
+    L1 = [
+        np.abs(gas ['density']  - exact.density(x-x0, t)).mean(),
+        np.abs(dust['density']  - exact.density(x-x0, t)).mean(),
+        ]
+
+    name = "dusty_shock"
+    if L1s is not None:
+        passed = True
+        for l1, target in zip(L1, L1s):
+            passed &= l1 <= target
+
+        if passed:
+            print('Test {} L1 check passed'.format(name))
+        else:
+            print('Test {} L1 checked failed:'.format(name))
+            print('\tL1={}, target={}'.format(L1, L1_target))
+    else:
+         print('Test {} L1 values:'.format(name))
+         print('\tL1={}'.format(L1))
+    
 if __name__ == "__main__":
 
-    plot_dusty_shock()
+    import argparse
+    
+    parser = argparse.ArgumentParser("Check shock tube test results")
+    parser.add_argument("-p", "--make_plots", default=None,
+                        action="store_true",
+                        help="Make plots of the results")
+    args = parser.parse_args()
+
+    check_dusty_shock([0.54, 0.54])
+    
+    if args.make_plots:
+        f = plot_dusty_shock()
+        f.show()
