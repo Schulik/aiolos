@@ -375,7 +375,7 @@ void c_Sim::compute_friction_numerical() {
             }
         
         
-                
+        
         for(int si=0; si<num_species; si++) {
             for(int sj=0; sj<num_species; sj++) {
                     
@@ -391,8 +391,13 @@ void c_Sim::compute_friction_numerical() {
                         
                     }
                     
-                    if(si==0 && sj == 1)
+                    if(si==0 && sj == 1) {
                         alphas_sample(j) = alpha_local;
+                        //cout<<"    spec "<<species[si].name<<" j = "<<j<<" alpha_local = "<<alpha_local<<endl;
+                        if(steps == 1 && ((j==2) || (j==num_cells-2) || (j==num_cells/2)) )
+                            cout<<"    spec "<<species[si].name<<" j = "<<j<<" alpha_local = "<<alpha_local<<endl;
+                    }
+                        
                             
                 
                     if(si==sj)

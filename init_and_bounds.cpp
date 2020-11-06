@@ -55,7 +55,7 @@ c_Sim::c_Sim(string filename, string speciesfile, int debug) {
         //
         if( !(num_cells > 0 && num_cells < 999999) ) {
             std::stringstream err ;
-            err<<"WARNING! Something seems wrong with the number of cells required. num_cells = "<<num_cells<<endl;
+            err<<"    WARNING! Something seems wrong with the number of cells required. num_cells = "<<num_cells<<endl;
             throw std::invalid_argument(err.str()) ;
         }
             
@@ -68,6 +68,12 @@ c_Sim::c_Sim(string filename, string speciesfile, int debug) {
         monitor_time = read_parameter_from_file<double>(filename,"PARI_TIME_DT", debug).value;
         globalTime = 0.0;    
         timecount = 0;
+        
+        if(t_max / monitor_time > 1e6) {
+            char b;
+            cout<<"    WARNING! Specified t_max and t_dt will result in "<<(t_max / monitor_time)<<" entries in the monitor file."<<endl<<"    This might create a large file and/or impact performance significantly. Press the any key to continue."<<endl;
+            cin>>b;
+        }
         
         if(debug > 0) cout<<"Init: Finished reading time parameters."<<endl;
 
@@ -577,7 +583,7 @@ void c_Species::initialize_hydrostatic_atmosphere() {
     for(int i=num_cells+1; i>=0; i--) {
             
             prim[i].temperature = - 1.0 * base->phi[i] / (cv * gamma_adiabat) + const_T_space;
-            //prim[i].temperature = 100.;
+            //prim[i].temperature = const_T_space;
             
             //Add temperature bumps and troughs
             prim[i].temperature += TEMPERATURE_BUMP_STRENGTH * 4.  * exp( - pow(base->x_i12[i] - 1.e-1 ,2.) / (0.1) );
@@ -636,6 +642,15 @@ void c_Species::initialize_hydrostatic_atmosphere() {
             cin>>a;
         }
     }
+    
+    if(u[2].u1 > 1e40) {
+        cout<<"    ---WARNING---"<<endl;
+        cout<<"    IN CONSTRUCT HYDROSTATIC:"<<endl;
+        cout<<"    species["<<name<<"] has reached a very high initial density  of > 1e40 at the inner boundary."<<endl;
+        cout<<"    The well-balanced scheme seems to be unable to compensate minor velocity fluctuations under those circumstances."<<endl;
+        cout<<"    Be advised, your solution is probably about to unphysically explode."<<endl;
+    }
+        
   
     compute_pressure(u);
     

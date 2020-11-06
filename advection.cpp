@@ -232,9 +232,10 @@ void c_Species::execute(std::vector<AOS>& u_in, std::vector<AOS>& dudt) {
         for(int j=1; j<=num_cells; j++) {
             dudt[j] = (flux[j-1] * base->surf[j-1] - flux[j] * base->surf[j]) / base->vol[j] + (source[j] + source_pressure[j]) ;
             
-            if( (debug > 1) && ( j==1 || j==num_cells || j==(num_cells/2) )) {
-                //char alpha;
-                cout<<"Debuggin fluxes in cell i= "<<j<<endl; 
+            //if( (debug > 1) && ( j==1 || j==num_cells || j==(num_cells/2) )) {
+            if( (debug > 1) && ( j==2 ) && (base->steps==1)) {
+                char alpha;
+                cout<<"Debuggin fluxes in cell i= "<<j<<" for species "<<name<<" at time "<<base->steps<<endl; 
                 cout<<"     fl.u1 = "<<flux[j-1].u1<<": fr.u1 = "<<flux[j].u1<<endl;
                 cout<<"     fl.u2 = "<<flux[j-1].u2<<": fr.u2 = "<<flux[j].u2<<endl;
                 cout<<"     fl.u3 = "<<flux[j-1].u3<<": fr.u3 = "<<flux[j].u3<<endl;
@@ -251,7 +252,7 @@ void c_Species::execute(std::vector<AOS>& u_in, std::vector<AOS>& dudt) {
                 cout<<endl;
                 cout<<"     Al*Fl - Ar*Fr + s = "<<((flux[j-1].u2 * base->surf[j-1] - flux[j].u2 * base->surf[j]) / base->vol[j] + (source[j].u2))<<endl;
                 cout<<"     Al*Fl - Ar*Fr + s + sP = "<<((flux[j-1].u2 * base->surf[j-1] - flux[j].u2 * base->surf[j]) / base->vol[j] + (source[j].u2 +source_pressure[j].u2))<<endl;
-                //cin>>alpha;
+                cin>>alpha;
             }
         }
         
