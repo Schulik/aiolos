@@ -53,6 +53,8 @@ int main()
 
     count += !run_test("test_files/dustywave_nonstiff.par") ;
     count += !run_test("test_files/dustywave_stiff.par") ;
+
+    count += !run_test("test_files/dusty_shock.par") ;
     
     count += !run_test("test_files/planet_cartesian.par") ;
     count += !run_test("test_files/planet_spherical.par") ;

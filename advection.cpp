@@ -338,7 +338,7 @@ AOS c_Species::dust_flux(int j)
         double mom = W.density * W.speed ;
         double en = W.density*(W.internal_energy + 0.5*W.speed*W.speed) ;
 
-        return AOS(mom, W.speed*mom, W.speed*(en + W.pres)) ;
+        return AOS(mom, W.speed*mom + W.pres, W.speed*(en + W.pres)) ;
     } ;
 
     if (SS > 0) {

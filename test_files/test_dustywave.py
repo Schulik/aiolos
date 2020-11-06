@@ -1,6 +1,5 @@
 import os
 import numpy as np
-from scipy.integrate import ode
 
 from load_aiolos import load_aiolos_snap, load_aiolos_params
 
@@ -58,7 +57,6 @@ class DustyWaveSolver(object):
         k = 2*np.pi / self.wavelength
         cs2 = self.cs**2
         gammaP0 = cs2 * self.rho_g 
-        gamma = self.GAMMA
 
         ts_inv = self.K * self.rho_g / self.rho_d
         if self.feedback:
@@ -68,27 +66,13 @@ class DustyWaveSolver(object):
             Kg = 0
             Kd = ts_inv
 
-        def f(t, y,_=None):
-            drho_g, v_g = y[0:2]
-            drho_d, v_d = y[2:4]
-            dP = y[4]
-            
-            dydt = np.empty([5], dtype='c8')
-            dydt[0] = - 1j*k*self.vf*drho_g - 1j*k*self.rho_g * v_g 
-            dydt[1] = - 1j*k*self.vf * v_g - Kg*(v_g - v_d) - 1j*k*dP/self.rho_g
-            dydt[2] = - 1j*k*self.rho_d * v_d - 1j*k*self.vf*drho_d
-            dydt[3] = - 1j*k*self.vf * v_d + Kd*(v_g - v_d)
-            dydt[4] = - 1j*k*gammaP0 * v_g - 1j*k*self.vf*dP
-            return dydt
-
-        _jac = np.zeros([5,5], dtype='c8')
-        _jac[0,:] = [-1j*k*self.vf, -1j*k*self.rho_g, 0, 0, 0]
-        _jac[1,:] = [0, -Kg - 1j*k*self.vf, 0,  Kg, -1j*k/self.rho_g]
-        _jac[2,:] = [0, 0, -1j*k*self.vf, -1j*k*self.rho_d, 0]
-        _jac[3,:] = [0,  Kd, 0, -Kd - 1j*k*self.vf,      0         ]
-        _jac[4,:] = [0, - 1j*k*gammaP0, 0, 0, -1j*k*self.vf]
-        def jac(t, y,_=None):
-            return _jac
+        # Construct the jacobian of the linearized system
+        jac = np.zeros([5,5], dtype='c8')
+        jac[0,:] = [-1j*k*self.vf, -1j*k*self.rho_g, 0, 0, 0]
+        jac[1,:] = [0, -Kg - 1j*k*self.vf, 0,  Kg, -1j*k/self.rho_g]
+        jac[2,:] = [0, 0, -1j*k*self.vf, -1j*k*self.rho_d, 0]
+        jac[3,:] = [0,  Kd, 0, -Kd - 1j*k*self.vf,      0         ]
+        jac[4,:] = [0, - 1j*k*gammaP0, 0, 0, -1j*k*self.vf]
 
         # Do the right going part of the wave (we can get the left going wave
         # for free by taking the real part).
@@ -100,7 +84,7 @@ class DustyWaveSolver(object):
                       dtype='c8')
 
         # Diagonalize the equations
-        l, U = np.linalg.eig(_jac)
+        l, U = np.linalg.eig(jac)
         u0 = np.linalg.solve(U, IC)
 
         sol = []
@@ -190,7 +174,7 @@ def check_dustywave_problem(name, L1s=None, make_plots=False):
             print('Test {} L1 check passed'.format(name))
         else:
             print('Test {} L1 checked failed:'.format(name))
-            print('\tL1={}, target={}'.format(L1, L1_target))
+            print('\tL1={}, target={}'.format(L1, L1s))
     else:
          print('Test {} L1 values:'.format(name))
          print('\tL1={}'.format(L1))

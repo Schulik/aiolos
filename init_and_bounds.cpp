@@ -486,14 +486,14 @@ c_Species::c_Species(c_Sim *base_simulation, string filename, string species_fil
             
             SHOCK_TUBE_MID = read_parameter_from_file<double>(filename,"PARI_INIT_SHOCK_MID", debug, 0.5).value;
             
-             //If we test friction, set species=2 velocity to zero
-            if(base->num_species > 1) {
-                u2l = density_excess;
-                u2r = density_excess;
-            }
             u1l = initial_fraction * u1l;
             u1r = initial_fraction * u1r;
             
+            if (is_dust_like) { 
+                u3l *= 2 / mass_amu ;
+                u3r *= 2 / mass_amu ;
+            } 
+
             // Conversion from shock tube parameters (given as dens, velocity, pressure) to conserved variables (dens, momentum, internal energy)
             AOS_prim pl(u1l, u2l, u3l) ;
             eos->compute_conserved(&pl, &SHOCK_TUBE_UL, 1) ;
