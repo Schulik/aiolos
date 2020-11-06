@@ -217,7 +217,7 @@ simulation_parameter<T> read_parameter_from_file(string filename, string variabl
         throw std::runtime_error(error.str()) ;
     }
 
-    simulation_parameter<T> tmp_parameter = {"NaN",T(),"NaN"};
+    simulation_parameter<T> tmp_parameter = {"NaN",T()};
     int found = 0;
     
     //cout<<"    In read_parameter Pos1"<<endl;

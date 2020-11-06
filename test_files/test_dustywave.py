@@ -1,6 +1,5 @@
 import os
 import numpy as np
-from scipy.integrate import ode
 
 from load_aiolos import load_aiolos_snap, load_aiolos_params
 
