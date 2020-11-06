@@ -52,4 +52,4 @@ tests: $(TEST_OBJ) makefile aiolos.h
 	cd test_files ; python test_dustyshock.py
 
 clean:
-	rm -f *.o test_files/*.o problems/*.o
+	rm -f *.o test_files/*.o problems/*.o test_files/*dat
