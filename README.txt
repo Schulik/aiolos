@@ -19,7 +19,7 @@ Fixed number of species
 
 By default, aiolos is compiled in a flexible mode that can run problesm with any
 number of input species. However, a significant (10-20%) speed up can be
-realised if the number of species is restricted at compile time. This can be
+realised if the number of species is set at compile time. This can be
 done via:
 
      make PROBLEM=my_problem NUM_SPECIES=4
