@@ -411,7 +411,6 @@ c_Species::c_Species(c_Sim *base_simulation, string filename, string species_fil
         const_T_space  = read_parameter_from_file<double>(filename,"PARI_CONST_TEMP", debug, 1.).value;
         TEMPERATURE_BUMP_STRENGTH = read_parameter_from_file<double>(filename,"TEMPERATURE_BUMP_STRENGTH", debug, 0.).value; 
         
-
         if(debug > 0) cout<<"        Species["<<species_index<<"] Init: Finished reading boundaries."<<endl;
         if(debug > 0) cout<<"         Boundaries used in species["<<name<<"]: "<<boundary_left<<" / "<<boundary_right<<endl;
 
@@ -426,7 +425,6 @@ c_Species::c_Species(c_Sim *base_simulation, string filename, string species_fil
         if(debug > 0) cout<<"        Species["<<species_index<<"] Init: Reading species data..."<<endl;
         read_species_data(species_filename, species_index); 
         if(debug > 0) cout<<"        Species["<<species_index<<"] Init: Done reading species data."<<endl;
-        
         
         u               = init_AOS(num_cells+2); //Conserved hyperbolic variables: density, mass flux, energy density
         dudt[0]         = init_AOS(num_cells+2);
@@ -740,7 +738,6 @@ void c_Species::initialize_sound_wave() {
         AOS_prim p (rho0 *(1 + f), cs*f, p0*(1 + gamma_adiabat*f)) ;
         eos->compute_conserved(&p, &u[i], 1) ;
     }
-
 }
 
 

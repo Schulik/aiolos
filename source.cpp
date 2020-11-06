@@ -483,7 +483,6 @@ void c_Sim::compute_friction_numerical() {
                     dens_vector(si)        =  species[si].u[j].u1; 
                 }
                     
-                
                 //if(debug > 0) cout<<"    Before friciton coeffs."<<endl;
                 
                 // Compute or set friction coefficients
