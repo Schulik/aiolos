@@ -1,4 +1,5 @@
 
+
 ifeq ($(SYSTEM), intel)
 CXX = icpc -std=c++17
 CXXFLAGS = -Wall -Wextra -xHost -ipo #-pg or -g put compiler settings here
@@ -47,6 +48,7 @@ tests: $(TEST_OBJ) makefile aiolos.h
 	./tests > /dev/null
 	cd test_files ; python test_shock_tube.py
 	cd test_files ; python test_steady_state.py
+	cd test_files ; python test_dustywave.py
 
 clean:
 	rm -f *.o test_files/*.o problems/*.o

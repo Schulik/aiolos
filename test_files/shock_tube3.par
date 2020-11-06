@@ -16,6 +16,8 @@ PARI_INIT_DATA_U1R      1.
 PARI_INIT_DATA_U2R      0.
 PARI_INIT_DATA_U3R      0.01
 PARI_INIT_SHOCK_MID     0.5
+PARI_NUM_SPECIES        1
+
 
 OUTPUT_FILENAME         test_files/shock_tube3
 

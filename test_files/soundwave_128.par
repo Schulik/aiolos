@@ -17,6 +17,8 @@ PARI_DEBUGLEVEL         1
 PARI_INIT_STATIC        1
 PARI_ORDER              2
 PARI_GEOMETRY	        0
+PARI_NUM_SPECIES        1
+
 
 #Numerical parameters
 PARI_BOUND_TYPE_LEFT    4
