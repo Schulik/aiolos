@@ -5,6 +5,7 @@ test_files/*.o
 test_files/*.dat
 test_files/*.png
 test_files/*~
+test_files/plots/*
 aiolos
 tests
 .vscode
