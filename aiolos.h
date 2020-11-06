@@ -15,8 +15,6 @@
 #include <Eigen/Core>
 #include <Eigen/Dense>
 #include <Eigen/LU>
-#include "advection.h"
-#include "source.h"
 
 #include "enum.h"
 #include "eos.h"
@@ -27,13 +25,6 @@
 
 
 using namespace std;
-
-//
-// Definition of helper constants, mainly used to initialize simulation parameter from file
-//
-const int TYPE_INT = 0;
-const int TYPE_DOUBLE = 1;
-const int TYPE_STRING = 2;
 
 //Basic physics quantities
 const double G        = 6.678e-8; //cgs units
