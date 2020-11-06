@@ -493,6 +493,12 @@ c_Species::c_Species(c_Sim *base_simulation, string filename, string species_fil
                 u3l *= 2 / mass_amu ;
                 u3r *= 2 / mass_amu ;
             } 
+            
+            if(base->init_wind) {
+                
+                u2l = density_excess;
+                u2r = density_excess;
+            }
 
             // Conversion from shock tube parameters (given as dens, velocity, pressure) to conserved variables (dens, momentum, internal energy)
             AOS_prim pl(u1l, u2l, u3l) ;
