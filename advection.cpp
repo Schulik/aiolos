@@ -128,6 +128,10 @@ void c_Sim::execute() {
                 //compute_friction_numerical_sparse();
         }
         
+        if(use_rad_fluxes==1)
+            transport_radiation();
+        
+        
         steps++;
         
         if(steps==1)
@@ -167,8 +171,6 @@ void c_Sim::execute() {
 
 void c_Species::execute(std::vector<AOS>& u_in, std::vector<AOS>& dudt) {
     
-        if(base->use_rad_fluxes==1)
-            update_radiation(u_in);
         
         //
         // Step 1: Boundary values
@@ -250,14 +252,6 @@ void c_Species::execute(std::vector<AOS>& u_in, std::vector<AOS>& dudt) {
         
         if(debug >= 2)
             cout<<" Before updating rad fluxes... ";
-        
-        if(base->use_rad_fluxes) {
-            for(int j=1; j<=num_cells; j++) {
-                dudt[j].u3 = (radiative_flux[j-1] - radiative_flux[j]); //Dummy physics for now
-            }
-        }
-        
-    
     
 } 
 

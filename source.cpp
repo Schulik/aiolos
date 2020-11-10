@@ -144,29 +144,147 @@
         //
         ///////////////////////////////////////////////////////////
         
-    void c_Species::update_radiation(std::vector<AOS>& u) {
+        //void c_Sim::update_radiation(std::vector<AOS>& u)
+void c_Sim::transport_radiation() {
         
-        //
-        // Update opacities in case thats needed.
-        //
-        //for(int i = 0; i < num_cells; i++) {
-        //   opacity = some_function(density, temperature);
-        //}
+        int iters = 0;
+        double epsilon_rad = 1.;
         
+        if(steps == 1)
+            cout<<"   in transport_radiation, before loop, steps = "<<steps<<endl;
         
-        opticaldepth[num_cells-1] = 1e-6; // Some start value for the top of the atmosphere. TODO: Improve this into some physically motivated estiamte.
-        
-        for(int i = num_cells-2; i>=0; i--)  {
-            opticaldepth[i] = opticaldepth[i+1] + opacity[i] * u[i].u1 * (base->x_i12[i+1] - base->x_i12[i]);
+        while( ( iters < rad_solver_max_iter) && (epsilon_rad > epsilon_rad_min) ) {
             
-            radiative_flux[i] = pow(prim[i].temperature, 4.) / ( 3./4. * ( 2./3. + opticaldepth[i]) ); //Hubeny 1990 relation with zero scattering
+            if(steps == 1)
+                cout<<"   in transport_radiation, in loop, steps = "<<steps<<endl;
             
+            update_opacities();
+            
+            update_fluxes();
+            
+            update_internal_energies();
+            
+            iters++;
+        }
+        
+    
+}
+
+//
+// Computation of opacities based on material properties
+//
+
+void c_Sim::update_opacities() {
+    
+    //Compute kappa
+    for(int s=0; s<num_species; s++)
+        species[s].update_opacities();
+    
+    //Compute dtau = dx * kappa * dens
+    for(int j=0; j<num_cells; j++) {
+        
+        for(int b=0; b<num_bands; b++) {
+            
+            cell_optical_depth(j,b) = 0.;
+            
+            for(int s=0; s<num_species; s++) {
+                cell_optical_depth(j,b) += species[s].opacity(j,b) * species[s].u[j].u1 * dx[j];
+            }
+            
+            //
+            // Afyter the total optical depth per band is known, we assign the fractional optical depths
+            // Maybe merge with previous loop for optimization
+            //
+            
+            for(int s=0; s<num_species; s++) {
+                    species[s].fraction_total_opacity(j,b) = species[s].opacity(j,b) * species[s].u[j].u1 * dx[j] / cell_optical_depth(j,b);
+            }
         }
         
         
+        
+    }
+    
+}
+
+void c_Species::update_opacities() {
+    
+    for(int j=0; j<num_cells; j++) {
+        for(int b=0; b<num_bands; b++) {
+            opacity(j,b) = const_opacity; //TODO: Replace with some_tabulated_opacity_function();
+        }
+    }
+}
+
+//
+// Computation of fluxes based on radiative transport theory
+//
+void c_Sim::update_fluxes() {
+    
+    for(int b=0; b<num_bands; b++) {
+        F_up(0,b) = 0.; //Some value that makes sense with T_internal
+        F_down(num_cells,b) = 0.; //Some value that makes sense with T_irradiated + Nonthermal irradiation
+    }
+    
+    for(int j=1; j<=num_cells; j++) {
+        for(int b=0; b<num_bands; b++) {
+            
+            F_up(j,b) = F_up(j-1,b) - cell_optical_depth(j,b) *1.; 
+            //TODO: Replace 1. with appropriate geometric factors for (non)-plane parallel emission
+            //TODO: Add appropriate term for source function
+        }
+    }
+    
+    
+    for(int j=num_cells-1; j<=0; j--) {
+        for(int b=0; b<num_bands; b++) {
+               
+            F_down(j,b) = F_up(j+1,b) - cell_optical_depth(j,b) *1.; 
+            //TODO: Replace 1. with appropriate geometric factors for (non)-plane parallel emission
+            //TODO: Add appropriate term for source function
+            
+        }
+        
+    }
+    
+    F_plus  = F_up + F_down;
+    F_minus = F_up - F_down;
+}
+
+//
+// Implicit energy update based on fluxes
+//
+void c_Sim::update_internal_energies() {
+    
+    for(int j=num_cells-1; j<=0; j--) {
+        
+        dErad(j) = 0.;
+        
+        //for(int b=0; b<num_bands; b++) {
+        //    dErad(j) += dt * F_minus(j,b) * 1.; //TODO Replace 1. with appropriate conversion factors
+        //}
+        
+        //
+        // After we know the total internal energy change for the cell and the band, distribute the lost energy on the species according to their opacity contrbutions
+        //
+        
+        for(int s=0; s<num_species; s++) {
+            for(int b=0; b<num_bands; b++) {
+                
+                //species[s].prim[j].internal_energy += dErad(j) * species[s].fraction_total_opacity(j,b)
+                species[s].prim[j].internal_energy +=  global_e_update_multiplier * dt * F_minus(j,b) * species[s].fraction_total_opacity(j,b); 
+                //TODO: This won't work
+        }
+                //
+                // This should be a consistency condition? I don't quite remember how to do that
+                // 
+                // species[s].prim.temperature = some_function_of(F_plus);
+        }
+    
     }
 
-    
+}
+
     
         ///////////////////////////////////////////////////////////
         //
@@ -410,7 +528,7 @@ void c_Sim::compute_friction_numerical() {
                     
                 }
                 
-                if(debug >= 0 && j==7 && steps == 1) cout<<"    Computed coefficient matrix ="<<endl<<friction_coefficients<<endl;
+                if(debug >= 1 && j==7 && steps == 1) cout<<"    Computed coefficient matrix ="<<endl<<friction_coefficients<<endl;
                 if(debug >= 1 && j==0 && steps == 0) cout<<"    velocities ="<<endl<<friction_vec_input<<endl;
                 if(debug >= 1 && j==0 && steps == 0) cout<<"    velocities[0] = "<<friction_vec_input(0)<<endl;
                 if(debug >= 1 && j==0 && steps == 0) cout<<"    rho[0] = "<<species[0].u[j].u1<<endl;
@@ -421,9 +539,9 @@ void c_Sim::compute_friction_numerical() {
                 LU.compute(friction_matrix_T) ;
                 friction_vec_output.noalias() = LU.solve(friction_vec_input);
                 
-                if(debug >= 0 && j==7 && steps == 1) cout<<"    T = "<<friction_matrix_T<<endl;
-                if(debug >= 0 && j==7 && steps == 1) cout<<"    v_inp = "<<friction_vec_input<<endl;
-                if(debug >= 0 && j==7 && steps == 1) cout<<"    v_out = "<<friction_vec_output<<endl;
+                if(debug >= 1 && j==7 && steps == 1) cout<<"    T = "<<friction_matrix_T<<endl;
+                if(debug >= 1 && j==7 && steps == 1) cout<<"    v_inp = "<<friction_vec_input<<endl;
+                if(debug >= 1 && j==7 && steps == 1) cout<<"    v_out = "<<friction_vec_output<<endl;
                 
                 //*/
                 // Update new speed and internal energy

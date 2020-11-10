@@ -30,7 +30,9 @@ c_Sim::c_Sim(string filename, string speciesfile, int debug) {
         domain_max       = read_parameter_from_file<double>(filename,"PARI_DOMAIN_MAX", debug).value;
         geometry = read_parameter_from_file<Geometry>(filename, "PARI_GEOMETRY", debug, Geometry::cartesian).value;
         order = read_parameter_from_file<IntegrationType>(filename, "PARI_ORDER", debug, IntegrationType::second_order).value;
-
+        num_bands        = read_parameter_from_file<int>(filename,"PARI_NUM_BANDS", debug, 1).value;
+        global_e_update_multiplier = read_parameter_from_file<double>(filename,"PARI_RAD_MULTIPLIER", debug, 0.).value;
+        
         if(debug > 0) cout<<"Using integration order "<<order<<" while second order would be "<<IntegrationType::second_order<<endl;
         
         if (order == IntegrationType::first_order)
@@ -378,6 +380,30 @@ c_Sim::c_Sim(string filename, string speciesfile, int debug) {
                     friction_coeff_mask(si,sj) = 0.;
                     friction_coeff_mask(sj,si) = 0.;
                 }
+    
+    //const int num_cells2 = num_cells;
+    //const int num_bands2 = num_bands;
+    /*
+    Eigen::Matrix<double, num_cells2, num_bands2, Eigen::RowMajor> F_up;      //num_cells * num_bands each
+    Eigen::Matrix<double, num_cells2, num_bands2, Eigen::RowMajor> F_down;
+    Eigen::Matrix<double, num_cells2, num_bands2, Eigen::RowMajor> F_plus;
+    Eigen::Matrix<double, num_cells2, num_bands2, Eigen::RowMajor> F_minus;
+    Eigen::Matrix<double, num_cells2, num_bands2, Eigen::RowMajor> dErad;
+    
+    Eigen::Matrix<double, num_cells2, num_bands2, Eigen::RowMajor> total_opacity;
+    Eigen::Matrix<double, num_cells2, num_bands2, Eigen::RowMajor> cell_optical_depth;
+    */
+    
+    
+    F_up   = Eigen::MatrixXd::Zero(num_cells, num_bands);      //num_cells * num_bands each
+    F_down = Eigen::MatrixXd::Zero(num_cells, num_bands);
+    F_plus = Eigen::MatrixXd::Zero(num_cells, num_bands);
+    F_minus= Eigen::MatrixXd::Zero(num_cells, num_bands);
+    dErad  = Eigen::MatrixXd::Zero(num_cells, num_bands);
+    
+    total_opacity      = Eigen::MatrixXd::Zero(num_cells, num_bands);
+    cell_optical_depth = Eigen::MatrixXd::Zero(num_cells, num_bands);
+    
 }
 
 
@@ -396,6 +422,7 @@ c_Species::c_Species(c_Sim *base_simulation, string filename, string species_fil
         base               = base_simulation;
         this_species_index = species_index;
         num_cells          = base->num_cells;
+        num_bands          = base->num_bands;
         this->debug        = debug;
         
         if(debug > 0) cout<<"        Species["<<species_index<<"] Init: Begin"<<endl;
@@ -452,9 +479,7 @@ c_Species::c_Species(c_Sim *base_simulation, string filename, string species_fil
         
         if(debug >= 0) cout<<"        Species["<<species_index<<"] got a gamma_adiabatic = "<<gamma_adiabat<<" and cv = "<<cv<<endl;
 
-        opacity        = np_somevalue(num_cells+2, const_opacity);
-        opticaldepth   = np_zeros(num_cells+2);
-        radiative_flux = np_zeros(num_cells+1);
+
         u_analytic     = np_zeros(num_cells+2);
 
         prim   = std::vector<AOS_prim>(num_cells+2); //Those helper quantities are also defined on the ghost cells, so they get +2
@@ -558,6 +583,12 @@ c_Species::c_Species(c_Sim *base_simulation, string filename, string species_fil
         apply_boundary_right(u) ;
         
         if(debug > 0) cout<<"        Species["<<species_index<<"]: Init done."<<endl;
+        
+        
+        
+        
+        opacity                = Eigen::MatrixXd::Zero(num_cells, num_bands); //num_cells * num_bands
+        fraction_total_opacity = Eigen::MatrixXd::Zero(num_cells, num_bands); //num_cells * num_bands
     
 }
 

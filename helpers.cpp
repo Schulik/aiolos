@@ -349,7 +349,7 @@ void c_Species::print_AOS_component_tofile(int timestepnumber) {
             hydrostat2 = flux[i].u2/base->dx[i];//pressure[i+1] - pressure[i];
             hydrostat3 = source[i].u2;//0.5 * (u[i].u1 + u[i+1].u1) * (phi[i+1] - phi[i]);
             
-            outfile<<base->x_i12[i]<<'\t'<<u[i].u1<<'\t'<<u[i].u2<<'\t'<<u[i].u3<<'\t'<<flux[i].u1<<'\t'<<flux[i].u2<<'\t'<<flux[i].u3<<'\t'<<balance1<<'\t'<<balance2<<'\t'<<balance3<<'\t'<<prim[i].pres<<'\t'<<u[i].u2/u[i].u1<<'\t'<<prim[i].temperature <<'\t'<<timesteps[i]<<'\t'<<base->phi[i]<<'\t'<<prim[i].sound_speed<<'\t'<<opticaldepth[i]<<'\t'<<u_analytic[i]<<'\t'<<base->alphas_sample(i)<<'\t'<<hydrostat3<<'\t'<<base->enclosed_mass[i]<<endl;
+            outfile<<base->x_i12[i]<<'\t'<<u[i].u1<<'\t'<<u[i].u2<<'\t'<<u[i].u3<<'\t'<<flux[i].u1<<'\t'<<flux[i].u2<<'\t'<<flux[i].u3<<'\t'<<balance1<<'\t'<<balance2<<'\t'<<balance3<<'\t'<<prim[i].pres<<'\t'<<u[i].u2/u[i].u1<<'\t'<<prim[i].temperature <<'\t'<<timesteps[i]<<'\t'<<base->phi[i]<<'\t'<<prim[i].sound_speed<<'\t'<<1.<<'\t'<<u_analytic[i]<<'\t'<<base->alphas_sample(i)<<'\t'<<hydrostat3<<'\t'<<base->enclosed_mass[i]<<endl;
         }
         
         //Print right ghost stuff
@@ -382,10 +382,7 @@ void c_Sim::print_monitor(int num_steps) {
                 initial_monitored_quantities.u2_tot += species[s].u[i].u2 * vol[i];
                 initial_monitored_quantities.u3_tot += species[s].u[i].u3 * vol[i];
             }
-        
-        
-        
-        
+\
     }
     
     //
@@ -471,11 +468,11 @@ void c_Species::compute_analytic_solution() {
         double D      = pow(rrc,-4.) * std::exp(4.*(1.-1./rrc)-1. );
         
         if(base->x_i12[i] < bondi_radius) {
-            u_analytic[i] = prim[num_cells].sound_speed * std::sqrt( - gsl_sf_lambert_W0(-D) ); 
+            u_analytic[i] = 0.;//prim[num_cells].sound_speed * std::sqrt( - gsl_sf_lambert_W0(-D) ); 
         }
         else {
             
-            u_analytic[i] = prim[num_cells].sound_speed * std::sqrt( - gsl_sf_lambert_Wm1(-D) ); 
+            u_analytic[i] = 0.;//prim[num_cells].sound_speed * std::sqrt( - gsl_sf_lambert_Wm1(-D) ); 
         }
     
     

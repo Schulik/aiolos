@@ -186,19 +186,12 @@ public:
 
     string simname;
     
-    int num_species;
-    std::vector<c_Species> species;
-    
     int problem_number;
     int debug;
     int use_self_gravity;
     int use_linear_gravity;
     int use_rad_fluxes;
     int suppress_warnings;
-    int init_geometry;
-    char collision_model;
-    
-    Geometry geometry ;
     
 
     ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -207,10 +200,14 @@ public:
     //
     ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+    int num_species;
+    std::vector<c_Species> species;
     
+    int num_bands;
+    
+    int num_cells;
     std::vector<double>dx;
     double domain_min, domain_max;
-    int num_cells;
     double cells_per_decade;
     int type_of_grid;       //0 = cartesian, 1 = log
     std::vector<double> x_i;    		//The cell boundaries
@@ -223,6 +220,11 @@ public:
     std::vector<double> source_pressure_prefactor_left;
     std::vector<double> source_pressure_prefactor_right;
 
+    int init_geometry;
+    char collision_model;
+    
+    Geometry geometry ;
+    
     double dt;
     double cflfactor;
     double t_max;
@@ -242,19 +244,32 @@ public:
     // Physical, global
     //
     ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
+    
+    //
+    // Conserved quantities to be monitored etc.
+    //
+    
+    Monitored_Quantities monitored_quantities;
+    Monitored_Quantities initial_monitored_quantities;
+    
+    //
+    // Gravitation
+    //
+    
     double planet_mass;     //in Earth masses
     double planet_position; //inside the simulation domain
     double rs;
     double rs_at_moment = 0 ;
     double rs_time;
     
-    std::vector<double> phi;            //Parabolic Variables: gravitational potential
+    std::vector<double> phi;
     std::vector<double> enclosed_mass;
     
+    //
+    // Friction
+    //
+    
     int friction_solver;
-    Monitored_Quantities monitored_quantities;
-    Monitored_Quantities initial_monitored_quantities;
     
     using Matrix_t = Eigen::Matrix<double, NUM_SPECIES,NUM_SPECIES, Eigen::RowMajor>;
     using Vector_t = Eigen::Matrix<double, NUM_SPECIES, 1>;
@@ -273,7 +288,41 @@ public:
 
     Eigen::VectorXd alphas_sample;
 
-
+    //
+    // Radiation
+    //
+    /*
+    Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> F_up;      //num_cells * num_bands each
+    Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> F_down;
+    Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> F_plus;
+    Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> F_minus;
+    Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> dErad;
+    
+    Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> total_opacity;
+    Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> cell_optical_depth;
+    */
+    
+    Eigen::MatrixXd F_up;      //num_cells * num_bands each
+    Eigen::MatrixXd F_down;
+    Eigen::MatrixXd F_plus;
+    Eigen::MatrixXd F_minus;
+    Eigen::MatrixXd dErad;
+    
+    Eigen::MatrixXd total_opacity;
+    Eigen::MatrixXd cell_optical_depth;
+    
+    
+    
+    
+    int rad_solver_max_iter = 1;
+    double epsilon_rad_min = 1e-1;  // Some convergence measure for the radiation solver, if needed
+    double global_e_update_multiplier;
+    
+    void transport_radiation();     //  Called if use_rad_fluxes == 1
+    void update_opacities();
+    void update_fluxes();           //  Called from transport_radiation#
+    void update_internal_energies();
+    //AOS source_radflux(int i);
     
     ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     //
@@ -360,6 +409,7 @@ public:
     BoundaryType boundary_left;
     BoundaryType boundary_right;
     int num_cells;
+    int num_bands;
     int debug;
     
 
@@ -379,6 +429,14 @@ public:
     std::vector<AOS> source_pressure;// Geometric source term
     std::vector<AOS> flux;
     std::vector<double> u_analytic;
+    
+    Eigen::MatrixXd opacity; //num_cells * num_bands
+    Eigen::MatrixXd fraction_total_opacity; //num_cells * num_bands
+    
+    //std::vector<double> opticaldepth;
+    //std::vector<double> opacity;
+    //std::vector<double> radiative_flux;
+    
     
     double density_excess;
     double bondi_radius;
@@ -401,10 +459,6 @@ public:
     std::vector<AOS_prim> prim ;
     std::vector<AOS_prim> prim_l ; // Reconstructed left/ right edges
     std::vector<AOS_prim> prim_r ;
-    std::vector<double> opticaldepth;
-    std::vector<double> opacity;
-    std::vector<double> radiative_flux;
-    
     
     ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     //
@@ -469,12 +523,7 @@ public:
         eos->compute_auxillary(&(prim[0]), num_cells+2);
     }
     
-    //
-    // Radiation
-    //
-    int use_rad_fluxes;
-    void update_radiation(std::vector<AOS>& u);
-    AOS source_radflux(int i);
+    void update_opacities();
     
     //
     // Equations of state
