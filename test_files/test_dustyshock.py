@@ -116,7 +116,7 @@ def check_dusty_shock(L1s=None):
             print('Test {} L1 check passed'.format(name))
         else:
             print('Test {} L1 checked failed:'.format(name))
-            print('\tL1={}, target={}'.format(L1, L1_target))
+            print('\tL1={}, target={}'.format(L1, L1s))
     else:
          print('Test {} L1 values:'.format(name))
          print('\tL1={}'.format(L1))
@@ -131,7 +131,7 @@ if __name__ == "__main__":
                         help="Make plots of the results")
     args = parser.parse_args()
 
-    check_dusty_shock([0.54, 0.54])
+    check_dusty_shock([0.541, 0.540])
     
     if args.make_plots:
         f = plot_dusty_shock()

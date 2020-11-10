@@ -18,10 +18,11 @@
 //
 //  
 
-bool run_test(std::string test_name, int suppress_warn=1, int debug=0) {
+bool run_test(std::string test_name, std::string spc = "test_files/hydrogen.spc",
+	      int suppress_warn=1, int debug=0) {
       
     try {
-        c_Sim test(test_name, "test_files/hydrogen.spc", debug) ;
+        c_Sim test(test_name, spc, debug) ;
         test.set_suppress_warnings(suppress_warn);
 
         test.execute(); 
@@ -51,6 +52,9 @@ int main()
     count += !run_test("test_files/soundwave_256.par") ;
     count += !run_test("test_files/soundwave_512.par") ;
 
+    count += !run_test("test_files/friction_6spc.par",
+		       "test_files/friction_6spc.spc") ;
+    
     count += !run_test("test_files/dustywave_nonstiff.par") ;
     count += !run_test("test_files/dustywave_stiff.par") ;
 

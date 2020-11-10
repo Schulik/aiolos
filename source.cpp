@@ -436,7 +436,10 @@ void c_Sim::compute_friction_numerical() {
                     double temp = 0;
                     
                     for(int sj=0; sj<num_species; sj++) {
-                        temp += dt * friction_coefficients(si,sj) * (species[sj].mass_amu/(species[sj].mass_amu+species[si].mass_amu))  * pow( friction_vec_output(si) - friction_vec_output(sj), 2.);
+                        double v_end = friction_vec_output(si) - friction_vec_output(sj) ;
+                        double v_half = 0.5*(v_end + friction_vec_input(si) - friction_vec_input(sj)) ; 
+                                                       
+                        temp += dt * friction_coefficients(si,sj) * (species[sj].mass_amu/(species[sj].mass_amu+species[si].mass_amu)) * v_half * v_end ;
                     }
                     species[si].prim[j].internal_energy += temp;
                     
@@ -544,14 +547,11 @@ void c_Sim::compute_friction_numerical() {
                     friction_dEkin(si) = 0.;
                     
                     for(int sj=0; sj<num_species; sj++) {
-                            double temp = 0;
-                            
-                            //if(si != sj){
-                                 temp += dt * friction_coefficients(si,sj) * (species[sj].mass_amu/(species[sj].mass_amu+species[si].mass_amu))  * pow( friction_vec_output(si) - friction_vec_output(sj), 2.);
-                                
-                                //friction_dEkin(si) += dt * species[si].u[j].u1 * friction_coefficients(si,sj)  * ( friction_vec_output(si) - friction_vec_output(sj)) * (species[si].mass_amu*friction_vec_output(si) +species[sj].mass_amu*friction_vec_output(sj) ) /(species[sj].mass_amu+species[si].mass_amu);
-                            //}
-                            
+                            double v_end = friction_vec_output(si) - friction_vec_output(sj) ;
+                            double v_half = 0.5*(v_end + friction_vec_input(si) - friction_vec_input(sj)) ; 
+                                                       
+                            double temp = dt * friction_coefficients(si,sj) * (species[sj].mass_amu/(species[sj].mass_amu+species[si].mass_amu)) * v_half * v_end ;
+
                             species[si].prim[j].internal_energy += temp;
                     }
                     
