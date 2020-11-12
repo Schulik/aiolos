@@ -185,11 +185,11 @@ void c_Sim::update_opacities() {
         
         for(int b=0; b<num_bands; b++) {
             
-            cell_optical_depth(j,b) = 0.;
-            
+            total_opacity(j,b) = 0 ;
             for(int s=0; s<num_species; s++) {
-                cell_optical_depth(j,b) += species[s].opacity(j,b) * species[s].u[j].u1 * dx[j];
+                total_opacity(j,b) += species[s].opacity(j,b) * species[s].u[j].u1 ;
             }
+            cell_optical_depth(j,b) = total_opacity(j, b) * dx[j] ;
             
             //
             // Afyter the total optical depth per band is known, we assign the fractional optical depths
@@ -249,6 +249,65 @@ void c_Sim::update_fluxes() {
     
     F_plus  = F_up + F_down;
     F_minus = F_up - F_down;
+}
+
+void c_Sim::update_fluxes_FLD() {
+
+    auto flux_limiter = [](double R) {
+        if (R <= 2)
+            return 2 / (3 + std::sqrt(9 + 10*R*R)) ;
+        else 
+            return 10 / (10*R + 9 + std::sqrt(81 + 180*R)) ;
+    } ;
+
+    std::vector<double> l(num_cells+2), d(num_cells+2), u(num_cells+2), r(num_cells+2) ;
+    
+    for(int b=0; b<num_bands; b++) {
+   
+        for (int j=0; j < num_species+1; j++) {
+            double dx = (x_i12[j+1]-x_i12[j]) ;
+            double tau_inv = 0.5 / (dx * (total_opacity(j,b) + total_opacity(j+1,b))) ;
+            double R = 2 * tau_inv * std::abs(Erad_FLD(j+1,b) - Erad_FLD(j,b)) / (Erad_FLD(j+1,b) + Erad_FLD(j, b)) ;
+            double D = surf[j] * flux_limiter(R) * tau_inv;
+            
+            // divergence terms
+            u[j] = -D ;
+            d[j] += D ;
+            d[j+1] = D ;
+            l[j+1] = -D ;
+
+            // source terms
+            d[j] += vol[j] * total_opacity(j,b) ;
+            //r[j] = vol[j] * ThermalEmission(j, b) ;
+        }
+
+        // Boundaries:
+        int Ncell = num_cells - 2*(num_ghosts - 1) ;
+        for (int j=0; j < num_ghosts; j++) {
+            // Left boundary:
+            //    Reflecting / no flux
+            l[j] = r[j] = 0 ;
+            d[j] = +1 ;
+            u[j] = -1 ;
+
+            //   Right boundary: free stream, no emission / absorbtion.
+            int i = Ncell + num_ghosts + j ; 
+                        
+            double dx_R = (x_i12[i+1]-x_i12[i]) ;
+            double dx_L = (x_i12[i]-x_i12[i-1]) ;
+
+            l[i] = - surf[i-1] / dx_L ;
+            d[i] = + surf[ i ] /  dx_R ;
+            r[i] = u[i] = 0 ;
+        }
+
+        tridiag.factor_matrix(&l[0], &d[0], &u[0]) ;
+        tridiag.solve(&r[0], &r[0]) ; // Solve in place (check it works)
+        
+        // Store result
+        for (int j=0; j < num_species+2; j++) 
+            Erad_FLD(j, b) = r[j] ;
+    }
 }
 
 //

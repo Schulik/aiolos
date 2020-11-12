@@ -16,6 +16,8 @@
 #include <Eigen/Dense>
 #include <Eigen/LU>
 
+#include "block_tridiag_solve.h"
+
 #include "enum.h"
 #include "eos.h"
 
@@ -310,7 +312,9 @@ public:
     
     Eigen::MatrixXd total_opacity;
     Eigen::MatrixXd cell_optical_depth;
-    
+
+    Eigen::MatrixXd Erad_FLD ;
+    BlockTriDiagSolver<1> tridiag ;
     
     
     
@@ -320,7 +324,8 @@ public:
     
     void transport_radiation();     //  Called if use_rad_fluxes == 1
     void update_opacities();
-    void update_fluxes();           //  Called from transport_radiation#
+    void update_fluxes();           //  Called from transport_radiation#   
+    void update_fluxes_FLD();           //  Called from transport_radiation#
     void update_internal_energies();
     //AOS source_radflux(int i);
     

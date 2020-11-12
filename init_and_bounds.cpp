@@ -403,7 +403,9 @@ c_Sim::c_Sim(string filename, string speciesfile, int debug) {
     
     total_opacity      = Eigen::MatrixXd::Zero(num_cells, num_bands);
     cell_optical_depth = Eigen::MatrixXd::Zero(num_cells, num_bands);
-    
+
+    Erad_FLD  = Eigen::MatrixXd::Zero(num_cells, num_bands);
+    tridiag = BlockTriDiagSolver<1>(num_cells+2) ;
 }
 
 
