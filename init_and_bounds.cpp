@@ -394,15 +394,24 @@ c_Sim::c_Sim(string filename, string speciesfile, int debug) {
     Eigen::Matrix<double, num_cells2, num_bands2, Eigen::RowMajor> cell_optical_depth;
     */
     
+    radiation_matrix_T   = Matrix_t::Zero(num_species, num_species);
+    radiation_matrix_M   = Matrix_t::Zero(num_species, num_species);
+    radiation_vec_input  = Vector_t(num_species);
+    radiation_vec_output = Vector_t(num_species);
+    radiation_cv_vector  = Vector_t(num_species);
+    radiation_T3_vector  = Vector_t(num_species);
     
     F_up   = Eigen::MatrixXd::Zero(num_cells, num_bands);      //num_cells * num_bands each
     F_down = Eigen::MatrixXd::Zero(num_cells, num_bands);
     F_plus = Eigen::MatrixXd::Zero(num_cells, num_bands);
     F_minus= Eigen::MatrixXd::Zero(num_cells, num_bands);
     dErad  = Eigen::MatrixXd::Zero(num_cells, num_bands);
+    S_total = Eigen::VectorXd::Zero(num_cells,  1);
+    S_band  = Eigen::MatrixXd::Zero(num_cells, num_bands);
     
     total_opacity      = Eigen::MatrixXd::Zero(num_cells, num_bands);
     cell_optical_depth = Eigen::MatrixXd::Zero(num_cells, num_bands);
+    total_optical_depth = Eigen::MatrixXd::Zero(num_cells, num_bands);
     
 }
 
@@ -472,7 +481,7 @@ c_Species::c_Species(c_Sim *base_simulation, string filename, string species_fil
         }
         //Dust species
         else {
-            cv            = 1.5 * Rgas_fake / mass_amu ; // 3 Degrees of freedom per atom (high T limit of debye theory)
+            cv            = 1.5 * Rgas_fake / mass_amu; // 3 Degrees of freedom per atom (high T limit of debye theory)
             gamma_adiabat = (degrees_of_freedom + 2.)/ degrees_of_freedom; // Total degrees of freedom per grain
             eos           = new IdealGas_EOS(degrees_of_freedom, cv, mass_amu) ;
         }
@@ -588,6 +597,7 @@ c_Species::c_Species(c_Sim *base_simulation, string filename, string species_fil
         
         
         opacity                = Eigen::MatrixXd::Zero(num_cells, num_bands); //num_cells * num_bands
+        opacity_planck         = Eigen::MatrixXd::Zero(num_cells, 1); //num_cells * num_bands
         fraction_total_opacity = Eigen::MatrixXd::Zero(num_cells, num_bands); //num_cells * num_bands
     
 }

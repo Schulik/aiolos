@@ -29,10 +29,11 @@ using namespace std;
 //Basic physics quantities
 const double G        = 6.678e-8; //cgs units
 const double pi       = 3.141592;
-const double navo     = 6e23; // particles per mole
+const double navo     = 6.02214e23; // particles per mole
+const double amu      = 1.66054e-24; //g
 const double Rgas     = 8.31446261815324e7;  //erg/K/mole
 const double Rgas_fake = 1.;
-const double sigma    = 5.67e-5;   //erg cm-2 s-1 K-4
+const double sigma_rad= 5.67e-5;   //erg cm-2 s-1 K-4
 const double kb       = 1.38e-16;  //erg/K
 const double km       = 1e5; //kilometers in cm
 const double mearth   = 5.98e27;  //g
@@ -256,11 +257,20 @@ public:
     // Gravitation
     //
     
+    double star_mass;
+    
     double planet_mass;     //in Earth masses
     double planet_position; //inside the simulation domain
+    double planet_semimajor = 5.2;
     double rs;
     double rs_at_moment = 0 ;
     double rs_time;
+    
+    double scale_rb;
+    double scale_rh;
+    double scale_cs;
+    double scale_vk;
+    double scale_time;
     
     std::vector<double> phi;
     std::vector<double> enclosed_mass;
@@ -286,8 +296,19 @@ public:
     Vector_t numdens_vector;
     Vector_t mass_vector;
 
+    Matrix_t radiation_matrix_T;
+    Matrix_t radiation_matrix_M;
+    Vector_t radiation_vec_input;
+    Vector_t radiation_vec_output;
+    Vector_t radiation_cv_vector;
+    Vector_t radiation_T3_vector;
+    
     Eigen::VectorXd alphas_sample;
 
+    void fill_alpha_basis_arrays(int j);
+    void fill_rad_basis_arrays(int j);
+    void compute_alpha_matrix(int j, int actually_compute_beta);
+    
     //
     // Radiation
     //
@@ -307,9 +328,12 @@ public:
     Eigen::MatrixXd F_plus;
     Eigen::MatrixXd F_minus;
     Eigen::MatrixXd dErad;
+    Eigen::MatrixXd S_total;
+    Eigen::MatrixXd S_band;
     
     Eigen::MatrixXd total_opacity;
     Eigen::MatrixXd cell_optical_depth;
+    Eigen::MatrixXd total_optical_depth;
     
     
     
@@ -358,7 +382,6 @@ public:
     //
     void compute_friction_analytical(); 
     void compute_friction_numerical(); 
-    void compute_friction_numerical_sparse(); 
     
     //Gravity
     void init_grav_pot();
@@ -411,7 +434,6 @@ public:
     int num_cells;
     int num_bands;
     int debug;
-    
 
     ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     //
@@ -430,7 +452,8 @@ public:
     std::vector<AOS> flux;
     std::vector<double> u_analytic;
     
-    Eigen::MatrixXd opacity; //num_cells * num_bands
+    Eigen::MatrixXd opacity;        //num_cells * num_bands
+    Eigen::MatrixXd opacity_planck; //num_cells
     Eigen::MatrixXd fraction_total_opacity; //num_cells * num_bands
     
     //std::vector<double> opticaldepth;
