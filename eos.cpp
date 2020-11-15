@@ -62,6 +62,12 @@ void IdealGas_EOS::update_p_from_eint(AOS_prim* prim, int num_cells) const {
     }
 }
 
+void IdealGas_EOS::update_eint_from_T(AOS_prim* prim, int num_cells) const {
+    for (int i=0; i < num_cells; i++) {
+        prim[i].internal_energy = prim[i].temperature * _cv;
+    }
+}
+
 
 void IdealGas_EOS::get_p_over_rho_analytic(const double* temperature, double* returnval) const {
     
@@ -106,6 +112,12 @@ void Polytropic_EOS::compute_auxillary(AOS_prim* prim, int num_cells) const {
 void Polytropic_EOS::update_p_from_eint(AOS_prim* prim, int num_cells) const {
     for (int i=0; i < num_cells; i++) {
         prim[i].pres = 0.;
+    }
+}
+
+void Polytropic_EOS::update_eint_from_T(AOS_prim* prim, int num_cells) const {
+    for (int i=0; i < num_cells; i++) {
+        prim[i].internal_energy = 0.;
     }
 }
 

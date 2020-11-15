@@ -33,6 +33,12 @@ c_Sim::c_Sim(string filename, string speciesfile, int debug) {
         num_bands        = read_parameter_from_file<int>(filename,"PARI_NUM_BANDS", debug, 1).value;
         global_e_update_multiplier = read_parameter_from_file<double>(filename,"PARI_RAD_MULTIPLIER", debug, 0.).value;
         
+        lambda_min       = read_parameter_from_file<double>(filename,"PARI_LAM_MIN", debug, 1e-1).value;
+        lambda_max       = read_parameter_from_file<double>(filename,"PARI_LAM_MAX", debug, 10.).value;
+        lambda_per_decade= read_parameter_from_file<double>(filename,"PARI_LAM_PER_DECADE", debug, 10.).value;
+        T_star           = read_parameter_from_file<double>(filename,"PARI_TSTAR", debug, 5777.).value;
+        UV_star            = read_parameter_from_file<double>(filename,"PARI_TSTAR", debug, 1.).value;
+        
         if(debug > 0) cout<<"Using integration order "<<order<<" while second order would be "<<IntegrationType::second_order<<endl;
         
         if (order == IntegrationType::first_order)
@@ -140,6 +146,16 @@ c_Sim::c_Sim(string filename, string speciesfile, int debug) {
         source_pressure_prefactor_right   = np_zeros(num_cells+2);
         enclosed_mass   = np_zeros(num_cells+2);
         phi             = np_zeros(num_cells+2);
+        l_i       = np_zeros(num_bands+1);    // Wavelenght bin boundaries
+        l_i12     = np_zeros(num_bands);      // Wavelength bin midpoints or averages
+        
+        double dlogl = pow(10., 1./lambda_per_decade);
+        l_i[0] = lambda_min;
+        
+        for(int b=1; b<num_bands+1; b++) {
+            l_i[b]      = l_i[b-1] * dlogl;
+            l_i12[b-1]  = 0.5 * (l_i[b] + l_i[b-1]);
+        }
         
         if(debug > 0) cout<<"Init: Setup grid memory"<<endl;
         
@@ -239,7 +255,6 @@ c_Sim::c_Sim(string filename, string speciesfile, int debug) {
             x_i12[i] = 0.5 * (x_i[i] + x_i[i-1]);
         }
     
-        
         //Ghost cells
         x_i12[0]           = x_i[0] - dx[0]/2 ;
         x_i12[num_cells+1] = x_i[num_cells] + dx[num_cells+1]/2; 
@@ -401,18 +416,28 @@ c_Sim::c_Sim(string filename, string speciesfile, int debug) {
     radiation_cv_vector  = Vector_t(num_species);
     radiation_T3_vector  = Vector_t(num_species);
     
-    F_up   = Eigen::MatrixXd::Zero(num_cells, num_bands);      //num_cells * num_bands each
-    F_down = Eigen::MatrixXd::Zero(num_cells, num_bands);
-    F_plus = Eigen::MatrixXd::Zero(num_cells, num_bands);
-    F_minus= Eigen::MatrixXd::Zero(num_cells, num_bands);
-    dErad  = Eigen::MatrixXd::Zero(num_cells, num_bands);
+    F_up    = Eigen::MatrixXd::Zero(num_cells, num_bands);      //num_cells * num_bands each
+    F_down  = Eigen::MatrixXd::Zero(num_cells, num_bands);
+    F_plus  = Eigen::MatrixXd::Zero(num_cells, num_bands);
+    F_minus = Eigen::MatrixXd::Zero(num_cells, num_bands);
+    dErad   = Eigen::MatrixXd::Zero(num_cells, num_bands);
     S_total = Eigen::VectorXd::Zero(num_cells,  1);
-    S_band  = Eigen::MatrixXd::Zero(num_cells, num_bands);
+    solar_heating = Eigen::VectorXd::Zero(num_bands,  1);
+    S_band        = Eigen::MatrixXd::Zero(num_cells, num_bands);
+    dS_band       = Eigen::MatrixXd::Zero(num_cells, num_bands);
+    for(int s=0; s<num_species; s++) {
+        species[s].dS = Eigen::VectorXd::Zero(num_cells,  1);
+    }
+    for(int b=0; b<num_bands; b++)
+        solar_heating(b) = compute_planck_function_integral(l_i[b], l_i[b+1], T_star) + UV_star * 1.;
     
     total_opacity      = Eigen::MatrixXd::Zero(num_cells, num_bands);
     cell_optical_depth = Eigen::MatrixXd::Zero(num_cells, num_bands);
     total_optical_depth = Eigen::MatrixXd::Zero(num_cells, num_bands);
-    
+
+    Erad_FLD       = Eigen::MatrixXd::Zero(num_cells, num_bands);
+    Erad_FLD_total = Eigen::VectorXd::Zero(num_cells,  1);
+    tridiag        = BlockTriDiagSolver<1>(num_cells+2) ;
 }
 
 

@@ -162,7 +162,7 @@ void c_Sim::transport_radiation() {
             
             update_fluxes();
             
-            update_internal_energies();
+            update_temperatures();
             
             iters++;
         }
@@ -181,49 +181,54 @@ void c_Sim::update_opacities() {
         species[s].update_opacities();
     
     //Compute dtau = dx * kappa * dens
+    
     for(int j=num_cells; j>0; j--) {
+        
+        for(int s=0; s<num_species; s++)
+                species[s]. dS(j)  = 0.;
         
         for(int b=0; b<num_bands; b++) {
             
             cell_optical_depth(j,b) = 0.;
+            total_opacity(j,b) = 0 ;
             total_optical_depth(j,b) = 0.;
             
             for(int s=0; s<num_species; s++) {
+                total_opacity(j,b)      += species[s].opacity(j,b) * species[s].u[j].u1 ;
                 cell_optical_depth(j,b)  = species[s].opacity(j,b) * species[s].u[j].u1 * dx[j];
-                total_optical_depth(j,b)+= cell_optical_depth(j,b);
             }
+            cell_optical_depth(j,b) = total_opacity(j, b) * dx[j] ;
             
+            if(j==num_cells)
+                total_optical_depth(j,b) = cell_optical_depth(j,b);
+            else
+                total_optical_depth(j,b) = total_optical_depth(j+1,b) + cell_optical_depth(j,b);
+                
             //
             // Afyter the total optical depth per band is known, we assign the fractional optical depths
             // Maybe merge with previous loop for optimization
             //
             
-            for(int s=0; s<num_species; s++) {
+            for(int s=0; s<num_species; s++) 
                     species[s].fraction_total_opacity(j,b) = species[s].opacity(j,b) * species[s].u[j].u1 * dx[j] / cell_optical_depth(j,b);
-            }
+            
+            //
+            // Now compute the attentiation of solar radiation and then assign the lost energy back to individual species in a manner that conserves energy
+            //
+            S_band(j,b)  = solar_heating(b) * std::exp(-total_optical_depth(j,b));
+            dS_band(j,b) = surf[j+1] * S_band(j+1,b) - surf[j] * S_band(j,b);
+            
+            for(int s=0; s<num_species; s++)
+                species[s].dS(j)  += dS_band(j,b) * species[s].fraction_total_opacity(j,b);
         }
     }
-    
-    //After dtau is known, compute attenuation of fluxes
-    for(int j=num_cells; j>0; j--) {
-        
-        S_total(j) = 0.;
-        
-        for(int b=0; b<num_bands; b++) {
-            S_band(j,b) = S_band(num_cells) * (1.-std::exp(-total_optical_depth(j,b)));
-            S_total(j) += S_band(j,b);
-        }
-        
-        
-    }
-    
 }
 
 void c_Species::update_opacities() {
     
     for(int j=0; j<num_cells; j++) {
         for(int b=0; b<num_bands; b++) {
-            opacity(j,b) = const_opacity; //TODO: Replace with some_tabulated_opacity_function();
+            opacity(j,b) = const_opacity; //TODO: Replace with some_complex_tabulated_opacity_function();
         }
     }
 }
@@ -264,27 +269,99 @@ void c_Sim::update_fluxes() {
 }
 
 
+void c_Sim::update_fluxes_FLD() {
+
+    auto flux_limiter = [](double R) {
+        if (R <= 2)
+            return 2 / (3 + std::sqrt(9 + 10*R*R)) ;
+        else 
+            return 10 / (10*R + 9 + std::sqrt(81 + 180*R)) ;
+    } ;
+
+    std::vector<double> l(num_cells+2), d(num_cells+2), u(num_cells+2), r(num_cells+2) ;
+    
+    for(int b=0; b<num_bands; b++) {
+   
+        for (int j=0; j < num_species+1; j++) {
+            double dx      = (x_i12[j+1]-x_i12[j]) ;
+            double tau_inv = 0.5 / (dx * (total_opacity(j,b) + total_opacity(j+1,b))) ;
+            double R       = 2 * tau_inv * std::abs(Erad_FLD(j+1,b) - Erad_FLD(j,b)) / (Erad_FLD(j+1,b) + Erad_FLD(j, b)) ;
+            double D       = surf[j] * flux_limiter(R) * tau_inv;
+            
+            // divergence terms
+            u[j] = -D ;
+            d[j] += D ;
+            d[j+1] = D ;
+            l[j+1] = -D ;
+
+            // source terms
+            d[j] += vol[j] * total_opacity(j,b) ;
+            //r[j] = vol[j] * ThermalEmission(j, b) ;
+        }
+
+        // Boundaries:
+        int Ncell = num_cells - 2*(num_ghosts - 1) ;
+        for (int j=0; j < num_ghosts; j++) {
+            // Left boundary:
+            //    Reflecting / no flux
+            l[j] = r[j] = 0 ;
+            d[j] = +1 ;
+            u[j] = -1 ;
+
+            //   Right boundary: free stream, no emission / absorbtion.
+            int i = Ncell + num_ghosts + j ; 
+                        
+            double dx_R = (x_i12[i+1]-x_i12[i]) ;
+            double dx_L = (x_i12[i]-x_i12[i-1]) ;
+
+            l[i] = - surf[i-1] / dx_L ;
+            d[i] = + surf[ i ] /  dx_R ;
+            r[i] = u[i] = 0 ;
+        }
+
+        tridiag.factor_matrix(&l[0], &d[0], &u[0]) ;
+        tridiag.solve(&r[0], &r[0]) ; // Solve in place (check it works)
+        
+        // Store result
+        for (int j=0; j < num_cells; j++) 
+            Erad_FLD(j, b) = r[j] ;
+        
+        // Bug?
+        //for (int j=0; j < num_species+2; j++) 
+        //    Erad_FLD(j, b) = r[j] ;
+    }
+    
+    // 
+    // Compute total radiation field that we need to update the temperatures
+    // 
+    for (int j=0; j < num_cells; j++)  {
+        Erad_FLD_total(j) = 0.;
+        
+        for (int b=0; j < num_bands; j++) 
+            Erad_FLD_total(j) += Erad_FLD(j,b);
+        
+    }
+}
+
 void c_Sim::fill_rad_basis_arrays(int j) { //Called in compute_radiation() in source.cpp
         
         for(int si=0; si<num_species; si++) {
+                
                 dens_vector(si)        = species[si].u[j].u1; 
                 numdens_vector(si)     = species[si].prim[j].number_density; 
                 mass_vector(si)        = species[si].mass_amu;
                 
-                radiation_vec_input(si)= dt/species[si].cv*(12.*species[si].opacity_planck(j)*sigma_rad*pow(species[si].prim[j].temperature,4.) + S_total(j)/dens_vector(si));
-                //radiation_vec_input(si)= dt/species[si].cv*(12.*species[si].opacity_planck(j)*sigma_rad*pow(species[si].prim[j].temperature,4.)- c * erad()+ S_total(j)/dens_vector(si));
+                radiation_vec_input(si)= dt/species[si].cv*(12.*species[si].opacity_planck(j)*sigma_rad*pow(species[si].prim[j].temperature,4.) + species[si].dS(j)/dens_vector(si) + c_light * Erad_FLD_total(j) );
                 radiation_cv_vector(si)= dt/species[si].cv;
                 radiation_T3_vector(si)= dt/species[si].cv * 16 * species[si].opacity_planck(j) * pow(species[si].prim[j].temperature,3.);
-                //TODO:Specify S
+                //TODO:Specify S properly and band_integral over Erad_FLD
         }
 }
-    
 
 //
 // Implicit energy update based on fluxes
 //
-void c_Sim::update_internal_energies() {
-    
+void c_Sim::update_temperatures() {
     
     Eigen::internal::set_is_malloc_allowed(false) ;
          
@@ -295,17 +372,12 @@ void c_Sim::update_internal_energies() {
 
     for(int j=0; j <= num_cells+1; j++){
 
-        //
-        // This is similar to the friction for now, let's keep it with no furhter updates
-        //
         fill_rad_basis_arrays(j);
         compute_alpha_matrix(j, 1);
         
         // 
-        // TODO: Loop for determining friction coefficients is not needed here, as those coeffs have already been computed in friction();
+        // Loop for determining friction coefficients is not needed here, as those coeffs have already been computed in friction();
         //
-        
-        //TODO: Plug in the proper T matrix
         
         radiation_matrix_M = friction_coefficients;
         radiation_matrix_M = radiation_cv_vector.asDiagonal() * radiation_matrix_M;
@@ -328,32 +400,13 @@ void c_Sim::update_internal_energies() {
                 
         for(int si=0; si<num_species; si++)
             species[si].prim[j].temperature = radiation_vec_output(si);
-                
-        for(int si=0; si<num_species; si++) {
-            double temp = 0;
-                    
-                    for(int sj=0; sj<num_species; sj++) {
-                        temp += dt * friction_coefficients(si,sj) * (species[sj].mass_amu/(species[sj].mass_amu+species[si].mass_amu))  * pow( friction_vec_output(si) - friction_vec_output(sj), 2.);
-                    }
-                    species[si].prim[j].internal_energy += temp;
-                    
-                    
-                    //
-                    // Update scheme 2
-                    //
-                    
-                    //update_cons_prim_after_friction(&species[si].u[j], &species[si].prim[j], friction_dEkin(si), friction_vec_output(si), species[si].mass_amu, species[si].gamma_adiabat, species[si].cv);
-                    
-                }
-                
-        }
-            
-        //
-        // Update scheme 1
-        //
-        for(int si=0; si<num_species; si++) {
-                species[si].eos->update_p_from_eint(&(species[si].prim[0]), num_cells+2);
-                species[si].eos->compute_conserved(&(species[si].prim[0]), &(species[si].u[0]), num_cells+2);        
+        
+    }
+    
+    for(int si=0; si<num_species; si++) {
+            species[si].eos->update_eint_from_T(&(species[si].prim[0]), num_cells+2);
+            species[si].eos->update_p_from_eint(&(species[si].prim[0]), num_cells+2);
+            species[si].eos->compute_conserved(&(species[si].prim[0]), &(species[si].u[0]), num_cells+2);        
         }
 
 }
@@ -373,44 +426,35 @@ void c_Sim::update_internal_energies() {
     void c_Sim::compute_friction_analytical() {
 
         if(debug > 0) cout<<"in analytic friction, num_species = "<<num_species<<endl;
-        
-        // Just do the basic update here
-        //for(int s=0; s < num_species; s++) {
-        //    for(int j=0; j < num_cells+1; j++)
-        //        species[s].u[j] = species[s].u[j] + species[s].dudt[0][j]*dt ;
-        //}
-        
-        if(num_species == 2) {
-            
-                
 
-                //Apply analytic solutions ...
-                double alpha=0, eps=0, f1=0, f2=0;
-                double v1b=0, v2b=0, v1a=0, v2a=0;
+        if(num_species == 2) {
+        
+            //Apply analytic solutions ...
+            double alpha=0, eps=0, f1=0, f2=0;
+            double v1b=0, v2b=0, v1a=0, v2a=0;
+            
+            for(int j=0; j <= num_cells+1; j++){
                 
-                for(int j=0; j <= num_cells+1; j++){
-                    
-                    v1b = species[0].prim[j].speed;
-                    v2b = species[1].prim[j].speed;
-                    
-                    alpha = alpha_collision * (1e-1/x_i12[j]); // (f[0]+f[1])/(mu0*f[0]+mu1*f[1]) * k_b T/(m_i * b_i)
-                    eps   = species[0].u[j].u1 / species[1].u[j].u1;
-                    f1    = (1. + dt*alpha)/(1. + dt*alpha*(1.+eps)) ;
-                    f2    = dt*alpha*eps / (1. + dt * alpha);
-                    
-                    v2a    = (v2b + v1b * f2 ) * f1;
-                    v1a    = v1b - (v2a - v2b) / eps;
-                    
-                    species[0].prim[j].speed = v1a;
-                    species[1].prim[j].speed = v2a;
-                    
-                    species[0].prim[j].internal_energy += dt * alpha * (species[1].mass_amu/(species[0].mass_amu+species[1].mass_amu))  * pow( v1a - v2a, 2.);
-                    species[1].prim[j].internal_energy += dt * alpha * eps * (species[0].mass_amu/(species[0].mass_amu+species[1].mass_amu))  * pow( v1a - v2a, 2.);
-                    
-                    
-                }
+                v1b = species[0].prim[j].speed;
+                v2b = species[1].prim[j].speed;
+                
+                alpha = alpha_collision * (1e-1/x_i12[j]); // (f[0]+f[1])/(mu0*f[0]+mu1*f[1]) * k_b T/(m_i * b_i)
+                eps   = species[0].u[j].u1 / species[1].u[j].u1;
+                f1    = (1. + dt*alpha)/(1. + dt*alpha*(1.+eps)) ;
+                f2    = dt*alpha*eps / (1. + dt * alpha);
+                
+                v2a    = (v2b + v1b * f2 ) * f1;
+                v1a    = v1b - (v2a - v2b) / eps;
+                
+                species[0].prim[j].speed = v1a;
+                species[1].prim[j].speed = v2a;
+                
+                species[0].prim[j].internal_energy += dt * alpha * (species[1].mass_amu/(species[0].mass_amu+species[1].mass_amu))  * pow( v1a - v2a, 2.);
+                species[1].prim[j].internal_energy += dt * alpha * eps * (species[0].mass_amu/(species[0].mass_amu+species[1].mass_amu))  * pow( v1a - v2a, 2.);
                 
                 
+            }
+            
             if(debug > 0) {
                 char a;
                 double dekin1 = 0.5*species[0].u[num_cells+1].u1 * (v1a - v1b) * (v1a - v1b) ; 
@@ -423,101 +467,101 @@ void c_Sim::update_internal_energies() {
         }
         if(num_species == 3) {
                 
-                double det;
-                double v1a=0, v2a=0, v3a=0, v1b=0, v2b=0, v3b=0;
-                Eigen::Matrix3d a = Eigen::Matrix3d::Zero();
-                Eigen::Vector3d dens_vector(0,0,0);
+            double det;
+            double v1a=0, v2a=0, v3a=0, v1b=0, v2b=0, v3b=0;
+            Eigen::Matrix3d a = Eigen::Matrix3d::Zero();
+            Eigen::Vector3d dens_vector(0,0,0);
+            
+            if(debug > 0) cout<<"    Before radial loop. a ="<<a<<endl;
+            
+            for(int j=0; j <= num_cells+1; j++){
+            
+                if(debug > 1) cout<<"    Before species loop."<<endl;
                 
-                if(debug > 0) cout<<"    Before radial loop. a ="<<a<<endl;
+                for(int si=0; si<num_species; si++) {
+                    dens_vector(si)        = species[si].u[j].u1; 
+                }
                 
-                for(int j=0; j <= num_cells+1; j++){
+                v1b = species[0].prim[j].speed;
+                v2b = species[1].prim[j].speed;
+                v3b = species[2].prim[j].speed;
                 
-                    if(debug > 1) cout<<"    Before species loop."<<endl;
-                    
-                    for(int si=0; si<num_species; si++) {
-                        dens_vector(si)        = species[si].u[j].u1; 
+                if(debug > 1) cout<<"    Before coeff loop."<<endl;
+                
+                for(int si=0; si<num_species; si++) 
+                    for(int sj=0; sj<num_species; sj++)
+                    {
+                    if(si==sj)
+                        a(si,sj) = 0.;
+                    else if(si > sj)
+                        a(si,sj) = friction_coeff_mask(si,sj) * alpha_collision;
+                    else
+                        a(si,sj) = friction_coeff_mask(si,sj) * alpha_collision  * dens_vector(sj) / dens_vector(si);
                     }
-                    
-                    v1b = species[0].prim[j].speed;
-                    v2b = species[1].prim[j].speed;
-                    v3b = species[2].prim[j].speed;
-                    
-                    if(debug > 1) cout<<"    Before coeff loop."<<endl;
-                    
-                    for(int si=0; si<num_species; si++) 
-                        for(int sj=0; sj<num_species; sj++)
-                        {
-                        if(si==sj)
-                            a(si,sj) = 0.;
-                        else if(si > sj)
-                            a(si,sj) = friction_coeff_mask(si,sj) * alpha_collision;
-                        else
-                            a(si,sj) = friction_coeff_mask(si,sj) * alpha_collision  * dens_vector(sj) / dens_vector(si);
-                        }
-                    
-                    if(debug > 1) cout<<"    Before radial loop."<<endl;
-                    
-                    det = - ( a(0, 2) + dt* a(0, 2) * a(1, 0) + a(0, 1) * a(1, 2) +dt* a(0, 2)* a(1, 2)) * a(2, 0); 
-                    det += (-a(0, 2) * a(1, 0) - a(1, 2) -dt* a(0, 1)* a(1, 2) - dt* a(0, 2)* a(1, 2)) * a(2, 1); 
-                    det += (-a(0, 1) * a(1, 0) + (1. + dt* (a(0, 1) + a(0, 2) ))* (1. +dt* (a(1, 0) + a(1, 2)))) *(1. +dt *(a(2, 0) + a(2, 1)));
-                    
-                    v1a =  v1b*(-a(1, 2) * a(2, 1) + (1. + dt* (a(1, 0) + a(1, 2))) * (1. +  dt * (a(2, 0) + a(2, 1))));
-                    v1a += v2b*( a(0, 1) + dt * a(0, 1) * a(2, 0) + dt * a(0, 1) * a(2, 1) + a(0, 2)* a(2, 1));
-                    v1a += v3b*(a(0, 2) + dt * a(0, 2)* a(1, 0) + a(0, 1) * a(1, 2) + dt * a(0, 2)* a(1, 2));
-                    
-                    v2a  = v1b*(a(1, 0) + dt * a(1, 0) * a(2, 0) + a(1, 2)* a(2, 0) + dt * a(1, 0) * a(2, 1));
-                    v2a += v2b*( -a(0, 2) * a(2, 0) + (1. + dt * (a(0, 1)* + a(0, 2))) * (1. + dt * (a(2, 0) + a(2, 1) ) ))  ;
-                    v2a += v3b*( a(0, 2) * a(1, 0) + a(1, 2) + dt * a(0, 1) * a(1, 2) + dt * a(0, 2) * a(1, 2));
-                    
-                    v3a  = v1b*(a(2, 0) + dt * a(1, 0) * a(2, 0) + dt * a(1, 2) * a(2, 0) + a(1, 0) * a(2, 1) );
-                    v3a += v2b*(a(0, 1)* a(2, 0) + a(2, 1) + dt * a(0, 1) * a(2, 1) + dt * a(0, 2) * a(2, 1) );
-                    v3a += v3b*(-a(0, 1)* a(1, 0) + (1. + dt* (a(0, 1) + a(0, 2)) ) * (1. + dt * (a(1, 0) + a(1, 2)) ) );
-                    
-                    v1a /= det;
-                    v2a /= det;
-                    v3a /= det;
-                    
-                    species[0].prim[j].speed = v1a;
-                    species[1].prim[j].speed = v2a;
-                    species[2].prim[j].speed = v3a;
-                    
-                    species[0].prim[j].internal_energy += dt * a(0,1) * (species[1].mass_amu/(species[0].mass_amu+species[1].mass_amu))  
-                                                                     * pow( v1a - v2a, 2.);
-                    species[0].prim[j].internal_energy += dt * a(0,2) * (species[2].mass_amu/(species[0].mass_amu+species[2].mass_amu))  
-                                                                     * pow( v1a - v3a, 2.);
-                                                                     
-                    species[1].prim[j].internal_energy += dt * a(1,0) * (species[0].mass_amu/(species[1].mass_amu+species[0].mass_amu))  
-                                                                     * pow( v1a - v2a, 2.);
-                    species[1].prim[j].internal_energy += dt * a(1,2) * (species[2].mass_amu/(species[1].mass_amu+species[2].mass_amu))  
-                                                                     * pow( v2a - v3a, 2.);
-                    
-                    species[2].prim[j].internal_energy += dt * a(2,0) * (species[0].mass_amu/(species[2].mass_amu+species[0].mass_amu))  
-                                                                     * pow( v1a - v3a, 2.);
-                    species[2].prim[j].internal_energy += dt * a(2,1) * (species[1].mass_amu/(species[2].mass_amu+species[1].mass_amu))  
-                                                                     * pow( v2a - v3a, 2.);
-                    ///TODO: Internal energy update
-                    
-            }
-        
-            if(debug > 0) {
-                    char b;
-                    double dekin1 = 0.5*species[0].u[num_cells+1].u1 * (v1a - v1b) * (v1a - v1b) ; 
-                    double dekin2 = 0.5*species[1].u[num_cells+1].u1 * (v2a - v2b) * (v2a - v2b) ;
-                    double dvrel1 = (v1a - v1b)/v1b;
-                    double dvrel2 = (v2a - v2b)/v2b;
-                    cout<<"alpha_collision ="<<alpha_collision<<" det = "<<det<<" a(0,0)="<<a(0,0)<<" matrix a = "<<a<<endl;
-                    cout<<"Relative differences in velocities 1/2 = "<<dvrel1<<" / "<<dvrel2<<" differences in Ekin = "<<dekin1<<" / "<<dekin2<<endl;
-                    cin>>b;
-            }
+                
+                if(debug > 1) cout<<"    Before radial loop."<<endl;
+                
+                det = - ( a(0, 2) + dt* a(0, 2) * a(1, 0) + a(0, 1) * a(1, 2) +dt* a(0, 2)* a(1, 2)) * a(2, 0); 
+                det += (-a(0, 2) * a(1, 0) - a(1, 2) -dt* a(0, 1)* a(1, 2) - dt* a(0, 2)* a(1, 2)) * a(2, 1); 
+                det += (-a(0, 1) * a(1, 0) + (1. + dt* (a(0, 1) + a(0, 2) ))* (1. +dt* (a(1, 0) + a(1, 2)))) *(1. +dt *(a(2, 0) + a(2, 1)));
+                
+                v1a =  v1b*(-a(1, 2) * a(2, 1) + (1. + dt* (a(1, 0) + a(1, 2))) * (1. +  dt * (a(2, 0) + a(2, 1))));
+                v1a += v2b*( a(0, 1) + dt * a(0, 1) * a(2, 0) + dt * a(0, 1) * a(2, 1) + a(0, 2)* a(2, 1));
+                v1a += v3b*(a(0, 2) + dt * a(0, 2)* a(1, 0) + a(0, 1) * a(1, 2) + dt * a(0, 2)* a(1, 2));
+                
+                v2a  = v1b*(a(1, 0) + dt * a(1, 0) * a(2, 0) + a(1, 2)* a(2, 0) + dt * a(1, 0) * a(2, 1));
+                v2a += v2b*( -a(0, 2) * a(2, 0) + (1. + dt * (a(0, 1)* + a(0, 2))) * (1. + dt * (a(2, 0) + a(2, 1) ) ))  ;
+                v2a += v3b*( a(0, 2) * a(1, 0) + a(1, 2) + dt * a(0, 1) * a(1, 2) + dt * a(0, 2) * a(1, 2));
+                
+                v3a  = v1b*(a(2, 0) + dt * a(1, 0) * a(2, 0) + dt * a(1, 2) * a(2, 0) + a(1, 0) * a(2, 1) );
+                v3a += v2b*(a(0, 1)* a(2, 0) + a(2, 1) + dt * a(0, 1) * a(2, 1) + dt * a(0, 2) * a(2, 1) );
+                v3a += v3b*(-a(0, 1)* a(1, 0) + (1. + dt* (a(0, 1) + a(0, 2)) ) * (1. + dt * (a(1, 0) + a(1, 2)) ) );
+                
+                v1a /= det;
+                v2a /= det;
+                v3a /= det;
+                
+                species[0].prim[j].speed = v1a;
+                species[1].prim[j].speed = v2a;
+                species[2].prim[j].speed = v3a;
+                
+                species[0].prim[j].internal_energy += dt * a(0,1) * (species[1].mass_amu/(species[0].mass_amu+species[1].mass_amu))  
+                                                                    * pow( v1a - v2a, 2.);
+                species[0].prim[j].internal_energy += dt * a(0,2) * (species[2].mass_amu/(species[0].mass_amu+species[2].mass_amu))  
+                                                                    * pow( v1a - v3a, 2.);
+                                                                    
+                species[1].prim[j].internal_energy += dt * a(1,0) * (species[0].mass_amu/(species[1].mass_amu+species[0].mass_amu))  
+                                                                    * pow( v1a - v2a, 2.);
+                species[1].prim[j].internal_energy += dt * a(1,2) * (species[2].mass_amu/(species[1].mass_amu+species[2].mass_amu))  
+                                                                    * pow( v2a - v3a, 2.);
+                
+                species[2].prim[j].internal_energy += dt * a(2,0) * (species[0].mass_amu/(species[2].mass_amu+species[0].mass_amu))  
+                                                                    * pow( v1a - v3a, 2.);
+                species[2].prim[j].internal_energy += dt * a(2,1) * (species[1].mass_amu/(species[2].mass_amu+species[1].mass_amu))  
+                                                                    * pow( v2a - v3a, 2.);
+                ///TODO: Internal energy update
+                
+        }
+    
+        if(debug > 0) {
+                char b;
+                double dekin1 = 0.5*species[0].u[num_cells+1].u1 * (v1a - v1b) * (v1a - v1b) ; 
+                double dekin2 = 0.5*species[1].u[num_cells+1].u1 * (v2a - v2b) * (v2a - v2b) ;
+                double dvrel1 = (v1a - v1b)/v1b;
+                double dvrel2 = (v2a - v2b)/v2b;
+                cout<<"alpha_collision ="<<alpha_collision<<" det = "<<det<<" a(0,0)="<<a(0,0)<<" matrix a = "<<a<<endl;
+                cout<<"Relative differences in velocities 1/2 = "<<dvrel1<<" / "<<dvrel2<<" differences in Ekin = "<<dekin1<<" / "<<dekin2<<endl;
+                cin>>b;
+        }
             
     }
     
     if(debug > 0) cout<<"in friction, pos2"<<endl;
             
-        for(int s=0; s<num_species; s++){
-                species[s].eos->update_p_from_eint(&(species[s].prim[0]), num_cells+2);
-                species[s].eos->compute_conserved(&(species[s].prim[0]), &(species[s].u[0]), num_cells+2);        
-        }
+    for(int s=0; s<num_species; s++){
+            species[s].eos->update_p_from_eint(&(species[s].prim[0]), num_cells+2);
+            species[s].eos->compute_conserved(&(species[s].prim[0]), &(species[s].u[0]), num_cells+2);        
+    }
         
 }
 
@@ -538,66 +582,58 @@ void c_Sim::compute_friction_numerical() {
         if(debug >= 1 && j==7 && steps == 1) cout<<"    Computed coefficient matrix ="<<endl<<friction_coefficients<<endl;
         if(debug >= 1 && j==0 && steps == 0) cout<<"    velocities ="<<endl<<friction_vec_input<<endl;
         if(debug >= 1 && j==0 && steps == 0) cout<<"    velocities[0] = "<<friction_vec_input(0)<<endl;
-                if(debug >= 1 && j==0 && steps == 0) cout<<"    rho[0] = "<<species[0].u[j].u1<<endl;
+        if(debug >= 1 && j==0 && steps == 0) cout<<"    rho[0] = "<<species[0].u[j].u1<<endl;
                 
-                friction_matrix_T = identity_matrix - friction_coefficients * dt;
-                friction_matrix_T.diagonal().noalias() += dt * (friction_coefficients * unity_vector);
-                
-                LU.compute(friction_matrix_T) ;
-                friction_vec_output.noalias() = LU.solve(friction_vec_input);
-                
-                if(debug >= 1 && j==7 && steps == 1) cout<<"    T = "<<friction_matrix_T<<endl;
-                if(debug >= 1 && j==7 && steps == 1) cout<<"    v_inp = "<<friction_vec_input<<endl;
-                if(debug >= 1 && j==7 && steps == 1) cout<<"    v_out = "<<friction_vec_output<<endl;
-                
-                //*/
-                // Update new speed and internal energy
-                //
-                
-                for(int si=0; si<num_species; si++)
-                    species[si].prim[j].speed = friction_vec_output(si);
-                
-                for(int si=0; si<num_species; si++) {
-                    double temp = 0;
-                    
-                    for(int sj=0; sj<num_species; sj++) {
-                        temp += dt * friction_coefficients(si,sj) * (species[sj].mass_amu/(species[sj].mass_amu+species[si].mass_amu))  * pow( friction_vec_output(si) - friction_vec_output(sj), 2.);
-                    }
-                    species[si].prim[j].internal_energy += temp;
-                    
-                    
-                    //
-                    // Update scheme 2
-                    //
-                    
-                    //update_cons_prim_after_friction(&species[si].u[j], &species[si].prim[j], friction_dEkin(si), friction_vec_output(si), species[si].mass_amu, species[si].gamma_adiabat, species[si].cv);
-                    
-                }
-                
-            }
+        friction_matrix_T = identity_matrix - friction_coefficients * dt;
+        friction_matrix_T.diagonal().noalias() += dt * (friction_coefficients * unity_vector);
+        
+        LU.compute(friction_matrix_T) ;
+        friction_vec_output.noalias() = LU.solve(friction_vec_input);
+        
+        if(debug >= 1 && j==7 && steps == 1) cout<<"    T = "<<friction_matrix_T<<endl;
+        if(debug >= 1 && j==7 && steps == 1) cout<<"    v_inp = "<<friction_vec_input<<endl;
+        if(debug >= 1 && j==7 && steps == 1) cout<<"    v_out = "<<friction_vec_output<<endl;
+        
+        //*/
+        // Update new speed and internal energy
+        //
+        
+        for(int si=0; si<num_species; si++)
+            species[si].prim[j].speed = friction_vec_output(si);
+        
+        for(int si=0; si<num_species; si++) {
+            double temp = 0;
             
-            //
-            // Update scheme 1
-            //
-            for(int si=0; si<num_species; si++) {
-                species[si].eos->update_p_from_eint(&(species[si].prim[0]), num_cells+2);
-                species[si].eos->compute_conserved(&(species[si].prim[0]), &(species[si].u[0]), num_cells+2);        
+            for(int sj=0; sj<num_species; sj++) {
+                temp += dt * friction_coefficients(si,sj) * (species[sj].mass_amu/(species[sj].mass_amu+species[si].mass_amu))  * pow( friction_vec_output(si) - friction_vec_output(sj), 2.);
             }
+            species[si].prim[j].internal_energy += temp;
+        }
+        
+    }
+    
+    //
+    // Update scheme 1
+    //
+    for(int si=0; si<num_species; si++) {
+        species[si].eos->update_p_from_eint(&(species[si].prim[0]), num_cells+2);
+        species[si].eos->compute_conserved(&(species[si].prim[0]), &(species[si].u[0]), num_cells+2);        
+    }
     
 }
 
 
-    void c_Sim::fill_alpha_basis_arrays(int j) { //Called in compute_friction() in source.cpp
+void c_Sim::fill_alpha_basis_arrays(int j) { //Called in compute_friction() in source.cpp
     
-        for(int si=0; si<num_species; si++) {
-                friction_vec_input(si) = species[si].prim[j].speed;
-                dens_vector(si)        =  species[si].u[j].u1; 
-                numdens_vector(si)     =  species[si].prim[j].number_density; 
-                mass_vector(si)        =  species[si].mass_amu;
-            }
+    for(int si=0; si<num_species; si++) {
+        friction_vec_input(si) = species[si].prim[j].speed;
+        dens_vector(si)        =  species[si].u[j].u1; 
+        numdens_vector(si)     =  species[si].prim[j].number_density; 
+        mass_vector(si)        =  species[si].mass_amu;
     }
+}
     
-    void c_Sim::compute_alpha_matrix(int j, int actually_compute_beta) { //Called in compute_friction() and compute_radiation() in source.cpp
+void c_Sim::compute_alpha_matrix(int j, int actually_compute_beta) { //Called in compute_friction() and compute_radiation() in source.cpp
         
         double alpha_local;
         double coll_b;
@@ -611,7 +647,6 @@ void c_Sim::compute_friction_numerical() {
                     else {
                         coll_b      = 1./(1.4142*pow(numdens_vector(sj),0.3333333333333));     // Update this, if charged species collide
                         alpha_local = (numdens_vector(si) + numdens_vector(sj))/(numdens_vector(si)*mass_vector(sj) + numdens_vector(si)*mass_vector(sj) );
-                        //cout<<"   in coll, alpha_local_prefactor = "<<alpha_local<<" ";
                         alpha_local *= kb * species[si].prim[j].temperature /(mass_vector(si) * coll_b);
                         //cout<<" alpha_local = "<<alpha_local<<" T = "<<species[si].prim[j].temperature<< " n="<<numdens_vector(si)<<" mass="<<mass_vector(si)<<" b = "<<coll_b<<" n^1/3 = "<<pow(numdens_vector3(sj),0.3333333333333)<<" n^-1/3"<<(1./pow(numdens_vector3(sj),0.3333333333333))<<endl;
                         
@@ -645,37 +680,4 @@ void c_Sim::compute_friction_numerical() {
             }
                     
         }
-        
-        
 }
-
-    /*
-  
-
-
-
-
-
-
-
-
-void c_Species::update_opacities() {
-    
-}
-
-//
-// Computation of fluxes based on radiative transport theory
-//
-void c_Sim::update_fluxes() {
-}
-
-//
-// Implicit energy update based on fluxes
-//
-void c_Sim::update_internal_energies() {
-    
-
-}
-
-    
-*/

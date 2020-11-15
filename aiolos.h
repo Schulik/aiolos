@@ -16,6 +16,8 @@
 #include <Eigen/Dense>
 #include <Eigen/LU>
 
+#include "block_tridiag_solve.h"
+
 #include "enum.h"
 #include "eos.h"
 
@@ -29,8 +31,10 @@ using namespace std;
 //Basic physics quantities
 const double G        = 6.678e-8; //cgs units
 const double pi       = 3.141592;
+const double c_light   = 2.99792458e10;
 const double navo     = 6.02214e23; // particles per mole
 const double amu      = 1.66054e-24; //g
+const double h_planck = 6.6261e-27;//  cm^2 g/s
 const double Rgas     = 8.31446261815324e7;  //erg/K/mole
 const double Rgas_fake = 1.;
 const double sigma_rad= 5.67e-5;   //erg cm-2 s-1 K-4
@@ -75,6 +79,7 @@ std::vector<double> np_zeros(int);
 std::vector<double> np_ones(int);
 std::vector<double> np_somevalue(int, double);
 
+double compute_planck_function_integral(double lmin, double lmax, double temperature);
 //
 // Everything to define and read simulation parameters
 //
@@ -221,6 +226,10 @@ public:
     std::vector<double> source_pressure_prefactor_left;
     std::vector<double> source_pressure_prefactor_right;
 
+    double lambda_min, lambda_max, lambda_per_decade;
+    std::vector<double> l_i;
+    std::vector<double> l_i12;
+    
     int init_geometry;
     char collision_model;
     
@@ -312,16 +321,8 @@ public:
     //
     // Radiation
     //
-    /*
-    Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> F_up;      //num_cells * num_bands each
-    Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> F_down;
-    Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> F_plus;
-    Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> F_minus;
-    Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> dErad;
-    
-    Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> total_opacity;
-    Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> cell_optical_depth;
-    */
+    double T_star;
+    double UV_star;
     
     Eigen::MatrixXd F_up;      //num_cells * num_bands each
     Eigen::MatrixXd F_down;
@@ -330,13 +331,16 @@ public:
     Eigen::MatrixXd dErad;
     Eigen::MatrixXd S_total;
     Eigen::MatrixXd S_band;
+    Eigen::MatrixXd dS_band;
+    Eigen::MatrixXd solar_heating;
     
     Eigen::MatrixXd total_opacity;
     Eigen::MatrixXd cell_optical_depth;
     Eigen::MatrixXd total_optical_depth;
-    
-    
-    
+
+    Eigen::MatrixXd Erad_FLD ;
+    Eigen::MatrixXd Erad_FLD_total ;
+    BlockTriDiagSolver<1> tridiag ;
     
     int rad_solver_max_iter = 1;
     double epsilon_rad_min = 1e-1;  // Some convergence measure for the radiation solver, if needed
@@ -344,8 +348,9 @@ public:
     
     void transport_radiation();     //  Called if use_rad_fluxes == 1
     void update_opacities();
-    void update_fluxes();           //  Called from transport_radiation#
-    void update_internal_energies();
+    void update_fluxes();           //  Called from transport_radiation#   
+    void update_fluxes_FLD();           //  Called from transport_radiation#
+    void update_temperatures();
     //AOS source_radflux(int i);
     
     ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -455,6 +460,7 @@ public:
     Eigen::MatrixXd opacity;        //num_cells * num_bands
     Eigen::MatrixXd opacity_planck; //num_cells
     Eigen::MatrixXd fraction_total_opacity; //num_cells * num_bands
+    Eigen::MatrixXd dS;
     
     //std::vector<double> opticaldepth;
     //std::vector<double> opacity;

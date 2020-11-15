@@ -116,6 +116,21 @@ vector<string> stringsplit(const string& str, const string& delim)
     return tokens;
 }
 
+//
+//
+// Compute Planck integral in a quick way
+//
+//
+
+double compute_planck_function_integral(double lmin, double lmax, double temperature) {
+    
+    double l_avg = 0.5*(lmin+lmax);
+    double prefactor = 2*h_planck*pow(h_planck,2.)/pow(l_avg,5.);
+    double expfactor = h_planck*c_light/(l_avg*kb*temperature);
+    
+    return prefactor*(lmax-lmin)/(std::exp(-expfactor)-1.);
+}
+
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 //
 // Read parameters: Looks for the value of one parameter in a file
