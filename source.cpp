@@ -323,14 +323,15 @@ void c_Sim::update_fluxes_FLD() {
             l[j+1] = -D ;
 
             // source terms
-            d[j] += vol[j] * total_opacity(j,b) * c_light;
+            d[j] += vol[j] * total_opacity(j,b) ;//* c_light;
             
             //Thermal emission field from all species in this band
             r[j] = 0;
             for(int s=0; s<num_species; s++) {
-                r[j] += vol[j] * species[s].prim[j].density * species[s].opacity(j,b) * compute_planck_function_integral(l_i[b], l_i[b+1], species[s].prim[j].temperature) + UV_star * 1.;
+                r[j] += vol[j] * species[s].prim[j].density * species[s].opacity(j,b) * 
+                    compute_planck_function_integral(l_i[b], l_i[b+1], species[s].prim[j].temperature) + UV_star * 1.;
             }
-            r[j] *= 4.*pi;
+            r[j] *= 4.*pi ;
         }
         
         cout<<" IN UPDATE ERAD, before solve, band["<<b<<"], r[num_cells/2] = "<<r[num_cells/2]<<endl<<"], Erad[num_cells/2, 0] = "<<Erad_FLD(num_cells/2,0)<<endl;
@@ -344,15 +345,18 @@ void c_Sim::update_fluxes_FLD() {
             d[j] = +1 ;
             u[j] = -1 ;
 
-            //   Right boundary: free stream, no emission / absorbtion.
-            int i = Ncell + num_ghosts + j ; 
-                        
-            double dx_R = (x_i12[i+1]-x_i12[i]) ;
-            double dx_L = (x_i12[i]-x_i12[i-1]) ;
+        }
+        //   Right boundary: free stream, no emission / absorbtion.
+        int i = Ncell + num_ghosts ;
+        double dx_R = (x_i12[i+1]-x_i12[i]) ;
 
-            l[i] = - surf[i-1] / dx_L ;
-            d[i] = + surf[ i ] /  dx_R ;
-            r[i] = u[i] = 0 ;
+        l[i] = u[i-1] ;
+        d[i] = -l[i] + surf[ i ] / (x_i12[i+1]-x_i12[i]) ;
+        u[i] = r[i] = 0 ;
+        for (int j=1; j < num_ghosts; j++) {
+            i = Ncell + num_ghosts + j ;
+            l[i] = d[i] = 1 ;
+            u[i] = r[i] = 0 ;
         }
 
         tridiag.factor_matrix(&l[0], &d[0], &u[0]) ;
