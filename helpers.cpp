@@ -124,11 +124,31 @@ vector<string> stringsplit(const string& str, const string& delim)
 
 double compute_planck_function_integral(double lmin, double lmax, double temperature) {
     
-    double l_avg = 0.5*(lmin+lmax);
-    double prefactor = 2*h_planck*pow(h_planck,2.)/pow(l_avg,5.);
-    double expfactor = h_planck*c_light/(l_avg*kb*temperature);
+    int num_steps=1000;
+    double dloggrid = pow(lmax/lmin, 1./((double)num_steps));
+    double l1;
+    double l2;
+    double l_avg;
+    double expfactor;
+    double prefactor;
+    double tempresult = 0;
+    //cout<<"    In compute_planck lmin/lmax/dloggrid = "<<lmin<<"/"<<lmax<<"/"<<dloggrid<<" ";
     
-    return prefactor*(lmax-lmin)/(std::exp(-expfactor)-1.);
+    for(int i=0; i<num_steps; i++) {
+        //cout<<"---";
+        l1        = lmin * pow(dloggrid,(double)i);
+        l2        = l1 * dloggrid;
+        l_avg     = 0.5*(l1+l2);
+        expfactor = h_planck*c_light/(l_avg*angstroem*kb*temperature);
+        //prefactor = 2*h_planck*c_light*c_light/pow(l_avg,5.)/pow(angstroem,4.);
+        
+        tempresult += sigma_rad2*(l2-l1)/pow(l_avg,5.)/(std::exp(expfactor)-1.);
+        //tempresult += (l1-l2)/(std::exp(-expfactor)-1.);
+        //cout<<" "<<l1<<"/"<<l2<<" "<<prefactor*(l2-l1)/(std::exp(-expfactor)-1.);
+    }
+    //cout<<endl;
+    
+    return tempresult;
 }
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

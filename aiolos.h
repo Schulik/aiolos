@@ -37,7 +37,6 @@ const double amu      = 1.66054e-24; //g
 const double h_planck = 6.6261e-27;//  cm^2 g/s
 const double Rgas     = 8.31446261815324e7;  //erg/K/mole
 const double Rgas_fake = 1.;
-const double sigma_rad= 5.67e-5;   //erg cm-2 s-1 K-4
 const double kb       = 1.38e-16;  //erg/K
 const double km       = 1e5; //kilometers in cm
 const double mearth   = 5.98e27;  //g
@@ -52,6 +51,10 @@ const double rsolar   = 695510*km;
 const double pc       = 3.08567758e18; //cm
 const double kpc      = 1e3 * pc;
 const double mpc      = 1e6 * pc;
+const double angstroem= 1e-4; //cm
+const double ergcm2_to_wattperm2 = 1e-3;
+const double sigma_rad = 5.67e-5;   //erg cm-2 s-1 K-4
+const double sigma_rad2= 2*h_planck*c_light*c_light/pow(angstroem,4.);
 
 // For entropy computation, to be set to sensible parameters e.g. at setting of initial conditions
 const double P_ref   = 1e-20;
@@ -336,7 +339,7 @@ public:
     
     Eigen::MatrixXd total_opacity;
     Eigen::MatrixXd cell_optical_depth;
-    Eigen::MatrixXd total_optical_depth;
+    Eigen::MatrixXd radial_optical_depth;
 
     Eigen::MatrixXd Erad_FLD ;
     Eigen::MatrixXd Erad_FLD_total ;

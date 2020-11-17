@@ -24,9 +24,9 @@ int main(int argc, char** argv)
     string speciesfile;
     int debug;
     int suppress_warnings_global = 0;
-    cout<<endl<<"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"<<endl;
-          cout<<"~~~ Welcome to AIOLOS! May a gentle breeze lead your way home."<<endl;
-          cout<<"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"<<endl;
+    cout<<endl<<"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"<<endl;
+          cout<<"~~~ Welcome to AIOLOS! May a gentle breeze lead your way through the bugs."<<endl;
+          cout<<"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"<<endl;
     
     //
     // Loop through all args, in order to find the name of the parameter file (KEY), debug options etc.

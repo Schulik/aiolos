@@ -160,9 +160,15 @@ void c_Sim::transport_radiation() {
             
             update_opacities();
             
-            update_fluxes();
+            cout<<"   in transport_radiation, after update opacities."<<endl;
+            
+            update_fluxes_FLD();
+            
+            cout<<"   in transport_radiation, after update fluxes."<<endl;
             
             update_temperatures();
+            
+            cout<<"   in transport_radiation, after update temperatures."<<endl;
             
             iters++;
         }
@@ -185,24 +191,24 @@ void c_Sim::update_opacities() {
     for(int j=num_cells; j>0; j--) {
         
         for(int s=0; s<num_species; s++)
-                species[s]. dS(j)  = 0.;
+                species[s].dS(j)  = 0.;
         
         for(int b=0; b<num_bands; b++) {
             
             cell_optical_depth(j,b) = 0.;
             total_opacity(j,b) = 0 ;
-            total_optical_depth(j,b) = 0.;
+            radial_optical_depth(j,b) = 0.;
             
             for(int s=0; s<num_species; s++) {
                 total_opacity(j,b)      += species[s].opacity(j,b) * species[s].u[j].u1 ;
-                cell_optical_depth(j,b)  = species[s].opacity(j,b) * species[s].u[j].u1 * dx[j];
+                //cell_optical_depth(j,b)  = species[s].opacity(j,b) * species[s].u[j].u1 * dx[j];
             }
             cell_optical_depth(j,b) = total_opacity(j, b) * dx[j] ;
             
             if(j==num_cells)
-                total_optical_depth(j,b) = cell_optical_depth(j,b);
+                radial_optical_depth(j,b) = cell_optical_depth(j,b);
             else
-                total_optical_depth(j,b) = total_optical_depth(j+1,b) + cell_optical_depth(j,b);
+                radial_optical_depth(j,b) = radial_optical_depth(j+1,b) + cell_optical_depth(j,b);
                 
             //
             // Afyter the total optical depth per band is known, we assign the fractional optical depths
@@ -215,18 +221,40 @@ void c_Sim::update_opacities() {
             //
             // Now compute the attentiation of solar radiation and then assign the lost energy back to individual species in a manner that conserves energy
             //
-            S_band(j,b)  = solar_heating(b) * std::exp(-total_optical_depth(j,b));
-            dS_band(j,b) = surf[j+1] * S_band(j+1,b) - surf[j] * S_band(j,b);
+            S_band(j,b)  = solar_heating(b) * std::exp(-radial_optical_depth(j,b));
+            if(j<num_cells)
+                dS_band(j,b) = surf[j+1] * S_band(j+1,b) - surf[j] * S_band(j,b);
+            else
+                dS_band(j,b) = 0;
             
             for(int s=0; s<num_species; s++)
                 species[s].dS(j)  += dS_band(j,b) * species[s].fraction_total_opacity(j,b);
         }
     }
+    
+    
+        for(int j=num_cells; j>0; j--) {
+            
+            cout<<"    in update opa ";
+            
+            for(int b=0; b<num_bands;b++) {
+                cout<<"    band ["<<b<<"] = "<<S_band(j,b)<<" banddS = "<<dS_band(j,b)<<" tau = "<<radial_optical_depth(j,b);
+                for(int s=0; s<num_species; s++) {
+                    cout<<" dS_fraction["<<species[s].name<<"] = "<<(species[s].fraction_total_opacity(j,b))<<" opa = "<<species[s].opacity(j,b);
+                }
+                
+            }
+            cout<<endl;
+        }
+            
+    
+        
 }
+        
 
 void c_Species::update_opacities() {
     
-    for(int j=0; j<num_cells; j++) {
+    for(int j=0; j<=num_cells; j++) {
         for(int b=0; b<num_bands; b++) {
             opacity(j,b) = const_opacity; //TODO: Replace with some_complex_tabulated_opacity_function();
         }
@@ -257,7 +285,7 @@ void c_Sim::update_fluxes() {
         for(int b=0; b<num_bands; b++) {
             
             F_down(j,b) = F_up(j+1,b) - cell_optical_depth(j,b) *1.; 
-            //TODO: Replace 1. with appropriate geometric factors for (non)-plane parallel emission
+            //T ODO: Replace 1. with appropriate geometric factors for (non)-plane parallel emission
             //TODO: Add appropriate term for source function
             
         }
@@ -282,7 +310,7 @@ void c_Sim::update_fluxes_FLD() {
     
     for(int b=0; b<num_bands; b++) {
    
-        for (int j=0; j < num_species+1; j++) {
+        for (int j=0; j < num_cells+1; j++) {
             double dx      = (x_i12[j+1]-x_i12[j]) ;
             double tau_inv = 0.5 / (dx * (total_opacity(j,b) + total_opacity(j+1,b))) ;
             double R       = 2 * tau_inv * std::abs(Erad_FLD(j+1,b) - Erad_FLD(j,b)) / (Erad_FLD(j+1,b) + Erad_FLD(j, b)) ;
@@ -295,9 +323,17 @@ void c_Sim::update_fluxes_FLD() {
             l[j+1] = -D ;
 
             // source terms
-            d[j] += vol[j] * total_opacity(j,b) ;
-            //r[j] = vol[j] * ThermalEmission(j, b) ;
+            d[j] += vol[j] * total_opacity(j,b) * c_light;
+            
+            //Thermal emission field from all species in this band
+            r[j] = 0;
+            for(int s=0; s<num_species; s++) {
+                r[j] += vol[j] * species[s].prim[j].density * species[s].opacity(j,b) * compute_planck_function_integral(l_i[b], l_i[b+1], species[s].prim[j].temperature) + UV_star * 1.;
+            }
+            r[j] *= 4.*pi;
         }
+        
+        cout<<" IN UPDATE ERAD, before solve, band["<<b<<"], r[num_cells/2] = "<<r[num_cells/2]<<endl<<"], Erad[num_cells/2, 0] = "<<Erad_FLD(num_cells/2,0)<<endl;
 
         // Boundaries:
         int Ncell = num_cells - 2*(num_ghosts - 1) ;
@@ -325,11 +361,9 @@ void c_Sim::update_fluxes_FLD() {
         // Store result
         for (int j=0; j < num_cells; j++) 
             Erad_FLD(j, b) = r[j] ;
-        
-        // Bug?
-        //for (int j=0; j < num_species+2; j++) 
-        //    Erad_FLD(j, b) = r[j] ;
     }
+    
+    cout<<"END OF UPDATE ERAD:"<<endl;
     
     // 
     // Compute total radiation field that we need to update the temperatures
@@ -337,24 +371,41 @@ void c_Sim::update_fluxes_FLD() {
     for (int j=0; j < num_cells; j++)  {
         Erad_FLD_total(j) = 0.;
         
-        for (int b=0; j < num_bands; j++) 
+        for (int b=0; b < num_bands; b++)  {
             Erad_FLD_total(j) += Erad_FLD(j,b);
-        
+            cout<<" Erad["<<j<<","<<b<<"] = "<<Erad_FLD(j,b);
+            
+        }
+        cout<<" Erad_tot = "<<Erad_FLD_total(j)<<endl;
     }
 }
 
 void c_Sim::fill_rad_basis_arrays(int j) { //Called in compute_radiation() in source.cpp
+    
+        if(debug >= 0) cout<<" IN FILL RAD BASIS, pos0.;"<<endl;
         
         for(int si=0; si<num_species; si++) {
-                
-                dens_vector(si)        = species[si].u[j].u1; 
-                numdens_vector(si)     = species[si].prim[j].number_density; 
-                mass_vector(si)        = species[si].mass_amu;
-                
-                radiation_vec_input(si)= dt/species[si].cv*(12.*species[si].opacity_planck(j)*sigma_rad*pow(species[si].prim[j].temperature,4.) + species[si].dS(j)/dens_vector(si) + c_light * Erad_FLD_total(j) );
-                radiation_cv_vector(si)= dt/species[si].cv;
-                radiation_T3_vector(si)= dt/species[si].cv * 16 * species[si].opacity_planck(j) * pow(species[si].prim[j].temperature,3.);
-                //TODO:Specify S properly and band_integral over Erad_FLD
+        
+            cout<<" dens "<<species[si].u[j].u1<<endl;
+            cout<<" densve"<<dens_vector(si)<<endl;
+            
+            dens_vector(si)        = species[si].u[j].u1; 
+            if(debug >= 0) cout<<" IN FILL RAD BASIS, pos-1.;"<<endl;
+            numdens_vector(si)     = species[si].prim[j].number_density; 
+            if(debug >= 0) cout<<" IN FILL RAD BASIS, pos-1.5.;"<<endl;
+            mass_vector(si)        = species[si].mass_amu;
+            
+            if(debug >= 0) cout<<" IN FILL RAD BASIS, species = ;"<<si<<endl;
+            
+            //radiation_vec_input(si)= dt/species[si].cv*(12.*species[si].opacity_planck(j)*sigma_rad*pow(species[si].prim[j].temperature,4.) + species[si].dS(j)/dens_vector(si) + c_light * Erad_FLD_total(j) ); //TODO: kappa* c*Erad needs to be a band sum! -> c sum_b kappa_b Erad_b
+            
+            radiation_vec_input(si)= dt/species[si].cv*(12.*species[si].opacity_planck(j)*sigma_rad*pow(species[si].prim[j].temperature,4.) + species[si].dS(j)/dens_vector(si) ); //TODO: kappa* c*Erad needs to be a band sum! -> c sum_b kappa_b Erad_b
+            
+            if(debug >= 0) cout<<" IN FILL RAD BASIS, pos2  = ;"<<si<<endl;
+            
+            radiation_cv_vector(si)= dt/species[si].cv;
+            radiation_T3_vector(si)= dt/species[si].cv * 16 * species[si].opacity_planck(j) * pow(species[si].prim[j].temperature,3.);
+            //TODO:Specify S properly and band_integral over Erad_FLD
         }
 }
 
@@ -365,22 +416,27 @@ void c_Sim::update_temperatures() {
     
     Eigen::internal::set_is_malloc_allowed(false) ;
          
-    if(debug > 0) cout<<"in numerical, dense friction, num_species = "<<num_species<<endl;
+    if(debug >= 0) cout<<" IN UPDATE TEMPERATURES, dense friction, num_species = "<<num_species<<endl;
             
     double beta_local;
     double coll_b;
 
-    for(int j=0; j <= num_cells+1; j++){
+    for(int j=1; j < num_cells+1; j++){
 
         fill_rad_basis_arrays(j);
+        if(debug >= 0) cout<<" IN UPDATE TEMPERATURES, pos0.;"<<endl;
         compute_alpha_matrix(j, 1);
         
+        
+        if(debug >= 0) cout<<" IN UPDATE TEMPERATURES, pos1.;"<<endl;
         // 
         // Loop for determining friction coefficients is not needed here, as those coeffs have already been computed in friction();
         //
         
         radiation_matrix_M = friction_coefficients;
         radiation_matrix_M = radiation_cv_vector.asDiagonal() * radiation_matrix_M;
+        
+        if(debug >= 0) cout<<" IN UPDATE TEMPERATURES, pos2.;"<<endl;
         
         radiation_matrix_T = identity_matrix;
         radiation_matrix_T.diagonal().noalias() += radiation_T3_vector;
@@ -389,17 +445,34 @@ void c_Sim::update_temperatures() {
         
         LU.compute(radiation_matrix_T);
         radiation_vec_output.noalias() = LU.solve(radiation_vec_input);
-                
+        
+        if(debug >= 0) cout<<" IN UPDATE TEMPERATURES, pos3.;"<<endl;
+        
         if(debug >= 1 && j==7 && steps == 1) cout<<"    T = "<<radiation_matrix_T<<endl;
         if(debug >= 1 && j==7 && steps == 1) cout<<"    v_inp = "<<radiation_vec_input<<endl;
         if(debug >= 1 && j==7 && steps == 1) cout<<"    v_out = "<<radiation_vec_output<<endl;
-                
+        
         //
         // Update new temperature and internal energy
         //
-                
+        cout<<"UPDATE TEMPERATURES:"<<endl<<" T before: ";
+        for(int si=0;si<num_species; si++) {
+            cout<<" s["<<species[si].name<<"].T = "<<species[si].prim[j].temperature;
+        }
+        cout<<endl;
+        
+        
         for(int si=0; si<num_species; si++)
             species[si].prim[j].temperature = radiation_vec_output(si);
+        
+        cout<<" T after: ";
+        for(int si=0; si<num_species; si++) {
+            cout<<" s["<<species[si].name<<"].T = "<<species[si].prim[j].temperature;
+        }
+        cout<<endl;
+        
+        char chr;
+        cin>>chr;
         
     }
     
