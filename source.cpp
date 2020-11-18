@@ -387,7 +387,6 @@ void c_Sim::update_fluxes_FLD() {
             
         }
         
-
         tridiag.factor_matrix(&l[0], &d[0], &u[0]) ;
         tridiag.solve(&r[0], &r[0]) ; // Solve in place (check it works)
         
