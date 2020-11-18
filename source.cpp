@@ -337,9 +337,16 @@ void c_Sim::update_fluxes_FLD() {
 
             //Thermal emission field from all species in this band
             r[j] = 0;
-            for(int s=0; s<num_species; s++) {
-                r[j] += vol[j] * species[s].prim[j].density * species[s].opacity(j,b) * 
-                    compute_planck_function_integral(l_i[b], l_i[b+1], species[s].prim[j].temperature) ;
+            if (num_bands == 1) {
+                for(int s=0; s<num_species; s++) {
+                    r[j] += vol[j] * species[s].prim[j].density * species[s].opacity_planck(j) * 
+                        sigma_rad*pow(species[s].prim[j].temperature,4) / pi;
+                }
+            } else {
+                for(int s=0; s<num_species; s++) {
+                    r[j] += vol[j] * species[s].prim[j].density * species[s].opacity(j,b) * 
+                        compute_planck_function_integral(l_i[b], l_i[b+1], species[s].prim[j].temperature) ;
+                }
             }
 
             // Time dependent terms:
@@ -436,7 +443,7 @@ void c_Sim::fill_rad_basis_arrays(int j) { //Called in compute_radiation() in so
                 J_bandsum += species[si].opacity(j,b) * Jrad_FLD(j,b);
             
             radiation_vec_input(si) = species[si].prim[j].temperature * (1. + dt/species[si].cv*(12.*species[si].opacity_planck(j)*sigma_rad*pow(species[si].prim[j].temperature,3.) ) ) ;
-            radiation_vec_input(si) += dt/species[si].cv * ( species[si].dS(j)/dens_vector(si) + 4.*pi*J_bandsum ); // TODO: is this 4*pi correct?
+            radiation_vec_input(si) += dt/species[si].cv * ( species[si].dS(j)/dens_vector(si) + 4.*pi*J_bandsum ); 
             
             if(debug >= 1) cout<<" IN FILL RAD BASIS, rhs, T3-term debug, T = "<<species[si].prim[j].temperature<< " dt/cv = "<<dt/species[si].cv<<" kappa_planck = "<<species[si].opacity_planck(j)<<" sT3 = "<<sigma_rad*pow(species[si].prim[j].temperature,3.)<<" T = "<<species[si].prim[j].temperature<<endl;
             
