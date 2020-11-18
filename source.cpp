@@ -379,7 +379,6 @@ void c_Sim::update_fluxes_FLD() {
             int Ncell   = num_cells - 2*(num_ghosts - 1) ;
             for (int j=0; j < num_ghosts-1; j++) {
                 int i       = Ncell + num_ghosts ;
-                double dx_R = (x_i12[i+1]-x_i12[i]) ;
             
                 if (j == 0) // FLD flux at the edge of the last cell
                     l[i] = u[i-1] ;
@@ -438,7 +437,7 @@ void c_Sim::fill_rad_basis_arrays(int j) { //Called in compute_radiation() in so
                 J_bandsum += species[si].opacity(j,b) * Jrad_FLD(j,b);
             
             radiation_vec_input(si) = species[si].prim[j].temperature * (1. + dt/species[si].cv*(12.*species[si].opacity_planck(j)*sigma_rad*pow(species[si].prim[j].temperature,3.) ) ) ;
-            radiation_vec_input(si) += dt/species[si].cv * ( species[si].dS(j)/dens_vector(si) + 4.*pi*J_bandsum );
+            radiation_vec_input(si) += dt/species[si].cv * ( species[si].dS(j)/dens_vector(si) + 4.*pi*J_bandsum ); // TODO: is this 4*pi correct?
             
             if(debug >= 1) cout<<" IN FILL RAD BASIS, rhs, T3-term debug, T = "<<species[si].prim[j].temperature<< " dt/cv = "<<dt/species[si].cv<<" kappa_planck = "<<species[si].opacity_planck(j)<<" sT3 = "<<sigma_rad*pow(species[si].prim[j].temperature,3.)<<" T = "<<species[si].prim[j].temperature<<endl;
             
