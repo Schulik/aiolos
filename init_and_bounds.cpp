@@ -429,8 +429,8 @@ c_Sim::c_Sim(string filename, string speciesfile, int debug) {
     cell_optical_depth = Eigen::MatrixXd::Zero(num_cells, num_bands);
     radial_optical_depth = Eigen::MatrixXd::Zero(num_cells, num_bands);
 
-    Jrad_FLD       = Eigen::MatrixXd::Zero(num_cells, num_bands);
-    Jrad_FLD_total = Eigen::VectorXd::Zero(num_cells,  1);
+    Jrad_FLD       = Eigen::MatrixXd::Zero(num_cells+2, num_bands);
+    Jrad_FLD_total = Eigen::VectorXd::Zero(num_cells+2,  1);
     tridiag        = BlockTriDiagSolver<1>(num_cells+2) ;
     
     for(int j = 0; j < num_cells; j++) {

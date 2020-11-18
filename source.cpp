@@ -332,15 +332,19 @@ void c_Sim::update_fluxes_FLD() {
             l[j+1] = -D ;
 
             // source terms
-            d[j] += vol[j] * total_opacity(j,b) ;//* c_light;
+            d[j] += vol[j] * total_opacity(j,b) ;
             
+
             //Thermal emission field from all species in this band
             r[j] = 0;
             for(int s=0; s<num_species; s++) {
                 r[j] += vol[j] * species[s].prim[j].density * species[s].opacity(j,b) * 
-                    compute_planck_function_integral(l_i[b], l_i[b+1], species[s].prim[j].temperature) + UV_star * 1.;
+                    compute_planck_function_integral(l_i[b], l_i[b+1], species[s].prim[j].temperature) ;
             }
-            r[j] *= 4.*pi ;
+
+            // Time dependent terms:
+            d[j] +=  vol[j] / (c_light * dt) ;
+            r[j] += (vol[j] / (c_light * dt)) * Jrad_FLD(j, b) ;
         }
         
         //if(debug >= 1) cout<<" IN UPDATE ERAD, before solve, band["<<b<<"], r[num_cells/2] = "<<r[num_cells/2]<<endl<<"], Jrad[num_cells/2, 0] = "<<Jrad_FLD(num_cells/2,0)<<endl;
@@ -358,47 +362,50 @@ void c_Sim::update_fluxes_FLD() {
         
         //   Right boundary: reflective?
         //if(geometry == Geometry::cartesian) {
-        if(1 == 2) {
-            
+        if(true) {
+
             int Ncell = num_cells - 2*(num_ghosts - 1);
             for (int j=0; j < num_ghosts; j++) {
                 int i = Ncell + num_ghosts + j ;
                 
-                l[i] = +1;
-                r[i] = 0 ;
-                d[i] = -1 ;
+                l[i] = -1;
+                d[i] = +1 ;
                 u[i] = 0 ;
+                r[i] = 0 ;
             }
         }
         else {//   Right boundary: free stream, no emission / absorbtion.
             
             int Ncell   = num_cells - 2*(num_ghosts - 1) ;
-            int i       = Ncell + num_ghosts ;
-            double dx_R = (x_i12[i+1]-x_i12[i]) ;
+            for (int j=0; j < num_ghosts-1; j++) {
+                int i       = Ncell + num_ghosts ;
             
-            l[i] = u[i-1] ;
-            d[i] = -l[i] + surf[ i ] / (x_i12[i+1]-x_i12[i]) ;
-            u[i] = r[i] = 0 ;
-            for (int j=1; j < num_ghosts; j++) {
-                i = Ncell + num_ghosts + j ;
-                l[i] = d[i] = 1 ;
+                if (j == 0) // FLD flux at the edge of the last cell
+                    l[i] = u[i-1] ;
+                else // Free-stream 
+                    l[i] = -surf[i-1] / (x_i12[i]-x_i12[i-1]) ;
+
+                d[i] = -l[i] + surf[ i ] / (x_i12[i+1]-x_i12[i]) ;
                 u[i] = r[i] = 0 ;
             }
-            
+            l[num_cells+1] = -1;
+            d[num_cells+1] = 1;
+            u[num_cells+1] = 0;
+            r[num_cells+1] = 0 ;
         }
         
         tridiag.factor_matrix(&l[0], &d[0], &u[0]) ;
         tridiag.solve(&r[0], &r[0]) ; // Solve in place (check it works)
         
         // Store result
-        for (int j=0; j < num_cells; j++) 
+        for (int j=0; j < num_cells+2; j++) 
             Jrad_FLD(j, b) = r[j] ;
     }
     
     // 
     // Compute total radiation field that we need to update the temperatures
     // 
-    for (int j=0; j < num_cells; j++)  {
+    for (int j=0; j < num_cells+2; j++)  {
         Jrad_FLD_total(j) = 0.;
         
         for (int b=0; b < num_bands; b++)  {
@@ -429,7 +436,7 @@ void c_Sim::fill_rad_basis_arrays(int j) { //Called in compute_radiation() in so
                 J_bandsum += species[si].opacity(j,b) * Jrad_FLD(j,b);
             
             radiation_vec_input(si) = species[si].prim[j].temperature * (1. + dt/species[si].cv*(12.*species[si].opacity_planck(j)*sigma_rad*pow(species[si].prim[j].temperature,3.) ) ) ;
-            radiation_vec_input(si) += dt/species[si].cv * ( species[si].dS(j)/dens_vector(si) + 4.*pi*J_bandsum );
+            radiation_vec_input(si) += dt/species[si].cv * ( species[si].dS(j)/dens_vector(si) + 4.*pi*J_bandsum ); // TODO: is this 4*pi correct?
             
             if(debug >= 1) cout<<" IN FILL RAD BASIS, rhs, T3-term debug, T = "<<species[si].prim[j].temperature<< " dt/cv = "<<dt/species[si].cv<<" kappa_planck = "<<species[si].opacity_planck(j)<<" sT3 = "<<sigma_rad*pow(species[si].prim[j].temperature,3.)<<" T = "<<species[si].prim[j].temperature<<endl;
             
