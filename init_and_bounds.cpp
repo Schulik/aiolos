@@ -100,6 +100,7 @@ c_Sim::c_Sim(string filename, string speciesfile, int debug) {
         alpha_collision   = read_parameter_from_file<double>(filename,"PARI_ALPHA_COLL", debug, 0).value;
         collision_model   = read_parameter_from_file<char>(filename,"PARI_COLL_MODEL", debug, 'C').value;
         friction_solver   = read_parameter_from_file<int>(filename,"FRICTION_SOLVER", debug, 0).value;
+        do_hydrodynamics  = read_parameter_from_file<int>(filename,"DO_HYDRO", debug, 1).value;
         
         if(problem_number == 2)
             monitor_output_index = num_cells/2; //TODO: Replace with index of sonic radius for dominant species?
@@ -366,7 +367,7 @@ c_Sim::c_Sim(string filename, string speciesfile, int debug) {
 
         alphas_sample  = Eigen::VectorXd::Zero(num_cells+2);
         
-        if(num_species > 1) {
+        if(num_species >= 1) {
             friction_matrix_T     = Matrix_t::Zero(num_species, num_species);
             friction_coefficients = Matrix_t::Zero(num_species, num_species);
             friction_coeff_mask   = Matrix_t::Ones(num_species, num_species);
@@ -406,7 +407,7 @@ c_Sim::c_Sim(string filename, string speciesfile, int debug) {
     F_down  = Eigen::MatrixXd::Zero(num_cells, num_bands);
     F_plus  = Eigen::MatrixXd::Zero(num_cells, num_bands);
     F_minus = Eigen::MatrixXd::Zero(num_cells, num_bands);
-    dErad   = Eigen::MatrixXd::Zero(num_cells, num_bands);
+    dJrad   = Eigen::MatrixXd::Zero(num_cells, num_bands);
     S_total = Eigen::VectorXd::Zero(num_cells,  1);
     solar_heating = Eigen::VectorXd::Zero(num_bands,  1);
     S_band        = Eigen::MatrixXd::Zero(num_cells, num_bands);
@@ -417,7 +418,7 @@ c_Sim::c_Sim(string filename, string speciesfile, int debug) {
     
     double templumi = 0;
     for(int b=0; b<num_bands; b++) {
-        solar_heating(b)  = compute_planck_function_integral(l_i[b], l_i[b+1], T_star) + UV_star * 1.;
+        solar_heating(b)  = compute_planck_function_integral(l_i[b], l_i[b+1], T_star) * 4. * pow(rsolar,2.)/pow(planet_semimajor*au,2.)  + UV_star * 1.;
         templumi += solar_heating(b);
         cout<<"SOLAR HEATING in bin "<<b<<" from/to lmin/lmax"<<l_i[b]<<"/"<<l_i[b+1]<<" is "<<solar_heating(b)<<endl;
         
@@ -428,15 +429,15 @@ c_Sim::c_Sim(string filename, string speciesfile, int debug) {
     cell_optical_depth = Eigen::MatrixXd::Zero(num_cells, num_bands);
     radial_optical_depth = Eigen::MatrixXd::Zero(num_cells, num_bands);
 
-    Erad_FLD       = Eigen::MatrixXd::Zero(num_cells, num_bands);
-    Erad_FLD_total = Eigen::VectorXd::Zero(num_cells,  1);
+    Jrad_FLD       = Eigen::MatrixXd::Zero(num_cells, num_bands);
+    Jrad_FLD_total = Eigen::VectorXd::Zero(num_cells,  1);
     tridiag        = BlockTriDiagSolver<1>(num_cells+2) ;
     
     for(int j = 0; j < num_cells; j++) {
         for(int b = 0; b < num_bands; b++) {
             for(int s = 0; s< num_species; s++){
                 
-                Erad_FLD(j,b) += compute_planck_function_integral(l_i[b], l_i[b+1], species[s].prim[j].temperature);
+                Jrad_FLD(j,b) += 1e-5 * compute_planck_function_integral(l_i[b], l_i[b+1], species[s].prim[j].temperature);
                 
             }
         }

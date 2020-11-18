@@ -201,6 +201,7 @@ public:
     int use_linear_gravity;
     int use_rad_fluxes;
     int suppress_warnings;
+    int do_hydrodynamics;
     
 
     ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -273,7 +274,7 @@ public:
     
     double planet_mass;     //in Earth masses
     double planet_position; //inside the simulation domain
-    double planet_semimajor = 5.2;
+    double planet_semimajor = 1.0;
     double rs;
     double rs_at_moment = 0 ;
     double rs_time;
@@ -331,7 +332,7 @@ public:
     Eigen::MatrixXd F_down;
     Eigen::MatrixXd F_plus;
     Eigen::MatrixXd F_minus;
-    Eigen::MatrixXd dErad;
+    Eigen::MatrixXd dJrad;
     Eigen::MatrixXd S_total;
     Eigen::MatrixXd S_band;
     Eigen::MatrixXd dS_band;
@@ -341,8 +342,8 @@ public:
     Eigen::MatrixXd cell_optical_depth;
     Eigen::MatrixXd radial_optical_depth;
 
-    Eigen::MatrixXd Erad_FLD ;
-    Eigen::MatrixXd Erad_FLD_total ;
+    Eigen::MatrixXd Jrad_FLD ;
+    Eigen::MatrixXd Jrad_FLD_total ;
     BlockTriDiagSolver<1> tridiag ;
     
     int rad_solver_max_iter = 1;
