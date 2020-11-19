@@ -246,6 +246,7 @@ public:
     double output_time;
     double monitor_time;
     double max_snd_crs_time;
+    double rad_energy_multipier;
     int steps;
     int timecount;
     int monitor_output_index;

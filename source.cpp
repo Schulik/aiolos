@@ -401,8 +401,21 @@ void c_Sim::update_fluxes_FLD() {
             r[num_cells+1] = 0 ;
         }
         
+        if(debug >= 1) {
+            cout<<" band["<<b<<"] l/d/u/r = "<<l[2]<<"/"<<d[2]<<"/"<<u[2]<<"/"<<r[2];
+            cout<<" temps = ";
+            for(int si = 0; si<num_species; si++) {
+                    cout<<species[si].prim[2].temperature<<" ";
+            }
+            
+        }
+        
         tridiag.factor_matrix(&l[0], &d[0], &u[0]) ;
         tridiag.solve(&r[0], &r[0]) ; // Solve in place (check it works)
+        
+        if(debug >= 1) {
+                cout<< " r_final = "<<r[2]<<endl;
+        }
         
         // Store result
         for (int j=0; j < num_cells+2; j++) 
@@ -420,13 +433,13 @@ void c_Sim::update_fluxes_FLD() {
             //if(debug >= 1) cout<<" Erad["<<j<<","<<b<<"] = "<<Jrad_FLD(j,b);
             
         }
-        //if(debug >= 1) cout<<" Erad_tot = "<<Jrad_FLD_total(j)<<endl;
+        if(debug >= 1 && j==1) cout<<" Erad_tot = "<<Jrad_FLD_total(j)<<endl;
     }
 }
 
 void c_Sim::fill_rad_basis_arrays(int j) { //Called in compute_radiation() in source.cpp
     
-        if(debug >= 1) cout<<" IN FILL RAD BASIS, pos0.;"<<endl;
+        if(debug >= 2) cout<<" IN FILL RAD BASIS, pos0.;"<<endl;
         
         for(int si=0; si<num_species; si++) {
             double J_bandsum = 0.;
@@ -435,7 +448,7 @@ void c_Sim::fill_rad_basis_arrays(int j) { //Called in compute_radiation() in so
             //numdens_vector(si)     = species[si].prim[j].number_density; 
             //mass_vector(si)        = species[si].mass_amu;
             
-            if(debug >= 1) cout<<" IN FILL RAD BASIS, species = "<<si<<" j ="<<j<<" x[j]="<<x_i[j]<<endl;
+            if(debug >= 2) cout<<" IN FILL RAD BASIS, species = "<<si<<" j ="<<j<<" x[j]="<<x_i[j]<<endl;
             
             //radiation_vec_input(si)= dt/species[si].cv*(12.*species[si].opacity_planck(j)*sigma_rad*pow(species[si].prim[j].temperature,4.) + species[si].dS(j)/dens_vector(si) + c_light * Erad_FLD_total(j) ); //TODO: kappa* c*Erad needs to be a band sum! -> c sum_b kappa_b Erad_b
             
@@ -445,16 +458,16 @@ void c_Sim::fill_rad_basis_arrays(int j) { //Called in compute_radiation() in so
             radiation_vec_input(si) = species[si].prim[j].temperature * (1. + dt/species[si].cv*(12.*species[si].opacity_planck(j)*sigma_rad*pow(species[si].prim[j].temperature,3.) ) ) ;
             radiation_vec_input(si) += dt/species[si].cv * ( species[si].dS(j)/dens_vector(si) + 4.*pi*J_bandsum ); 
             
-            if(debug >= 1) cout<<" IN FILL RAD BASIS, rhs, T3-term debug, T = "<<species[si].prim[j].temperature<< " dt/cv = "<<dt/species[si].cv<<" kappa_planck = "<<species[si].opacity_planck(j)<<" sT3 = "<<sigma_rad*pow(species[si].prim[j].temperature,3.)<<" T = "<<species[si].prim[j].temperature<<endl;
+            if(debug >= 2) cout<<" IN FILL RAD BASIS, rhs, T3-term debug, T = "<<species[si].prim[j].temperature<< " dt/cv = "<<dt/species[si].cv<<" kappa_planck = "<<species[si].opacity_planck(j)<<" sT3 = "<<sigma_rad*pow(species[si].prim[j].temperature,3.)<<" T = "<<species[si].prim[j].temperature<<endl;
             
-            if(debug >= 1) cout<<" IN FILL RAD BASIS, rhs, T3-term = "<<(dt/species[si].cv*(12.*species[si].opacity_planck(j)*sigma_rad*pow(species[si].prim[j].temperature,3.) ))<<" solar heating = "<<(dt/species[si].cv * ( species[si].dS(j)/dens_vector(si)))<<" cooling "<<(dt/species[si].cv*4.*pi*J_bandsum )<<endl;
+            if(debug >= 2) cout<<" IN FILL RAD BASIS, rhs, T3-term = "<<(dt/species[si].cv*(12.*species[si].opacity_planck(j)*sigma_rad*pow(species[si].prim[j].temperature,3.) ))<<" solar heating = "<<(dt/species[si].cv * ( species[si].dS(j)/dens_vector(si)))<<" cooling "<<(dt/species[si].cv*4.*pi*J_bandsum )<<endl;
             
             radiation_cv_vector(si)= dt/species[si].cv;
             radiation_T3_vector(si)= dt/species[si].cv * 16 * species[si].opacity_planck(j) * sigma_rad * pow(species[si].prim[j].temperature,3.);
             //TODO:Specify S properly and band_integral over Erad_FLD
         }
         
-        if(debug >= 1) cout<<" IN FILL RAD BASIS, posLast.;"<<endl;
+        if(debug >= 2) cout<<" IN FILL RAD BASIS, posLast.;"<<endl;
 }
 
 //
@@ -478,12 +491,12 @@ void c_Sim::update_temperatures() {
         // Loop for determining friction coefficients is not needed here, as those coeffs have already been computed in friction();
         //
         
-        if(debug >= 1) cout<<"    T_inp = "<<endl<<radiation_vec_input<<endl;
+        if(debug >= 2) cout<<"    T_inp = "<<endl<<radiation_vec_input<<endl;
         
         radiation_matrix_M = friction_coefficients;
         radiation_matrix_M = radiation_cv_vector.asDiagonal() * radiation_matrix_M;
         
-        if(debug >= 1) cout<<"    T_out = "<<endl<<radiation_vec_output<<endl;
+        if(debug >= 2) cout<<"    T_out = "<<endl<<radiation_vec_output<<endl;
         
         radiation_matrix_T = identity_matrix;
         radiation_matrix_T.diagonal().noalias() += radiation_T3_vector;
@@ -493,12 +506,21 @@ void c_Sim::update_temperatures() {
         LU.compute(radiation_matrix_T);
         radiation_vec_output.noalias() = LU.solve(radiation_vec_input);
         
+        //if(debug >= 1) cout<<"    T_matrix = "<<endl<<radiation_matrix_T<<endl;
+        //if(debug >= 1 && j==7 && steps == 1) cout<<"    T = "<<radiation_matrix_T<<endl;
+        //if(debug >= 1 && j==7 && steps == 1) cout<<"    inp_vector = "<<radiation_vec_input<<endl;
+        //if(debug >= 1 && j==7 && steps == 1) cout<<"    T_out = "<<radiation_vec_output<<endl;
         
-        
-        if(debug >= 1) cout<<"    T_matrix = "<<endl<<radiation_matrix_T<<endl;
-        if(debug >= 1 && j==7 && steps == 1) cout<<"    T = "<<radiation_matrix_T<<endl;
-        if(debug >= 1 && j==7 && steps == 1) cout<<"    v_inp = "<<radiation_vec_input<<endl;
-        if(debug >= 1 && j==7 && steps == 1) cout<<"    v_out = "<<radiation_vec_output<<endl;
+        if(debug >= 1 && j==1) {
+            cout<<"    T_init/T_out/T_matrix_diag elements = ";
+            for(int si=0; si<num_species; si++)
+                cout<<species[si].prim[j].temperature<<" "<<radiation_vec_output(si)<<" "<<radiation_matrix_T(si,si);
+            
+            cout<<endl;
+            //cout<<"    T_out = "<<radiation_vec_output;
+            //cout<<"    inp_vector = "<<radiation_vec_input<<endl;
+            
+        }
         
         //
         // Update new temperature and internal energy
@@ -536,6 +558,12 @@ void c_Sim::update_temperatures() {
         //char chr;
         //cin>>chr;
         
+    }
+    
+    if(debug >= 1)
+    {            
+        char chr;
+        cin>>chr;
     }
     
     for(int si=0; si<num_species; si++) {
