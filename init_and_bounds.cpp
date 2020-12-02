@@ -432,15 +432,14 @@ c_Sim::c_Sim(string filename, string speciesfile, int debug) {
     }
     cout<<"TOTAL SOLAR HEATING / Lumi = "<<templumi/(sigma_rad*pow(T_star,4.)/pi)<<" lumi = "<<(templumi*4.*pi*rsolar*rsolar*pi)<< " also sigmarad2/sigmarad = "<<sigma_rad2/sigma_rad<<endl;
     
-    total_opacity      = Eigen::MatrixXd::Zero(num_cells, num_bands);
-    cell_optical_depth = Eigen::MatrixXd::Zero(num_cells, num_bands);
-    radial_optical_depth = Eigen::MatrixXd::Zero(num_cells, num_bands);
+    total_opacity      = Eigen::MatrixXd::Zero(num_cells+2, num_bands);
+    cell_optical_depth = Eigen::MatrixXd::Zero(num_cells+2, num_bands);
+    radial_optical_depth = Eigen::MatrixXd::Zero(num_cells+2, num_bands);
 
     Jrad_FLD       = Eigen::MatrixXd::Zero(num_cells+2, num_bands);
-    Jrad_FLD_total = Eigen::VectorXd::Zero(num_cells+2,  1);
-    tridiag        = BlockTriDiagSolver<1>(num_cells+2) ;
+    tridiag        = BlockTriDiagSolver<Eigen::Dynamic>(num_cells+2, num_bands + num_species) ;
     
-    for(int j = 0; j < num_cells; j++) {
+    for(int j = 0; j < num_cells+2; j++) {
         
         if(num_bands == 1)  {
             for(int s = 0; s< num_species; s++){

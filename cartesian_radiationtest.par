@@ -12,13 +12,13 @@ DO_HYDRO                0
 FRICTION_SOLVER         1
 PARI_ORDER              2
 PARI_USE_RADIATION      1
-PARI_CONST_OPAC         1e4
+PARI_CONST_OPAC         1e10
 PARI_RAD_MULTIPLIER     0.
 
 #Radiation parameters
-PARI_LAM_MIN            1e-1
+PARI_LAM_MIN            1e-3
 PARI_LAM_MAX            1000.
-PARI_LAM_PER_DECADE     0.2
+PARI_LAM_PER_DECADE     0.1
 PARI_TSTAR              0.
 PARI_UVSTAR             0.
 

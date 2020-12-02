@@ -344,8 +344,7 @@ public:
     Eigen::MatrixXd radial_optical_depth;
 
     Eigen::MatrixXd Jrad_FLD ;
-    Eigen::MatrixXd Jrad_FLD_total ;
-    BlockTriDiagSolver<1> tridiag ;
+    BlockTriDiagSolver<Eigen::Dynamic> tridiag ;
     
     int rad_solver_max_iter = 1;
     double epsilon_rad_min = 1e-1;  // Some convergence measure for the radiation solver, if needed

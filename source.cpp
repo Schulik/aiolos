@@ -153,8 +153,9 @@ void c_Sim::transport_radiation() {
         if(steps == 1)
             cout<<"   in transport_radiation, before loop, steps = "<<steps<<endl;
         
-        while( ( iters < rad_solver_max_iter) && (epsilon_rad > epsilon_rad_min) ) {
-            
+        //while( ( iters < rad_solver_max_iter) && (epsilon_rad > epsilon_rad_min) ) {
+        while( iters < 1) {
+
             if(steps == 1)
                 cout<<"   in transport_radiation, in loop, steps = "<<steps<<endl;
             
@@ -168,11 +169,12 @@ void c_Sim::transport_radiation() {
             if(steps == 1)
                 cout<<"   in transport_radiation, after update fluxes."<<endl;
             
+            /*
             update_temperatures();
             
             if(steps == 1)
                 cout<<"   in transport_radiation, after update temperatures."<<endl;
-            
+            */
             iters++;
         }
         
@@ -315,56 +317,52 @@ void c_Sim::update_fluxes_FLD() {
             return 10 / (10*R + 9 + std::sqrt(81 + 180*R)) ;
     } ;
 
-    std::vector<double> l(num_cells+2), d(num_cells+2), u(num_cells+2), r(num_cells+2) ;
+    int num_vars = num_bands + num_species;
+    int stride = num_vars * num_vars ;
+    int size_r = (num_cells + 2) * num_vars ;
+    int size_M = (num_cells + 2) * stride ;
+
+    std::vector<double> 
+        l(size_M, 0.), d(size_M, 0.), u(size_M, 0.), r(size_r, 0.) ;
     
+    // Step 1: setup transport terms (J)
     for(int b=0; b<num_bands; b++) {
-   
-        for (int j=0; j < num_cells+1; j++) {
-            double dx      = (x_i12[j+1]-x_i12[j]) ;
-            double tau_inv = 0.5 / (dx * (total_opacity(j,b) + total_opacity(j+1,b))) ;
-            double R       = 2 * tau_inv * std::abs(Jrad_FLD(j+1,b) - Jrad_FLD(j,b)) / (Jrad_FLD(j+1,b) + Jrad_FLD(j, b)) ;
-            double D       = surf[j] * flux_limiter(R) * tau_inv;
-            
-            // divergence terms
-            u[j] = -D ;
-            d[j] += D ;
-            d[j+1] = D ;
-            l[j+1] = -D ;
-
-            // source terms
-            d[j] += vol[j] * total_opacity(j,b) ;
-            
-
-            //Thermal emission field from all species in this band
-            r[j] = 0;
-            if (num_bands == 1) {
-                for(int s=0; s<num_species; s++) {
-                    r[j] += vol[j] * species[s].prim[j].density * species[s].opacity_planck(j) * 
-                        sigma_rad*pow(species[s].prim[j].temperature,4) / pi;
-                }
-            } else {
-                for(int s=0; s<num_species; s++) {
-                    r[j] += vol[j] * species[s].prim[j].density * species[s].opacity(j,b) * 
-                        compute_planck_function_integral(l_i[b], l_i[b+1], species[s].prim[j].temperature) ;
-                }
-            }
+        for (int j=0; j < num_cells+2; j++) {
+            int idx = j*stride + b*(num_vars + 1) ;
+            int idx_r = j*num_vars + b ;
 
             // Time dependent terms:
-            d[j] +=  vol[j] / (c_light * dt) ;
-            r[j] += (vol[j] / (c_light * dt)) * Jrad_FLD(j, b) ;
+            d[idx] +=  vol[j] / (c_light * dt) ;
+            r[idx_r] += (vol[j] / (c_light * dt)) * Jrad_FLD(j, b) ;
+
+            // Flux across right boundary
+            if (j > 0 && j < num_cells + 1) {
+                double dx      = (x_i12[j+1]-x_i12[j]) ;
+                double tau_inv = 0.5 / (dx * (total_opacity(j,b) + total_opacity(j+1,b))) ;
+                double R       = 2 * tau_inv * std::abs(Jrad_FLD(j+1,b) - Jrad_FLD(j,b)) / (Jrad_FLD(j+1,b) + Jrad_FLD(j, b)) ;
+                double D       = surf[j] * flux_limiter(R) * tau_inv;
+
+                // divergence terms
+                u[idx] = -D ;
+                d[idx] += D ;
+                d[idx+stride] = D ;
+                l[idx+stride] = -D ;
+            }
+            
+
         }
         
-        //if(debug >= 1) cout<<" IN UPDATE ERAD, before solve, band["<<b<<"], r[num_cells/2] = "<<r[num_cells/2]<<endl<<"], Jrad[num_cells/2, 0] = "<<Jrad_FLD(num_cells/2,0)<<endl;
-
         // Boundaries:
         
-        for (int j=0; j < num_ghosts; j++) {
+        for (int j=0l; j < num_ghosts; j++) {
+            int idx = j*stride + b*(num_vars + 1) ;
+            int idx_r = j*num_vars + b ;
             // Left boundary:
             //    Reflecting / no flux
-            l[j] = r[j] = 0 ;
-            d[j] = +1 ;
-            u[j] = -1 ;
-
+            l[idx] = 0 ;
+            d[idx] = +1 ;
+            u[idx] = -1 ;
+            r[idx_r] = 0 ;
         }
         
         //   Right boundary: reflective?
@@ -374,11 +372,14 @@ void c_Sim::update_fluxes_FLD() {
             int Ncell = num_cells - 2*(num_ghosts - 1);
             for (int j=0; j < num_ghosts; j++) {
                 int i = Ncell + num_ghosts + j ;
-                
-                l[i] = -1;
-                d[i] = +1 ;
-                u[i] = 0 ;
-                r[i] = 0 ;
+
+                int idx = i*stride + b*(num_vars + 1) ;
+                int idx_r = i*num_vars + b ;    
+
+                l[idx] = -1;
+                d[idx] = +1 ;
+                u[idx] = 0 ;
+                r[idx_r] = 0 ;
             }
         }
         else {//   Right boundary: free stream, no emission / absorbtion.
@@ -386,19 +387,26 @@ void c_Sim::update_fluxes_FLD() {
             int Ncell   = num_cells - 2*(num_ghosts - 1) ;
             for (int j=0; j < num_ghosts-1; j++) {
                 int i       = Ncell + num_ghosts ;
-            
+
+                int idx = i*stride + b*(num_vars + 1) ;
+                int idx_r = i*num_vars + b ;  
+
                 if (j == 0) // FLD flux at the edge of the last cell
-                    l[i] = u[i-1] ;
+                    l[idx] = u[i-1] ;
                 else // Free-stream 
                     l[i] = -surf[i-1] / (x_i12[i]-x_i12[i-1]) ;
 
-                d[i] = -l[i] + surf[ i ] / (x_i12[i+1]-x_i12[i]) ;
-                u[i] = r[i] = 0 ;
+                d[idx] = -l[idx] + surf[ i ] / (x_i12[i+1]-x_i12[i]) ;
+                u[idx] = 0 ;
+                r[idx_r] = 0 ;
             }
-            l[num_cells+1] = -1;
-            d[num_cells+1] = 1;
-            u[num_cells+1] = 0;
-            r[num_cells+1] = 0 ;
+
+            int idx = (num_cells+1)*stride + b*(num_vars + 1) ;
+            int idx_r = (num_cells+1)*num_vars + b ;  
+            l[idx] = -1;
+            d[idx] = 1;
+            u[idx] = 0;
+            r[idx_r] = 0 ;
         }
         
         if(debug >= 1) {
@@ -409,32 +417,68 @@ void c_Sim::update_fluxes_FLD() {
             }
             
         }
-        
-        tridiag.factor_matrix(&l[0], &d[0], &u[0]) ;
-        tridiag.solve(&r[0], &r[0]) ; // Solve in place (check it works)
-        
-        if(debug >= 1) {
-                cout<< " r_final = "<<r[2]<<endl;
+    }
+
+    // Step 2: Energy exchange terms
+    for (int j=0; j < num_cells+2; j++)
+        for (int s=0; s < num_species; s++) {
+            
+            int idx_s = j*stride + (s + num_bands) * (num_vars+1) ;
+            int idx_rs = j*num_vars + (s + num_bands) ;
+
+            double Ts = species[s].prim[j].temperature ;
+            double rhos = species[s].prim[j].density ;
+
+            d[idx_s ] = 1 / dt ;
+            r[idx_rs] = Ts / dt ;
+
+            if (j < num_ghosts || j >= num_cells + 2-num_ghosts) continue ;
+
+            for(int b=0; b<num_bands; b++) {
+                int idx_b  = j*stride + b * (num_vars+1) ;
+                int idx_bs = j*stride + b * num_vars + (s + num_bands) ; 
+                int idx_sb = j*stride + (s + num_bands) * num_vars + b ;
+                int idx_rb = j*num_vars + b ; 
+
+                // TODO multiply by fraction in band.
+                double fac = species[s].opacity(j, b) * sigma_rad*Ts*Ts*Ts / pi ;
+                d[idx_s ] += 16 * pi * fac / species[s].cv ;
+                d[idx_sb] = - 4 * pi * species[s].opacity(j, b) / species[s].cv ;
+                r[idx_rs] += 12 * pi * fac * Ts / species[s].cv ;
+
+                d[idx_b ] += vol[j] * rhos * species[s].opacity(j, b) ;
+                d[idx_bs] = - 4 * vol[j] * rhos * fac ;
+                r[idx_rb] -=  3 * vol[j] * rhos * fac * Ts ;
+            }
         }
-        
-        // Store result
-        for (int j=0; j < num_cells+2; j++) 
-            Jrad_FLD(j, b) = r[j] ;
+
+    // TODO:
+    //   Add collision terms here
+
+    tridiag.factor_matrix(&l[0], &d[0], &u[0]) ;
+    tridiag.solve(&r[0], &r[0]) ; // Solve in place (check it works)
+
+    // Store the result
+    for (int j=0; j < num_cells+2; j++) {
+        for(int b=0; b<num_bands; b++) {
+            Jrad_FLD(j, b) = r[j*num_vars + b] ;
+          //  std::cout << j << "\t" <<  Jrad_FLD(j, b) << "\n" ;
+        }
+
+        for(int s=0; s<num_species; s++) {
+            species[s].prim[j].temperature = r[j*num_vars + (s + num_bands)] ;
+       //     std::cout <<  "\t" << species[s].prim[j].temperature << "\n" ;
+        }
     }
     
-    // 
-    // Compute total radiation field that we need to update the temperatures
-    // 
-    for (int j=0; j < num_cells+2; j++)  {
-        Jrad_FLD_total(j) = 0.;
-        
-        for (int b=0; b < num_bands; b++)  {
-            Jrad_FLD_total(j) += Jrad_FLD(j,b);
-            //if(debug >= 1) cout<<" Erad["<<j<<","<<b<<"] = "<<Jrad_FLD(j,b);
-            
+    // Update energies. 
+    // TODO: We should add cv * (Tf - Ti) to u to conserve energy properly.
+    for(int si=0; si<num_species; si++) {
+            species[si].eos->update_eint_from_T(&(species[si].prim[0]), num_cells+2);
+            species[si].eos->update_p_from_eint(&(species[si].prim[0]), num_cells+2);
+            species[si].eos->compute_conserved(&(species[si].prim[0]), &(species[si].u[0]), num_cells+2);        
         }
-        if(debug >= 1 && j==1) cout<<" Erad_tot = "<<Jrad_FLD_total(j)<<endl;
-    }
+
 }
 
 void c_Sim::fill_rad_basis_arrays(int j) { //Called in compute_radiation() in source.cpp
@@ -493,8 +537,7 @@ void c_Sim::update_temperatures() {
         
         if(debug >= 2) cout<<"    T_inp = "<<endl<<radiation_vec_input<<endl;
         
-        radiation_matrix_M = friction_coefficients;
-        radiation_matrix_M = radiation_cv_vector.asDiagonal() * radiation_matrix_M;
+        radiation_matrix_M.noalias() = radiation_cv_vector.asDiagonal() * friction_coefficients;
         
         if(debug >= 2) cout<<"    T_out = "<<endl<<radiation_vec_output<<endl;
         
@@ -809,7 +852,7 @@ void c_Sim::compute_alpha_matrix(int j, int actually_compute_beta) { //Called in
                     }
                     else {
                         coll_b      = 1./(1.4142*pow(numdens_vector(sj),0.3333333333333));     // Update this, if charged species collide
-                        alpha_local = (numdens_vector(si) + numdens_vector(sj))/(numdens_vector(si)*mass_vector(sj) + numdens_vector(si)*mass_vector(sj) );
+                        alpha_local = (numdens_vector(si) + numdens_vector(sj))/(numdens_vector(si)*mass_vector(sj) + numdens_vector(si)*mass_vector(sj));
                         alpha_local *= kb * species[si].prim[j].temperature /(mass_vector(si) * coll_b);
                         //cout<<" alpha_local = "<<alpha_local<<" T = "<<species[si].prim[j].temperature<< " n="<<numdens_vector(si)<<" mass="<<mass_vector(si)<<" b = "<<coll_b<<" n^1/3 = "<<pow(numdens_vector3(sj),0.3333333333333)<<" n^-1/3"<<(1./pow(numdens_vector3(sj),0.3333333333333))<<endl;
                         

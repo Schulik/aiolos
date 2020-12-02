@@ -124,7 +124,7 @@ vector<string> stringsplit(const string& str, const string& delim)
 
 double compute_planck_function_integral(double lmin, double lmax, double temperature) {
     
-    int num_steps=1000;
+    int num_steps=10000;
     double dloggrid = pow(lmax/lmin, 1./((double)num_steps));
     double l1;
     double l2;
