@@ -21,7 +21,24 @@ void c_Sim::execute() {
         
     cout<<endl<<"Beginning main loop with num_cells="<<num_cells<<" and timestep="<<dt<<" cflfactor="<<cflfactor<<" and num_species = "<<num_species<<endl;
     if(num_species == 0) 
-        throw std::invalid_argument("WARNING: No species specified! I cannot work like that.") ;
+        throw std::invalid_argument("WARNING: No species specified! I cannot work like that. Aborting program.") ;
+    
+    //
+    // Compute real, physical scales for orientation
+    //
+    star_mass = 1. * msolar;
+    double temp_cv = 1.5 * Rgas / (2. * amu);
+    scale_cs = std::sqrt(species[0].gamma_adiabat * (species[0].gamma_adiabat - 1.) * temp_cv * species[0].prim[num_cells].temperature); // cm/s
+    scale_rb = G*planet_mass*mearth / scale_cs / scale_cs; 
+    scale_rh = planet_semimajor * au * pow(planet_mass / (3.* star_mass ),0.333333333333333333);
+    
+    scale_vk = std::sqrt(G*star_mass/planet_semimajor);
+    scale_time = scale_rb/scale_cs;
+    
+    cout<<"    Reporting base physical scales for selected problem in cgs units or other units that make sense;"<<endl;
+    cout<<"    bondi_radius: "<<scale_rb<<" rb/au = "<<scale_rb/au<<" rh/au = "<<scale_rh/au<<" rh/rb"<<scale_rh/scale_rb<<endl;
+    cout<<"    velocities: vk = "<<scale_vk<<" vk/cs = "<<scale_vk/scale_cs<<" cs = "<<scale_cs<<endl;
+    cout<<"    times, rb/cs/yr = "<<scale_time/year<<" rh/cs/yr"<<scale_rh/scale_cs/year<<endl;
     
     ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~////
     //                                                                         //
@@ -128,6 +145,10 @@ void c_Sim::execute() {
                 //compute_friction_numerical_sparse();
         }
         
+        if(use_rad_fluxes==1)
+            transport_radiation();
+        
+        
         steps++;
         
         if(steps==1)
@@ -167,8 +188,6 @@ void c_Sim::execute() {
 
 void c_Species::execute(std::vector<AOS>& u_in, std::vector<AOS>& dudt) {
     
-        if(base->use_rad_fluxes==1)
-            update_radiation(u_in);
         
         //
         // Step 1: Boundary values
@@ -250,14 +269,6 @@ void c_Species::execute(std::vector<AOS>& u_in, std::vector<AOS>& dudt) {
         
         if(debug >= 2)
             cout<<" Before updating rad fluxes... ";
-        
-        if(base->use_rad_fluxes) {
-            for(int j=1; j<=num_cells; j++) {
-                dudt[j].u3 = (radiative_flux[j-1] - radiative_flux[j]); //Dummy physics for now
-            }
-        }
-        
-    
     
 } 
 

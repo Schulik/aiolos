@@ -30,7 +30,15 @@ c_Sim::c_Sim(string filename, string speciesfile, int debug) {
         domain_max       = read_parameter_from_file<double>(filename,"PARI_DOMAIN_MAX", debug).value;
         geometry = read_parameter_from_file<Geometry>(filename, "PARI_GEOMETRY", debug, Geometry::cartesian).value;
         order = read_parameter_from_file<IntegrationType>(filename, "PARI_ORDER", debug, IntegrationType::second_order).value;
-
+        global_e_update_multiplier = read_parameter_from_file<double>(filename,"PARI_RAD_MULTIPLIER", debug, 0.).value;
+        
+        lambda_min       = read_parameter_from_file<double>(filename,"PARI_LAM_MIN", debug, 1e-1).value;
+        lambda_max       = read_parameter_from_file<double>(filename,"PARI_LAM_MAX", debug, 10.).value;
+        lambda_per_decade= read_parameter_from_file<double>(filename,"PARI_LAM_PER_DECADE", debug, 10.).value;
+        T_star           = read_parameter_from_file<double>(filename,"PARI_TSTAR", debug, 5777.).value;
+        UV_star            = read_parameter_from_file<double>(filename,"PARI_UVSTAR", debug, 1.).value;
+        num_bands        = read_parameter_from_file<int>(filename,"PARI_NUM_BANDS", debug, 1).value;
+        
         if(debug > 0) cout<<"Using integration order "<<order<<" while second order would be "<<IntegrationType::second_order<<endl;
         
         if (order == IntegrationType::first_order)
@@ -60,7 +68,6 @@ c_Sim::c_Sim(string filename, string speciesfile, int debug) {
         }
             
         if(debug > 0) cout<<"Init: Finished reading grid parameters."<<endl;
-        
         
         cflfactor   = read_parameter_from_file<double>(filename,"PARI_CFLFACTOR", debug, 1.).value;
         t_max       = read_parameter_from_file<double>(filename,"PARI_TIME_TMAX", debug).value;
@@ -138,6 +145,16 @@ c_Sim::c_Sim(string filename, string speciesfile, int debug) {
         source_pressure_prefactor_right   = np_zeros(num_cells+2);
         enclosed_mass   = np_zeros(num_cells+2);
         phi             = np_zeros(num_cells+2);
+        l_i       = np_zeros(num_bands+1);    // Wavelenght bin boundaries
+        l_i12     = np_zeros(num_bands);      // Wavelength bin midpoints or averages
+        
+        double dlogl = pow(10., 1./lambda_per_decade);
+        l_i[0] = lambda_min;
+        
+        for(int b=1; b<num_bands+1; b++) {
+            l_i[b]      = l_i[b-1] * dlogl;
+            l_i12[b-1]  = 0.5 * (l_i[b] + l_i[b-1]);
+        }
         
         if(debug > 0) cout<<"Init: Setup grid memory"<<endl;
         
@@ -237,7 +254,6 @@ c_Sim::c_Sim(string filename, string speciesfile, int debug) {
             x_i12[i] = 0.5 * (x_i[i] + x_i[i-1]);
         }
     
-        
         //Ghost cells
         x_i12[0]           = x_i[0] - dx[0]/2 ;
         x_i12[num_cells+1] = x_i[num_cells] + dx[num_cells+1]/2; 
@@ -378,6 +394,57 @@ c_Sim::c_Sim(string filename, string speciesfile, int debug) {
                     friction_coeff_mask(si,sj) = 0.;
                     friction_coeff_mask(sj,si) = 0.;
                 }
+    
+    radiation_matrix_T   = Matrix_t::Zero(num_species, num_species);
+    radiation_matrix_M   = Matrix_t::Zero(num_species, num_species);
+    radiation_vec_input  = Vector_t(num_species);
+    radiation_vec_output = Vector_t(num_species);
+    radiation_cv_vector  = Vector_t(num_species);
+    radiation_T3_vector  = Vector_t(num_species);
+    
+    F_up    = Eigen::MatrixXd::Zero(num_cells, num_bands);      //num_cells * num_bands each
+    F_down  = Eigen::MatrixXd::Zero(num_cells, num_bands);
+    F_plus  = Eigen::MatrixXd::Zero(num_cells, num_bands);
+    F_minus = Eigen::MatrixXd::Zero(num_cells, num_bands);
+    dErad   = Eigen::MatrixXd::Zero(num_cells, num_bands);
+    S_total = Eigen::VectorXd::Zero(num_cells,  1);
+    solar_heating = Eigen::VectorXd::Zero(num_bands,  1);
+    S_band        = Eigen::MatrixXd::Zero(num_cells, num_bands);
+    dS_band       = Eigen::MatrixXd::Zero(num_cells, num_bands);
+    for(int s=0; s<num_species; s++) {
+        species[s].dS = Eigen::VectorXd::Zero(num_cells,  1);
+    }
+    
+    double templumi = 0;
+    for(int b=0; b<num_bands; b++) {
+        solar_heating(b)  = compute_planck_function_integral(l_i[b], l_i[b+1], T_star) + UV_star * 1.;
+        templumi += solar_heating(b);
+        cout<<"SOLAR HEATING in bin "<<b<<" from/to lmin/lmax"<<l_i[b]<<"/"<<l_i[b+1]<<" is "<<solar_heating(b)<<endl;
+        
+    }
+    cout<<"TOTAL SOLAR HEATING / Lumi = "<<templumi/(sigma_rad*pow(T_star,4.)/pi)<<" lumi = "<<(templumi*4.*pi*rsolar*rsolar*pi)<< " also sigmarad2/sigmarad = "<<sigma_rad2/sigma_rad<<endl;
+    
+    total_opacity      = Eigen::MatrixXd::Zero(num_cells, num_bands);
+    cell_optical_depth = Eigen::MatrixXd::Zero(num_cells, num_bands);
+    radial_optical_depth = Eigen::MatrixXd::Zero(num_cells, num_bands);
+
+    Erad_FLD       = Eigen::MatrixXd::Zero(num_cells, num_bands);
+    Erad_FLD_total = Eigen::VectorXd::Zero(num_cells,  1);
+    tridiag        = BlockTriDiagSolver<1>(num_cells+2) ;
+    
+    for(int j = 0; j < num_cells; j++) {
+        for(int b = 0; b < num_bands; b++) {
+            for(int s = 0; s< num_species; s++){
+                
+                Erad_FLD(j,b) += compute_planck_function_integral(l_i[b], l_i[b+1], species[s].prim[j].temperature);
+                
+            }
+        }
+    }
+    
+    
+    
+    
 }
 
 
@@ -396,6 +463,7 @@ c_Species::c_Species(c_Sim *base_simulation, string filename, string species_fil
         base               = base_simulation;
         this_species_index = species_index;
         num_cells          = base->num_cells;
+        num_bands          = base->num_bands;
         this->debug        = debug;
         
         if(debug > 0) cout<<"        Species["<<species_index<<"] Init: Begin"<<endl;
@@ -445,16 +513,14 @@ c_Species::c_Species(c_Sim *base_simulation, string filename, string species_fil
         }
         //Dust species
         else {
-            cv            = 1.5 * Rgas_fake / mass_amu ; // 3 Degrees of freedom per atom (high T limit of debye theory)
+            cv            = 1.5 * Rgas_fake / mass_amu; // 3 Degrees of freedom per atom (high T limit of debye theory)
             gamma_adiabat = (degrees_of_freedom + 2.)/ degrees_of_freedom; // Total degrees of freedom per grain
             eos           = new IdealGas_EOS(degrees_of_freedom, cv, mass_amu) ;
         }
         
         if(debug >= 0) cout<<"        Species["<<species_index<<"] got a gamma_adiabatic = "<<gamma_adiabat<<" and cv = "<<cv<<endl;
 
-        opacity        = np_somevalue(num_cells+2, const_opacity);
-        opticaldepth   = np_zeros(num_cells+2);
-        radiative_flux = np_zeros(num_cells+1);
+
         u_analytic     = np_zeros(num_cells+2);
 
         prim   = std::vector<AOS_prim>(num_cells+2); //Those helper quantities are also defined on the ghost cells, so they get +2
@@ -558,6 +624,13 @@ c_Species::c_Species(c_Sim *base_simulation, string filename, string species_fil
         apply_boundary_right(u) ;
         
         if(debug > 0) cout<<"        Species["<<species_index<<"]: Init done."<<endl;
+        
+        
+        
+        
+        opacity                = Eigen::MatrixXd::Zero(num_cells, num_bands); //num_cells * num_bands
+        opacity_planck         = Eigen::MatrixXd::Zero(num_cells, 1); //num_cells * num_bands
+        fraction_total_opacity = Eigen::MatrixXd::Zero(num_cells, num_bands); //num_cells * num_bands
     
 }
 

@@ -116,6 +116,41 @@ vector<string> stringsplit(const string& str, const string& delim)
     return tokens;
 }
 
+//
+//
+// Compute Planck integral in a quick way
+//
+//
+
+double compute_planck_function_integral(double lmin, double lmax, double temperature) {
+    
+    int num_steps=1000;
+    double dloggrid = pow(lmax/lmin, 1./((double)num_steps));
+    double l1;
+    double l2;
+    double l_avg;
+    double expfactor;
+    double prefactor;
+    double tempresult = 0;
+    //cout<<"    In compute_planck lmin/lmax/dloggrid = "<<lmin<<"/"<<lmax<<"/"<<dloggrid<<" ";
+    
+    for(int i=0; i<num_steps; i++) {
+        //cout<<"---";
+        l1        = lmin * pow(dloggrid,(double)i);
+        l2        = l1 * dloggrid;
+        l_avg     = 0.5*(l1+l2);
+        expfactor = h_planck*c_light/(l_avg*angstroem*kb*temperature);
+        //prefactor = 2*h_planck*c_light*c_light/pow(l_avg,5.)/pow(angstroem,4.);
+        
+        tempresult += sigma_rad2*(l2-l1)/pow(l_avg,5.)/(std::exp(expfactor)-1.);
+        //tempresult += (l1-l2)/(std::exp(-expfactor)-1.);
+        //cout<<" "<<l1<<"/"<<l2<<" "<<prefactor*(l2-l1)/(std::exp(-expfactor)-1.);
+    }
+    //cout<<endl;
+    
+    return tempresult;
+}
+
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 //
 // Read parameters: Looks for the value of one parameter in a file
@@ -349,7 +384,7 @@ void c_Species::print_AOS_component_tofile(int timestepnumber) {
             hydrostat2 = flux[i].u2/base->dx[i];//pressure[i+1] - pressure[i];
             hydrostat3 = source[i].u2;//0.5 * (u[i].u1 + u[i+1].u1) * (phi[i+1] - phi[i]);
             
-            outfile<<base->x_i12[i]<<'\t'<<u[i].u1<<'\t'<<u[i].u2<<'\t'<<u[i].u3<<'\t'<<flux[i].u1<<'\t'<<flux[i].u2<<'\t'<<flux[i].u3<<'\t'<<balance1<<'\t'<<balance2<<'\t'<<balance3<<'\t'<<prim[i].pres<<'\t'<<u[i].u2/u[i].u1<<'\t'<<prim[i].temperature <<'\t'<<timesteps[i]<<'\t'<<base->phi[i]<<'\t'<<prim[i].sound_speed<<'\t'<<opticaldepth[i]<<'\t'<<u_analytic[i]<<'\t'<<base->alphas_sample(i)<<'\t'<<hydrostat3<<'\t'<<base->enclosed_mass[i]<<endl;
+            outfile<<base->x_i12[i]<<'\t'<<u[i].u1<<'\t'<<u[i].u2<<'\t'<<u[i].u3<<'\t'<<flux[i].u1<<'\t'<<flux[i].u2<<'\t'<<flux[i].u3<<'\t'<<balance1<<'\t'<<balance2<<'\t'<<balance3<<'\t'<<prim[i].pres<<'\t'<<u[i].u2/u[i].u1<<'\t'<<prim[i].temperature <<'\t'<<timesteps[i]<<'\t'<<base->phi[i]<<'\t'<<prim[i].sound_speed<<'\t'<<1.<<'\t'<<u_analytic[i]<<'\t'<<base->alphas_sample(i)<<'\t'<<hydrostat3<<'\t'<<base->enclosed_mass[i]<<endl;
         }
         
         //Print right ghost stuff
@@ -382,10 +417,7 @@ void c_Sim::print_monitor(int num_steps) {
                 initial_monitored_quantities.u2_tot += species[s].u[i].u2 * vol[i];
                 initial_monitored_quantities.u3_tot += species[s].u[i].u3 * vol[i];
             }
-        
-        
-        
-        
+\
     }
     
     //
@@ -471,11 +503,11 @@ void c_Species::compute_analytic_solution() {
         double D      = pow(rrc,-4.) * std::exp(4.*(1.-1./rrc)-1. );
         
         if(base->x_i12[i] < bondi_radius) {
-            u_analytic[i] = prim[num_cells].sound_speed * std::sqrt( - gsl_sf_lambert_W0(-D) ); 
+            u_analytic[i] = 0.;//prim[num_cells].sound_speed * std::sqrt( - gsl_sf_lambert_W0(-D) ); 
         }
         else {
             
-            u_analytic[i] = prim[num_cells].sound_speed * std::sqrt( - gsl_sf_lambert_Wm1(-D) ); 
+            u_analytic[i] = 0.;//prim[num_cells].sound_speed * std::sqrt( - gsl_sf_lambert_Wm1(-D) ); 
         }
     
     

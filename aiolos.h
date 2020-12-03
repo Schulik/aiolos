@@ -16,6 +16,8 @@
 #include <Eigen/Dense>
 #include <Eigen/LU>
 
+#include "block_tridiag_solve.h"
+
 #include "enum.h"
 #include "eos.h"
 
@@ -29,10 +31,12 @@ using namespace std;
 //Basic physics quantities
 const double G        = 6.678e-8; //cgs units
 const double pi       = 3.141592;
-const double navo     = 6e23; // particles per mole
+const double c_light   = 2.99792458e10;
+const double navo     = 6.02214e23; // particles per mole
+const double amu      = 1.66054e-24; //g
+const double h_planck = 6.6261e-27;//  cm^2 g/s
 const double Rgas     = 8.31446261815324e7;  //erg/K/mole
 const double Rgas_fake = 1.;
-const double sigma    = 5.67e-5;   //erg cm-2 s-1 K-4
 const double kb       = 1.38e-16;  //erg/K
 const double km       = 1e5; //kilometers in cm
 const double mearth   = 5.98e27;  //g
@@ -47,6 +51,10 @@ const double rsolar   = 695510*km;
 const double pc       = 3.08567758e18; //cm
 const double kpc      = 1e3 * pc;
 const double mpc      = 1e6 * pc;
+const double angstroem= 1e-4; //cm
+const double ergcm2_to_wattperm2 = 1e-3;
+const double sigma_rad = 5.67e-5;   //erg cm-2 s-1 K-4
+const double sigma_rad2= 2*h_planck*c_light*c_light/pow(angstroem,4.);
 
 // For entropy computation, to be set to sensible parameters e.g. at setting of initial conditions
 const double P_ref   = 1e-20;
@@ -74,6 +82,7 @@ std::vector<double> np_zeros(int);
 std::vector<double> np_ones(int);
 std::vector<double> np_somevalue(int, double);
 
+double compute_planck_function_integral(double lmin, double lmax, double temperature);
 //
 // Everything to define and read simulation parameters
 //
@@ -186,19 +195,12 @@ public:
 
     string simname;
     
-    int num_species;
-    std::vector<c_Species> species;
-    
     int problem_number;
     int debug;
     int use_self_gravity;
     int use_linear_gravity;
     int use_rad_fluxes;
     int suppress_warnings;
-    int init_geometry;
-    char collision_model;
-    
-    Geometry geometry ;
     
 
     ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -207,10 +209,14 @@ public:
     //
     ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+    int num_species;
+    std::vector<c_Species> species;
     
+    int num_bands;
+    
+    int num_cells;
     std::vector<double>dx;
     double domain_min, domain_max;
-    int num_cells;
     double cells_per_decade;
     int type_of_grid;       //0 = cartesian, 1 = log
     std::vector<double> x_i;    		//The cell boundaries
@@ -223,6 +229,15 @@ public:
     std::vector<double> source_pressure_prefactor_left;
     std::vector<double> source_pressure_prefactor_right;
 
+    double lambda_min, lambda_max, lambda_per_decade;
+    std::vector<double> l_i;
+    std::vector<double> l_i12;
+    
+    int init_geometry;
+    char collision_model;
+    
+    Geometry geometry ;
+    
     double dt;
     double cflfactor;
     double t_max;
@@ -242,19 +257,41 @@ public:
     // Physical, global
     //
     ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
+    
+    //
+    // Conserved quantities to be monitored etc.
+    //
+    
+    Monitored_Quantities monitored_quantities;
+    Monitored_Quantities initial_monitored_quantities;
+    
+    //
+    // Gravitation
+    //
+    
+    double star_mass;
+    
     double planet_mass;     //in Earth masses
     double planet_position; //inside the simulation domain
+    double planet_semimajor = 5.2;
     double rs;
     double rs_at_moment = 0 ;
     double rs_time;
     
-    std::vector<double> phi;            //Parabolic Variables: gravitational potential
+    double scale_rb;
+    double scale_rh;
+    double scale_cs;
+    double scale_vk;
+    double scale_time;
+    
+    std::vector<double> phi;
     std::vector<double> enclosed_mass;
     
+    //
+    // Friction
+    //
+    
     int friction_solver;
-    Monitored_Quantities monitored_quantities;
-    Monitored_Quantities initial_monitored_quantities;
     
     using Matrix_t = Eigen::Matrix<double, NUM_SPECIES,NUM_SPECIES, Eigen::RowMajor>;
     using Vector_t = Eigen::Matrix<double, NUM_SPECIES, 1>;
@@ -271,9 +308,53 @@ public:
     Vector_t numdens_vector;
     Vector_t mass_vector;
 
+    Matrix_t radiation_matrix_T;
+    Matrix_t radiation_matrix_M;
+    Vector_t radiation_vec_input;
+    Vector_t radiation_vec_output;
+    Vector_t radiation_cv_vector;
+    Vector_t radiation_T3_vector;
+    
     Eigen::VectorXd alphas_sample;
 
+    void fill_alpha_basis_arrays(int j);
+    void fill_rad_basis_arrays(int j);
+    void compute_alpha_matrix(int j, int actually_compute_beta);
+    
+    //
+    // Radiation
+    //
+    double T_star;
+    double UV_star;
+    
+    Eigen::MatrixXd F_up;      //num_cells * num_bands each
+    Eigen::MatrixXd F_down;
+    Eigen::MatrixXd F_plus;
+    Eigen::MatrixXd F_minus;
+    Eigen::MatrixXd dErad;
+    Eigen::MatrixXd S_total;
+    Eigen::MatrixXd S_band;
+    Eigen::MatrixXd dS_band;
+    Eigen::MatrixXd solar_heating;
+    
+    Eigen::MatrixXd total_opacity;
+    Eigen::MatrixXd cell_optical_depth;
+    Eigen::MatrixXd radial_optical_depth;
 
+    Eigen::MatrixXd Erad_FLD ;
+    Eigen::MatrixXd Erad_FLD_total ;
+    BlockTriDiagSolver<1> tridiag ;
+    
+    int rad_solver_max_iter = 1;
+    double epsilon_rad_min = 1e-1;  // Some convergence measure for the radiation solver, if needed
+    double global_e_update_multiplier;
+    
+    void transport_radiation();     //  Called if use_rad_fluxes == 1
+    void update_opacities();
+    void update_fluxes();           //  Called from transport_radiation#   
+    void update_fluxes_FLD();           //  Called from transport_radiation#
+    void update_temperatures();
+    //AOS source_radflux(int i);
     
     ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     //
@@ -309,7 +390,6 @@ public:
     //
     void compute_friction_analytical(); 
     void compute_friction_numerical(); 
-    void compute_friction_numerical_sparse(); 
     
     //Gravity
     void init_grav_pot();
@@ -360,8 +440,8 @@ public:
     BoundaryType boundary_left;
     BoundaryType boundary_right;
     int num_cells;
+    int num_bands;
     int debug;
-    
 
     ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     //
@@ -379,6 +459,16 @@ public:
     std::vector<AOS> source_pressure;// Geometric source term
     std::vector<AOS> flux;
     std::vector<double> u_analytic;
+    
+    Eigen::MatrixXd opacity;        //num_cells * num_bands
+    Eigen::MatrixXd opacity_planck; //num_cells
+    Eigen::MatrixXd fraction_total_opacity; //num_cells * num_bands
+    Eigen::MatrixXd dS;
+    
+    //std::vector<double> opticaldepth;
+    //std::vector<double> opacity;
+    //std::vector<double> radiative_flux;
+    
     
     double density_excess;
     double bondi_radius;
@@ -401,10 +491,6 @@ public:
     std::vector<AOS_prim> prim ;
     std::vector<AOS_prim> prim_l ; // Reconstructed left/ right edges
     std::vector<AOS_prim> prim_r ;
-    std::vector<double> opticaldepth;
-    std::vector<double> opacity;
-    std::vector<double> radiative_flux;
-    
     
     ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     //
@@ -469,12 +555,7 @@ public:
         eos->compute_auxillary(&(prim[0]), num_cells+2);
     }
     
-    //
-    // Radiation
-    //
-    int use_rad_fluxes;
-    void update_radiation(std::vector<AOS>& u);
-    AOS source_radflux(int i);
+    void update_opacities();
     
     //
     // Equations of state

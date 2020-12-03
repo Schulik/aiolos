@@ -12,6 +12,7 @@ class EOS_Base {
     virtual void compute_conserved(const AOS_prim*, AOS*, int) const = 0 ;
     virtual void compute_auxillary(AOS_prim*, int) const = 0;
     virtual void update_p_from_eint(AOS_prim*, int) const =0;
+    virtual void update_eint_from_T(AOS_prim*, int) const =0;
     virtual void get_p_over_rho_analytic(const double*, double*) const = 0;
     virtual void get_p_from_rhoT(const double*,const double*, double*) const = 0;
     
@@ -30,6 +31,7 @@ class IdealGas_EOS final: public EOS_Base {
     void compute_conserved(const AOS_prim*, AOS*, int) const ;
     void compute_auxillary(AOS_prim*, int) const ;
     void update_p_from_eint(AOS_prim*, int) const ;
+    void update_eint_from_T(AOS_prim*, int) const ;
     void get_p_over_rho_analytic(const double*, double*) const ;
     void get_p_from_rhoT(const double*,const double*, double*) const;
     
@@ -48,6 +50,7 @@ class Polytropic_EOS final: public EOS_Base {
     void compute_conserved(const AOS_prim*, AOS*, int) const ;
     void compute_auxillary(AOS_prim*, int) const ;
     void update_p_from_eint(AOS_prim*, int) const ;
+    void update_eint_from_T(AOS_prim*, int) const ;
     void get_p_over_rho_analytic(const double*, double*) const ;
     void get_p_from_rhoT(const double*,const double*, double*) const;
     
