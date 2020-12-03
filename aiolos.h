@@ -478,6 +478,9 @@ public:
     int num_cells;
     int num_bands;
     int debug;
+    
+    string opacity_data_string;
+    int num_opacity_datas;
 
     ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     //
@@ -496,6 +499,7 @@ public:
     std::vector<AOS> flux;
     std::vector<double> u_analytic;
     
+    Eigen::MatrixXd opacity_data;   //
     Eigen::MatrixXd opacity;        //num_cells * num_bands
     Eigen::MatrixXd opacity_planck; //num_cells
     Eigen::MatrixXd fraction_total_opacity; //num_cells * num_bands

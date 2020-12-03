@@ -464,9 +464,9 @@ c_Sim::c_Sim(string filename, string speciesfile, int debug) {
         planck_matrix(p,1) = sum_planck;
         planck_matrix(p,0) = lmax*100.;
         
-        cout<<" in planck_matrix, lT = "<<planck_matrix(p,0)<<" percentile = "<<planck_matrix(p,1)<<endl;
+        //cout<<" in planck_matrix, lT = "<<planck_matrix(p,0)<<" percentile = "<<planck_matrix(p,1)<<endl;
     }
-    
+    /*
     cout<<" Example planck integrals: 288K between 5.03 and 79.5 "<<compute_planck_function_integral3(5.03,79.5,288)<<endl;
     cout<<" Example planck integrals: 288K between 0 and 5.03 "<<compute_planck_function_integral3(0.,5.03,288)<<endl;
     cout<<" Example planck integrals: 288K between 79.5 and infty "<<compute_planck_function_integral3(79.5,999999999.,288)<<endl;
@@ -478,7 +478,7 @@ c_Sim::c_Sim(string filename, string speciesfile, int debug) {
     cout<<" Sum for the sun = "<<compute_planck_function_integral3(0.251,3.961,5777) + compute_planck_function_integral3(0., 0.251,5777) + compute_planck_function_integral3(3.961,99999999999.,5777)<<endl;
     
     cout<<endl<<" ############################ init 0"<<endl;
-    
+    */
     /*
     i_wien = -1;
     for(int p = 0; p < num_plancks && i_wien == -1; p++) {
@@ -516,7 +516,7 @@ c_Sim::c_Sim(string filename, string speciesfile, int debug) {
             for(int s = 0; s< num_species; s++){
                 
                 //Jrad_FLD(j,0) += rad_energy_multipier * sigma_rad*pow(species[s].prim[j].temperature,4) / pi;
-                Jrad_FLD(j,0) = rad_energy_multipier * sigma_rad*pow(species[s].prim[j].temperature,4) / pi;
+                Jrad_FLD(j,0)  = rad_energy_multipier * sigma_rad*pow(species[s].prim[j].temperature,4) / pi;
                 Jrad_init(j,0) = Jrad_FLD(j,0);
                 if(debug > 1 && j==1)
                         cout<<" Jrad("<<j<<","<<0<<") = "<<Jrad_FLD(j,0)<<" dJrad_species["<<s<<"] = "<<rad_energy_multipier * compute_planck_function_integral3(l_i[0], l_i[1], species[s].prim[j].temperature)<<endl;

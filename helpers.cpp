@@ -263,6 +263,7 @@ void c_Species::read_species_data(string filename, int species_index) {
     }
     //simulation_parameter tmp_parameter = {"NaN",0,0.,0,"NaN"};
     int found = 0;
+    this->num_opacity_datas = -1;
     
     if(debug > 0) cout<<"          In read species Pos1"<<endl;
     
@@ -284,6 +285,9 @@ void c_Species::read_species_data(string filename, int species_index) {
                 this->initial_fraction = std::stod(stringlist[6]);
                 this->density_excess   = std::stod(stringlist[7]);
                 this->is_dust_like     = std::stod(stringlist[8]);
+                
+                this->opacity_data_string = stringlist[9];
+                this->num_opacity_datas= std::stod(stringlist[10]);
                 
                 if(debug > 0)
                     cout<<"Found species called "<<name<<" with a mass of "<<mass_amu<<" dof "<<degrees_of_freedom<<" gamma "<<gamma_adiabat<<" and zeta_0 = "<<initial_fraction<<endl;
@@ -308,6 +312,32 @@ void c_Species::read_species_data(string filename, int species_index) {
     file.close();
     
     if(debug > 0) cout<<"         Leaving species readin now. Bye!"<<endl;
+    
+    if(num_opacity_datas > -1) {
+        
+        cout<<"Starting reading opacity data. string = "<<opacity_data_string<<" num_opacity_datas = "<<num_opacity_datas<<endl;
+        
+        opacity_data = Eigen::MatrixXd::Zero(num_opacity_datas, 2);   //
+        
+        ifstream file2(opacity_data_string);
+        string line2;
+        
+        int data_count=0;
+        
+        while(std::getline( file2, line2 )) {
+            
+            std::vector<string> stringlist = stringsplit(line2," ");
+            
+            opacity_data(data_count, 0) = std::stod(stringlist[0]);
+            opacity_data(data_count, 1) = std::stod(stringlist[1]);
+            
+            data_count++;
+        }
+        
+        file2.close();
+    }
+    
+    cout<<" IN INIT SPECIES, OPACITY_DATA for file "<<opacity_data_string<<" is "<<endl<<opacity_data<<endl;
 }
 
 
@@ -481,9 +511,7 @@ void c_Species::print_AOS_component_tofile(int timestepnumber) {
     }
     else cout << "Unable to open file" << filename << endl; 
     outfile.close();
-    
-    
- 
+
 }
 
 void c_Sim::print_monitor(int num_steps) {

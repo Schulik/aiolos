@@ -169,7 +169,7 @@ void c_Sim::transport_radiation() {
             //update_fluxes_FLD(1.0*dt,   Jrad_FLD, Jrad_FLD2, T_FLD); //J_in, J_out, T_in
             //update_temperatures(1.0*dt, Jrad_FLD2, T_FLD, T_FLD2); // J_in,  T_in, T_out
             
-            if(steps == 1 || steps == 0) {
+            if(steps == -1 || steps == -2) {
                 cout<<"   in transport_radiation, after update fluxes."<<endl;
                 cout<<"Jrad_FLD2 and T_FLD2= "<<endl<<Jrad_FLD2<<endl<<endl<<T_FLD2<<endl;
             }
