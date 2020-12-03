@@ -209,13 +209,13 @@ double c_Sim::compute_planck_function_integral3(double lmin, double lmax, double
     if(lT_min < planck_matrix(0,0)) {
         m    = planck_matrix(0,1) / planck_matrix(0,0);
         
-        power_min = planck_matrix(0,1) + m * lT_min;//TODO: Replace with better interpolation
+        power_min = planck_matrix(0,1) + m * lT_min;
     }
     else {
         imin = std::log(lT_min/planck_matrix(0,0)) / std::log(lT_spacing);
         m    = (planck_matrix(imin+1,1) - planck_matrix(imin,1)) / (planck_matrix(imin+1,0)-planck_matrix(imin,0));
         
-        power_min = planck_matrix(imin,1) + m * (lT_min - planck_matrix(imin,0));//TODO: Replace with better interpolation
+        power_min = planck_matrix(imin,1) + m * (lT_min - planck_matrix(imin,0));
     }
     
     //
@@ -229,10 +229,11 @@ double c_Sim::compute_planck_function_integral3(double lmin, double lmax, double
         imax = std::log(lT_max/planck_matrix(0,0)) / std::log(lT_spacing);
         m    = (planck_matrix(imax+1,1) - planck_matrix(imax,1)) / (planck_matrix(imax+1,0)-planck_matrix(imax,0));
         
-        power_max = planck_matrix(imax,1) + m * (lT_max - planck_matrix(imax,0));//TODO: Replace with better interpolation
+        power_max = planck_matrix(imax,1) + m * (lT_max - planck_matrix(imax,0));
     }
     
-    cout<<endl<<"Integral3, lmin/lmax/t = "<<lmin<<"/"<<lmax<<"/"<<temperature<<" imin/imax = "<<imin<<"/"<<imax<<" P(imin)/P(imax) = "<<power_min<<"/"<<power_max<<endl; 
+    if(debug > 1)
+        cout<<endl<<"Integral3, lmin/lmax/t = "<<lmin<<"/"<<lmax<<"/"<<temperature<<" imin/imax = "<<imin<<"/"<<imax<<" P(imin)/P(imax) = "<<power_min<<"/"<<power_max<<endl; 
     
     return power_max - power_min;
     
