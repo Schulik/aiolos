@@ -670,7 +670,7 @@ void c_Sim::compute_friction_numerical() {
         if(debug >= 1 && j==7 && steps == 1) cout<<"    T = "<<friction_matrix_T<<endl;
         if(debug >= 1 && j==7 && steps == 1) cout<<"    v_inp = "<<friction_vec_input<<endl;
         if(debug >= 1 && j==7 && steps == 1) cout<<"    v_out = "<<friction_vec_output<<endl;
-        
+      
         //*/
         // Update new speed and internal energy
         //
@@ -682,8 +682,11 @@ void c_Sim::compute_friction_numerical() {
             double temp = 0;
             
             for(int sj=0; sj<num_species; sj++) {
-                temp += dt * friction_coefficients(si,sj) * (species[sj].mass_amu/(species[sj].mass_amu+species[si].mass_amu))  * pow( friction_vec_output(si) - friction_vec_output(sj), 2.);
-            }
+                        double v_end = friction_vec_output(si) - friction_vec_output(sj) ;
+                        double v_half = 0.5*(v_end + friction_vec_input(si) - friction_vec_input(sj)) ; 
+                                                       
+                        temp += dt * friction_coefficients(si,sj) * (species[sj].mass_amu/(species[sj].mass_amu+species[si].mass_amu)) * v_half * v_end ;
+                    }
             species[si].prim[j].internal_energy += temp;
         }
         
@@ -745,16 +748,16 @@ void c_Sim::compute_alpha_matrix(int j, int actually_compute_beta) { //Called in
                         else
                            friction_coefficients(si,sj) = friction_coeff_mask(si,sj) * alpha_local  * dens_vector(sj) / dens_vector(si) ;
                     }
-                    else {
+              
+                   else {
                         if(si==sj)
                            friction_coefficients(si,sj) = 0.;
                         else if(si > sj)
                            friction_coefficients(si,sj) = friction_coeff_mask(si,sj) * alpha_local / dens_vector(sj);
                         else
                            friction_coefficients(si,sj) = friction_coeff_mask(si,sj) * alpha_local / dens_vector(si) ;
-                    }
-                    
+                   }
+              
             }
-                    
         }
 }

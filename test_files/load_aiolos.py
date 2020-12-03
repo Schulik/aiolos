@@ -26,6 +26,29 @@ def load_aiolos_params(filename):
             
             params[key.strip()] = val.strip()
     return params
+
+
+class Species:
+    def __init__(self, name, mass, dof, is_dust):
+        self.name = name
+        self.mass = mass
+        self.dof = dof
+        self.gamma = (dof + 2.)/dof
+        self.dust_like = is_dust 
+
+def load_aiolos_species(filename):
+    species = {}
+    with open(filename, 'r') as f:
+        for l in f:
+            if l.startswith('@'):
+                data = l[1:].split()
+                species[int(data[0].strip())] = Species(data[1].strip(),
+                                                    float(data[2].strip()),
+                                                    float(data[3].strip()),
+                                                    int(data[7].strip()))
+
+    return species
+            
     
 
 if __name__ == "__main__":
