@@ -83,6 +83,8 @@ std::vector<double> np_ones(int);
 std::vector<double> np_somevalue(int, double);
 
 double compute_planck_function_integral(double lmin, double lmax, double temperature);
+double compute_planck_function_integral2(double lmin, double lmax, double temperature);
+
 //
 // Everything to define and read simulation parameters
 //
@@ -169,6 +171,7 @@ simulation_parameter<T> read_parameter_from_file(string, string, int, T);
 
 void update_cons_prim_after_friction(AOS* cons, AOS_prim* prim, double dEkin, double newv, double mass, double gamma, double cv);
 
+
 class c_Species;
 
 
@@ -214,6 +217,12 @@ public:
     std::vector<c_Species> species;
     
     int num_bands;
+    int num_plancks = 100;
+    int i_wien;
+    int i_rayleighjeans;
+    double lT_spacing;
+    double T_crit_min;
+    double T_crit_max; //Critical min/max temperatures beyond which one should extend the wavelength grid
     
     int num_cells;
     std::vector<double>dx;
@@ -318,16 +327,18 @@ public:
     Vector_t radiation_T3_vector;
     
     Eigen::VectorXd alphas_sample;
-
-    void fill_alpha_basis_arrays(int j);
-    void fill_rad_basis_arrays(int j);
-    void compute_alpha_matrix(int j, int actually_compute_beta);
     
     //
     // Radiation
     //
     double T_star;
     double UV_star;
+    
+    int radiation_matter_equilibrium_test; //If set to 1, sets J = J_init in update_radiation()
+    double CFL_break_time; //Numerical time after which cflfactor=0.9. Used in get_cfl_timestep()
+    
+    std::vector<double> previous_monitor_J;
+    std::vector<double> previous_monitor_T;
     
     Eigen::MatrixXd F_up;      //num_cells * num_bands each
     Eigen::MatrixXd F_down;
@@ -343,20 +354,39 @@ public:
     Eigen::MatrixXd cell_optical_depth;
     Eigen::MatrixXd radial_optical_depth;
 
+    Eigen::MatrixXd T_FLD ;
+    Eigen::MatrixXd T_FLD2 ;
+    Eigen::MatrixXd T_FLD3 ;
+    
+    Eigen::MatrixXd planck_matrix;
+    
+    Eigen::MatrixXd Etot_corrected ;
+    
     Eigen::MatrixXd Jrad_FLD ;
+    Eigen::MatrixXd Jrad_FLD2 ;
+    Eigen::MatrixXd Jrad_FLD3 ;
+    Eigen::MatrixXd Jrad_init;
     Eigen::MatrixXd Jrad_FLD_total ;
+    Eigen::MatrixXd Jrad_FLD_total2 ;
     BlockTriDiagSolver<1> tridiag ;
     
     int rad_solver_max_iter = 1;
     double epsilon_rad_min = 1e-1;  // Some convergence measure for the radiation solver, if needed
     double global_e_update_multiplier;
     
+    void fill_alpha_basis_arrays(int j);
+    void fill_rad_basis_arrays(int, double, Eigen::MatrixXd &, Eigen::MatrixXd &);
+    void compute_alpha_matrix(int j, int actually_compute_beta);
+    
     void transport_radiation();     //  Called if use_rad_fluxes == 1
     void update_opacities();
-    void update_fluxes();           //  Called from transport_radiation#   
-    void update_fluxes_FLD();           //  Called from transport_radiation#
-    void update_temperatures();
+    void update_fluxes(double timestep);           //  Called from transport_radiation#   
+    void update_fluxes_FLD(double, Eigen::MatrixXd &,Eigen::MatrixXd &,Eigen::MatrixXd &);           //  Called from transport_radiation#
+    void update_fluxes_FLD2(double, Eigen::MatrixXd &,Eigen::MatrixXd &,Eigen::MatrixXd &);           //  Called from transport_radiation#
+    void update_temperatures(double, Eigen::MatrixXd &,Eigen::MatrixXd &,Eigen::MatrixXd &);
+    void correct_totalenergy(double, Eigen::MatrixXd &);
     //AOS source_radflux(int i);
+    double compute_planck_function_integral3(double lmin, double lmax, double temperature);
     
     ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     //
@@ -399,6 +429,9 @@ public:
     double get_phi_grav(double &r, double &mass);
     
     void print_monitor(int i);
+    
+ 
+    
 public:
     
     c_Sim() {};
@@ -493,6 +526,7 @@ public:
     std::vector<AOS_prim> prim ;
     std::vector<AOS_prim> prim_l ; // Reconstructed left/ right edges
     std::vector<AOS_prim> prim_r ;
+    std::vector<double> temp_temperature;
     
     ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     //
@@ -523,6 +557,7 @@ public:
     void initialize_hydrostatic_atmosphere();
     void initialize_sound_wave();
     void compute_analytic_solution();
+    
     
     ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     //
