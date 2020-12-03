@@ -1,0 +1,51 @@
+#
+# Parameterfile for atmosphere simulations
+# Do not use tabs, only white spaces as value separators
+#
+
+#Control parameters
+PARI_PROBLEM_NUMBER     2
+#
+# Problem numbers explained: shock_tube, no grav = 1, planet with grav = 2
+#
+
+PARI_INIT_DATA_SWITCH   1
+PARI_INIT_DATA_U1      1e-6
+PARI_INIT_DATA_U2      0.0
+PARI_INIT_DATA_U3      1e-6
+
+PARI_SELF_GRAV_SWITCH   0
+PARI_LINEAR_GRAV        1
+PARI_DEBUGLEVEL         1
+PARI_INIT_STATIC        1
+
+WAVE_USE                1
+WAVE_AMPLITUDE          1e-1
+WAVE_PERIOD             1.8
+
+#Numerical parameters
+PARI_BOUND_TYPE         2
+PARI_BOUND_TYPE_LEFT    2
+PARI_BOUND_TYPE_RIGHT   1
+PARI_DOMAIN_DX          1e-4
+PARI_GRID_TYPE          0
+PARI_GEOMETRY           0
+PARI_CELLS_PER_DECADE   100
+PARI_DOMAIN_MIN         0e0.
+PARI_DOMAIN_MAX         2e0.
+PARI_TIME_DT            1e-3
+PARI_CFLFACTOR          1.0
+PARI_TIME_TMAX          1.81e0
+PARI_TIME_OUTPUT        1.e-1
+
+#Physical parameters
+PARI_PLANET_POS         0.
+PARI_PLANET_MASS        1.
+PARI_SMOOTHING_LENGTH   1e-3
+PARI_SMOOTHING_TIME     0.0
+PARI_GAMMA              1.4
+ACCRETION_RATE          1.e-1
+PARI_CONST_TEMP         1.
+PARI_TEMP_INCR          1.e-8
+PARI_USE_RADIATION      0
+PARI_CONST_OPAC         1.

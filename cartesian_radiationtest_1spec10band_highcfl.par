@@ -9,6 +9,7 @@ PARI_NUM_SPECIES        1
 PARI_NUM_BANDS          10
 DO_HYDRO                0
 PARI_RADE_MULTIPL       1e15
+MAX_RAD_ITER            1000
 
 FRICTION_SOLVER         1
 PARI_ORDER              2
@@ -40,7 +41,7 @@ PARI_LINEAR_GRAV        0
 PARI_DEBUGLEVEL         1
 PARI_INIT_STATIC        0
 
-OUTPUT_FILENAME         test_files/cartesian_radiationtest_2s2b
+OUTPUT_FILENAME         test_files/cartesian_radiationtest_1s10b_hcfl
 
 #Numerical parameters
 PARI_BOUND_TYPE         2
@@ -52,10 +53,10 @@ PARI_GEOMETRY           0
 PARI_CELLS_PER_DECADE   10
 PARI_DOMAIN_MIN         0.
 PARI_DOMAIN_MAX         1.
-PARI_TIME_DT            1e-8
-PARI_CFLFACTOR          1e-7
-PARI_TIME_TMAX          1.01e1
-PARI_TIME_OUTPUT        1.e-1
+PARI_TIME_DT            1e-3
+PARI_CFLFACTOR          1e0
+PARI_TIME_TMAX          1.01e2
+PARI_TIME_OUTPUT        1.e0
 
 #Scenarios
 TEMPERATURE_BUMP_STRENGTH 0.

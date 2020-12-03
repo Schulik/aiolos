@@ -6,19 +6,20 @@
 #Control parameters
 PARI_PROBLEM_NUMBER     1
 PARI_NUM_SPECIES        1
-PARI_NUM_BANDS          10
+PARI_NUM_BANDS          1
 DO_HYDRO                0
 PARI_RADE_MULTIPL       1e15
+CFL_BREAK_TIME          1e-12
 
 FRICTION_SOLVER         1
 PARI_ORDER              2
 PARI_USE_RADIATION      1
-PARI_CONST_OPAC         1e-5
+PARI_CONST_OPAC         1e5
 PARI_RAD_MULTIPLIER     0.
 
 #Radiation parameters
-PARI_LAM_MIN            1e-1
-PARI_LAM_MAX            1e4.
+PARI_LAM_MIN            3e-1
+PARI_LAM_MAX            3000.
 PARI_LAM_PER_DECADE     0.4
 PARI_TSTAR              0.
 PARI_UVSTAR             0.
@@ -40,7 +41,7 @@ PARI_LINEAR_GRAV        0
 PARI_DEBUGLEVEL         1
 PARI_INIT_STATIC        0
 
-OUTPUT_FILENAME         test_files/cartesian_radiationtest_2s2b
+OUTPUT_FILENAME         test_files/cartesian_radiationtest_1s1b
 
 #Numerical parameters
 PARI_BOUND_TYPE         2
@@ -52,10 +53,10 @@ PARI_GEOMETRY           0
 PARI_CELLS_PER_DECADE   10
 PARI_DOMAIN_MIN         0.
 PARI_DOMAIN_MAX         1.
-PARI_TIME_DT            1e-8
-PARI_CFLFACTOR          1e-7
-PARI_TIME_TMAX          1.01e1
-PARI_TIME_OUTPUT        1.e-1
+PARI_TIME_DT            1e-14
+PARI_CFLFACTOR          1e-13
+PARI_TIME_TMAX          1.01e-9
+PARI_TIME_OUTPUT        1.e5
 
 #Scenarios
 TEMPERATURE_BUMP_STRENGTH 0.

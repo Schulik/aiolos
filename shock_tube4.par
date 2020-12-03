@@ -1,0 +1,33 @@
+#
+# Parameterfile for atmosphere simulations
+# Do not use tabs, only white spaces as value separators
+#
+
+#Control parameters
+PARI_PROBLEM_NUMBER     1
+PARI_INIT_DATA_SWITCH   1
+PARI_INIT_DATA_U1L      5.99924
+PARI_INIT_DATA_U2L      19.5975
+PARI_INIT_DATA_U3L      460.894
+PARI_INIT_DATA_U1R      5.99242
+PARI_INIT_DATA_U2R      -6.19633
+PARI_INIT_DATA_U3R      46.0950
+PARI_INIT_SHOCK_MID      0.4
+
+PARI_USE_GRAV_SWITCH    0
+PARI_DEBUGLEVEL         1
+
+#Numerical parameters
+PARI_BOUND_TYPE         1
+PARI_DOMAIN_DX          1e-2
+PARI_DOMAIN_MIN         0.
+PARI_DOMAIN_MAX         1.
+PARI_TIME_DT            1e-3
+PARI_TIME_TMAX          0.035
+PARI_TIME_OUTPUT        1e-1
+PARI_GAMMA              1.4
+
+#Physical parameters
+PARI_PLANET_POS         0.
+PARI_SMOOTHING_LENGTH   0.1
+PARI_GAMMA              1.4

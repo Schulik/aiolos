@@ -30,14 +30,15 @@ c_Sim::c_Sim(string filename, string speciesfile, int debug) {
         domain_max       = read_parameter_from_file<double>(filename,"PARI_DOMAIN_MAX", debug).value;
         geometry = read_parameter_from_file<Geometry>(filename, "PARI_GEOMETRY", debug, Geometry::cartesian).value;
         order = read_parameter_from_file<IntegrationType>(filename, "PARI_ORDER", debug, IntegrationType::second_order).value;
-        global_e_update_multiplier = read_parameter_from_file<double>(filename,"PARI_RAD_MULTIPLIER", debug, 0.).value;
         
         lambda_min       = read_parameter_from_file<double>(filename,"PARI_LAM_MIN", debug, 1e-1).value;
         lambda_max       = read_parameter_from_file<double>(filename,"PARI_LAM_MAX", debug, 10.).value;
         lambda_per_decade= read_parameter_from_file<double>(filename,"PARI_LAM_PER_DECADE", debug, 10.).value;
         T_star           = read_parameter_from_file<double>(filename,"PARI_TSTAR", debug, 5777.).value;
-        UV_star            = read_parameter_from_file<double>(filename,"PARI_UVSTAR", debug, 1.).value;
+        UV_star          = read_parameter_from_file<double>(filename,"PARI_UVSTAR", debug, 1.).value;
         num_bands        = read_parameter_from_file<int>(filename,"PARI_NUM_BANDS", debug, 1).value;
+        radiation_matter_equilibrium_test = read_parameter_from_file<int>(filename,"RAD_MATTER_EQUI_TEST", debug, 0).value;
+        global_e_update_multiplier = read_parameter_from_file<double>(filename,"PARI_RAD_MULTIPLIER", debug, 0.).value;
         
         if(debug > 0) cout<<"Using integration order "<<order<<" while second order would be "<<IntegrationType::second_order<<endl;
         
@@ -73,6 +74,8 @@ c_Sim::c_Sim(string filename, string speciesfile, int debug) {
         t_max       = read_parameter_from_file<double>(filename,"PARI_TIME_TMAX", debug).value;
         output_time = read_parameter_from_file<double>(filename,"PARI_TIME_OUTPUT", debug).value; 
         monitor_time = read_parameter_from_file<double>(filename,"PARI_TIME_DT", debug).value;
+        CFL_break_time = read_parameter_from_file<double>(filename,"CFL_BREAK_TIME", debug, 1.).value;
+        
         globalTime = 0.0;    
         timecount = 0;
         
@@ -102,6 +105,7 @@ c_Sim::c_Sim(string filename, string speciesfile, int debug) {
         collision_model   = read_parameter_from_file<char>(filename,"PARI_COLL_MODEL", debug, 'C').value;
         friction_solver   = read_parameter_from_file<int>(filename,"FRICTION_SOLVER", debug, 0).value;
         do_hydrodynamics  = read_parameter_from_file<int>(filename,"DO_HYDRO", debug, 1).value;
+        rad_solver_max_iter = read_parameter_from_file<int>(filename,"MAX_RAD_ITER", debug, 1).value;
         
         if(problem_number == 2)
             monitor_output_index = num_cells/2; //TODO: Replace with index of sonic radius for dominant species?
@@ -410,33 +414,100 @@ c_Sim::c_Sim(string filename, string speciesfile, int debug) {
     radiation_cv_vector  = Vector_t(num_species);
     radiation_T3_vector  = Vector_t(num_species);
     
+    previous_monitor_J = std::vector<double>(num_bands) ;
+    previous_monitor_T = std::vector<double>(num_species) ;
+    
     F_up    = Eigen::MatrixXd::Zero(num_cells, num_bands);      //num_cells * num_bands each
     F_down  = Eigen::MatrixXd::Zero(num_cells, num_bands);
     F_plus  = Eigen::MatrixXd::Zero(num_cells, num_bands);
     F_minus = Eigen::MatrixXd::Zero(num_cells, num_bands);
-    dJrad   = Eigen::MatrixXd::Zero(num_cells, num_bands);
-    S_total = Eigen::VectorXd::Zero(num_cells,  1);
+    dJrad   = Eigen::MatrixXd::Zero(num_cells+2, num_bands);
+    S_total = Eigen::VectorXd::Zero(num_cells+2,  1);
     solar_heating = Eigen::VectorXd::Zero(num_bands,  1);
-    S_band        = Eigen::MatrixXd::Zero(num_cells, num_bands);
-    dS_band       = Eigen::MatrixXd::Zero(num_cells, num_bands);
+    S_band        = Eigen::MatrixXd::Zero(num_cells+2, num_bands);
+    dS_band       = Eigen::MatrixXd::Zero(num_cells+2, num_bands);
     for(int s=0; s<num_species; s++) {
-        species[s].dS = Eigen::VectorXd::Zero(num_cells,  1);
+        species[s].dS = Eigen::VectorXd::Zero(num_cells+2,  1);
     }
     
     double templumi = 0;
     for(int b=0; b<num_bands; b++) {
-        solar_heating(b)  = compute_planck_function_integral(l_i[b], l_i[b+1], T_star) * 4. * pow(rsolar,2.)/pow(planet_semimajor*au,2.)  + UV_star * 1.;
+        solar_heating(b)  = compute_planck_function_integral2(l_i[b], l_i[b+1], T_star) * 4. * pow(rsolar,2.)/pow(planet_semimajor*au,2.)  + UV_star * 1.;
         templumi += solar_heating(b);
         cout<<"SOLAR HEATING in bin "<<b<<" from/to lmin/lmax"<<l_i[b]<<"/"<<l_i[b+1]<<" is "<<solar_heating(b)<<endl;
         
     }
     cout<<"TOTAL SOLAR HEATING / Lumi = "<<templumi/(sigma_rad*pow(T_star,4.)/pi)<<" lumi = "<<(templumi*4.*pi*rsolar*rsolar*pi)<< " also sigmarad2/sigmarad = "<<sigma_rad2/sigma_rad<<endl;
     
-    total_opacity      = Eigen::MatrixXd::Zero(num_cells+2, num_bands);
-    cell_optical_depth = Eigen::MatrixXd::Zero(num_cells+2, num_bands);
+    planck_matrix = Eigen::MatrixXd::Zero(num_plancks, 2);
+    
+    //
+    // Compute Planck matrix based on loggrid and 100 K blackbody
+    //
+    double sum_planck = 0;
+    double dsum_planck;
+    double lmin, lmax;
+    double lminglobal = 1e-3, lmaxglobal = 1e6;
+    double dlogx = pow(lmaxglobal/lminglobal, 1./((double)num_plancks));
+    lT_spacing     = dlogx;
+    double lT_crit = 14387.770; //mum K
+    double lumi100 = sigma_rad * pow(100.,4.) / pi;
+    
+    for(int p = 0; p < num_plancks; p++) {
+
+        lmin      = lminglobal * pow(dlogx,(double)p);
+        lmax      = lmin * dlogx;
+        
+        dsum_planck = compute_planck_function_integral2(lmin, lmax, 100.) / lumi100;
+        sum_planck += dsum_planck;
+        
+        planck_matrix(p,1) = sum_planck;
+        planck_matrix(p,0) = lmax*100.;
+        
+        cout<<" in planck_matrix, lT = "<<planck_matrix(p,0)<<" percentile = "<<planck_matrix(p,1)<<endl;
+    }
+    
+    cout<<" Example planck integrals: 288K between 5.03 and 79.5 "<<compute_planck_function_integral3(5.03,79.5,288)<<endl;
+    cout<<" Example planck integrals: 288K between 0 and 5.03 "<<compute_planck_function_integral3(0.,5.03,288)<<endl;
+    cout<<" Example planck integrals: 288K between 79.5 and infty "<<compute_planck_function_integral3(79.5,999999999.,288)<<endl;
+    
+    cout<<" Sun between 251 and 3961 nm "<<compute_planck_function_integral3(0.251,3.961,5777)<<endl;
+    cout<<" Sun between 0 and 251 nm "<<compute_planck_function_integral3(0., 0.251,5777)<<endl;
+    cout<<" Sun between 3961 and infty nm "<<compute_planck_function_integral3(3.961,99999999999.,5777)<<endl;
+    
+    cout<<" Sum for the sun = "<<compute_planck_function_integral3(0.251,3.961,5777) + compute_planck_function_integral3(0., 0.251,5777) + compute_planck_function_integral3(3.961,99999999999.,5777)<<endl;
+    
+    cout<<endl<<" ############################ init 0"<<endl;
+    
+    /*
+    i_wien = -1;
+    for(int p = 0; p < num_plancks && i_wien == -1; p++) {
+        if (planck_matrix(p,0) < 0.2 * lT_crit )
+            i_wien = p;
+    }
+    
+    i_rayleighjeans = -1;
+    for(int p = 0; p < num_plancks && i_rayleighjeans == -1; p++) {
+        if (planck_matrix(p,0) > 1. * lT_crit )
+            i_rayleighjeans = p;
+    }
+    */
+    total_opacity        = Eigen::MatrixXd::Zero(num_cells+2, num_bands);
+    cell_optical_depth   = Eigen::MatrixXd::Zero(num_cells+2, num_bands);
     radial_optical_depth = Eigen::MatrixXd::Zero(num_cells+2, num_bands);
 
+    T_FLD          = Eigen::MatrixXd::Zero(num_cells+2, num_species);
+    T_FLD2         = Eigen::MatrixXd::Zero(num_cells+2, num_species);
+    T_FLD3         = Eigen::MatrixXd::Zero(num_cells+2, num_species);
+    
+    Etot_corrected = Eigen::MatrixXd::Zero(num_cells+2, 1);
+    
     Jrad_FLD       = Eigen::MatrixXd::Zero(num_cells+2, num_bands);
+    Jrad_FLD2      = Eigen::MatrixXd::Zero(num_cells+2, num_bands);
+    Jrad_FLD3      = Eigen::MatrixXd::Zero(num_cells+2, num_bands);
+    Jrad_init      = Eigen::MatrixXd::Zero(num_cells+2, num_bands);
+    Jrad_FLD_total = Eigen::VectorXd::Zero(num_cells+2,  1);
+    Jrad_FLD_total2= Eigen::VectorXd::Zero(num_cells+2,  1);
     tridiag        = BlockTriDiagSolver<Eigen::Dynamic>(num_cells+2, num_bands + num_species) ;
     
     for(int j = 0; j < num_cells+2; j++) {
@@ -444,30 +515,29 @@ c_Sim::c_Sim(string filename, string speciesfile, int debug) {
         if(num_bands == 1)  {
             for(int s = 0; s< num_species; s++){
                 
-                Jrad_FLD(j,0) += rad_energy_multipier * sigma_rad*pow(species[s].prim[j].temperature,4) / pi;
+                //Jrad_FLD(j,0) += rad_energy_multipier * sigma_rad*pow(species[s].prim[j].temperature,4) / pi;
+                Jrad_FLD(j,0) = rad_energy_multipier * sigma_rad*pow(species[s].prim[j].temperature,4) / pi;
+                Jrad_init(j,0) = Jrad_FLD(j,0);
                 if(debug > 1 && j==1)
-                        cout<<" Jrad("<<j<<","<<0<<") = "<<Jrad_FLD(j,0)<<" dJrad_species["<<s<<"] = "<<rad_energy_multipier * compute_planck_function_integral(l_i[0], l_i[1], species[s].prim[j].temperature)<<endl;
+                        cout<<" Jrad("<<j<<","<<0<<") = "<<Jrad_FLD(j,0)<<" dJrad_species["<<s<<"] = "<<rad_energy_multipier * compute_planck_function_integral3(l_i[0], l_i[1], species[s].prim[j].temperature)<<endl;
                 
             }
         } else {
             
             for(int b = 0; b < num_bands; b++) {
                 for(int s = 0; s< num_species; s++){
-                    Jrad_FLD(j,b) += rad_energy_multipier * compute_planck_function_integral(l_i[b], l_i[b+1], species[s].prim[j].temperature);
+                    Jrad_FLD(j,b)  = rad_energy_multipier * compute_planck_function_integral3(l_i[b], l_i[b+1], species[s].prim[j].temperature);
+                    Jrad_init(j,b) = Jrad_FLD(j,b);
+                    //Jrad_FLD(j,b) += rad_energy_multipier * compute_planck_function_integral(l_i[b], l_i[b+1], species[s].prim[j].temperature);
                     if(debug > 1 && j==1)
-                        cout<<" Jrad("<<j<<","<<b<<") = "<<Jrad_FLD(j,b)<<" dJrad_species["<<s<<"] = "<<rad_energy_multipier * compute_planck_function_integral(l_i[b], l_i[b+1], species[s].prim[j].temperature)<<endl;
+                        cout<<" Jrad("<<j<<","<<b<<") = "<<Jrad_FLD(j,b)<<" dJrad_species["<<s<<"] = "<<rad_energy_multipier * compute_planck_function_integral3(l_i[b], l_i[b+1], species[s].prim[j].temperature)<<endl;
                 }
             }
             
             
         }
         
-        
-        
-        
     }
-    
-    
     
     
 }
@@ -551,6 +621,7 @@ c_Species::c_Species(c_Sim *base_simulation, string filename, string species_fil
         prim   = std::vector<AOS_prim>(num_cells+2); //Those helper quantities are also defined on the ghost cells, so they get +2
         prim_l = std::vector<AOS_prim>(num_cells+2);
         prim_r = std::vector<AOS_prim>(num_cells+2);
+        temp_temperature = std::vector<double>(num_cells+2);
         
         timesteps    = np_zeros(num_cells+2);		    
         timesteps_cs = np_zeros(num_cells+2);	
@@ -653,9 +724,9 @@ c_Species::c_Species(c_Sim *base_simulation, string filename, string species_fil
         
         if(debug > 0) cout<<"        Species["<<species_index<<"]: Init done."<<endl;
         
-        opacity                = Eigen::MatrixXd::Zero(num_cells, num_bands); //num_cells * num_bands
-        opacity_planck         = Eigen::MatrixXd::Zero(num_cells, 1); //num_cells * num_bands
-        fraction_total_opacity = Eigen::MatrixXd::Zero(num_cells, num_bands); //num_cells * num_bands
+        opacity                = Eigen::MatrixXd::Zero(num_cells+2, num_bands); //num_cells * num_bands
+        opacity_planck         = Eigen::MatrixXd::Zero(num_cells+2, 1); //num_cells * num_bands
+        fraction_total_opacity = Eigen::MatrixXd::Zero(num_cells+2, num_bands); //num_cells * num_bands
     
 }
 

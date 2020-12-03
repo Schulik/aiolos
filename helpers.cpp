@@ -40,6 +40,11 @@ double c_Sim::get_cfl_timestep() {
         }
         max_snd_crs_time = std::max(max_snd_crs_time, species[s].snd_crs_time) ;
     }
+    
+    //Set CFLfactor to safe value once finding the radiative equilibrium is over
+    if(globalTime > CFL_break_time)
+        cflfactor = 10.;
+    
     //Invert and apply CFL secutiry factor
     minstep = cflfactor / minstep;
     
@@ -116,6 +121,7 @@ vector<string> stringsplit(const string& str, const string& delim)
     return tokens;
 }
 
+    
 //
 //
 // Compute Planck integral in a quick way
@@ -124,32 +130,113 @@ vector<string> stringsplit(const string& str, const string& delim)
 
 double compute_planck_function_integral(double lmin, double lmax, double temperature) {
     
-    int num_steps=10000;
+    int num_steps=3;
     double dloggrid = pow(lmax/lmin, 1./((double)num_steps));
     double l1;
     double l2;
     double l_avg;
+    double l_avginv;
     double expfactor;
+    double lam_db = h_planck*c_light/(kb*temperature)/angstroem;
+    double prefactor;
+    double tempresult = 0;
+    
+    l1        = lmin ;//* pow(dloggrid,(double)i);
+    l2        = lmax ;//l1 * dloggrid;
+    l_avg     = 0.5*(l1+l2);
+    l_avginv  = 1./l_avg;
+    expfactor = h_planck*c_light/(l_avg*angstroem*kb*temperature);
+            
+    return sigma_rad2*(l2-l1)/(std::exp(expfactor)-1.)*l_avginv*l_avginv*l_avginv*l_avginv*l_avginv;
+}
+
+
+double compute_planck_function_integral2(double lmin, double lmax, double temperature) {
+    
+    int num_steps=10;
+    double dloggrid = pow(lmax/lmin, 1./((double)num_steps));
+    double l1;
+    double l2;
+    double l_avg;
+    double l_avginv;
+    double expfactor;
+    double lam_db = h_planck*c_light/(kb*temperature)/angstroem;
     double prefactor;
     double tempresult = 0;
     //cout<<"    In compute_planck lmin/lmax/dloggrid = "<<lmin<<"/"<<lmax<<"/"<<dloggrid<<" ";
     
-    for(int i=0; i<num_steps; i++) {
-        //cout<<"---";
-        l1        = lmin * pow(dloggrid,(double)i);
-        l2        = l1 * dloggrid;
-        l_avg     = 0.5*(l1+l2);
-        expfactor = h_planck*c_light/(l_avg*angstroem*kb*temperature);
-        //prefactor = 2*h_planck*c_light*c_light/pow(l_avg,5.)/pow(angstroem,4.);
+    if(lmin > 3.*lam_db)
+        return 2.*c_light*kb*temperature * (1./lmin/lmin/lmin-1./lmax/lmax/lmax)/3.;
+    else {
+                
+        for(int i=0; i<num_steps; i++) {
+            //cout<<"---";
+            l1        = lmin * pow(dloggrid,(double)i);
+            l2        = l1 * dloggrid;
+            l_avg     = 0.5*(l1+l2);
+            l_avginv  = 1./l_avg;
+            expfactor = h_planck*c_light/(l_avg*angstroem*kb*temperature);
+            //prefactor = 2*h_planck*c_light*c_light/pow(l_avg,5.)/pow(angstroem,4.);
+            
+            tempresult += sigma_rad2*(l2-l1)/(std::exp(expfactor)-1.)*l_avginv*l_avginv*l_avginv*l_avginv*l_avginv;
+            //tempresult += sigma_rad2*(l2-l1)/pow(l_avg,5.)/(std::exp(expfactor)-1.);
+            //tempresult += (l1-l2)/(std::exp(-expfactor)-1.);
+            //cout<<" "<<l1<<"/"<<l2<<" "<<prefactor*(l2-l1)/(std::exp(-expfactor)-1.);
+        }
+        //cout<<endl;
         
-        tempresult += sigma_rad2*(l2-l1)/pow(l_avg,5.)/(std::exp(expfactor)-1.);
-        //tempresult += (l1-l2)/(std::exp(-expfactor)-1.);
-        //cout<<" "<<l1<<"/"<<l2<<" "<<prefactor*(l2-l1)/(std::exp(-expfactor)-1.);
+        return tempresult;
     }
-    //cout<<endl;
     
-    return tempresult;
 }
+
+double c_Sim::compute_planck_function_integral3(double lmin, double lmax, double temperature) {
+    
+    double power_min;
+    double power_max;
+    double lT_min = lmin * temperature;
+    double lT_max = lmax * temperature;
+    double m;
+    int imin;
+    int imax;
+    
+    //
+    // Lower power
+    //
+    if(lT_min < planck_matrix(0,0)) {
+        m    = planck_matrix(0,1) / planck_matrix(0,0);
+        
+        power_min = planck_matrix(0,1) + m * lT_min;
+    }
+    else {
+        imin = std::log(lT_min/planck_matrix(0,0)) / std::log(lT_spacing);
+        m    = (planck_matrix(imin+1,1) - planck_matrix(imin,1)) / (planck_matrix(imin+1,0)-planck_matrix(imin,0));
+        
+        power_min = planck_matrix(imin,1) + m * (lT_min - planck_matrix(imin,0));
+    }
+    
+    //
+    // Upper power
+    //
+    if(lmax * temperature > planck_matrix(num_plancks-1,0)) {
+        power_max = 1.;
+    }
+    else {
+        
+        imax = std::log(lT_max/planck_matrix(0,0)) / std::log(lT_spacing);
+        m    = (planck_matrix(imax+1,1) - planck_matrix(imax,1)) / (planck_matrix(imax+1,0)-planck_matrix(imax,0));
+        
+        power_max = planck_matrix(imax,1) + m * (lT_max - planck_matrix(imax,0));
+    }
+    
+    if(debug > 1)
+        cout<<endl<<"Integral3, lmin/lmax/t = "<<lmin<<"/"<<lmax<<"/"<<temperature<<" imin/imax = "<<imin<<"/"<<imax<<" P(imin)/P(imax) = "<<power_min<<"/"<<power_max<<endl; 
+    
+    return power_max - power_min;
+    
+}
+
+   
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 //
@@ -417,7 +504,7 @@ void c_Sim::print_monitor(int num_steps) {
                 initial_monitored_quantities.u2_tot += species[s].u[i].u2 * vol[i];
                 initial_monitored_quantities.u3_tot += species[s].u[i].u3 * vol[i];
             }
-\
+
     }
     
     //
@@ -464,22 +551,45 @@ void c_Sim::print_monitor(int num_steps) {
         //
         
         //Cols 1-5
-        monitor<<globalTime<<'\t'<<dt<<'\t'<<monitored_quantities.u1_tot/initial_monitored_quantities.u1_tot<<'\t'<<monitored_quantities.u2_tot/initial_monitored_quantities.u2_tot<<'\t'<<monitored_quantities.u3_tot/initial_monitored_quantities.u3_tot<<'\t';
+        monitor<<globalTime<<'\t'<<dt<<'\t';//<<monitored_quantities.u1_tot/initial_monitored_quantities.u1_tot<<'\t'<<monitored_quantities.u2_tot/initial_monitored_quantities.u2_tot<<'\t'<<monitored_quantities.u3_tot/initial_monitored_quantities.u3_tot<<'\t';
         
+        double etot = 0;
+        
+        for(int b=0; b<num_bands; b++) 
+            etot += Jrad_FLD(5,b)*4*pi/c_light; 
+            
+        
+        for(int s=0; s<num_species; s++) 
+            etot += species[s].prim[5].density*species[s].cv*species[s].prim[5].temperature;
+            
+        monitor<<etot<<'\t';     
+        
+        monitor<<Etot_corrected(5)<<'\t';     
         
         //Starting with col 6
-        for(int b=0; b<num_bands; b++)
-            monitor<<Jrad_FLD(5,b)<<'\t'; 
+        for(int b=0; b<num_bands; b++) 
+            monitor<<Jrad_FLD(5,b)*4*pi/c_light<<'\t'; 
         
         for(int s=0; s<num_species; s++)
-            monitor<<sigma_rad/pi*pow(species[s].prim[5].temperature,4.)<<'\t';
+            monitor<<4*sigma_rad/c_light*pow(species[s].prim[5].temperature,4.)<<'\t';
+        
+        //Convergence measures for radiative quantities
+        for(int b=0; b<num_bands; b++)  {
+            monitor<<((Jrad_FLD(5,b)-previous_monitor_J[b])/previous_monitor_J[b])<<'\t'; 
+            previous_monitor_J[b] = Jrad_FLD(5,b);
+        }
+        
+        for(int s=0; s<num_species; s++)  {
+            monitor<<((sigma_rad/pi*pow(species[s].prim[5].temperature,4.)-previous_monitor_T[s])/previous_monitor_T[s])<<'\t'; 
+            previous_monitor_T[s] = sigma_rad/pi*pow(species[s].prim[5].temperature,4.);
+        }
         
         //Starting with col 6
-        for(int s=0; s<num_species; s++)
-            monitor<<species[s].prim[1].speed<<'\t';
+        //for(int s=0; s<num_species; s++)
+        //    monitor<<species[s].prim[1].speed<<'\t';
         
         for(int s=0; s<num_species; s++)
-            monitor<<species[s].prim[1].internal_energy<<'\t';
+            monitor<<species[s].cv*species[s].prim[1].temperature<<'\t';
         
         monitor<<endl;
     }
