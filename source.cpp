@@ -443,7 +443,7 @@ void c_Sim::update_fluxes_FLD() {
                 int idx_rb = j*num_vars + b ; 
 
                 // TODO multiply by fraction in band.
-                double fac = species[s].opacity(j, b) * sigma_rad*Ts*Ts*Ts / pi ; //*compute_planck_function_integral3(l_i[b], l_i[b+1], species[s].prim[j].temperature)
+                double fac = species[s].opacity(j, b) * sigma_rad*Ts*Ts*Ts / pi * compute_planck_function_integral3(l_i[b], l_i[b+1], species[s].prim[j].temperature);
                 d[idx_s ] += 16 * pi * fac / species[s].cv ;
                 d[idx_sb] = - 4 * pi * species[s].opacity(j, b) / species[s].cv ;
                 r[idx_rs] += 12 * pi * fac * Ts / species[s].cv ;
