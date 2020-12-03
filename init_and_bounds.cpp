@@ -98,8 +98,10 @@ c_Sim::c_Sim(string filename, string speciesfile, int debug) {
         use_rad_fluxes    = read_parameter_from_file<int>(filename,"PARI_USE_RADIATION", debug, 0).value;
         init_wind         = read_parameter_from_file<int>(filename,"PARI_INIT_WIND", debug, 0).value;
         alpha_collision   = read_parameter_from_file<double>(filename,"PARI_ALPHA_COLL", debug, 0).value;
+        rad_energy_multipier=read_parameter_from_file<double>(filename,"PARI_RADE_MULTIPL", debug, 1.).value;
         collision_model   = read_parameter_from_file<char>(filename,"PARI_COLL_MODEL", debug, 'C').value;
         friction_solver   = read_parameter_from_file<int>(filename,"FRICTION_SOLVER", debug, 0).value;
+        do_hydrodynamics  = read_parameter_from_file<int>(filename,"DO_HYDRO", debug, 1).value;
         
         if(problem_number == 2)
             monitor_output_index = num_cells/2; //TODO: Replace with index of sonic radius for dominant species?
@@ -149,13 +151,19 @@ c_Sim::c_Sim(string filename, string speciesfile, int debug) {
         l_i12     = np_zeros(num_bands);      // Wavelength bin midpoints or averages
         
         double dlogl = pow(10., 1./lambda_per_decade);
+        double dlogl2 = pow(lambda_max/lambda_min, 1./num_bands);
         l_i[0] = lambda_min;
         
         for(int b=1; b<num_bands+1; b++) {
-            l_i[b]      = l_i[b-1] * dlogl;
+            l_i[b]      = l_i[b-1] * dlogl2;
             l_i12[b-1]  = 0.5 * (l_i[b] + l_i[b-1]);
         }
-        
+        /*
+        cout<<"   ATTENTION: Bands go from "<<l_i[0]<<" till "<<l_i[num_bands]<<", while lmin/lmax was given as "<<lambda_min<<"/"<<lambda_max<<endl;
+        cout<<"   Please confirm this is correct."<<endl;
+        char tmpchar;
+        cin>>tmpchar;
+        */
         if(debug > 0) cout<<"Init: Setup grid memory"<<endl;
         
         //
@@ -366,7 +374,7 @@ c_Sim::c_Sim(string filename, string speciesfile, int debug) {
 
         alphas_sample  = Eigen::VectorXd::Zero(num_cells+2);
         
-        if(num_species > 1) {
+        if(num_species >= 1) {
             friction_matrix_T     = Matrix_t::Zero(num_species, num_species);
             friction_coefficients = Matrix_t::Zero(num_species, num_species);
             friction_coeff_mask   = Matrix_t::Ones(num_species, num_species);
@@ -406,7 +414,7 @@ c_Sim::c_Sim(string filename, string speciesfile, int debug) {
     F_down  = Eigen::MatrixXd::Zero(num_cells, num_bands);
     F_plus  = Eigen::MatrixXd::Zero(num_cells, num_bands);
     F_minus = Eigen::MatrixXd::Zero(num_cells, num_bands);
-    dErad   = Eigen::MatrixXd::Zero(num_cells, num_bands);
+    dJrad   = Eigen::MatrixXd::Zero(num_cells, num_bands);
     S_total = Eigen::VectorXd::Zero(num_cells,  1);
     solar_heating = Eigen::VectorXd::Zero(num_bands,  1);
     S_band        = Eigen::MatrixXd::Zero(num_cells, num_bands);
@@ -417,29 +425,46 @@ c_Sim::c_Sim(string filename, string speciesfile, int debug) {
     
     double templumi = 0;
     for(int b=0; b<num_bands; b++) {
-        solar_heating(b)  = compute_planck_function_integral(l_i[b], l_i[b+1], T_star) + UV_star * 1.;
+        solar_heating(b)  = compute_planck_function_integral(l_i[b], l_i[b+1], T_star) * 4. * pow(rsolar,2.)/pow(planet_semimajor*au,2.)  + UV_star * 1.;
         templumi += solar_heating(b);
         cout<<"SOLAR HEATING in bin "<<b<<" from/to lmin/lmax"<<l_i[b]<<"/"<<l_i[b+1]<<" is "<<solar_heating(b)<<endl;
         
     }
     cout<<"TOTAL SOLAR HEATING / Lumi = "<<templumi/(sigma_rad*pow(T_star,4.)/pi)<<" lumi = "<<(templumi*4.*pi*rsolar*rsolar*pi)<< " also sigmarad2/sigmarad = "<<sigma_rad2/sigma_rad<<endl;
     
-    total_opacity      = Eigen::MatrixXd::Zero(num_cells, num_bands);
-    cell_optical_depth = Eigen::MatrixXd::Zero(num_cells, num_bands);
-    radial_optical_depth = Eigen::MatrixXd::Zero(num_cells, num_bands);
+    total_opacity      = Eigen::MatrixXd::Zero(num_cells+2, num_bands);
+    cell_optical_depth = Eigen::MatrixXd::Zero(num_cells+2, num_bands);
+    radial_optical_depth = Eigen::MatrixXd::Zero(num_cells+2, num_bands);
 
-    Erad_FLD       = Eigen::MatrixXd::Zero(num_cells, num_bands);
-    Erad_FLD_total = Eigen::VectorXd::Zero(num_cells,  1);
-    tridiag        = BlockTriDiagSolver<1>(num_cells+2) ;
+    Jrad_FLD       = Eigen::MatrixXd::Zero(num_cells+2, num_bands);
+    tridiag        = BlockTriDiagSolver<Eigen::Dynamic>(num_cells+2, num_bands + num_species) ;
     
-    for(int j = 0; j < num_cells; j++) {
-        for(int b = 0; b < num_bands; b++) {
+    for(int j = 0; j < num_cells+2; j++) {
+        
+        if(num_bands == 1)  {
             for(int s = 0; s< num_species; s++){
                 
-                Erad_FLD(j,b) += compute_planck_function_integral(l_i[b], l_i[b+1], species[s].prim[j].temperature);
+                Jrad_FLD(j,0) += rad_energy_multipier * sigma_rad*pow(species[s].prim[j].temperature,4) / pi;
+                if(debug > 1 && j==1)
+                        cout<<" Jrad("<<j<<","<<0<<") = "<<Jrad_FLD(j,0)<<" dJrad_species["<<s<<"] = "<<rad_energy_multipier * compute_planck_function_integral(l_i[0], l_i[1], species[s].prim[j].temperature)<<endl;
                 
             }
+        } else {
+            
+            for(int b = 0; b < num_bands; b++) {
+                for(int s = 0; s< num_species; s++){
+                    Jrad_FLD(j,b) += rad_energy_multipier * compute_planck_function_integral(l_i[b], l_i[b+1], species[s].prim[j].temperature);
+                    if(debug > 1 && j==1)
+                        cout<<" Jrad("<<j<<","<<b<<") = "<<Jrad_FLD(j,b)<<" dJrad_species["<<s<<"] = "<<rad_energy_multipier * compute_planck_function_integral(l_i[b], l_i[b+1], species[s].prim[j].temperature)<<endl;
+                }
+            }
+            
+            
         }
+        
+        
+        
+        
     }
     
     
@@ -552,8 +577,11 @@ c_Species::c_Species(c_Sim *base_simulation, string filename, string species_fil
             
             SHOCK_TUBE_MID = read_parameter_from_file<double>(filename,"PARI_INIT_SHOCK_MID", debug, 0.5).value;
             
-            u1l = initial_fraction * u1l;
-            u1r = initial_fraction * u1r;
+            u1l *= initial_fraction;
+            u1r *= initial_fraction;
+            
+            u3l *= initial_fraction;
+            u3r *= initial_fraction;
             
             if (is_dust_like) { 
                 u3l *= 2 / mass_amu ;
@@ -575,7 +603,7 @@ c_Species::c_Species(c_Sim *base_simulation, string filename, string species_fil
             
             initialize_shock_tube_test(SHOCK_TUBE_UL, SHOCK_TUBE_UR);
             
-            if(debug > 0) cout<<"        Species["<<species_index<<"] initialized problem 1. with left primitives ="<<pl.density<<" /"<<pl.speed<<" init atmo "<<init_static_atmosphere  <<" density excess"<<density_excess<<endl;
+            if(debug > 0) cout<<"        Species["<<species_index<<"] initialized problem 1. with left rho/v/p/T ="<<pl.density<<"/"<<pl.speed<<"/"<<pl.pres <<"/"<<pl.temperature<<" init atmo "<<init_static_atmosphere  <<" density excess"<<density_excess<<endl;
         }
         //
         // Problem 2: A constant background state, with a planet embedded into it, free to evolve as physics dictates
@@ -624,9 +652,6 @@ c_Species::c_Species(c_Sim *base_simulation, string filename, string species_fil
         apply_boundary_right(u) ;
         
         if(debug > 0) cout<<"        Species["<<species_index<<"]: Init done."<<endl;
-        
-        
-        
         
         opacity                = Eigen::MatrixXd::Zero(num_cells, num_bands); //num_cells * num_bands
         opacity_planck         = Eigen::MatrixXd::Zero(num_cells, 1); //num_cells * num_bands

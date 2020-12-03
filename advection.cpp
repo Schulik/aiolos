@@ -103,17 +103,25 @@ void c_Sim::execute() {
         // Do all explicit and implicit operations for one timestep on the entire grid for all species
         //
         ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~////
-        for(int s = 0; s < num_species; s++)
-            species[s].execute(species[s].u, species[s].dudt[0]);
         
-        // Just do the basic update here
-        for(int s=0; s < num_species; s++) {
-            for(int j=0; j < num_cells+2; j++)
-                species[s].u[j] = species[s].u[j] + species[s].dudt[0][j]*dt ;
+        //
+        // Step 0: If no gas movement is desired, set all velocity changes to 0
+        //
+        
+        
+        
+        
+        if (do_hydrodynamics == 1) {
+        
+            for(int s = 0; s < num_species; s++)
+                species[s].execute(species[s].u, species[s].dudt[0]);
+            
+            for(int s=0; s < num_species; s++) {
+                for(int j=0; j < num_cells+2; j++)
+                    species[s].u[j] = species[s].u[j] + species[s].dudt[0][j]*dt ;
+            }
         }
         
-        
-
         if (order == IntegrationType::first_order) {
             globalTime += dt ;
         }
@@ -124,25 +132,31 @@ void c_Sim::execute() {
             if(use_self_gravity==1)
                 update_mass_and_pot();
 
-            for(int s = 0; s < num_species; s++)
-                species[s].execute(species[s].u, species[s].dudt[1]);
-
-            for(int s = 0; s < num_species; s++)
-                for(int j = 0; j < num_cells+2; j++) {
-                    species[s].u[j] += (species[s].dudt[1][j] -  species[s].dudt[0][j])*dt / 2 ; 
-                    
+            if (do_hydrodynamics == 1) {
+            
+                for(int s = 0; s < num_species; s++)
+                    species[s].execute(species[s].u, species[s].dudt[1]);
+                
+                for(int s = 0; s < num_species; s++){
+                    for(int j = 0; j < num_cells+2; j++) {
+                        species[s].u[j] += (species[s].dudt[1][j] -  species[s].dudt[0][j])*dt / 2 ; 
+                        
+                    }
                 }
+            }
         }
+        
         
         for(int s = 0; s < num_species; s++)
             species[s].compute_pressure(species[s].u);
         
-        if(alpha_collision > 0 && num_species > 1) {
-            if(friction_solver == 0)
-                compute_friction_analytical(); 
-            else
-                compute_friction_numerical();
-                //compute_friction_numerical_sparse();
+        if (do_hydrodynamics == 1) {
+            if(alpha_collision > 0 && num_species > 1) {
+                if(friction_solver == 0)
+                    compute_friction_analytical(); 
+                else
+                    compute_friction_numerical();
+            }
         }
         
         if(use_rad_fluxes==1)
