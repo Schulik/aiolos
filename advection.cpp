@@ -1,3 +1,15 @@
+///////////////////////////////////////////////////////////
+//
+//
+//  advection.cpp
+//
+// This file contains the base routines to start and run a simulation, 
+// as well as hydrodynamics, i.e. the HLLC Riemann solver.
+//
+//
+//
+///////////////////////////////////////////////////////////
+
 #include "aiolos.h"
 
 
