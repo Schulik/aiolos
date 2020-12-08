@@ -395,7 +395,7 @@ void c_Sim::compute_alpha_matrix(int j, int actually_compute_beta) { //Called in
                         alphas_sample(j) = alpha_local;
                         //cout<<"    spec "<<species[si].name<<" j = "<<j<<" alpha_local = "<<alpha_local<<endl;
                         if(steps == 1 && ((j==2) || (j==num_cells-2) || (j==num_cells/2)) )
-                            cout<<"    spec "<<species[si].name<<" j = "<<j<<" alpha_local = "<<alpha_local<<endl;
+                            cout<<"    spec "<<species[si].speciesname<<" j = "<<j<<" alpha_local = "<<alpha_local<<endl;
                     }
                         
                             

@@ -242,7 +242,7 @@ double c_Sim::compute_planck_function_integral3(double lmin, double lmax, double
     }
     
     if(debug > 1)
-        cout<<endl<<"Integral3, lmin/lmax/t = "<<lmin<<"/"<<lmax<<"/"<<temperature<<" imin/imax = "<<imin<<"/"<<imax<<" P(imin)/P(imax) = "<<power_min<<"/"<<power_max<<endl; 
+        cout<<endl<<"Integral3, lmin/lmax/t = "<<lmin<<"/"<<lmax<<"/"<<temperature<<" imin/imax = "<<imin<<"/"<<imax<<" P(imin)/P(imax) = "<<power_min<<"/"<<power_max<<" = "<<power_max-power_min<<endl; 
     
     return power_max - power_min;
     

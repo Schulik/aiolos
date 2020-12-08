@@ -29,7 +29,6 @@ void c_Sim::execute() {
     double output_counter = 0;
     double monitor_counter= 0;
     const int maxsteps = 1e9;
-    //double pressure_temp;
         
     cout<<endl<<"Beginning main loop with num_cells="<<num_cells<<" and timestep="<<dt<<" cflfactor="<<cflfactor<<" and num_species = "<<num_species<<endl;
     if(num_species == 0) 
@@ -271,7 +270,7 @@ void c_Species::execute(std::vector<AOS>& u_in, std::vector<AOS>& dudt) {
             //if( (debug > 1) && ( j==1 || j==num_cells || j==(num_cells/2) )) {
             if( (debug > 1) && ( j==2 ) && (base->steps==1)) {
                 char alpha;
-                cout<<"Debuggin fluxes in cell i= "<<j<<" for species "<<name<<" at time "<<base->steps<<endl; 
+                cout<<"Debuggin fluxes in cell i= "<<j<<" for species "<<speciesname<<" at time "<<base->steps<<endl; 
                 cout<<"     fl.u1 = "<<flux[j-1].u1<<": fr.u1 = "<<flux[j].u1<<endl;
                 cout<<"     fl.u2 = "<<flux[j-1].u2<<": fr.u2 = "<<flux[j].u2<<endl;
                 cout<<"     fl.u3 = "<<flux[j-1].u3<<": fr.u3 = "<<flux[j].u3<<endl;

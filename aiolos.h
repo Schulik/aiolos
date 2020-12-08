@@ -35,8 +35,8 @@ const double c_light   = 2.99792458e10;
 const double navo     = 6.02214e23; // particles per mole
 const double amu      = 1.66054e-24; //g
 const double h_planck = 6.6261e-27;//  cm^2 g/s
-const double Rgas     = 8.31446261815324e7;  //erg/K/mole
-const double Rgas_fake = 1.;
+const double Rgas     = 8.31446261815324e7;  //erg/K/g
+//const double Rgas_fake = 1.;
 const double kb       = 1.38e-16;  //erg/K
 const double km       = 1e5; //kilometers in cm
 const double mearth   = 5.98e27;  //g
@@ -197,6 +197,7 @@ public:
     ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     string simname;
+    string workingdir;
     
     int problem_number;
     int debug;
@@ -255,7 +256,7 @@ public:
     double output_time;
     double monitor_time;
     double max_snd_crs_time;
-    double rad_energy_multipier;
+    double rad_energy_multiplier;
     int steps;
     int timecount;
     int monitor_output_index;
@@ -335,6 +336,8 @@ public:
     double UV_star;
     
     int radiation_matter_equilibrium_test; //If set to 1, sets J = J_init in update_radiation()
+    int radiation_diffusion_test_linear;
+    int radiation_diffusion_test_nonlinear;
     double CFL_break_time; //Numerical time after which cflfactor=0.9. Used in get_cfl_timestep()
     
     std::vector<double> previous_monitor_J;
@@ -373,7 +376,6 @@ public:
     
     int rad_solver_max_iter = 1;
     double epsilon_rad_min = 1e-1;  // Some convergence measure for the radiation solver, if needed
-    double global_e_update_multiplier;
     
     void fill_alpha_basis_arrays(int j);
     void fill_rad_basis_arrays(int, double, Eigen::MatrixXd &, Eigen::MatrixXd &);
@@ -436,7 +438,7 @@ public:
 public:
     
     c_Sim() {};
-    c_Sim(string parameter_filename, string species_filename, int debug=0);
+    c_Sim(string parameter_filename, string species_filename, string workingdir, int debug=0);
     ~c_Sim();
     
     void execute(); //Main loop
@@ -470,7 +472,9 @@ public:
     //
     ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-    string name;
+    string speciesname;
+    string workingdir;
+    
     int this_species_index;
     int boundaries_number;
     BoundaryType boundary_left;

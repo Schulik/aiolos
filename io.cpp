@@ -55,7 +55,7 @@ void c_Species::read_species_data(string filename, int species_index) {
                 
                 found = 1;
                 
-                this->name             = stringlist[2];
+                this->speciesname             = stringlist[2];
                 this->mass_amu         = std::stod(stringlist[3]);
                 this->degrees_of_freedom = std::stod(stringlist[4]);
                 this->gamma_adiabat    = std::stod(stringlist[5]);
@@ -67,7 +67,7 @@ void c_Species::read_species_data(string filename, int species_index) {
                 this->num_opacity_datas= std::stod(stringlist[10]);
                 
                 if(debug > 0)
-                    cout<<"Found species called "<<name<<" with a mass of "<<mass_amu<<" dof "<<degrees_of_freedom<<" gamma "<<gamma_adiabat<<" and zeta_0 = "<<initial_fraction<<endl;
+                    cout<<"Found species called "<<speciesname<<" with a mass of "<<mass_amu<<" dof "<<degrees_of_freedom<<" gamma "<<gamma_adiabat<<" and zeta_0 = "<<initial_fraction<<endl;
                 
             }
 
@@ -96,7 +96,7 @@ void c_Species::read_species_data(string filename, int species_index) {
         
         opacity_data = Eigen::MatrixXd::Zero(num_opacity_datas, 2);   //
         
-        ifstream file2(opacity_data_string);
+        ifstream file2("inputdata/" + opacity_data_string);
         string line2;
         
         int data_count=0;
@@ -238,18 +238,18 @@ void c_Species::print_AOS_component_tofile(int timestepnumber) {
     {
         stringstream filenamedummy;
         string truncated_name = stringsplit(base->simname,".")[0];
-        filenamedummy<<"output_"<<"_"<<truncated_name;
+        filenamedummy<<base->workingdir<<"output_"<<truncated_name<<"_"<<speciesname<<"_t"<<timestepnumber<<".dat";
         filename = filenamedummy.str() ;
     }
-
-    filename = read_parameter_from_file<string>(base->simname, "OUTPUT_FILENAME", debug-1, filename).value ;
+    /*
+    filename = read_parameter_from_file<string>(base->workingdir+base->simname, "OUTPUT_FILENAME", debug-1, filename).value ;
 
     // Add the snap number
     {
         stringstream filenamedummy;
-        filenamedummy << filename<<"_"<< name << "_t" << timestepnumber << ".dat";
+        filenamedummy << filename<<"_"<< speciesname << "_t" << timestepnumber << ".dat";
         filename = filenamedummy.str() ;
-    }
+    }*/
 
     if(debug > 1)
         cout<<"Trying to open file "<<filename<<endl;
@@ -278,13 +278,13 @@ void c_Species::print_AOS_component_tofile(int timestepnumber) {
             hydrostat2 = flux[i].u2/base->dx[i];//pressure[i+1] - pressure[i];
             hydrostat3 = source[i].u2;//0.5 * (u[i].u1 + u[i+1].u1) * (phi[i+1] - phi[i]);
             
-            outfile<<base->x_i12[i]<<'\t'<<u[i].u1<<'\t'<<u[i].u2<<'\t'<<u[i].u3<<'\t'<<flux[i].u1<<'\t'<<flux[i].u2<<'\t'<<flux[i].u3<<'\t'<<balance1<<'\t'<<balance2<<'\t'<<balance3<<'\t'<<prim[i].pres<<'\t'<<u[i].u2/u[i].u1<<'\t'<<prim[i].temperature <<'\t'<<timesteps[i]<<'\t'<<base->phi[i]<<'\t'<<prim[i].sound_speed<<'\t'<<1.<<'\t'<<u_analytic[i]<<'\t'<<base->alphas_sample(i)<<'\t'<<hydrostat3<<'\t'<<base->enclosed_mass[i]<<'\t'<<(base->Jrad_FLD(i,0)/(sigma_rad/pi*pow(prim[i].temperature,4.)))<<endl;
+            outfile<<base->x_i12[i]<<'\t'<<u[i].u1<<'\t'<<u[i].u2<<'\t'<<u[i].u3<<'\t'<<flux[i].u1<<'\t'<<flux[i].u2<<'\t'<<flux[i].u3<<'\t'<<balance1<<'\t'<<balance2<<'\t'<<balance3<<'\t'<<prim[i].pres<<'\t'<<u[i].u2/u[i].u1<<'\t'<<prim[i].temperature <<'\t'<<timesteps[i]<<'\t'<<base->phi[i]<<'\t'<<prim[i].sound_speed<<'\t'<<1.<<'\t'<<u_analytic[i]<<'\t'<<base->alphas_sample(i)<<'\t'<<hydrostat3<<'\t'<<base->enclosed_mass[i]<<'\t'<<(base->Jrad_FLD(i,0)/c_light*4.*pi)<<endl;
         }
         
         //Print right ghost stuff
         outfile<<base->x_i12[num_cells+1]<<'\t'<<u[num_cells+1].u1<<'\t'<<u[num_cells+1].u2<<'\t'<<u[num_cells+1].u3<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<prim[num_cells+1].pres<<'\t'<<u[num_cells+1].u2/u[num_cells+1].u1<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<base->phi[num_cells+1]<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<endl;
    
-        cout<<"    Sucessfully written file "<<filename<<" for species = "<<name<<" at time "<<base->globalTime<<" and dt="<<base->dt<<endl;
+        cout<<"    Sucessfully written file "<<filename<<" for species = "<<speciesname<<" at time "<<base->globalTime<<" and dt="<<base->dt<<endl;
     }
     else cout << "Unable to open file" << filename << endl; 
     outfile.close();
@@ -293,6 +293,8 @@ void c_Species::print_AOS_component_tofile(int timestepnumber) {
 
 void c_Sim::print_monitor(int num_steps) {
 
+    
+    
     //
     //
     // First compute the volumetric sum of all initial conserved quantities
@@ -322,16 +324,19 @@ void c_Sim::print_monitor(int num_steps) {
     {
         stringstream filenamedummy;
         string truncated_name = stringsplit(simname,".")[0];
-        filenamedummy<<"monitor_"<<truncated_name<<".dat";
+        filenamedummy<<workingdir<<"monitor_"<<truncated_name<<".dat";
         filename2 = filenamedummy.str() ;
     }
     
     //
     // Delete old file if we start a new one
     //
-    if(steps==0) 
+    if(steps==0) {
         ofstream monitor(filename2);
+        monitor.close();
+    }
         
+    
     ofstream monitor(filename2, std::ios_base::app);
     monitor << std::setprecision(24);
     
@@ -359,24 +364,31 @@ void c_Sim::print_monitor(int num_steps) {
         monitor<<globalTime<<'\t'<<dt<<'\t';//<<monitored_quantities.u1_tot/initial_monitored_quantities.u1_tot<<'\t'<<monitored_quantities.u2_tot/initial_monitored_quantities.u2_tot<<'\t'<<monitored_quantities.u3_tot/initial_monitored_quantities.u3_tot<<'\t';
         
         double etot = 0;
-        
         for(int b=0; b<num_bands; b++) 
             etot += Jrad_FLD(5,b)*4*pi/c_light; 
-            
+        monitor<<etot<<'\t';    //col 3  total radiative energy densities of all bands added up,  unit = erg/cm^3
         
+        etot=0;
         for(int s=0; s<num_species; s++) 
             etot += species[s].prim[5].density*species[s].cv*species[s].prim[5].temperature;
-            
-        monitor<<etot<<'\t';     
+        monitor<<etot<<'\t';     //col 4:      total internal energy densities of all species added up,  unit = erg/cm^3
         
-        monitor<<Etot_corrected(5)<<'\t';     
+        etot = 0;
+        for(int b=0; b<num_bands; b++) 
+            etot += Jrad_FLD(5,b)*4*pi/c_light; 
+        monitor<<pow(c_light * etot/sigma_rad/4., 0.25)<<'\t';      //col 5: The radiative temperature 
+        
+        for(int s=0; s<num_species; s++)
+            monitor<<species[s].prim[5].temperature<<'\t'; //col 6-...: all species temperatures 
+        
+        for(int s=0; s<num_species; s++)
+            monitor<<4*sigma_rad/c_light*pow(species[s].prim[5].temperature,4.)<<'\t'; // col..? species 4 sigma_T4/c, unit = erg/cm^3
         
         //Starting with col 6
         for(int b=0; b<num_bands; b++) 
             monitor<<Jrad_FLD(5,b)*4*pi/c_light<<'\t'; 
         
-        for(int s=0; s<num_species; s++)
-            monitor<<4*sigma_rad/c_light*pow(species[s].prim[5].temperature,4.)<<'\t';
+        
         
         //Convergence measures for radiative quantities
         for(int b=0; b<num_bands; b++)  {

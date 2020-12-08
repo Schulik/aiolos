@@ -169,7 +169,7 @@ void c_Sim::update_opacities() {
             for(int b=0; b<num_bands;b++) {
                 cout<<"    band ["<<b<<"] = "<<S_band(j,b)<<" banddS = "<<dS_band(j,b)<<" tau = "<<radial_optical_depth(j,b);
                 for(int s=0; s<num_species; s++) {
-                     cout<<" dS_fraction["<<species[s].name<<"] = "<<(species[s].fraction_total_opacity(j,b))<<" opa = "<<species[s].opacity(j,b)<<" total opa(j+1)"<<total_opacity(j+1,b)<<" x = "<<x_i12[j];
+                     cout<<" dS_fraction["<<species[s].speciesname<<"] = "<<(species[s].fraction_total_opacity(j,b))<<" opa = "<<species[s].opacity(j,b)<<" total opa(j+1)"<<total_opacity(j+1,b)<<" x = "<<x_i12[j];
                 }
                 cout<<endl;
             }
@@ -182,8 +182,17 @@ void c_Species::update_opacities() {
     
     for(int j=0; j< num_cells+2; j++) {
         for(int b=0; b<num_bands; b++) {
-            opacity(j,b)        = const_opacity; // TODO: Replace with some_complex_tabulated_opacity_function();
-            opacity_planck(j,b) = const_opacity; // TODO: Replace with some_complex_tabulated_opacity_function();
+            
+            if(base->radiation_matter_equilibrium_test <= 3) {
+                opacity(j,b)        = const_opacity; // TODO: Replace with some_complex_tabulated_opacity_function() or link with the opacity_data matrix
+                opacity_planck(j,b) = const_opacity; // TODO: Replace with some_complex_tabulated_opacity_function() or link with the opacity_data matrix   
+            }
+            else if(base->radiation_matter_equilibrium_test == 4){ //The nonlinear commercon radiative diffusion test
+                opacity(j,b)        = 1e11/this->u[j].u1*pow(base->Jrad_FLD(j,b)/c_light*4.*pi, -1.5 );
+                opacity_planck(j,b) = 1e11/this->u[j].u1*pow(base->Jrad_FLD(j,b)/c_light*4.*pi, -1.5 );                
+            }
+            
+            
         }
     }
 }
@@ -191,6 +200,18 @@ void c_Species::update_opacities() {
 
 
 void c_Sim::update_fluxes_FLD() {
+    
+    
+    // If test, then set J to initial values before computing on
+    if(radiation_matter_equilibrium_test == 1) {
+        
+        for (int j=0; j < num_cells+2; j++) {
+            for(int b=0; b<num_bands; b++) {
+                Jrad_FLD(j, b) = Jrad_init(j,b);
+            }
+        }
+    }
+    
 
     auto flux_limiter = [](double R) {
         if (R <= 2)
@@ -292,7 +313,9 @@ void c_Sim::update_fluxes_FLD() {
         }
         
         if(debug >= 1) {
-            cout<<" band["<<b<<"] l/d/u/r = "<<l[2]<<"/"<<d[2]<<"/"<<u[2]<<"/"<<r[2];
+            int index = (num_cells/2+1);
+            
+            cout<<" band["<<b<<"] cell["<<index<<"] l/d/u/r = "<<l[index]<<"/"<<d[index]<<"/"<<u[index]<<"/"<<r[index];
             cout<<" temps = ";
             for(int si = 0; si<num_species; si++) {
                     cout<<species[si].prim[2].temperature<<" ";
@@ -302,37 +325,43 @@ void c_Sim::update_fluxes_FLD() {
     }
 
     // Step 2: Energy exchange terms
-    for (int j=0; j < num_cells+2; j++)
-        for (int s=0; s < num_species; s++) {
-            
-            int idx_s  = j*stride + (s + num_bands) * (num_vars+1) ;
-            int idx_rs = j*num_vars + (s + num_bands) ;
+    
+    if(radiation_matter_equilibrium_test <= 2) { //radtests 3 and 4 are delta-radiation peaks without energy-matter coupling
+        
+        for (int j=0; j < num_cells+2; j++)
+            for (int s=0; s < num_species; s++) {
+                
+                int idx_s  = j*stride + (s + num_bands) * (num_vars+1) ;
+                int idx_rs = j*num_vars + (s + num_bands) ;
 
-            double Ts = species[s].prim[j].temperature ;
-            double rhos = species[s].prim[j].density ;
+                double Ts = species[s].prim[j].temperature ;
+                double rhos = species[s].prim[j].density ;
 
-            d[idx_s ] = 1 / dt ;
-            r[idx_rs] = Ts / dt ;
+                d[idx_s ] = 1 / dt ;
+                r[idx_rs] = Ts / dt ;
 
-            if (j < num_ghosts || j >= num_cells + 2-num_ghosts) continue ;
+                if (j < num_ghosts || j >= num_cells + 2-num_ghosts) continue ;
 
-            for(int b=0; b<num_bands; b++) {
-                int idx_b  = j*stride + b * (num_vars+1) ;
-                int idx_bs = j*stride + b * num_vars + (s + num_bands) ; 
-                int idx_sb = j*stride + (s + num_bands) * num_vars + b ;
-                int idx_rb = j*num_vars + b ; 
+                for(int b=0; b<num_bands; b++) {
+                    int idx_b  = j*stride + b * (num_vars+1) ;
+                    int idx_bs = j*stride + b * num_vars + (s + num_bands) ; 
+                    int idx_sb = j*stride + (s + num_bands) * num_vars + b ;
+                    int idx_rb = j*num_vars + b ; 
 
-                // TODO multiply by fraction in band.
-                double fac = species[s].opacity(j, b) * sigma_rad*Ts*Ts*Ts / pi * compute_planck_function_integral3(l_i[b], l_i[b+1], species[s].prim[j].temperature);
-                d[idx_s ] += 16 * pi * fac / species[s].cv ;
-                d[idx_sb] = - 4 * pi * species[s].opacity(j, b) / species[s].cv ;
-                r[idx_rs] += 12 * pi * fac * Ts / species[s].cv ;
+                    // TODO multiply by fraction in band.
+                    double fac = species[s].opacity(j, b) * sigma_rad*Ts*Ts*Ts / pi * compute_planck_function_integral3(l_i[b], l_i[b+1], species[s].prim[j].temperature);
+                    
+                    d[idx_s ] += 16 * pi * fac / species[s].cv ;
+                    d[idx_sb] = - 4 * pi * species[s].opacity(j, b) / species[s].cv ;
+                    r[idx_rs] += 12 * pi * fac * Ts / species[s].cv ;
 
-                d[idx_b ] += vol[j] * rhos * species[s].opacity(j, b) ;
-                d[idx_bs] = - 4 * vol[j] * rhos * fac ;
-                r[idx_rb] -=  3 * vol[j] * rhos * fac * Ts ;
+                    d[idx_b ] += vol[j] * rhos * species[s].opacity(j, b) ;
+                    d[idx_bs] = - 4 * vol[j] * rhos * fac ;
+                    r[idx_rb] -=  3 * vol[j] * rhos * fac * Ts ;
+                }
             }
-        }
+            
+    }
 
     // TODO:
     //   Add collision terms here
@@ -344,6 +373,11 @@ void c_Sim::update_fluxes_FLD() {
     for (int j=0; j < num_cells+2; j++) {
         for(int b=0; b<num_bands; b++) {
             Jrad_FLD(j, b) = r[j*num_vars + b] ;
+            
+            if(radiation_matter_equilibrium_test == 1) {
+                Jrad_FLD(j, b) = Jrad_init(j,b);
+            }
+                    
           //  std::cout << j << "\t" <<  Jrad_FLD(j, b) << "\n" ;
         }
 

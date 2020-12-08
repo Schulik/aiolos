@@ -1,0 +1,74 @@
+#
+# Parameterfile for atmosphere simulations
+# Do not use tabs, only white spaces as value separators
+#
+
+#Control parameters
+PARI_PROBLEM_NUMBER     1
+PARI_NUM_SPECIES        1
+PARI_NUM_BANDS          1
+DO_HYDRO                0
+PARI_RAD_MULTIPL        1e12
+CFL_BREAK_TIME          3e-4
+
+FRICTION_SOLVER         1
+PARI_ORDER              2
+PARI_USE_RADIATION      1
+PARI_CONST_OPAC         4e-1
+RAD_MATTER_EQUI_TEST    1
+
+#Radiation parameters
+PARI_LAM_MIN            1e-3
+PARI_LAM_MAX            1000.
+PARI_LAM_PER_DECADE     0.1
+PARI_TSTAR              0.
+PARI_UVSTAR             0.
+
+#
+# Problem numbers explained: shock_tube, no grav = 1, planet with grav = 2
+#
+
+PARI_INIT_DATA_SWITCH   1
+PARI_INIT_DATA_U1L      1e-7
+PARI_INIT_DATA_U2L      0.0
+PARI_INIT_DATA_U3L      1e2
+PARI_INIT_DATA_U1R      1e-7
+PARI_INIT_DATA_U2R      0.0
+PARI_INIT_DATA_U3R      1e2
+
+PARI_SELF_GRAV_SWITCH   0
+PARI_LINEAR_GRAV        0
+PARI_DEBUGLEVEL         1
+PARI_INIT_STATIC        1
+
+OUTPUT_FILENAME         test_files/cartesian_radiationtest
+
+#Numerical parameters
+PARI_BOUND_TYPE         2
+PARI_BOUND_TYPE_LEFT    2
+PARI_BOUND_TYPE_RIGHT   1
+PARI_DOMAIN_DX          1e-1
+PARI_GRID_TYPE          0
+PARI_GEOMETRY           0
+PARI_CELLS_PER_DECADE   10
+PARI_DOMAIN_MIN         0.
+PARI_DOMAIN_MAX         1.
+PARI_TIME_DT            1e-10
+PARI_CFLFACTOR          1e-6
+PARI_TIME_TMAX          2.01e4
+PARI_TIME_OUTPUT        1.e5
+
+#Scenarios
+TEMPERATURE_BUMP_STRENGTH 0.
+WAVE_USE                0
+PARI_INIT_WIND          1
+PARI_ALPHA_COLL         1.
+
+#Physical parameters
+PARI_PLANET_POS         0.
+PARI_PLANET_MASS        1.
+PARI_SMOOTHING_LENGTH   1e-3
+PARI_SMOOTHING_TIME     0.0
+ACCRETION_RATE          1.e-1
+PARI_CONST_TEMP         200.
+PARI_TEMP_INCR          1.e-8

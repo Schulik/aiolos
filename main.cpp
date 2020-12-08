@@ -22,6 +22,7 @@ int main(int argc, char** argv)
 {
     string simulationname;
     string speciesfile;
+    string workingdir = "./";
     int debug;
     int suppress_warnings_global = 0;
     cout<<endl<<"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"<<endl;
@@ -56,6 +57,11 @@ int main(int argc, char** argv)
             cout<<"Attempting at assingning the following string to speciesfile: "<<speciesfile<<endl;
             i++;
         }
+        if(tmpstring.compare("-dir") == 0) {
+            workingdir         = argv[i+1];
+            cout<<"Attempting at assingning the following string to workingdir: "<<workingdir<<endl;
+            i++;
+        }
         if(tmpstring.compare("-debug") == 0) {
             string yet_another_string = argv[i+1];
             debug      = std::stoi(yet_another_string);
@@ -87,7 +93,7 @@ int main(int argc, char** argv)
         cout<<endl<<"In main, construction of simulation is about to start."<<endl;
        
         //Main simulation class object, is initialized with the simulation parameters from a file
-        c_Sim simulation1(simulationname, speciesfile, debug);
+        c_Sim simulation1(simulationname, speciesfile, workingdir, debug);
         
         simulation1.set_suppress_warnings(suppress_warnings_global);
 
