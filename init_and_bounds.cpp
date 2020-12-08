@@ -545,8 +545,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
                         Jrad_FLD(j,0) = Jrad_init(j,0);
                         cout<<" HIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII I am in cell "<<j<<" and it got "<<Jrad_FLD(j,0)<<endl;
                     }
-                        
-                        
+                    
                     else
                         Jrad_FLD(j,0) = 0.;
                 }
