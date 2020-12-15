@@ -58,51 +58,6 @@ void c_Sim::transport_radiation() {
         }
 }
 
-void c_Sim::correct_totalenergy(double, Eigen::MatrixXd &Etot) {
-    
-    
-    //
-    // Get initial energy
-    //
-    double etot_now = 0.;
-    
-    if(steps == 0) {
-        
-        for(int i = 0; i < num_cells+2; i++) {
-            
-            Etot(i) = 0; 
-            
-            for(int b=0; b<num_bands; b++) {
-                Etot(i) += 0.*Jrad_FLD(i,b)*4*pi/c_light; 
-            }
-            
-            for(int s=0; s<num_species; s++) {
-                Etot(i) += 0.*species[s].prim[i].density*species[s].cv*species[s].prim[i].temperature;
-            }
-        }
-        
-        
-    }
-    
-    //
-    // Use analytic formula to correct total energy
-    //
-    else{
-        
-        for(int i = 0; i < num_cells+2; i++) {
-            double A = dt * c_light * species[0].opacity(i,0) * species[0].prim[i].density;
-            double Q = dt / species[0].cv * species[0].opacity(i,0) * sigma_rad * pow(species[0].prim[i].temperature,3.);
-            double J_minus_B = +(Jrad_FLD(i,0)*4*pi/c_light - species[0].prim[i].density*species[0].cv*species[0].prim[i].temperature);
-            
-            double correction_term = 64.*pi*A*Q/c_light/(1.+16.*Q)/(1.+A)*J_minus_B;
-            
-            if(correction_term > 0)
-                Etot(i) += 1e4*c_light*correction_term;
-            else
-                Etot(i) += 0.;
-        }
-    }
-}
 
 
 //
@@ -162,6 +117,7 @@ void c_Sim::update_opacities() {
     }
     
     if(debug >= 1) {
+        
         for(int j=num_cells; j>num_cells-1; j--) {
             
             cout<<"    in update opa ";
@@ -243,7 +199,7 @@ void c_Sim::update_fluxes_FLD() {
                 double dx      = (x_i12[j+1]-x_i12[j]) ;
                 double tau_inv = 0.5 / (dx * (total_opacity(j,b) + total_opacity(j+1,b))) ;
                 double R       = 2 * tau_inv * std::abs(Jrad_FLD(j+1,b) - Jrad_FLD(j,b)) / (Jrad_FLD(j+1,b) + Jrad_FLD(j, b)) ;
-                double D       = surf[j] * flux_limiter(R) * tau_inv;
+                double D       = 1. * surf[j] * flux_limiter(R) * tau_inv;
 
                 // divergence terms
                 u[idx] = -D ;
@@ -270,7 +226,7 @@ void c_Sim::update_fluxes_FLD() {
         
         //   Right boundary: reflective?
         //if(geometry == Geometry::cartesian) {
-        if(true) {
+        if(false) {
 
             int Ncell = num_cells - 2*(num_ghosts - 1);
             for (int j=0; j < num_ghosts; j++) {
@@ -349,12 +305,15 @@ void c_Sim::update_fluxes_FLD() {
                     int idx_rb = j*num_vars + b ; 
 
                     // TODO multiply by fraction in band.
-                    double fac = species[s].opacity(j, b) * sigma_rad*Ts*Ts*Ts / pi * compute_planck_function_integral3(l_i[b], l_i[b+1], species[s].prim[j].temperature);
+                    double fac = species[s].opacity(j, b) * sigma_rad*Ts*Ts*Ts / pi; // * compute_planck_function_integral3(l_i[b], l_i[b+1], species[s].prim[j].temperature);
                     
                     d[idx_s ] += 16 * pi * fac / species[s].cv ;
                     d[idx_sb] = - 4 * pi * species[s].opacity(j, b) / species[s].cv ;
                     r[idx_rs] += 12 * pi * fac * Ts / species[s].cv ;
+                    r[idx_rs] += species[s].dS(j)  / species[s].u[j].u1 / species[s].cv; //* 4. * pi /c_light
 
+                    //cout<<" in rad matrix["<<j<<"]: term1 = "<<12 * pi * fac * Ts / species[s].cv<<" term2 = "<<species[s].dS(j)  / species[s].u[j].u1 / species[s].cv<<endl;
+                    
                     d[idx_b ] += vol[j] * rhos * species[s].opacity(j, b) ;
                     d[idx_bs] = - 4 * vol[j] * rhos * fac ;
                     r[idx_rb] -=  3 * vol[j] * rhos * fac * Ts ;
@@ -529,7 +488,7 @@ void c_Sim::update_temperatures(double timestep, Eigen::MatrixXd &J_in, Eigen::M
 // Computation of fluxes based on radiative transport theory
 //
 void c_Sim::update_fluxes(double timestep) {
-    
+/*    
     for(int b=0; b<num_bands; b++) {
         F_up(0,b) = 0.; //Some value that makes sense with T_internal
         F_down(num_cells,b) = 0.; //Some value that makes sense with T_irradiated + Nonthermal irradiation
@@ -557,11 +516,11 @@ void c_Sim::update_fluxes(double timestep) {
     }
     
     F_plus  = F_up + F_down;
-    F_minus = F_up - F_down;
+    F_minus = F_up - F_down;*/
 }
 
 void c_Sim::update_fluxes_FLD2(double timestep, Eigen::MatrixXd &J_in, Eigen::MatrixXd &J_target, Eigen::MatrixXd &T_in) {
-
+/*
     auto flux_limiter = [](double R) {
         if (R <= 2)
             return 2 / (3 + std::sqrt(9 + 10*R*R)) ;
@@ -672,14 +631,14 @@ void c_Sim::update_fluxes_FLD2(double timestep, Eigen::MatrixXd &J_in, Eigen::Ma
             double result = (J_in(2,0) + f2)/(1.+f1);
             
             cout<<"    in update flux2 J_old = "<<J_in(2,0)*invcdt<<" cdtkrho = "<<(1.+f1)<<" cdtkrhosigmaT^4 = "<<(f2)<< " result = "<<result;
-            /*
+            
             for(int b=0; b<num_bands;b++) {
                 cout<<"    band ["<<b<<"] ";
                 for(int s=0; s<num_species; s++) {
                      cout<<" dS_fraction["<<species[s].name<<"] = "<<(species[s].fraction_total_opacity(2,b))<<" opa = "<<total_opacity(2,b);
                 }
                 cout<<endl;
-            }*/
+            }
             
         }
         
@@ -694,5 +653,53 @@ void c_Sim::update_fluxes_FLD2(double timestep, Eigen::MatrixXd &J_in, Eigen::Ma
         for (int j=0; j < num_cells+2; j++) 
             J_target(j, b) = r[j];
             //Jrad_FLD(j, b) = r[j];
+    }*/
+}
+
+
+
+void c_Sim::correct_totalenergy(double, Eigen::MatrixXd &Etot) {
+    
+    
+    //
+    // Get initial energy
+    //
+    double etot_now = 0.;
+    
+    if(steps == 0) {
+        
+        for(int i = 0; i < num_cells+2; i++) {
+            
+            Etot(i) = 0; 
+            
+            for(int b=0; b<num_bands; b++) {
+                Etot(i) += 0.*Jrad_FLD(i,b)*4*pi/c_light; 
+            }
+            
+            for(int s=0; s<num_species; s++) {
+                Etot(i) += 0.*species[s].prim[i].density*species[s].cv*species[s].prim[i].temperature;
+            }
+        }
+        
+        
+    }
+    
+    //
+    // Use analytic formula to correct total energy
+    //
+    else{
+        
+        for(int i = 0; i < num_cells+2; i++) {
+            double A = dt * c_light * species[0].opacity(i,0) * species[0].prim[i].density;
+            double Q = dt / species[0].cv * species[0].opacity(i,0) * sigma_rad * pow(species[0].prim[i].temperature,3.);
+            double J_minus_B = +(Jrad_FLD(i,0)*4*pi/c_light - species[0].prim[i].density*species[0].cv*species[0].prim[i].temperature);
+            
+            double correction_term = 64.*pi*A*Q/c_light/(1.+16.*Q)/(1.+A)*J_minus_B;
+            
+            if(correction_term > 0)
+                Etot(i) += 1e4*c_light*correction_term;
+            else
+                Etot(i) += 0.;
+        }
     }
 }

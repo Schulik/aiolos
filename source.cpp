@@ -16,13 +16,13 @@
 
 
 
-    
-        ///////////////////////////////////////////////////////////
-        //
-        // Chapter on gravitation
-        //
-        //
-        ///////////////////////////////////////////////////////////
+
+///////////////////////////////////////////////////////////
+//
+// Chapter on gravitation
+//
+//
+///////////////////////////////////////////////////////////
 
 
 
@@ -39,8 +39,6 @@
             
         }
         phi[0]           = get_phi_grav(x_i12[1],         planet_mass);
-            
-
     }
 
     //
@@ -90,7 +88,7 @@
     // Initialize the gravity array with a non-self gravitating solution
     //
     // takes: r as single value
-    //void correct_totalenergy(double, Eigen::MatrixXd &);
+    // void correct_totalenergy(double, Eigen::MatrixXd &);
     // Options: linear gravity and 1/r gravity with gravitational smoothing from Klahr&Kley 2006
     //
     double c_Sim::get_phi_grav(double &r, double &mass) {
@@ -109,13 +107,13 @@
         // Linear or 1/r gravity
         //
         if(use_linear_gravity)
-            return -mass*abs(domain_max - r);
+            return -G*mass*abs(domain_max - r);
         else
         {
             if(abs(r-planet_position) > rs_at_moment )
-                return -mass/abs(r-planet_position);
+                return -G*mass/abs(r-planet_position);
             else
-                return -mass * (pow(r-planet_position,3.)/pow(rs_at_moment,4.)  - 2.* pow(r-planet_position,2.)/pow(rs_at_moment,3.) + 2./rs_at_moment );
+                return -G*mass * (pow(r-planet_position,3.)/pow(rs_at_moment,4.)  - 2.* pow(r-planet_position,2.)/pow(rs_at_moment,3.) + 2./rs_at_moment );
             
         }
             

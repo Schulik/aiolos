@@ -8,20 +8,24 @@ PARI_PROBLEM_NUMBER     2
 PARI_NUM_SPECIES        1
 PARI_NUM_BANDS          1
 DO_HYDRO                0
+CFL_BREAK_TIME          1e-9
+PARI_CONST_TEMP         20.
 
 FRICTION_SOLVER         1
-PARI_ORDER              2
+PARI_ORDER              1
 PARI_USE_RADIATION      1
-PARI_CONST_OPAC         1e-2
-PARI_RAD_MULTIPLIER     0.
+PARI_CONST_OPAC         1e2
+PARI_RAD_MULTIPLIER     1.
+RAD_MATTER_EQUI_TEST    0
 
 #Radiation parameters
-PARI_LAM_MIN            1e-1
-PARI_LAM_MAX            1000.
-PARI_LAM_PER_DECADE     0.2
-PARI_TSTAR              0.
+PARI_LAM_MIN            1e-6
+PARI_LAM_MAX            1e14.
+PARI_LAM_PER_DECADE     0.1
+PARI_TSTAR              5777.
+PARI_RSTAR              1.
 PARI_UVSTAR             0.
-
+PARI_PLANET_DIST        0.1
 #
 # Problem numbers explained: shock_tube, no grav = 1, planet with grav = 2
 #
@@ -44,14 +48,14 @@ PARI_BOUND_TYPE_LEFT    2
 PARI_BOUND_TYPE_RIGHT   1
 PARI_DOMAIN_DX          1e-3
 PARI_GRID_TYPE          1
-PARI_GEOMETRY           2
-PARI_CELLS_PER_DECADE   10
-PARI_DOMAIN_MIN         1e-3.
-PARI_DOMAIN_MAX         1.
-PARI_TIME_DT            1e-4
-PARI_CFLFACTOR          1.0
-PARI_TIME_TMAX          2.01e-2
-PARI_TIME_OUTPUT        1.e-3
+PARI_GEOMETRY           1
+PARI_CELLS_PER_DECADE   40
+PARI_DOMAIN_MIN         1e-2.
+PARI_DOMAIN_MAX         1.e1
+PARI_TIME_DT            1e-2
+PARI_CFLFACTOR          0.9
+PARI_TIME_TMAX          1.01e0
+PARI_TIME_OUTPUT        2.e-2
 
 #Scenarios
 TEMPERATURE_BUMP_STRENGTH 0.
@@ -61,9 +65,8 @@ PARI_ALPHA_COLL         1.
 
 #Physical parameters
 PARI_PLANET_POS         0.
-PARI_PLANET_MASS        1.
-PARI_SMOOTHING_LENGTH   1e-3
+PARI_PLANET_MASS        1.e-10
+PARI_SMOOTHING_LENGTH   1e-2
 PARI_SMOOTHING_TIME     0.0
 ACCRETION_RATE          1.e-1
-PARI_CONST_TEMP         200.
 PARI_TEMP_INCR          1.e-8

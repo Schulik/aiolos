@@ -42,6 +42,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
         lambda_max       = read_parameter_from_file<double>(filename,"PARI_LAM_MAX", debug, 10.).value;
         lambda_per_decade= read_parameter_from_file<double>(filename,"PARI_LAM_PER_DECADE", debug, 10.).value;
         T_star           = read_parameter_from_file<double>(filename,"PARI_TSTAR", debug, 5777.).value;
+        R_star           = read_parameter_from_file<double>(filename,"PARI_RSTAR", debug, 1.).value;
         UV_star          = read_parameter_from_file<double>(filename,"PARI_UVSTAR", debug, 1.).value;
         num_bands        = read_parameter_from_file<int>(filename,"PARI_NUM_BANDS", debug, 1).value;
         
@@ -124,6 +125,8 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
         if(problem_number==2) {
             
             planet_mass     = read_parameter_from_file<double>(filename,"PARI_PLANET_MASS", debug, 1).value; //in Earth masses
+            planet_mass     *= mearth;
+            planet_semimajor= read_parameter_from_file<double>(filename,"PARI_PLANET_DIST", debug, 1.).value; //in Earth masses
             planet_position = read_parameter_from_file<double>(filename,"PARI_PLANET_POS", debug, 0.).value;  //inside the simulation domain
             rs              = read_parameter_from_file<double>(filename,"PARI_SMOOTHING_LENGTH", debug, 0.).value; //Gravitational smoothing length in hill 
             rs_time         = read_parameter_from_file<double>(filename,"PARI_SMOOTHING_TIME", debug, 0.).value; //Time until we reach rs starting at rs_at_moment
@@ -319,6 +322,9 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
         omegaplus[num_cells+1]  = 2*omegaplus[num_cells] - omegaplus[num_cells-1];
         
         for(int i=1; i<num_cells+1; i++) {
+            //source_pressure_prefactor_left[i]  = (surf[i-1]/vol[i] - 1./dx[i]); 
+            //source_pressure_prefactor_right[i] = (surf[i]  /vol[i] - 1./dx[i]); 
+            
             source_pressure_prefactor_left[i]  = (surf[i-1]/vol[i] - 1./dx[i]); 
             source_pressure_prefactor_right[i] = (surf[i]  /vol[i] - 1./dx[i]); 
         }
@@ -426,28 +432,15 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
     previous_monitor_J = std::vector<double>(num_bands) ;
     previous_monitor_T = std::vector<double>(num_species) ;
     
-    F_up    = Eigen::MatrixXd::Zero(num_cells, num_bands);      //num_cells * num_bands each
-    F_down  = Eigen::MatrixXd::Zero(num_cells, num_bands);
-    F_plus  = Eigen::MatrixXd::Zero(num_cells, num_bands);
-    F_minus = Eigen::MatrixXd::Zero(num_cells, num_bands);
-    dJrad   = Eigen::MatrixXd::Zero(num_cells+2, num_bands);
-    S_total = Eigen::VectorXd::Zero(num_cells+2,  1);
+    //F_up    = Eigen::MatrixXd::Zero(num_cells, num_bands);      //num_cells * num_bands each
+    //F_down  = Eigen::MatrixXd::Zero(num_cells, num_bands);
+    //F_plus  = Eigen::MatrixXd::Zero(num_cells, num_bands);
+    //F_minus = Eigen::MatrixXd::Zero(num_cells, num_bands);
+    //dJrad   = Eigen::MatrixXd::Zero(num_cells+2, num_bands);
+    //S_total = Eigen::VectorXd::Zero(num_cells+2,  1);
     solar_heating = Eigen::VectorXd::Zero(num_bands,  1);
     S_band        = Eigen::MatrixXd::Zero(num_cells+2, num_bands);
     dS_band       = Eigen::MatrixXd::Zero(num_cells+2, num_bands);
-    for(int s=0; s<num_species; s++) {
-        species[s].dS = Eigen::VectorXd::Zero(num_cells+2,  1);
-    }
-    
-    double templumi = 0;
-    for(int b=0; b<num_bands; b++) {
-        solar_heating(b)  = compute_planck_function_integral2(l_i[b], l_i[b+1], T_star) * 4. * pow(rsolar,2.)/pow(planet_semimajor*au,2.)  + UV_star * 1.;
-        templumi += solar_heating(b);
-        cout<<"SOLAR HEATING in bin "<<b<<" from/to lmin/lmax"<<l_i[b]<<"/"<<l_i[b+1]<<" is "<<solar_heating(b)<<endl;
-        
-    }
-    cout<<"TOTAL SOLAR HEATING / Lumi = "<<templumi/(sigma_rad*pow(T_star,4.)/pi)<<" lumi = "<<(templumi*4.*pi*rsolar*rsolar*pi)<< " also sigmarad2/sigmarad = "<<sigma_rad2/sigma_rad<<endl;
-    
     planck_matrix = Eigen::MatrixXd::Zero(num_plancks, 2);
     
     //
@@ -456,7 +449,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
     double sum_planck = 0;
     double dsum_planck;
     double lmin, lmax;
-    double lminglobal = 1e-6, lmaxglobal = 1e10; //in mum; corresponds to Wien-temperature maxima from 3e9 to 1e-7 K
+    double lminglobal = 1e-6, lmaxglobal = 1e14; //in mum; corresponds to Wien-temperature maxima from 3e9 to 1e-7 K
     double dlogx = pow(lmaxglobal/lminglobal, 1./((double)num_plancks));
     lT_spacing     = dlogx;
     double lT_crit = 14387.770; //=hc/k_b, in units of mum K
@@ -473,8 +466,42 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
         planck_matrix(p,1) = sum_planck;
         planck_matrix(p,0) = lmax*100.;
         
-        //cout<<" in planck_matrix, lT = "<<planck_matrix(p,0)<<" percentile = "<<planck_matrix(p,1)<<endl;
+        if(debug > 2)
+            cout<<" in planck_matrix, lT = "<<planck_matrix(p,0)<<" percentile = "<<planck_matrix(p,1)<<endl;
     }
+    
+    if(debug > 0) cout<<"Init: Assigning stellar luminosities 1."<<endl;
+    for(int s=0; s<num_species; s++) {
+        species[s].dS = Eigen::VectorXd::Zero(num_cells+2,  1);
+    }
+    
+    if(debug > 0) cout<<"Init: Assigning stellar luminosities 2."<<endl;
+    
+    double templumi = 0;
+    for(int b=0; b<num_bands; b++) {
+        if(debug > 0) cout<<"Init: Assigning stellar luminosities. b ="<<b<<endl;
+        
+        if(num_bands == 1) {
+            solar_heating(b)  = sigma_rad * pow(T_star,4.) * pow(R_star*rsolar,2.)/pow(planet_semimajor*au,2.)  + UV_star * 1.;
+            templumi += solar_heating(b);
+            
+            cout<<" Solar heating is "<<solar_heating(b)<<endl;
+        }
+        else{
+            cout<<"SOLAR HEATING in bin "<<b;
+            cout<<" from/to lmin/lmax"<<l_i[b];
+            cout<<"/"<<l_i[b+1]<<" with T_star = "<<T_star;
+            
+            solar_heating(b)  = sigma_rad * pow(T_star,4.) * pow(R_star*rsolar,2.)/pow(planet_semimajor*au,2.) * compute_planck_function_integral3(l_i[b], l_i[b+1], T_star)  + UV_star * 1.;
+            templumi += solar_heating(b);
+            
+            cout<<" is "<<solar_heating(b)<<endl;
+            
+        }
+        
+    }
+    cout<<"TOTAL SOLAR HEATING / Lumi = "<<templumi<<" lumi = "<<(templumi*4.*pi*rsolar*rsolar*pi)<< " also sigmarad2/sigmarad = "<<sigma_rad2/sigma_rad<<endl;
+    //   /(sigma_rad*pow(T_star,4.)*4.*pi*pow(R_star*rsolar,2.))
     
     cout<<" Earth planck integrals: 288K between 5.03 and 79.5 "<<compute_planck_function_integral3(5.03,79.5,288)<<endl;
     cout<<" Earth planck integrals: 288K between 0 and 5.03 "<<compute_planck_function_integral3(0.,5.03,288)<<endl;
@@ -486,8 +513,8 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
     
     cout<<" Sum for the sun = "<<compute_planck_function_integral3(0.251,3.961,5777) + compute_planck_function_integral3(0., 0.251,5777) + compute_planck_function_integral3(3.961,99999999999.,5777)<<endl;
     
-    cout<<" BB integral for T= 2.7 K "<<compute_planck_function_integral3(0.,9999999.,2.7)<<endl;
-    cout<<" BB integral for T= 1e9 K "<<compute_planck_function_integral3(0.,9999999.,1e9)<<endl;
+    cout<<" BB integral for T= 2.7 K "<<compute_planck_function_integral3(lminglobal,lmaxglobal,2.7)<<endl;
+    cout<<" BB integral for T= 1e9 K "<<compute_planck_function_integral3(lminglobal,lmaxglobal,1e9)<<endl;
     cout<<endl<<" ############################ init 0"<<endl;
     
     /*
@@ -534,7 +561,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
                 Jrad_init(j,0) = rad_energy_multiplier * c_light /4. /pi;
                 
                 if(radiation_matter_equilibrium_test == 0)
-                    Jrad_FLD(j,0)  = sigma_rad*pow(species[s].prim[j].temperature,4) / pi; //What happens for several species? Average temperature?
+                    Jrad_FLD(j,0)  = rad_energy_multiplier * sigma_rad*pow(species[s].prim[j].temperature,4) / pi; //What happens for several species? Average temperature?
                     
                 else if(radiation_matter_equilibrium_test == 1)
                     Jrad_FLD(j,0) = Jrad_init(j,0);
@@ -543,7 +570,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
                 {
                     if(j == (num_cells/2+1)) {
                         Jrad_FLD(j,0) = Jrad_init(j,0);
-                        cout<<" HIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII I am in cell "<<j<<" and it got "<<Jrad_FLD(j,0)<<endl;
+                        cout<<" ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~RADMATTER TEST 3, I am in cell "<<j<<" and it got J = "<<Jrad_FLD(j,0)<<endl;
                     }
                     
                     else

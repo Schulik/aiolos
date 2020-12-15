@@ -165,7 +165,7 @@ double compute_planck_function_integral(double lmin, double lmax, double tempera
 
 double compute_planck_function_integral2(double lmin, double lmax, double temperature) {
     
-    int num_steps=10;
+    int num_steps=10000;
     double dloggrid = pow(lmax/lmin, 1./((double)num_steps));
     double l1;
     double l2;
@@ -176,30 +176,24 @@ double compute_planck_function_integral2(double lmin, double lmax, double temper
     double prefactor;
     double tempresult = 0;
     //cout<<"    In compute_planck lmin/lmax/dloggrid = "<<lmin<<"/"<<lmax<<"/"<<dloggrid<<" ";
-    
-    if(lmin > 3.*lam_db)
-        return 2.*c_light*kb*temperature * (1./lmin/lmin/lmin-1./lmax/lmax/lmax)/3.;
-    else {
-                
-        for(int i=0; i<num_steps; i++) {
-            //cout<<"---";
-            l1        = lmin * pow(dloggrid,(double)i);
-            l2        = l1 * dloggrid;
-            l_avg     = 0.5*(l1+l2);
-            l_avginv  = 1./l_avg;
-            expfactor = h_planck*c_light/(l_avg*angstroem*kb*temperature);
-            //prefactor = 2*h_planck*c_light*c_light/pow(l_avg,5.)/pow(angstroem,4.);
             
-            tempresult += sigma_rad2*(l2-l1)/(std::exp(expfactor)-1.)*l_avginv*l_avginv*l_avginv*l_avginv*l_avginv;
-            //tempresult += sigma_rad2*(l2-l1)/pow(l_avg,5.)/(std::exp(expfactor)-1.);
-            //tempresult += (l1-l2)/(std::exp(-expfactor)-1.);
-            //cout<<" "<<l1<<"/"<<l2<<" "<<prefactor*(l2-l1)/(std::exp(-expfactor)-1.);
-        }
-        //cout<<endl;
+    for(int i=0; i<num_steps; i++) {
+        //cout<<"---";
+        l1        = lmin * pow(dloggrid,(double)i);
+        l2        = l1 * dloggrid;
+        l_avg     = 0.5*(l1+l2);
+        l_avginv  = 1./l_avg;
+        expfactor = h_planck*c_light/(l_avg*angstroem*kb*temperature);
+        //prefactor = 2*h_planck*c_light*c_light/pow(l_avg,5.)/pow(angstroem,4.);
         
-        return tempresult;
+        tempresult += sigma_rad2*(l2-l1)/(std::exp(expfactor)-1.)*l_avginv*l_avginv*l_avginv*l_avginv*l_avginv;
+        //tempresult += sigma_rad2*(l2-l1)/pow(l_avg,5.)/(std::exp(expfactor)-1.);
+        //tempresult += (l1-l2)/(std::exp(-expfactor)-1.);
+        //cout<<" "<<l1<<"/"<<l2<<" "<<prefactor*(l2-l1)/(std::exp(-expfactor)-1.);
     }
+    //cout<<endl;
     
+    return tempresult;
 }
 
 double c_Sim::compute_planck_function_integral3(double lmin, double lmax, double temperature) {
@@ -211,6 +205,10 @@ double c_Sim::compute_planck_function_integral3(double lmin, double lmax, double
     double m;
     int imin;
     int imax;
+    
+    if(debug > 1)
+        cout<<endl<<"Planck Integral3, lmin/lmax/t = "<<lmin<<"/"<<lmax<<"/"<<temperature;
+    
     
     //
     // Lower power
@@ -227,6 +225,9 @@ double c_Sim::compute_planck_function_integral3(double lmin, double lmax, double
         power_min = planck_matrix(imin,1) + m * (lT_min - planck_matrix(imin,0));
     }
     
+    if(debug > 1)
+        cout<<" imin/imax = "<<imin;
+    
     //
     // Upper power
     //
@@ -242,7 +243,7 @@ double c_Sim::compute_planck_function_integral3(double lmin, double lmax, double
     }
     
     if(debug > 1)
-        cout<<endl<<"Planck Integral3, lmin/lmax/t = "<<lmin<<"/"<<lmax<<"/"<<temperature<<" imin/imax = "<<imin<<"/"<<imax<<" P(imin)/P(imax) = "<<power_min<<"/"<<power_max<<" = "<<power_max-power_min<<endl; 
+        cout<<"/"<<imax<<" P(imin)/P(imax) = "<<power_min<<"/"<<power_max<<" = "<<power_max-power_min<<endl; 
     
     return power_max - power_min;
     

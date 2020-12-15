@@ -30,14 +30,14 @@ using namespace std;
 
 //Basic physics quantities
 const double G        = 6.678e-8; //cgs units
-const double pi       = 3.141592;
+const double pi       = 3.141592653589793;
 const double c_light   = 2.99792458e10;
 const double navo     = 6.02214e23; // particles per mole
 const double amu      = 1.66054e-24; //g
-const double h_planck = 6.6261e-27;//  cm^2 g/s
+const double h_planck = 6.62607015e-27;//  cm^2 g/s
 const double Rgas     = 8.31446261815324e7;  //erg/K/g
 //const double Rgas_fake = 1.;
-const double kb       = 1.38e-16;  //erg/K
+const double kb       = 1.380649e-16;  //erg/K
 const double km       = 1e5; //kilometers in cm
 const double mearth   = 5.98e27;  //g
 const double msolar   = 2.0e33;   //g
@@ -53,7 +53,7 @@ const double kpc      = 1e3 * pc;
 const double mpc      = 1e6 * pc;
 const double angstroem= 1e-4; //cm
 const double ergcm2_to_wattperm2 = 1e-3;
-const double sigma_rad = 5.67e-5;   //erg cm-2 s-1 K-4
+const double sigma_rad = 5.670374419e-5;   //erg cm-2 s-1 K-4
 const double sigma_rad2= 2*h_planck*c_light*c_light/pow(angstroem,4.);
 
 // For entropy computation, to be set to sensible parameters e.g. at setting of initial conditions
@@ -206,7 +206,6 @@ public:
     int use_rad_fluxes;
     int suppress_warnings;
     int do_hydrodynamics;
-    
 
     ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     //
@@ -218,7 +217,7 @@ public:
     std::vector<c_Species> species;
     
     int num_bands;
-    int num_plancks = 100;
+    int num_plancks = 512;
     int i_wien;
     int i_rayleighjeans;
     double lT_spacing;
@@ -285,7 +284,7 @@ public:
     
     double planet_mass;     //in Earth masses
     double planet_position; //inside the simulation domain
-    double planet_semimajor = 1.0;
+    double planet_semimajor;
     double rs;
     double rs_at_moment = 0 ;
     double rs_time;
@@ -334,6 +333,7 @@ public:
     //
     double T_star;
     double UV_star;
+    double R_star;
     
     int radiation_matter_equilibrium_test; //If set to 1, sets J = J_init in update_radiation()
     int radiation_diffusion_test_linear;
@@ -343,12 +343,12 @@ public:
     std::vector<double> previous_monitor_J;
     std::vector<double> previous_monitor_T;
     
-    Eigen::MatrixXd F_up;      //num_cells * num_bands each
-    Eigen::MatrixXd F_down;
-    Eigen::MatrixXd F_plus;
-    Eigen::MatrixXd F_minus;
-    Eigen::MatrixXd dJrad;
-    Eigen::MatrixXd S_total;
+    //Eigen::MatrixXd F_up;      //num_cells * num_bands each
+    //Eigen::MatrixXd F_down;
+    //Eigen::MatrixXd F_plus;
+    //Eigen::MatrixXd F_minus;
+    //Eigen::MatrixXd dJrad;
+    //Eigen::MatrixXd S_total;
     Eigen::MatrixXd S_band;
     Eigen::MatrixXd dS_band;
     Eigen::MatrixXd solar_heating;

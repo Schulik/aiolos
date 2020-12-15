@@ -5,7 +5,7 @@
 
 #Control parameters
 PARI_PROBLEM_NUMBER     2
-PARI_NUM_SPECIES        48
+PARI_NUM_SPECIES        1
 FRICTION_SOLVER         1
 PARI_ORDER              2
 

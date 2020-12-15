@@ -262,13 +262,14 @@ void c_Species::execute(std::vector<AOS>& u_in, std::vector<AOS>& dudt) {
         //
         // Step 3: Add it all up to update the conserved variables
         //
+        flux[0] = AOS(0,0,0);
+        //flux[1] = AOS(0,0,0);
         
-        //#pragma omp simd
         for(int j=1; j<=num_cells; j++) {
             dudt[j] = (flux[j-1] * base->surf[j-1] - flux[j] * base->surf[j]) / base->vol[j] + (source[j] + source_pressure[j]) ;
             
             //if( (debug > 1) && ( j==1 || j==num_cells || j==(num_cells/2) )) {
-            if( (debug > 1) && ( j==2 ) && (base->steps==1)) {
+            if( (debug > 2) && ( j==5 || j==1 || j==2 || j==3 || j==4 || j==6 || j==7 || j==8 || j==9 ) && (base->steps==1 || base->steps==0)) {
                 char alpha;
                 cout<<"Debuggin fluxes in cell i= "<<j<<" for species "<<speciesname<<" at time "<<base->steps<<endl; 
                 cout<<"     fl.u1 = "<<flux[j-1].u1<<": fr.u1 = "<<flux[j].u1<<endl;
@@ -277,16 +278,19 @@ void c_Species::execute(std::vector<AOS>& u_in, std::vector<AOS>& dudt) {
                 cout<<"     Cartesian fluxes: Fl-Fr+s = "<<((flux[j-1].u2 - flux[j].u2)/base->dx[j] + source[j].u2)<<endl;
                 cout<<"     D_surface/volume="<<(0.5*(base->surf[j]-base->surf[j-1])/base->vol[j])<<" vs. 1/dx="<<(1./base->dx[j])<<endl;
                 cout<<endl;
-                cout<<"     s = "<<source[j].u2<<endl;
-                cout<<"     sP = "<<source_pressure[j].u2<<endl;
-                
-                cout<<"     Al*Fl - Ar*Fr = "<<((flux[j-1].u2 * base->surf[j-1] - flux[j].u2 * base->surf[j]) /base->vol[j])<<endl;
+                cout<<"     Reminder, the following three lines must be +- equal for well-balancing:"<<endl;
+                cout<<"     s = "<<source[j].u1<<"/"<<source[j].u2<<"/"<<source[j].u3<<endl;
                 cout<<"     Al*Fl - Ar*Fr + sP = "<<((flux[j-1].u2 * base->surf[j-1] - flux[j].u2 * base->surf[j]) / base->vol[j] + source_pressure[j].u2)<<endl;
                 cout<<"     dP/dr = "<<((prim_l[j].pres - prim_r[j].pres)/base->dx[j])<<endl;
+                cout<<" "<<endl;
+                cout<<"     sP = "<<"/"<<source_pressure[j].u1<<"/"<<source_pressure[j].u2<<"/"<<source_pressure[j].u3<<endl;
+                cout<<"     Al*Fl - Ar*Fr = "<<((flux[j-1].u2 * base->surf[j-1] - flux[j].u2 * base->surf[j]) /base->vol[j])<<endl;
                 cout<<"     dP/dr + S = "<<((prim_l[j].pres - prim_r[j].pres)/base->dx[j] + source[j].u2)<<endl;
                 cout<<endl;
                 cout<<"     Al*Fl - Ar*Fr + s = "<<((flux[j-1].u2 * base->surf[j-1] - flux[j].u2 * base->surf[j]) / base->vol[j] + (source[j].u2))<<endl;
-                cout<<"     Al*Fl - Ar*Fr + s + sP = "<<((flux[j-1].u2 * base->surf[j-1] - flux[j].u2 * base->surf[j]) / base->vol[j] + (source[j].u2 +source_pressure[j].u2))<<endl;
+                cout<<"     u1 : Al*Fl - Ar*Fr + s + sP = "<<((flux[j-1].u1 * base->surf[j-1] - flux[j].u1 * base->surf[j]) / base->vol[j] + (source[j].u1 +source_pressure[j].u1))<<endl;
+                cout<<"     u2 : Al*Fl - Ar*Fr + s + sP = "<<((flux[j-1].u2 * base->surf[j-1] - flux[j].u2 * base->surf[j]) / base->vol[j] + (source[j].u2 +source_pressure[j].u2))<<endl;
+                cout<<"     u3 : Al*Fl - Ar*Fr + s + sP = "<<((flux[j-1].u3 * base->surf[j-1] - flux[j].u3 * base->surf[j]) / base->vol[j] + (source[j].u3 +source_pressure[j].u3))<<endl;
                 cin>>alpha;
             }
         }
@@ -301,6 +305,7 @@ AOS c_Species::hllc_flux(int j)
 {
     int jleft = j, jright = j+1;
     AOS flux;
+    int option;
     
     //Speed of gas
     double ul = prim_r[jleft].speed;  
@@ -318,6 +323,10 @@ AOS c_Species::hllc_flux(int j)
     double El = dl*prim_r[jleft].internal_energy + 0.5*mom_l*ul ;
     double Er = dr*prim_l[jright].internal_energy + 0.5*mom_r*ur ;
 
+    if( (debug > 2) && (j>0 && j<13) ) {
+        cout<<" IN HLLC, j = "<<j<<" dl/dr = "<<dl<<"/"<<dr<<" ul/ul = "<<ul<<"/"<<ur<<" pl/pr = "<<pl<<"/"<<pr<<" El/Er = "<<El<<"/"<<Er;
+    }
+    
     //Speed of shocks
     double SL = ul - prim_r[jleft].sound_speed ;
     double SR = ur + prim_l[jright].sound_speed ;
@@ -332,6 +341,7 @@ AOS c_Species::hllc_flux(int j)
         AOS FS_L       = FL + (US_L - AOS(dl, mom_l, El))  * SL;    
            
         flux = FS_L;
+        option = 1;
     }
     else if ((SS <= 0) && (SR >= 0)) {
         
@@ -341,15 +351,20 @@ AOS c_Species::hllc_flux(int j)
         AOS FS_R       = FR + (US_R - AOS(dr, mom_r, Er)) * SR;
         
         flux = FS_R;
+        option = 2;
     }
     else if (SL >= 0) {
         AOS FL = AOS (mom_l, mom_l * ul + pl, ul * (El + pl) );
         flux = FL;
+        option = 3;
     }
     else if (SR <= 0) {
         AOS FR = AOS(mom_r, mom_r * ur + pr, ur * (Er + pr) );
         flux = FR;
+        option= 4 ;
     }
+    if((debug > 2) && (j>0 && j<13))
+        cout<<" opt = "<<option<<" SL/SS/SR = "<<SL<<"/"<<SS<<"/"<<SR<<" f = "<<flux.u1<<"/"<<flux.u2<<"/"<<flux.u3<<" ((f.u2-Pl)/Pl)-1 = "<<((flux.u2-pl)/pl)<<" ((f.u2-Pr)/Pr)-1 = "<<((flux.u2-pr)/pr)<<endl;
     return flux;
 }
 
