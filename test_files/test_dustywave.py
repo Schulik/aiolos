@@ -127,8 +127,8 @@ def solve_dustywave(param_file):
 def plot_dustywave(name):
     param_file = name + '.par'
 
-    gas  = load_aiolos_snap(name + '_H2_t-1.dat')
-    dust = load_aiolos_snap(name + '_Dust_t-1.dat')
+    gas  = load_aiolos_snap('output_' + name + '_H2_t-1.dat')
+    dust = load_aiolos_snap('output_' + name + '_Dust_t-1.dat')
     
     sol = solve_dustywave(param_file)
 
@@ -153,8 +153,8 @@ def check_dustywave_problem(name, L1s=None, make_plots=False):
 
     param_file = name + '.par'
 
-    gas  = load_aiolos_snap(name + '_H2_t-1.dat')
-    dust = load_aiolos_snap(name + '_Dust_t-1.dat')
+    gas  = load_aiolos_snap('output_' + name + '_H2_t-1.dat')
+    dust = load_aiolos_snap('output_' + name + '_Dust_t-1.dat')
     
     sol = solve_dustywave(param_file)
 

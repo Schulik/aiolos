@@ -31,11 +31,11 @@ PARI_GRID_TYPE          1
 PARI_GEOMETRY           0
 PARI_CELLS_PER_DECADE   20.
 PARI_DOMAIN_MIN         1e8
-PARI_DOMAIN_MAX         1e10
+PARI_DOMAIN_MAX         1e11
 PARI_TIME_DT            1e3
 PARI_CFLFACTOR          0.9
-PARI_TIME_TMAX          1.4e6
-PARI_TIME_OUTPUT        1.4e6
+PARI_TIME_TMAX          1.0e6
+PARI_TIME_OUTPUT        1.0e6
 
 #Physical parameters
 PARI_PLANET_POS         0.

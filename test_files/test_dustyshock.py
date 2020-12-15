@@ -25,8 +25,8 @@ def setup_riemann_solver(param_file):
 
 def plot_dusty_shock():
     param_file = 'dusty_shock.par'
-    gas_file = 'dusty_shock_H2_t-1.dat'
-    dust_file = 'dusty_shock_Dust_t-1.dat'
+    gas_file = 'output_dusty_shock_H2_t-1.dat'
+    dust_file = 'output_dusty_shock_Dust_t-1.dat'
 
     #Get the Riemann problem
     exact = setup_riemann_solver(param_file)
@@ -85,8 +85,8 @@ def plot_dusty_shock():
 
 def check_dusty_shock(L1s=None):
     param_file = 'dusty_shock.par'
-    gas_file = 'dusty_shock_H2_t-1.dat'
-    dust_file = 'dusty_shock_Dust_t-1.dat'
+    gas_file = 'output_dusty_shock_H2_t-1.dat'
+    dust_file = 'output_dusty_shock_Dust_t-1.dat'
 
     #Get the Riemann problem
     exact = setup_riemann_solver(param_file)

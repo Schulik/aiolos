@@ -10,14 +10,14 @@ def get_data(DIR):
     Ns = [32, 64, 128, 256, 512]
     L1s = []
     for N in Ns:
-         IC_file = DIR + 'soundwave_{}_H2'.format(N) + '_t0.dat'
+         IC_file = DIR + 'output_soundwave_{}_H2'.format(N) + '_t0.dat'
          IC = load_aiolos_snap(IC_file)
 
          try:
-             snap_file = DIR + 'soundwave_{}_H2'.format(N) + '_t-1.dat'
+             snap_file = DIR + 'output_soundwave_{}_H2'.format(N) + '_t-1.dat'
              final = load_aiolos_snap(snap_file)
          except OSError:
-             snap_file = DIR + 'soundwave_{}_H2'.format(N) + '_t-666.dat'
+             snap_file = DIR + 'output_soundwave_{}_H2'.format(N) + '_t-666.dat'
              final = load_aiolos_snap(snap_file)
              
          L1 = [
