@@ -38,17 +38,17 @@ void c_Sim::execute() {
     // Compute real, physical scales for orientation
     //
     star_mass = 1. * msolar;
-    double temp_cv = 1.5 * Rgas / (2. * amu);
-    scale_cs = std::sqrt(species[0].gamma_adiabat * (species[0].gamma_adiabat - 1.) * temp_cv * species[0].prim[num_cells].temperature); // cm/s
+    scale_cs = std::sqrt(species[0].gamma_adiabat * (species[0].gamma_adiabat - 1.) * species[0].cv * species[0].prim[num_cells].temperature); // cm/s
     scale_rb = G*planet_mass / scale_cs / scale_cs; 
     scale_rh = planet_semimajor * au * pow(planet_mass / (3.* star_mass ),0.333333333333333333);
     
-    scale_vk   = std::sqrt(G*star_mass/planet_semimajor);
+    scale_vk = std::sqrt(G*star_mass/(au*planet_semimajor));
     scale_time = scale_rb/scale_cs;
     
     cout<<"    Reporting base physical scales for selected problem in cgs units or other units that make sense;"<<endl;
-    cout<<"    bondi_radius: "<<scale_rb<<" rb/au = "<<scale_rb/au<<" rh/au = "<<scale_rh/au<<" rh/rb"<<scale_rh/scale_rb<<endl;
-    cout<<"    velocities: vk = "<<scale_vk<<" vk/cs = "<<scale_vk/scale_cs<<" cs = "<<scale_cs<<endl;
+    cout<<"    bondi_radius: "<<scale_rb<<" cm = "<<scale_rb/au<<" au\n" ;
+    cout<<"    hill radius: " <<scale_rh << "cm = "<< scale_rh/au <<" au = "<<scale_rh/scale_rb<< " rb" << endl;
+    cout<<"    velocities: vk = "<<scale_vk<<" cm/s, vk/cs = "<<scale_vk/scale_cs<<", cs = "<<scale_cs<< "cm/s" << endl;
     cout<<"    times, rb/cs/yr = "<<scale_time/year<<" rh/cs/yr"<<scale_rh/scale_cs/year<<endl;
     
     ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~////

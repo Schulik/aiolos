@@ -11,7 +11,7 @@ def check_conservation(problem, species='hydrogen.spc', L1_target=None):
     final = [0,0,0]
 
     params = load_aiolos_params(problem + '.par')
-    base_name = os.path.split(params['OUTPUT_FILENAME'])[1]
+    base_name = "output_" + problem 
     
     try:
         num_spec = int(params['PARI_NUM_SPECIES'])
