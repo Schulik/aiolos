@@ -84,7 +84,8 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
         t_max       = read_parameter_from_file<double>(filename,"PARI_TIME_TMAX", debug).value;
         output_time = read_parameter_from_file<double>(filename,"PARI_TIME_OUTPUT", debug).value; 
         monitor_time = read_parameter_from_file<double>(filename,"PARI_TIME_DT", debug).value;
-        CFL_break_time = read_parameter_from_file<double>(filename,"CFL_BREAK_TIME", debug, 1.).value;
+        CFL_break_time = read_parameter_from_file<double>(filename,"CFL_BREAK_TIME", debug, 
+                                                          std::numeric_limits<double>::max()).value ;
         
         globalTime = 0.0;    
         timecount = 0;
