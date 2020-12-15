@@ -7,8 +7,8 @@ from load_aiolos import load_aiolos_snap, load_aiolos_params
 
 def check_steady_state(problem, L1_target=None):
 
-    IC_file = problem + '_t0.dat'
-    snap_file = problem + '_t-1.dat'
+    IC_file = 'output_' + problem + '_t0.dat'
+    snap_file = 'output_' + problem + '_t-1.dat'
 
     IC = load_aiolos_snap(IC_file)
     final = load_aiolos_snap(snap_file)
