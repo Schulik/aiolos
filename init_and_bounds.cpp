@@ -335,7 +335,6 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
                 cout<<"Last cell coordinates:  |<--"<<x_i[num_cells-1]<<" // "<<x_i12[num_cells-1]<<" // "<<x_i[num_cells]<<"-->|"<<endl;
         } 
         
-        
         if(debug > 0) cout<<"Init: Setup metric factors"<<endl;
         
         //
@@ -498,7 +497,6 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
             cout<<" is "<<solar_heating(b)<<endl;
             
         }
-        
     }
     cout<<"TOTAL SOLAR HEATING / Lumi = "<<templumi<<" lumi = "<<(templumi*4.*pi*rsolar*rsolar*pi)<< " also sigmarad2/sigmarad = "<<sigma_rad2/sigma_rad<<endl;
     //   /(sigma_rad*pow(T_star,4.)*4.*pi*pow(R_star*rsolar,2.))

@@ -40,10 +40,10 @@ void c_Sim::execute() {
     star_mass = 1. * msolar;
     double temp_cv = 1.5 * Rgas / (2. * amu);
     scale_cs = std::sqrt(species[0].gamma_adiabat * (species[0].gamma_adiabat - 1.) * temp_cv * species[0].prim[num_cells].temperature); // cm/s
-    scale_rb = G*planet_mass*mearth / scale_cs / scale_cs; 
+    scale_rb = G*planet_mass / scale_cs / scale_cs; 
     scale_rh = planet_semimajor * au * pow(planet_mass / (3.* star_mass ),0.333333333333333333);
     
-    scale_vk = std::sqrt(G*star_mass/planet_semimajor);
+    scale_vk   = std::sqrt(G*star_mass/planet_semimajor);
     scale_time = scale_rb/scale_cs;
     
     cout<<"    Reporting base physical scales for selected problem in cgs units or other units that make sense;"<<endl;
@@ -72,7 +72,6 @@ void c_Sim::execute() {
         if(debug >= 2)
             cout<<"Beginning timestep "<<steps<<endl;
         
-
         if(use_self_gravity==1)
             update_mass_and_pot();
         
@@ -119,9 +118,6 @@ void c_Sim::execute() {
         // Step 0: If no gas movement is desired, set all velocity changes to 0
         //
         
-        
-        
-        
         if (do_hydrodynamics == 1) {
         
             for(int s = 0; s < num_species; s++)
@@ -156,7 +152,6 @@ void c_Sim::execute() {
                 }
             }
         }
-        
         
         for(int s = 0; s < num_species; s++)
             species[s].compute_pressure(species[s].u);

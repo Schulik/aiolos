@@ -55,7 +55,7 @@ double c_Sim::get_cfl_timestep() {
     
     //Set CFLfactor to safe value once finding the radiative equilibrium is over
     if(globalTime > CFL_break_time)
-        cflfactor = 10.;
+        cflfactor = 0.9;
     
     //Invert and apply CFL secutiry factor
     minstep = cflfactor / minstep;
