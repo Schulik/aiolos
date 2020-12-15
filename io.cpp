@@ -382,8 +382,8 @@ void c_Sim::print_monitor(int num_steps) {
         for(int s=0; s<num_species; s++)
             monitor<<species[s].prim[5].temperature<<'\t'; //col 6-...: all species temperatures 
         
-        for(int s=0; s<num_species; s++)
-            monitor<<compute_planck_function_integral3(l_i[0],l_i[1],species[s].prim[5].temperature)<<'\t';
+        //for(int s=0; s<num_species; s++)
+        //    monitor<<compute_planck_function_integral3(l_i[0],l_i[1],species[s].prim[5].temperature)<<'\t';
             
         ///(sigma_rad/pi*pow(species[s].prim[5].temperature,4.))<<'\t'; // col..? species 4 sigma_T4/c, unit = erg/cm^3
         

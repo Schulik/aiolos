@@ -18,11 +18,11 @@
 //
 //  
 
-bool run_test(std::string test_name, std::string spc = "test_files/hydrogen.spc",
+bool run_test(std::string test_name, std::string spc = "hydrogen.spc",
 	      int suppress_warn=1, int debug=0) {
       
     try {
-        c_Sim test(test_name, spc, debug) ;
+        c_Sim test(test_name, spc, "test_files/", debug) ;
         test.set_suppress_warnings(suppress_warn);
 
         test.execute(); 
@@ -38,30 +38,30 @@ bool run_test(std::string test_name, std::string spc = "test_files/hydrogen.spc"
 int main()
 {
     int count = 0 ;
-    count += !run_test("test_files/shock_tube1.par") ;
-    count += !run_test("test_files/shock_tube2.par") ;
-    count += !run_test("test_files/shock_tube3.par") ;
-    count += !run_test("test_files/shock_tube4.par") ;
-    count += !run_test("test_files/shock_tube5.par") ;
-    count += !run_test("test_files/shock_tube6.par") ;
-    count += !run_test("test_files/shock_tube7.par") ;
+    count += !run_test("shock_tube1.par") ;
+    count += !run_test("shock_tube2.par") ;
+    count += !run_test("shock_tube3.par") ;
+    count += !run_test("shock_tube4.par") ;
+    count += !run_test("shock_tube5.par") ;
+    count += !run_test("shock_tube6.par") ;
+    count += !run_test("shock_tube7.par") ;
 
-    count += !run_test("test_files/soundwave_32.par") ;
-    count += !run_test("test_files/soundwave_64.par") ;
-    count += !run_test("test_files/soundwave_128.par") ;
-    count += !run_test("test_files/soundwave_256.par") ;
-    count += !run_test("test_files/soundwave_512.par") ;
+    count += !run_test("soundwave_32.par") ;
+    count += !run_test("soundwave_64.par") ;
+    count += !run_test("soundwave_128.par") ;
+    count += !run_test("soundwave_256.par") ;
+    count += !run_test("soundwave_512.par") ;
 
-    count += !run_test("test_files/friction_6spc.par",
-		       "test_files/friction_6spc.spc") ;
+    count += !run_test("friction_6spc.par",
+		       "friction_6spc.spc") ;
     
-    count += !run_test("test_files/dustywave_nonstiff.par") ;
-    count += !run_test("test_files/dustywave_stiff.par") ;
+    count += !run_test("dustywave_nonstiff.par") ;
+    count += !run_test("dustywave_stiff.par") ;
 
-    count += !run_test("test_files/dusty_shock.par") ;
+    count += !run_test("dusty_shock.par") ;
     
-    count += !run_test("test_files/planet_cartesian.par") ;
-    count += !run_test("test_files/planet_spherical.par") ;
+    count += !run_test("planet_cartesian.par") ;
+    count += !run_test("planet_spherical.par") ;
 
     
     return count ;
