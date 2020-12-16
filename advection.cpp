@@ -257,7 +257,7 @@ void c_Species::execute(std::vector<AOS>& u_in, std::vector<AOS>& dudt) {
         //
         // Step 3: Add it all up to update the conserved variables
         //
-        flux[0] = AOS(0,0,0);
+        //flux[0] = AOS(0,0,0);
         //flux[1] = AOS(0,0,0);
         
         for(int j=1; j<=num_cells; j++) {

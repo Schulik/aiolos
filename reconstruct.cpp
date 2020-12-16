@@ -37,7 +37,7 @@ void c_Species::reconstruct_edge_states() {
 
     // Step 1:
     //   1st order hydrostatic reconstruction
-    for (int i=0; i <= num_cells+1; i++) {
+    for (int i=0; i < num_cells+2; i++) {
         prim_r[i] = prim_l[i] = prim[i] ;
 
         if (is_gas) {
