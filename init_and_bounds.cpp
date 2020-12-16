@@ -164,17 +164,43 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
         source_pressure_prefactor_right   = np_zeros(num_cells+2);
         enclosed_mass   = np_zeros(num_cells+2);
         phi             = np_zeros(num_cells+2);
+        
+        
+        if(num_bands < 1) {
+            cout<<" In INIT RADIATION, invalid num_bands = "<<num_bands<<" changing to num_bands = 1."<<endl;
+            
+            num_bands = 1;
+        }
+        
         l_i       = np_zeros(num_bands+1);    // Wavelenght bin boundaries
         l_i12     = np_zeros(num_bands);      // Wavelength bin midpoints or averages
         
-        double dlogl = pow(10., 1./lambda_per_decade);
-        double dlogl2 = pow(lambda_max/lambda_min, 1./num_bands);
-        l_i[0] = lambda_min;
+        l_i[0]         = lminglobal/100.;
+        l_i[num_bands] = lmaxglobal/100.;
         
-        for(int b=1; b<num_bands+1; b++) {
-            l_i[b]      = l_i[b-1] * dlogl2;
-            l_i12[b-1]  = 0.5 * (l_i[b] + l_i[b-1]);
+        if(num_bands == 2) {
+            l_i[1]   = 0.5*(lambda_max + lambda_min);
+            l_i12[0] = lambda_min;
+            l_i12[1] = lambda_max;
         }
+        else if(num_bands > 2)
+        {
+            //double dlogl = pow(10., 1./lambda_per_decade);
+            //double dlogl2 = pow(lambda_max/lambda_min, 1./(num_bands-2));
+            l_i[1]             = lambda_min;
+            l_i[num_bands-1]   = lambda_max;
+            double dlogl2      = pow(lambda_max/lambda_min, 1./(num_bands-2));
+            //l_i[0] = lambda_min;
+            
+            for(int b=2; b<num_bands-1; b++) {
+                l_i[b]      = l_i[b-1] * dlogl2;
+                l_i12[b-1]  = 0.5 * (l_i[b] + l_i[b-1]);
+                cout<<" in NUM_BANDS>2, b = "<<b<<" l_i[b] = "<<l_i[b]<<endl;
+            }
+            
+        }
+        
+        
         /*
         cout<<"   ATTENTION: Bands go from "<<l_i[0]<<" till "<<l_i[num_bands]<<", while lmin/lmax was given as "<<lambda_min<<"/"<<lambda_max<<endl;
         cout<<"   Please confirm this is correct."<<endl;
@@ -449,7 +475,6 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
     double sum_planck = 0;
     double dsum_planck;
     double lmin, lmax;
-    double lminglobal = 1e-6, lmaxglobal = 1e14; //in mum; corresponds to Wien-temperature maxima from 3e9 to 1e-7 K
     double dlogx = pow(lmaxglobal/lminglobal, 1./((double)num_plancks));
     lT_spacing     = dlogx;
     double lT_crit = 14387.770; //=hc/k_b, in units of mum K
@@ -500,8 +525,19 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
         }
     }
     cout<<"TOTAL SOLAR HEATING / Lumi = "<<templumi<<" lumi = "<<(templumi*4.*pi*rsolar*rsolar*pi)<< " also sigmarad2/sigmarad = "<<sigma_rad2/sigma_rad<<endl;
-    //   /(sigma_rad*pow(T_star,4.)*4.*pi*pow(R_star*rsolar,2.))
     
+    double totallumi = 0;
+    double totallumiincr = 0;
+    for(int b=0; b < num_bands; b++) {
+        
+        totallumiincr = compute_planck_function_integral3(l_i[b], l_i[b+1], T_star);
+        totallumi     += totallumiincr;
+        cout<<" INIT BANDS, b = "<<b<<" l_i[b] = "<<l_i[b]<<" l_i[b+1] = "<<l_i[b+1]<<" l_i12[b] = "<<l_i12[b]<<" fraction = "<<totallumiincr<<endl;
+    }
+    cout<<" Total lumi / sigma T^4/pi is = "<<totallumi<<endl;
+    
+    //   /(sigma_rad*pow(T_star,4.)*4.*pi*pow(R_star*rsolar,2.))
+    /*
     cout<<" Earth planck integrals: 288K between 5.03 and 79.5 "<<compute_planck_function_integral3(5.03,79.5,288)<<endl;
     cout<<" Earth planck integrals: 288K between 0 and 5.03 "<<compute_planck_function_integral3(0.,5.03,288)<<endl;
     cout<<" Earth planck integrals: 288K between 79.5 and infty "<<compute_planck_function_integral3(79.5,999999999.,288)<<endl;
@@ -515,6 +551,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
     cout<<" BB integral for T= 2.7 K "<<compute_planck_function_integral3(lminglobal,lmaxglobal,2.7)<<endl;
     cout<<" BB integral for T= 1e9 K "<<compute_planck_function_integral3(lminglobal,lmaxglobal,1e9)<<endl;
     cout<<endl<<" ############################ init 0"<<endl;
+    */
     
     /*
     i_wien = -1;
@@ -550,7 +587,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
     double rade_l = read_parameter_from_file<double>(filename,"PARI_RADSHOCK_ERL", debug, 1.).value;
     double rade_r = read_parameter_from_file<double>(filename,"PARI_RADSHOCK_ERR", debug, 1.).value;
     
-    for(int j = 0; j < num_cells+2; j++) {
+    for(int j = 0; j < num_cells+1; j++) {
         
         if(num_bands == 1)  {
             for(int s = 0; s< num_species; s++){
@@ -599,7 +636,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
                     Jrad_FLD(j,b)  = rad_energy_multiplier * compute_planck_function_integral3(l_i[b], l_i[b+1], species[s].prim[j].temperature);
                     Jrad_init(j,b) = Jrad_FLD(j,b);
                     //Jrad_FLD(j,b) += rad_energy_multipier * compute_planck_function_integral(l_i[b], l_i[b+1], species[s].prim[j].temperature);
-                    if(debug > 1 && j==1)
+                    //if(debug >= 0 && j==1)
                         cout<<" Jrad("<<j<<","<<b<<") = "<<Jrad_FLD(j,b)<<" dJrad_species["<<s<<"] = "<<rad_energy_multiplier * compute_planck_function_integral3(l_i[b], l_i[b+1], species[s].prim[j].temperature)<<endl;
                 }
             }
@@ -609,7 +646,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
         
     }
     
-    
+    cout<<" IN INIT: FINISHED INIT. RETURNING TO MAIN NOW."<<endl;
 }
 
 

@@ -269,14 +269,23 @@ void c_Sim::update_fluxes_FLD() {
         }
         
         if(debug >= 1) {
-            int index = (num_cells/2+1);
             
-            cout<<" band["<<b<<"] cell["<<index<<"] l/d/u/r = "<<l[index]<<"/"<<d[index]<<"/"<<u[index]<<"/"<<r[index];
-            cout<<" temps = ";
-            for(int si = 0; si<num_species; si++) {
-                    cout<<species[si].prim[2].temperature<<" ";
+            for(int index=0; index < num_cells+2; index++) {    
+//                 /int index = (num_cells/2+1);
+                
+                cout<<" timestep "<<steps<<" band["<<b<<"] cell["<<index<<"] l/d/u/r = "<<l[index]<<"/"<<d[index]<<"/"<<u[index]<<"/"<<r[index];
+                cout<<" temps = ";
+                for(int si = 0; si<num_species; si++) {
+                        cout<<species[si].prim[2].temperature<<" ";
+                }
+                cout<<endl;
             }
             
+            if(steps <= 2) {
+                char a;
+                cin>>a;
+                
+            }
         }
     }
 
