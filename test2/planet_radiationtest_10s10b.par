@@ -5,8 +5,8 @@
 
 #Control parameters
 PARI_PROBLEM_NUMBER     2
-PARI_NUM_SPECIES        2
-PARI_NUM_BANDS          5
+PARI_NUM_SPECIES        10
+PARI_NUM_BANDS          10
 DO_HYDRO                1
 CFL_BREAK_TIME          1e-9
 PARI_CONST_TEMP         20.

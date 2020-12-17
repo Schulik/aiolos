@@ -629,20 +629,28 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
                     
                 }
                  
-                if(debug > 1 && j==5)
-                //if(j==5)
-                cout<<" Jrad("<<j<<","<<0<<") = "<<Jrad_FLD(j,0)<<" dJrad_species["<<s<<"] = "<<rad_energy_multiplier * compute_planck_function_integral3(l_i[0], l_i[1], species[s].prim[j].temperature)<<" T_rad = "<<pow(pi*Jrad_FLD(j,0)/sigma_rad,0.25)<<endl;
                 
+                //if(j==5)
+                if(debug > 1 && j==5) {
+                    cout<<" Jrad("<<j<<","<<0<<") = "<<Jrad_FLD(j,0)<<" dJrad_species["<<s<<"] = "<<rad_energy_multiplier * compute_planck_function_integral3(l_i[0], l_i[1], species[s].prim[j].temperature)<<" T_rad = "<<pow(pi*Jrad_FLD(j,0)/sigma_rad,0.25)<<endl;
+                }
+                    
             }
         } else {
             
             for(int b = 0; b < num_bands; b++) {
                 for(int s = 0; s< num_species; s++){
                     Jrad_FLD(j,b)  = rad_energy_multiplier * compute_planck_function_integral3(l_i[b], l_i[b+1], species[s].prim[j].temperature);
+                    if(Jrad_FLD(j,b) < 1e-50)
+                        Jrad_FLD(j,b) = 1e-50;
+                    
                     Jrad_init(j,b) = Jrad_FLD(j,b);
                     //Jrad_FLD(j,b) += rad_energy_multipier * compute_planck_function_integral(l_i[b], l_i[b+1], species[s].prim[j].temperature);
                     //if(debug >= 0 && j==1)
-                        cout<<" Jrad("<<j<<","<<b<<") = "<<Jrad_FLD(j,b)<<" dJrad_species["<<s<<"] = "<<rad_energy_multiplier * compute_planck_function_integral3(l_i[b], l_i[b+1], species[s].prim[j].temperature)<<endl;
+                     if(debug > 1 && j==5) {
+                        cout<<" Jrad("<<j<<","<<b<<") = "<<Jrad_FLD(j,b)<<" dJrad_species["<<s<<"] = "<<rad_energy_multiplier * compute_planck_function_integral3(l_i[b], l_i[b+1], species[s].prim[j].temperature)<<endl; 
+                     }
+                        
                 }
             }
             

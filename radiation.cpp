@@ -129,10 +129,10 @@ void c_Sim::update_opacities() {
         
         for(int j=num_cells; j>0; j--) {
             
-            cout<<"    in update opa ";
+            cout<<"    in update opa "<<endl;
             
             for(int b=0; b<num_bands;b++) {
-                cout<<"    band ["<<b<<"] = "<<S_band(j,b)<<" banddS = "<<dS_band(j,b)<<" tau = "<<radial_optical_depth(j,b);
+                cout<<"    band ["<<b<<"][j="<<j<<"] = "<<S_band(j,b)<<" banddS = "<<dS_band(j,b)<<" tau = "<<radial_optical_depth(j,b);
                 for(int s=0; s<num_species; s++) {
                      cout<<" dS_fraction["<<species[s].speciesname<<"] = "<<(species[s].fraction_total_opacity(j,b))<<" opa = "<<species[s].opacity(j,b)<<" total opa(j+1)"<<total_opacity(j+1,b)<<" x = "<<x_i12[j];
                 }
@@ -140,6 +140,9 @@ void c_Sim::update_opacities() {
             }
             cout<<endl;
         }
+        
+        char stop;
+        cin>>stop;
     }
 }
 
@@ -215,6 +218,9 @@ void c_Sim::update_fluxes_FLD() {
                 d[idx] += D ;
                 d[idx+stride] = D ;
                 l[idx+stride] = -D ;
+                
+                if(debug > 1)
+                    cout<<" radiation part 0. t,j,b="<<steps<<","<<j<<","<<b<<" tau_inv/R/D = "<<tau_inv<<"/"<<R<<"/"<<D<<" J/J = "<<Jrad_FLD(j+1,b)<<"/"<<Jrad_FLD(j,b)<<endl;
             }
             
 
@@ -282,7 +288,7 @@ void c_Sim::update_fluxes_FLD() {
             for(int index=0; index < num_cells+2; index++) {    
 //                 /int index = (num_cells/2+1);
                 
-                cout<<" timestep "<<steps<<" band["<<b<<"] cell["<<index<<"] l/d/u/r = "<<l[index]<<"/"<<d[index]<<"/"<<u[index]<<"/"<<r[index];
+                cout<<" radiation part1, t = "<<steps<<" band["<<b<<"] cell["<<index<<"] l/d/u/r = "<<l[index]<<"/"<<d[index]<<"/"<<u[index]<<"/"<<r[index];
                 cout<<" temps = ";
                 for(int si = 0; si<num_species; si++) {
                         cout<<species[si].prim[2].temperature<<" ";
@@ -335,11 +341,18 @@ void c_Sim::update_fluxes_FLD() {
                     d[idx_b ] += vol[j] * rhos * species[s].opacity(j, b) ;
                     d[idx_bs] = - 4 * vol[j] * rhos * fac ;
                     r[idx_rb] -=  3 * vol[j] * rhos * fac * Ts ;
+                    
+                    if(debug > 1)
+                        cout<<" radiation part2, t = "<<steps<<" b["<<b<<"] i["<<j<<"] s["<<s<<"] l/d/u/r_rs/rs_rb = "<<d[idx_s]<<"/"<<d[idx_sb]<<"/"<<d[idx_b]<<"/"<<d[idx_bs]<<"/"<<r[idx_rs]<<"/"<<r[idx_rb]<<" opac = "<<vol[j] * rhos * species[s].opacity(j, b)<<endl;
                 }
             }
             
     }
-
+    if(debug > 1) {
+        char stepstop;
+        cin>>stepstop;
+    }
+    
     // TODO:
     //   Add collision terms here
 
