@@ -89,8 +89,8 @@ void c_Sim::execute() {
             }
             print_monitor((int)monitor_counter);
                 
-             monitor_counter+=1.;
-             output_counter +=1.;
+            monitor_counter+=1.;
+            output_counter +=1.;
          }
          if(globalTime > output_counter*output_time){
              if(debug >= 1)
@@ -167,7 +167,6 @@ void c_Sim::execute() {
         
         if(use_rad_fluxes==1)
             transport_radiation();
-        
         
         steps++;
         

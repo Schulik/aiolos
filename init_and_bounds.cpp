@@ -194,8 +194,13 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
             
             for(int b=2; b<num_bands-1; b++) {
                 l_i[b]      = l_i[b-1] * dlogl2;
-                l_i12[b-1]  = 0.5 * (l_i[b] + l_i[b-1]);
                 cout<<" in NUM_BANDS>2, b = "<<b<<" l_i[b] = "<<l_i[b]<<endl;
+            }
+            
+            
+            for(int b=0; b<num_bands; b++) {
+                l_i12[b]  = pow( 10., 0.5 * (std::log10(l_i[b]) + std::log10(l_i[b+1])));   
+                
             }
             
         }
@@ -623,9 +628,9 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
                         Jrad_FLD(j,0) = rade_r;
                     
                 }
-                
-                //if(debug > 1 && j==1)
-                if(j==5)
+                 
+                if(debug > 1 && j==5)
+                //if(j==5)
                 cout<<" Jrad("<<j<<","<<0<<") = "<<Jrad_FLD(j,0)<<" dJrad_species["<<s<<"] = "<<rad_energy_multiplier * compute_planck_function_integral3(l_i[0], l_i[1], species[s].prim[j].temperature)<<" T_rad = "<<pow(pi*Jrad_FLD(j,0)/sigma_rad,0.25)<<endl;
                 
             }
@@ -833,7 +838,7 @@ c_Species::c_Species(c_Sim *base_simulation, string filename, string species_fil
         if(debug > 0) cout<<"        Species["<<species_index<<"]: Init done."<<endl;
         
         opacity                = Eigen::MatrixXd::Zero(num_cells+2, num_bands); //num_cells * num_bands
-        opacity_planck         = Eigen::MatrixXd::Zero(num_cells+2, 1); //num_cells * num_bands
+        opacity_planck         = Eigen::MatrixXd::Zero(num_cells+2, num_bands); //num_cells * num_bands
         fraction_total_opacity = Eigen::MatrixXd::Zero(num_cells+2, num_bands); //num_cells * num_bands
     
 }

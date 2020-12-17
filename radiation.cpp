@@ -105,7 +105,12 @@ void c_Sim::update_opacities() {
             //
             // Now compute the attentiation of solar radiation and then assign the lost energy back to individual species in a manner that conserves energy
             //
+            
             S_band(j,b)  = solar_heating(b) * std::exp(-radial_optical_depth(j,b));
+            
+            if(debug >= 1)
+                cout<<" in cell ["<<j<<"] band ["<<b<<"] top-of-the-atmosphere heating = "<<solar_heating(b)<<" tau_rad(j,b) = "<<radial_optical_depth(j,b)<<" exp(tau) = "<<std::exp(-radial_optical_depth(j,b))<<endl;
+            
             if(j<num_cells)
                 dS_band(j,b) = (surf[j+1] * S_band(j+1,b) - surf[j] * S_band(j,b))/vol[j];
             else
@@ -118,7 +123,11 @@ void c_Sim::update_opacities() {
     
     if(debug >= 1) {
         
-        for(int j=num_cells; j>num_cells-1; j--) {
+        for(int b=0; b<num_bands;b++) {
+           cout<<" in band ["<<b<<"] top-of-the-atmosphere heating = "<<solar_heating(b)<<endl;
+        }
+        
+        for(int j=num_cells; j>0; j--) {
             
             cout<<"    in update opa ";
             
