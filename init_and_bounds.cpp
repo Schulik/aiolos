@@ -114,6 +114,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
         alpha_collision   = read_parameter_from_file<double>(filename,"PARI_ALPHA_COLL", debug, 0).value;
         rad_energy_multiplier=read_parameter_from_file<double>(filename,"PARI_RAD_MULTIPL", debug, 1.).value;
         collision_model   = read_parameter_from_file<char>(filename,"PARI_COLL_MODEL", debug, 'C').value;
+        opacity_model     = read_parameter_from_file<char>(filename,"PARI_OPACITY_MODEL", debug, 'C').value;
         friction_solver   = read_parameter_from_file<int>(filename,"FRICTION_SOLVER", debug, 0).value;
         do_hydrodynamics  = read_parameter_from_file<int>(filename,"DO_HYDRO", debug, 1).value;
         rad_solver_max_iter = read_parameter_from_file<int>(filename,"MAX_RAD_ITER", debug, 1).value;
@@ -740,12 +741,15 @@ c_Species::c_Species(c_Sim *base_simulation, string filename, string species_fil
         u_analytic     = np_zeros(num_cells+2);
 
         prim   = std::vector<AOS_prim>(num_cells+2); //Those helper quantities are also defined on the ghost cells, so they get +2
+        primlast = std::vector<AOS_prim>(num_cells+2); 
+        de_e   = std::vector<double>(num_cells+2);
         prim_l = std::vector<AOS_prim>(num_cells+2);
         prim_r = std::vector<AOS_prim>(num_cells+2);
         temp_temperature = std::vector<double>(num_cells+2);
         
         timesteps    = np_zeros(num_cells+2);		    
         timesteps_cs = np_zeros(num_cells+2);	
+        timesteps_rad = np_zeros(num_cells+2);
         finalstep    = np_zeros(num_cells+2);
         
         //////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -946,6 +950,9 @@ void c_Species::initialize_hydrostatic_atmosphere() {
         
   
     compute_pressure(u);
+    for(int i=num_cells; i>=0; i--)  {
+        primlast[i].internal_energy = prim[i].internal_energy;
+    }
     
     //
     // Apply multiplicators for over/underdensities just below and above the sonic point
@@ -953,7 +960,7 @@ void c_Species::initialize_hydrostatic_atmosphere() {
     if(base->init_wind==1) {
         double csi              = prim[num_cells-1].sound_speed;
         double smoothed_factor;
-        bondi_radius = base->planet_mass / (pow(csi,2.)); //Most restrictive sonic point, as we are not quite isothermal
+        bondi_radius = base->planet_mass*G / (pow(csi,2.)); //Most restrictive sonic point, as we are not quite isothermal
     
         for( int i = 1; i < num_cells + 1; i++) {
             smoothed_factor = density_excess * (1./(1.+std::exp(-(base->x_i12[i] - bondi_radius)/(0.01 * bondi_radius )) ) ); 

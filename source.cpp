@@ -363,7 +363,7 @@ void c_Sim::compute_friction_numerical() {
 void c_Sim::fill_alpha_basis_arrays(int j) { //Called in compute_friction() in source.cpp
     
     for(int si=0; si<num_species; si++) {
-        friction_vec_input(si) = species[si].prim[j].speed;
+        friction_vec_input(si) =  species[si].prim[j].speed;
         dens_vector(si)        =  species[si].u[j].u1; 
         numdens_vector(si)     =  species[si].prim[j].number_density; 
         mass_vector(si)        =  species[si].mass_amu;

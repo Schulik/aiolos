@@ -22,7 +22,11 @@ void IdealGas_EOS::compute_primitive(const AOS* cons, AOS_prim* prim, int num_ce
         prim[i].density        = cons[i].u1;
         prim[i].speed          = cons[i].u2 / cons[i].u1 ;
         prim[i].pres           = _gamma_m1 *(cons[i].u3 - 0.5*cons[i].u2*prim[i].speed);
+    
+        if(debug2>3)
+            cout<<" In IDEAL GAS EOS i = "<<i<<", primitives = dens/speed/pres = "<<prim[i].density<<"/"<<prim[i].speed<<"/"<<prim[i].pres<<endl;
     }
+    
 }
 
 void IdealGas_EOS::compute_conserved(const AOS_prim* prim, AOS* cons, int num_cells) const {
@@ -30,6 +34,9 @@ void IdealGas_EOS::compute_conserved(const AOS_prim* prim, AOS* cons, int num_ce
         cons[i].u1 = prim[i].density;
         cons[i].u2 = prim[i].density * prim[i].speed ;
         cons[i].u3 = prim[i].pres/_gamma_m1 + 0.5 * cons[i].u2 * prim[i].speed ;
+        
+        if(debug2>3)
+            cout<<" In IDEAL GAS EOS i = "<<i<<", conserved = dens/mom/e_tot = "<<cons[i].u1<<"/"<<cons[i].u2<<"/"<<cons[i].u3<<" speed/pres/gamma = "<<prim[i].speed<<"/"<<prim[i].pres<<"/"<<_gamma_m1<<endl;
     }
 }
 
@@ -39,6 +46,9 @@ void IdealGas_EOS::compute_auxillary(AOS_prim* prim, int num_cells) const {
         prim[i].internal_energy = (prim[i].pres/prim[i].density)/_gamma_m1 ;
         prim[i].sound_speed = std::sqrt((_gamma_m1+1)*_gamma_m1*prim[i].internal_energy) ;
         prim[i].temperature = prim[i].internal_energy / _cv ;
+        
+        if(debug2>3)
+            cout<<" In IDEAL GAS EOS i = "<<i<<", aux = number/e_int/c_s/temper = "<<prim[i].number_density<<"/"<<prim[i].internal_energy<<"/"<<prim[i].sound_speed<<"/"<<prim[i].temperature<<" dens/speed/pres = "<<prim[i].density<<"/"<<prim[i].speed<<"/"<<prim[i].pres<<endl;
     }
 }
 

@@ -61,7 +61,7 @@ const double P_ref   = 1e-20;
 const double Rho_ref = 1e-20; 
 
 const double cflfactor = 0.9;
-
+const int debug2 = 0;
 
 ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -246,12 +246,14 @@ public:
     
     int init_geometry;
     char collision_model;
+    char opacity_model;
     
     Geometry geometry ;
     
     double dt;
     double cflfactor;
     double t_max;
+    double timestep_rad2;
     double globalTime;
     double output_time;
     double monitor_time;
@@ -530,10 +532,13 @@ public:
     
     std::vector<double> timesteps;
     std::vector<double> timesteps_cs;
+    std::vector<double> timesteps_rad;
     std::vector<double> finalstep;
     double snd_crs_time;
 
     std::vector<AOS_prim> prim ;
+    std::vector<AOS_prim> primlast ;
+    std::vector<double> de_e;
     std::vector<AOS_prim> prim_l ; // Reconstructed left/ right edges
     std::vector<AOS_prim> prim_r ;
     std::vector<double> temp_temperature;
@@ -594,7 +599,7 @@ public:
     void reconstruct_edge_states() ;
     
     AOS hllc_flux(int);
-    AOS dust_flux(int) ;
+    AOS dust_flux(int);
     AOS source_grav(AOS &u, int &j);
 
     void compute_pressure(std::vector<AOS>& u) {

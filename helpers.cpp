@@ -26,6 +26,23 @@
 
 
 double c_Sim::get_cfl_timestep() {
+    
+    //
+    // Compute heuristic radiative timestep
+    //
+    double maxde = 0;
+    
+    for(int s = 0; s < num_species; s++) {
+        for(int i=num_cells; i>=0; i--)  {
+            species[s].de_e[i] = (species[s].primlast[i].internal_energy - species[s].prim[i].internal_energy)/species[s].prim[i].internal_energy;
+            
+            maxde = (species[s].de_e[i] > maxde)?species[s].de_e[i]:maxde;
+            if(debug > 2)
+                cout<<" steps "<<steps<<" species "<<s<<" i = "<<i<<" de/e = "<<species[s].de_e[i]<<" de/e/cflfactor = "<<species[s].de_e[i]/cflfactor<<endl;
+        }
+    }
+    
+    timestep_rad2 = dt / maxde * 0.01;
 
     //
     // Compute individual max wave crossing timesteps per cell

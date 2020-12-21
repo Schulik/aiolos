@@ -58,12 +58,27 @@ void c_Sim::execute() {
     ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~////
     for (globalTime = 0; (globalTime < t_max) && (steps < maxsteps); ) {
         
+        //if(steps == 2013270) 
+        //    debug = 4;
+        
         if(steps==0)
             for(int s = 0; s < num_species; s++)
                 species[s].compute_pressure(species[s].u);
-        
+            
         dt = get_cfl_timestep();
         dt = std::min(dt, t_max - globalTime) ;
+        if(steps > 0)
+            dt = std::min(dt, timestep_rad2) ;
+        else
+            dt = 1e-20;
+        
+        //
+        // Save internal energy before we update it
+        //
+        for(int s = 0; s < num_species; s++)
+            for(int i=num_cells; i>=0; i--)  {
+                species[s].primlast[i].internal_energy = species[s].prim[i].internal_energy;
+            }
         
         //
         // Step 0: Update gravity. Important for self-gravity and time-dependent smoothing length
@@ -72,8 +87,8 @@ void c_Sim::execute() {
         if(debug >= 2)
             cout<<"Beginning timestep "<<steps<<endl;
         
-        if(use_self_gravity==1)
-            update_mass_and_pot();
+        //if(use_self_gravity==1)
+        update_mass_and_pot();
         
         if(debug >= 2)
             cout<<"Before fluxes... ";
@@ -176,12 +191,41 @@ void c_Sim::execute() {
         if(debug > 1)
             cout<<"timestep in execute()="<<dt<<" stepnum "<<steps<<" totaltime"<<globalTime<<endl;
         
+        for(int s = 0; s < num_species; s++) {
+            for(int i=num_cells; i>=0; i--)  {
+                    if(species[s].prim[i].temperature < 0) {
+                        cout<<" NEGATIVE TEMPERATURE at timestep, s/i = "<<s<<"/"<<i<<" in execute()="<<dt<<" stepnum "<<steps<<" totaltime"<<globalTime<<endl;
+                        char stopchar;
+                        cin>>stopchar;
+                    }
+            }
+        }
+        for(int b = 0; b < num_bands; b++) {
+            for(int i=num_cells; i>=0; i--)  {
+                    if(Jrad_FLD(i,b) < 0) {
+                        cout<<" NEGATIVE RAD DENSITY at timestep, b/i = "<<b<<"/"<<i<<" in execute()="<<dt<<" stepnum "<<steps<<" totaltime"<<globalTime<<endl;
+                        char stopchar;
+                        cin>>stopchar;
+                    }
+            }
+        }
+        
     
     }
     cout<<endl;
     
     //Print successful end result
-    cout<<"Finished at time="<<globalTime<<" after steps="<<steps<<" with num_cells="<<num_cells<<endl;
+    double checksum = 0.;
+    for(int s = 0; s < num_species; s++) {
+        for(int i=num_cells; i>=0; i--)  {
+                checksum = (species[s].de_e[i] > checksum )?species[s].de_e[i]:checksum ;
+        }
+    }
+            
+    //checksum /= num_species;
+    //checksum /= (num_cells+2);
+    
+    cout<<"Finished at time="<<globalTime<<" after steps="<<steps<<" with num_cells="<<num_cells<<" and checksum = "<<checksum<<endl;
     
     for(int s=0; s<num_species; s++) 
         species[s].print_AOS_component_tofile(-1);
@@ -223,10 +267,16 @@ void c_Species::execute(std::vector<AOS>& u_in, std::vector<AOS>& dudt) {
         //    cout<<" initial ghost momentum after start: "<<left_ghost.u2<<endl;
         
         if(debug >= 2)
-            cout<<"Done."<<endl<<" Before compute pressure... ";
+            cout<<"Done."<<endl<<" Before compute pressure in species "<<speciesname<<"... ";
         
         compute_pressure(u_in);
+        
+        
+        if(debug >= 2)
+            cout<<"Done. Starting edge-states."<<endl;
+        
         reconstruct_edge_states() ;
+        
         
         if(debug >= 2)
             cout<<"Done. Starting fluxes."<<endl;
@@ -263,14 +313,14 @@ void c_Species::execute(std::vector<AOS>& u_in, std::vector<AOS>& dudt) {
             dudt[j] = (flux[j-1] * base->surf[j-1] - flux[j] * base->surf[j]) / base->vol[j] + (source[j] + source_pressure[j]) ;
             
             //if( (debug > 1) && ( j==1 || j==num_cells || j==(num_cells/2) )) {
-            if( (debug > 2) && ( j==5 || j==1 || j==2 || j==3 || j==4 || j==6 || j==7 || j==8 || j==9 ) && (base->steps==1 || base->steps==0)) {
+            if( (debug > 3) && ( j==5 || j==1 || j==2 || j==3 || j==4 || j==6 || j==7 || j==8 || j==9 ) && (base->steps==1 || base->steps==0)) {
                 char alpha;
                 cout<<"Debuggin fluxes in cell i= "<<j<<" for species "<<speciesname<<" at time "<<base->steps<<endl; 
                 cout<<"     fl.u1 = "<<flux[j-1].u1<<": fr.u1 = "<<flux[j].u1<<endl;
                 cout<<"     fl.u2 = "<<flux[j-1].u2<<": fr.u2 = "<<flux[j].u2<<endl;
                 cout<<"     fl.u3 = "<<flux[j-1].u3<<": fr.u3 = "<<flux[j].u3<<endl;
                 cout<<"     Cartesian fluxes: Fl-Fr+s = "<<((flux[j-1].u2 - flux[j].u2)/base->dx[j] + source[j].u2)<<endl;
-                cout<<"     D_surface/volume="<<(0.5*(base->surf[j]-base->surf[j-1])/base->vol[j])<<" vs. 1/dx="<<(1./base->dx[j])<<endl;
+                cout<<"     D_surface/volume="<<(0.5*(base->surf[j]-base->surf[j-1])/base->vol[j])<<" vs. 1/dx="<<(1./base->dx[j])<<" AL = "<<base->surf[j]<<" AR = "<<base->surf[j-1]<<" VOL = "<<base->vol[j]<<endl;
                 cout<<endl;
                 cout<<"     Reminder, the following three lines must be +- equal for well-balancing:"<<endl;
                 cout<<"     s = "<<source[j].u1<<"/"<<source[j].u2<<"/"<<source[j].u3<<endl;
