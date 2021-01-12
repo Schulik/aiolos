@@ -63,8 +63,9 @@ void c_Species::read_species_data(string filename, int species_index) {
                 this->density_excess   = std::stod(stringlist[7]);
                 this->is_dust_like     = std::stod(stringlist[8]);
                 
+                //if(opacity_model == 'P') {}
                 this->opacity_data_string = stringlist[9];
-                this->num_opacity_datas= std::stod(stringlist[10]);
+                //this->num_opacity_datas= std::stod(stringlist[10]);
                 
                 if(debug > 0)
                     cout<<"Found species called "<<speciesname<<" with a mass of "<<mass_amu<<" dof "<<degrees_of_freedom<<" gamma "<<gamma_adiabat<<" and zeta_0 = "<<initial_fraction<<endl;
@@ -78,7 +79,6 @@ void c_Species::read_species_data(string filename, int species_index) {
     //cout<<"    In read_parameter Pos2"<<endl;
     
     if(found == 0) {
-            
             if(debug > 0)
                 cout<<"WARNING: Species number "<<species_index<<" not found in parameterfile!"<<endl;
     }
@@ -90,31 +90,175 @@ void c_Species::read_species_data(string filename, int species_index) {
     
     if(debug > 0) cout<<"         Leaving species readin now. Bye!"<<endl;
     
-    if(num_opacity_datas > -1) {
+    //
+    // If the opacity model is 'P', physical, then we read in opacity data from files
+    //
+    opacity_avg            = Eigen::VectorXd::Zero(num_bands); //num_cells * num_bands
+    
+    //if(num_opacity_datas > -1) 
+    if(base->opacity_model == 'P') {
         
-        cout<<"Starting reading opacity data. string = "<<opacity_data_string<<" num_opacity_datas = "<<num_opacity_datas<<endl;
+        cout<<"Physical opacity chosen & enough data to read in files. Reading file = "<<("inputdata/" +opacity_data_string)<<endl;
+        //
+        // Start reading opacity data
+        //
         
-        opacity_data = Eigen::MatrixXd::Zero(num_opacity_datas, 2);   //
-        
-        ifstream file2("inputdata/" + opacity_data_string);
+        ifstream file2( "inputdata/" + opacity_data_string);
         string line2;
         
         int data_count=0;
         
+        while(std::getline( file2, line2 ))
+            data_count++;
+        
+        num_opacity_datas = data_count;
+        cout<<" Found data_count = "<<data_count<<endl;
+        
+        file2.clear();
+        file2.seekg(0, ios::beg);
+        
+        Eigen::MatrixXd tmp_opacity_data = Eigen::MatrixXd::Zero(num_opacity_datas, 2);   //
+        
+        cout<<"pos1"<<endl;
+        
+        data_count = 0;
+        
         while(std::getline( file2, line2 )) {
             
             std::vector<string> stringlist = stringsplit(line2," ");
+            //cout<<"Splitting line2 = "<<line2<<" stringlist[1] = "<<std::stod(stringlist[1])<<endl;
             
-            opacity_data(data_count, 0) = std::stod(stringlist[0]);
-            opacity_data(data_count, 1) = std::stod(stringlist[1]);
+            tmp_opacity_data(data_count, 0) = std::stod(stringlist[0]); // Wavelength
+            tmp_opacity_data(data_count, 1) = std::stod(stringlist[1]); // Opacity
             
             data_count++;
         }
         
         file2.close();
+        cout<<"pos2"<<endl;
+        //
+        // Interpolate the possibly non-uniformely binned opacity data on a uniform grid for fast interpolation later
+        //
+        double minDeltaL = 9999999999.;
+        double deltaL;
+        // Determine smallest distance
+        for(int j = 0; j < num_opacity_datas-1; j++) {
+            deltaL    = tmp_opacity_data(j+1, 0) - tmp_opacity_data(j, 0); // Wavelength
+            minDeltaL = (deltaL < minDeltaL)?deltaL:minDeltaL;
+            cout<<" found deltaL = "<<deltaL<<" at j = "<<j<<endl;
+        }
+        
+        // Create grid with resolution as smallest distance
+        int num_tmp_lambdas = (tmp_opacity_data(num_opacity_datas-1,0) - tmp_opacity_data(0,0))/minDeltaL + 2;    
+        opacity_data = Eigen::MatrixXd::Zero(num_tmp_lambdas, 2);   
+    
+        // Find high-res opacity in read-in opacity 
+        int j = 0;
+        for(int i = 0; i< num_tmp_lambdas; i++) {
+            opacity_data(i,0) = tmp_opacity_data(0,0) + ((double)i) * minDeltaL;
+            
+            //for(int j = 0; j < num_opacity_datas-1; j++) {
+            double wl = opacity_data(i,0);
+            double lmin = tmp_opacity_data(j,   0);
+            double lmax = tmp_opacity_data(j+1, 0);
+            
+            if(wl > lmax) {
+                j++;
+                lmin = tmp_opacity_data(j,   0);
+                lmax = tmp_opacity_data(j+1, 0);
+            }
+            
+            //m  =  ( tmp_opacity_data(j+1,1) - tmp_opacity_data(j,1) ) /(lmax-lmin);
+            //opacity_data(i,1) = tmp_opacity_data(j,1) + m * (wl-lmin);
+            double m  =  std::log10(tmp_opacity_data(j+1,1)/tmp_opacity_data(j,1) ) / std::log10(lmax/lmin);
+            opacity_data(i,1) = pow(10., std::log10(tmp_opacity_data(j,1)) + m * std::log10(wl/lmin) );
+            
+            if(i==0)
+                opacity_data(i,1) = tmp_opacity_data(0,1);
+            if(i==num_tmp_lambdas-1)
+                opacity_data(i,1) = tmp_opacity_data(num_opacity_datas-1,1);
+            
+                //else if (wl < tmp_opacity_data(0, 0))
+                //    opacity_data(i,1) = tmp_opacity_data(0,1);
+                //else if (wl > tmp_opacity_data(num_tmp_lambdas-1, 0))
+                //    opacity_data(i,1) = tmp_opacity_data(num_tmp_lambdas-1,1);
+            //}
+            
+        }
+        
+        //
+        // Compute *the* average opacity per band (planck/rosseland/flux means have to be done on the fly)
+        //
+        if(debug > 1) {
+            cout<<" minDeltaL = "<<minDeltaL<<" num_tmp_lambdas = "<<num_tmp_lambdas<<endl;
+            cout<<"tmp_opacity_data = "<<endl<<tmp_opacity_data<<endl;
+            //cout<<"opacity_data = "<<endl<<opacity_data<<endl;
+        }
+        cout<<"pos3"<<endl;
+        for(int b = 0; b< num_bands; b++) {
+            
+            int    wlcount = 0;
+            double lmin = base->l_i[b];
+            double lmax = base->l_i[b+1];
+            opacity_avg(b) = 1e-20;
+            
+            for(int i = 0; i < num_tmp_lambdas; i++) {
+                double wl = opacity_data(i,0);
+                //cout<<" i = "<<i<<" wl = "<<wl<<" opa = "<<opacity_data(i,1)<<endl;
+                
+                if( wl < lmax && wl > lmin) {
+                    opacity_avg(b) += opacity_data(i,1); 
+                    wlcount++;
+                }
+                if(i==0) {
+                    
+                    //TODO: When data boundary and band boundary do not coincide
+                }
+                else if(i==num_tmp_lambdas-2) {
+                    //TODO: When data boundary and band boundary do not coincide
+                }
+            }
+            
+            if(wlcount > 0)
+                opacity_avg(b) /= (double)wlcount;
+            
+            //
+            // For bands which have no opacity data given / first and last band, we assume the nearest datapoint
+            //
+            if(lmax < opacity_data(0,0) ) {
+                opacity_avg(b) = opacity_data(0,1);
+            }
+            if(lmin > opacity_data(num_tmp_lambdas-1,0) ) {
+                opacity_avg(b) = opacity_data(num_tmp_lambdas-1,1);
+            }
+            
+            
+        }
+        cout<<"pos4"<<endl;
+        //Done! Now debug plot stuff
+        if(debug > 1) {
+            cout<<"After reading in data for species = "<<species_index<<endl;
+            
+            for(int b = 0; b < num_bands; b++) {
+                cout<<" Starting band "<<b<<" with lmin/lmax = "<<base->l_i[b]<<"/"<<base->l_i[b+1]<<" opacity_avg = "<<opacity_avg(b)<<endl;
+            }
+            
+            //cout<<"opacity_avg = "<<endl<<opacity_avg<<endl;
+        }
+        
+    }
+    else {
+        for(int b = 0; b < num_bands; b++)
+            opacity_avg(b) = const_opacity;
     }
     
-    cout<<" IN INIT SPECIES, OPACITY_DATA for file "<<opacity_data_string<<" is "<<endl<<opacity_data<<endl;
+    
+    //cout<<" IN INIT SPECIES, OPACITY_DATA for file "<<opacity_data_string<<" is "<<endl<<opacity_data<<endl;
+    if(debug > 1) {
+        
+        char stopchar;
+        cin>>stopchar;
+    }
 }
 
 

@@ -72,7 +72,7 @@ void c_Sim::update_opacities() {
     
     //Compute dtau = dx * kappa * dens
     
-    for(int j=0; j<num_cells+2; j++) {
+    for(int j = num_cells + 1; j>0; j--) {
         
         for(int s=0; s<num_species; s++)
                 species[s].dS(j)  = 0.;
@@ -89,8 +89,8 @@ void c_Sim::update_opacities() {
             }
             cell_optical_depth(j,b) = total_opacity(j, b) * dx[j] ;
             
-            if(j==num_cells)
-                radial_optical_depth(j,b) = cell_optical_depth(j,b);
+            if(j==num_cells+1)
+                radial_optical_depth(j,b) = 0.; //cell_optical_depth(j,b);
             else
                 radial_optical_depth(j,b) = radial_optical_depth(j+1,b) + cell_optical_depth(j,b);
                 
@@ -111,7 +111,7 @@ void c_Sim::update_opacities() {
             if(debug >= 1)
                 cout<<" in cell ["<<j<<"] band ["<<b<<"] top-of-the-atmosphere heating = "<<solar_heating(b)<<" tau_rad(j,b) = "<<radial_optical_depth(j,b)<<" exp(tau) = "<<std::exp(-radial_optical_depth(j,b))<<endl;
             
-            if(j<num_cells)
+            if(j<num_cells+1)
                 dS_band(j,b) = (surf[j+1] * S_band(j+1,b) - surf[j] * S_band(j,b))/vol[j];
             else
                 dS_band(j,b) = 0;
@@ -150,22 +150,60 @@ void c_Sim::update_opacities() {
 }
 
 void c_Species::update_opacities() {
-    
-    for(int j=0; j< num_cells+2; j++) {
-        for(int b=0; b<num_bands; b++) {
-            
-            if(base->radiation_matter_equilibrium_test <= 3) {
-                opacity(j,b)        = const_opacity; // TODO: Replace with some_complex_tabulated_opacity_function() or link with the opacity_data matrix
-                opacity_planck(j,b) = const_opacity; // TODO: Replace with some_complex_tabulated_opacity_function() or link with the opacity_data matrix   
-            }
-            else if(base->radiation_matter_equilibrium_test == 4){ //The nonlinear commercon radiative diffusion test
+    /*
+    else if(base->radiation_matter_equilibrium_test == 4){ //The nonlinear commercon radiative diffusion test
                 opacity(j,b)        = 1e11/this->u[j].u1*pow(base->Jrad_FLD(j,b)/c_light*4.*pi, -1.5 );
                 opacity_planck(j,b) = 1e11/this->u[j].u1*pow(base->Jrad_FLD(j,b)/c_light*4.*pi, -1.5 );                
+            }*/
+    
+    if(base->opacity_model == 'P') {
+        
+        if(is_dust_like == 0) {
+            
+            //is_gas_like: implement pressure broadening
+            for(int j=0; j< num_cells+2; j++) {
+                for(int b=0; b<num_bands; b++) {
+                    
+                    opacity(j,b)        = opacity_avg(b) * (1. + pressure_broadening_factor * prim[j].pressure/1e5); //interpol_opacity(j,b); 
+                    opacity_planck(j,b) = opacity_avg(b) * (1. + pressure_broadening_factor * prim[j].pressure/1e5); //opacity(j,b);
+                }
             }
+            
             
             
         }
+        else { //is_dust_like
+            
+            for(int j=0; j< num_cells+2; j++) {
+                for(int b=0; b<num_bands; b++) {
+                    
+                    opacity(j,b)        = opacity_avg(b); //interpol_opacity(j,b); 
+                    opacity_planck(j,b) = opacity_avg(b); //opacity(j,b);
+                }
+            }
+            
+        }
+        
+        if(debug > 3) {
+            cout<<" Physical opacities used, and species["<<this_species_index<<"] is_dust_like ="<<is_dust_like<<endl;
+        }
+                
     }
+    else { //opacity_model == 'C', the default
+        
+        for(int j=0; j< num_cells+2; j++) {
+            for(int b=0; b<num_bands; b++) {
+                opacity(j,b)        = const_opacity; 
+                opacity_planck(j,b) = const_opacity; 
+            }
+        }
+        
+        if(debug > 3) {
+            cout<<" Constant opacities used, and species["<<this_species_index<<"] is_dust_like ="<<is_dust_like<<endl;
+        }
+    }
+    
+    
 }
 
 

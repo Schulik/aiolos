@@ -506,16 +506,17 @@ public:
     std::vector<AOS> flux;
     std::vector<double> u_analytic;
     
-    Eigen::MatrixXd opacity_data;   //
+    Eigen::MatrixXd opacity_data;   //superhigh-res lamdba grid, resolution dependent on minimum wl-distance in opacity data
     Eigen::MatrixXd opacity;        //num_cells * num_bands
-    Eigen::MatrixXd opacity_planck; //num_cells
+    Eigen::VectorXd opacity_avg; //num_bands
+    Eigen::MatrixXd opacity_planck; //num_cells * num_bands
     Eigen::MatrixXd fraction_total_opacity; //num_cells * num_bands
     Eigen::MatrixXd dS;
+    double dlogOpa;
     
     //std::vector<double> opticaldepth;
     //std::vector<double> opacity;
     //std::vector<double> radiative_flux;
-    
     
     double density_excess;
     double bondi_radius;
@@ -523,6 +524,7 @@ public:
     double const_T_space;
     double const_opacity;
     int    is_dust_like;
+    double pressure_broadening_factor;
     
     ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     //
@@ -608,6 +610,12 @@ public:
     }
     
     void update_opacities();
+    double interpol_opacity(int j, int b) {
+        
+        int index_l = base->l_i[b] ;
+        int index_u = base->l_i[b+1];
+        
+    }
     
     //
     // Equations of state

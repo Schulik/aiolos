@@ -195,22 +195,22 @@ void c_Sim::execute() {
             for(int i=num_cells; i>=0; i--)  {
                     if(species[s].prim[i].temperature < 0) {
                         cout<<" NEGATIVE TEMPERATURE at timestep, s/i = "<<s<<"/"<<i<<" in execute()="<<dt<<" stepnum "<<steps<<" totaltime"<<globalTime<<endl;
-                        char stopchar;
-                        cin>>stopchar;
+                        cout<<" Writing crash dump into last output and exiting program."<<endl;
+                        globalTime = 1.1*t_max;
                     }
             }
+            
         }
         for(int b = 0; b < num_bands; b++) {
             for(int i=num_cells; i>=0; i--)  {
                     if(Jrad_FLD(i,b) < 0) {
                         cout<<" NEGATIVE RAD DENSITY at timestep, b/i = "<<b<<"/"<<i<<" in execute()="<<dt<<" stepnum "<<steps<<" totaltime"<<globalTime<<endl;
-                        char stopchar;
-                        cin>>stopchar;
+                        cout<<" Writing crash dump into last output and exiting program."<<endl;
+                        globalTime = 1.1*t_max;
                     }
             }
         }
         
-    
     }
     cout<<endl;
     
