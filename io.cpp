@@ -236,8 +236,14 @@ void c_Species::read_species_data(string filename, int species_index) {
         }
         cout<<"pos4"<<endl;
         //Done! Now debug plot stuff
+        cout<<"Done reading in data for species = "<<species_index<<" avg opacities per band = ";
+        for(int b = 0; b < num_bands; b++) {
+                cout<<opacity_avg(b)<<"/";
+        }
+        cout<<endl;
+        
         if(debug > 1) {
-            cout<<"After reading in data for species = "<<species_index<<endl;
+            
             
             for(int b = 0; b < num_bands; b++) {
                 cout<<" Starting band "<<b<<" with lmin/lmax = "<<base->l_i[b]<<"/"<<base->l_i[b+1]<<" opacity_avg = "<<opacity_avg(b)<<endl;
@@ -368,7 +374,7 @@ template simulation_parameter<BoundaryType> read_parameter_from_file(string, str
 template simulation_parameter<IntegrationType> read_parameter_from_file(string, string, int, IntegrationType);
 template simulation_parameter<IntegrationType> read_parameter_from_file(string, string, int);
 
-//Print 2 
+
 void c_Species::print_AOS_component_tofile(int timestepnumber) {
                            
     //
@@ -377,7 +383,11 @@ void c_Species::print_AOS_component_tofile(int timestepnumber) {
     if(base->init_wind==1 && base->problem_number == 2) 
         compute_analytic_solution();
     
-    // Choose a sensible default output name
+    // 
+    //
+    // Step 1: Print general information file with fixed column numbers for all setups
+    //
+    //
     string filename ;
     {
         stringstream filenamedummy;
@@ -385,15 +395,6 @@ void c_Species::print_AOS_component_tofile(int timestepnumber) {
         filenamedummy<<base->workingdir<<"output_"<<truncated_name<<"_"<<speciesname<<"_t"<<timestepnumber<<".dat";
         filename = filenamedummy.str() ;
     }
-    /*
-    filename = read_parameter_from_file<string>(base->workingdir+base->simname, "OUTPUT_FILENAME", debug-1, filename).value ;
-
-    // Add the snap number
-    {
-        stringstream filenamedummy;
-        filenamedummy << filename<<"_"<< speciesname << "_t" << timestepnumber << ".dat";
-        filename = filenamedummy.str() ;
-    }*/
 
     if(debug > 1)
         cout<<"Trying to open file "<<filename<<endl;
@@ -422,7 +423,14 @@ void c_Species::print_AOS_component_tofile(int timestepnumber) {
             hydrostat2 = flux[i].u2/base->dx[i];//pressure[i+1] - pressure[i];
             hydrostat3 = source[i].u2;//0.5 * (u[i].u1 + u[i+1].u1) * (phi[i+1] - phi[i]);
             
-            outfile<<base->x_i12[i]<<'\t'<<u[i].u1<<'\t'<<u[i].u2<<'\t'<<u[i].u3<<'\t'<<flux[i].u1<<'\t'<<flux[i].u2<<'\t'<<flux[i].u3<<'\t'<<balance1<<'\t'<<balance2<<'\t'<<balance3<<'\t'<<prim[i].pres<<'\t'<<u[i].u2/u[i].u1<<'\t'<<prim[i].temperature <<'\t'<<timesteps[i]<<'\t'<<base->phi[i]<<'\t'<<prim[i].sound_speed<<'\t'<<1.<<'\t'<<u_analytic[i]<<'\t'<<base->alphas_sample(i)<<'\t'<<hydrostat3<<'\t'<<base->enclosed_mass[i]-base->planet_mass<<'\t'<<(base->Jrad_FLD(i,0)/c_light*4.*pi)<<'\t'<<base->S_band(i,0)<<endl;
+            double Jtot = 0.;
+            double Stot = 0.;
+            for(int b=0; b<num_bands; b++) {
+                Jtot += base->Jrad_FLD(i,b)/c_light*4.*pi;
+                Stot += base->S_band(i,b);
+            }
+            
+            outfile<<base->x_i12[i]<<'\t'<<u[i].u1<<'\t'<<u[i].u2<<'\t'<<u[i].u3<<'\t'<<flux[i].u1<<'\t'<<flux[i].u2<<'\t'<<flux[i].u3<<'\t'<<balance1<<'\t'<<balance2<<'\t'<<balance3<<'\t'<<prim[i].pres<<'\t'<<u[i].u2/u[i].u1<<'\t'<<prim[i].temperature <<'\t'<<timesteps[i]<<'\t'<<base->phi[i]<<'\t'<<prim[i].sound_speed<<'\t'<<1.<<'\t'<<u_analytic[i]<<'\t'<<base->alphas_sample(i)<<'\t'<<hydrostat3<<'\t'<<base->enclosed_mass[i]-base->planet_mass<<'\t'<<Jtot<<'\t'<<Stot<<endl;
         }
         
         //Print right ghost stuff
@@ -432,8 +440,110 @@ void c_Species::print_AOS_component_tofile(int timestepnumber) {
     }
     else cout << "Unable to open file" << filename << endl; 
     outfile.close();
+    
+    
 
 }
+
+void c_Sim::print_diagnostic_file(int outputnumber) {
+    
+    //
+    //
+    // Step 2: Print radiation + species diagnostics file. Column numbers in this file will vary depending on setup
+    //
+    //
+    
+    //Only print this file once, as it contains all the info 
+    
+        
+        string filenameDiagnostic ;
+        {
+            stringstream filenamedummy;
+            string truncated_name = stringsplit(simname,".")[0];
+            filenamedummy<<workingdir<<"diagnostic_"<<truncated_name<<"_t"<<outputnumber<<".dat";
+            filenameDiagnostic = filenamedummy.str() ;
+        }
+
+        if(debug > 1)
+            cout<<"Trying to open file "<<filenameDiagnostic<<endl;
+        
+        ofstream outfileDiagnostic(filenameDiagnostic, ios::out);
+        outfileDiagnostic << std::setprecision(15) ;
+
+        if (outfileDiagnostic.is_open())
+        {
+            
+            //outfileDiagnostic<<""<<endl;
+            
+            for(int i=1; i<=num_cells; i++) {
+                
+                //
+                //Band-by-band info
+                // 
+                double Jtot = 0.;
+                double Stot = 0.;
+                for(int b=0; b<num_bands; b++) {
+                    Jtot += Jrad_FLD(i,b)/c_light*4.*pi;
+                    Stot += S_band(i,b);
+                }
+                outfileDiagnostic<<x_i12[i]<<'\t'<<Jtot<<'\t'<<Stot;
+                
+                //Radiation field
+                for(int b=0; b<num_bands; b++) {
+                    outfileDiagnostic<<'\t'<<Jrad_FLD(i,b);
+                }
+                
+                //Solar radiation field
+                for(int b=0; b<num_bands; b++) {
+                    outfileDiagnostic<<'\t'<<S_band(i,b);
+                }
+                
+                //Solar heating profile
+                for(int b=0; b<num_bands; b++) {
+                    outfileDiagnostic<<'\t'<<dS_band(i,b);
+                }
+                
+                //Total opacity from all species
+                for(int b=0; b<num_bands; b++) {
+                    outfileDiagnostic<<'\t'<<total_opacity(i,b);
+                }
+                
+                //Total opacity from all species
+                for(int b=0; b<num_bands; b++) {
+                    outfileDiagnostic<<'\t'<<cell_optical_depth(i,b);
+                }
+                
+                //Optical depths for solar radiation
+                for(int b=0; b<num_bands; b++) {
+                    outfileDiagnostic<<'\t'<<radial_optical_depth(i,b);
+                }
+                
+                //
+                //Species-by-species and band opacities
+                //
+                for(int b=0; b<num_bands; b++) {
+                    for(int s=0; s<num_species; s++) {
+                        outfileDiagnostic<<'\t'<<species[s].opacity(i,b);
+                    }
+                }
+                
+                //Radiative and species temperatures
+                outfileDiagnostic<<'\t'<<pow(Jtot*pi/sigma_rad*c_light/4./3.141, 0.25);      //col 5: The radiative temperature 
+                
+                for(int s=0; s<num_species; s++)
+                    outfileDiagnostic<<'\t'<<species[s].prim[i].temperature; //col 6-...: all species temperatures 
+                
+                outfileDiagnostic<<endl;
+            }
+            
+            
+            
+        }else cout << "Unable to open file" << filenameDiagnostic << endl; 
+        outfileDiagnostic.close();
+    
+    
+}
+
 
 void c_Sim::print_monitor(int num_steps) {
 
@@ -539,7 +649,6 @@ void c_Sim::print_monitor(int num_steps) {
         //Starting with col 6
         for(int b=0; b<num_bands; b++) 
             monitor<<Jrad_FLD(5,b)*4*pi/c_light<<'\t'; 
-        
         
         
         //Convergence measures for radiative quantities

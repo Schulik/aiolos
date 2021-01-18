@@ -33,7 +33,7 @@
     //
     void c_Sim::init_grav_pot() {
         
-        for(int i = 1; i <= num_cells; i++) {
+        for(int i = 1; i <= num_cells+1; i++) {
             enclosed_mass[i] = planet_mass;      //No self-gravity
             phi[i]           = get_phi_grav(x_i12[i], enclosed_mass[i]);
             

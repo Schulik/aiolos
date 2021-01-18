@@ -221,6 +221,7 @@ public:
     int i_wien;
     int i_rayleighjeans;
     double lT_spacing;
+    char temperature_model;
     double T_crit_min;
     double T_crit_max; //Critical min/max temperatures beyond which one should extend the wavelength grid
     
@@ -228,6 +229,10 @@ public:
     std::vector<double>dx;
     double domain_min, domain_max;
     double cells_per_decade;
+    double grid2_cells_per_decade;
+    double grid2_extension;
+    double grid2_transition;
+    
     int type_of_grid;       //0 = cartesian, 1 = log
     std::vector<double> x_i;    		//The cell boundaries
     std::vector<double> x_i12;  		//The cell mid positions
@@ -435,7 +440,7 @@ public:
     double get_phi_grav(double &r, double &mass);
     
     void print_monitor(int i);
-    
+    void print_diagnostic_file(int i);
  
     
 public:
@@ -571,7 +576,8 @@ public:
     void initialize_default_test();
     void initialize_space_test(AOS background);
     void initialize_custom_setup();
-    void initialize_hydrostatic_atmosphere();
+    void initialize_hydrostatic_atmosphere(string);
+    void initialize_exponential_atmosphere();
     void initialize_sound_wave();
     void compute_analytic_solution();
     

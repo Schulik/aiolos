@@ -103,7 +103,9 @@ void c_Sim::execute() {
                 species[s].print_AOS_component_tofile((int) output_counter);
             }
             print_monitor((int)monitor_counter);
-                
+            if(steps==1)
+                print_diagnostic_file((int)output_counter);
+            
             monitor_counter+=1.;
             output_counter +=1.;
          }
@@ -111,8 +113,10 @@ void c_Sim::execute() {
              if(debug >= 1)
                  cout<<" Globaltime is "<<globalTime<<" and comparevalue is "<<output_counter<<" "<<output_time<<endl;
              
+             print_diagnostic_file((int)output_counter);
              for(int s=0; s<num_species; s++)
                 species[s].print_AOS_component_tofile((int)output_counter); 
+             
              
              output_counter+=1.; 
          }
@@ -229,6 +233,7 @@ void c_Sim::execute() {
     
     for(int s=0; s<num_species; s++) 
         species[s].print_AOS_component_tofile(-1);
+    print_diagnostic_file(-1);
     print_monitor(-1);
         
 }

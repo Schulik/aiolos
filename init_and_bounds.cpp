@@ -66,6 +66,13 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
             cells_per_decade = read_parameter_from_file<double>(filename,"PARI_CELLS_PER_DECADE", debug).value;
             num_cells        = (int) ( (log10f(domain_max) - log10f(domain_min)) * cells_per_decade );
             dx0              = domain_min;
+            
+            if(type_of_grid==2) {
+                    grid2_extension        = read_parameter_from_file<double>(filename,"GRID2_EXTENSION", debug, 99.e99).value;
+                    grid2_cells_per_decade = read_parameter_from_file<double>(filename,"GRID2_CELLS_PER_DECADE", debug, 10).value;
+                    
+                    num_cells  += (int) ( (log10f(grid2_extension) - log10f(domain_max)) * grid2_cells_per_decade );
+            }
             cout<<"Domain specifics:  "<<domain_min<<" | . .  .  "<<num_cells<<" nonuniform cells .       .             .     | "<<domain_max<<endl;
         }
         
@@ -103,8 +110,6 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
         //    Control parameters for users
         //
         ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-        
         
         problem_number    = read_parameter_from_file<int>(filename,"PARI_PROBLEM_NUMBER", debug).value;
         use_self_gravity  = read_parameter_from_file<int>(filename,"PARI_SELF_GRAV_SWITCH", debug, 0).value;
@@ -115,6 +120,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
         rad_energy_multiplier=read_parameter_from_file<double>(filename,"PARI_RAD_MULTIPL", debug, 1.).value;
         collision_model   = read_parameter_from_file<char>(filename,"PARI_COLL_MODEL", debug, 'C').value;
         opacity_model     = read_parameter_from_file<char>(filename,"PARI_OPACITY_MODEL", debug, 'C').value;
+        temperature_model = read_parameter_from_file<char>(filename,"INIT_TEMPERATURE_MODEL", debug, 'P').value;
         friction_solver   = read_parameter_from_file<int>(filename,"FRICTION_SOLVER", debug, 0).value;
         do_hydrodynamics  = read_parameter_from_file<int>(filename,"DO_HYDRO", debug, 1).value;
         rad_solver_max_iter = read_parameter_from_file<int>(filename,"MAX_RAD_ITER", debug, 1).value;
@@ -166,7 +172,6 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
         enclosed_mass   = np_zeros(num_cells+2);
         phi             = np_zeros(num_cells+2);
         
-        
         if(num_bands < 1) {
             cout<<" In INIT RADIATION, invalid num_bands = "<<num_bands<<" changing to num_bands = 1."<<endl;
             
@@ -176,7 +181,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
         l_i       = np_zeros(num_bands+1);    // Wavelenght bin boundaries
         l_i12     = np_zeros(num_bands);      // Wavelength bin midpoints or averages
         
-        l_i[0]         = lminglobal/100.;
+        l_i[0]         = lminglobal/100.;     //Transform wavelengths into microns
         l_i[num_bands] = lmaxglobal/100.;
         
         if(num_bands == 2) {
@@ -197,7 +202,6 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
                 l_i[b]      = l_i[b-1] * dlogl2;
                 cout<<" in NUM_BANDS>2, b = "<<b<<" l_i[b] = "<<l_i[b]<<endl;
             }
-            
             
             for(int b=0; b<num_bands; b++) {
                 l_i12[b]  = pow( 10., 0.5 * (std::log10(l_i[b]) + std::log10(l_i[b+1])));   
@@ -233,6 +237,28 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
             cout<<"We have a changed DOMAIN MAX = "<<domain_max<<endl;
                 
         }
+        else if(type_of_grid==2) { //power-law grid with higher log-resolution near the planet
+            
+            double dlogx  = pow(10.,1./cells_per_decade);
+            double dlogx2 = pow(10.,1./grid2_cells_per_decade);
+            
+            //x_i[0] = domain_min / std::pow(dlogx, (num_ghosts-1)) ;
+            x_i[0] = domain_min - dx0*(num_ghosts-1) ;
+            for(int i=1; i<= num_cells; i++) {
+                
+                if(x_i[i-1] < domain_max)
+                    x_i[i]   =  x_i[i-1] * dlogx;
+                else
+                    x_i[i]   =  x_i[i-1] * dlogx2;
+            }
+            
+            //Assign the last boundary as domain maximum as long as nonuniform grid is in the test-phase
+            grid2_transition = domain_max;
+            domain_max       = x_i[num_cells];
+            cout<<"We have a changed DOMAIN MAX = "<<domain_max<<endl;
+            
+            
+        }
         //Uniform grid
         else {
             x_i[0] = domain_min - dx0*(num_ghosts-1) ;
@@ -241,7 +267,6 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
             }
         }
 
-       
         //
         // Differences, surfaces and volumes for all geometries
         //
@@ -328,7 +353,6 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
                 broken_value = dx[i];
             }
         
-        
         if(debug > 0) cout<<"Init: Finished grid setup"<<endl;
         if(!all_grid_ok) {
             std::stringstream err ;
@@ -336,7 +360,6 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
             err<<" FIRST AND LAST DX = "<<dx[0]<<" / "<<dx[num_cells+1]<<endl;
             throw std::runtime_error(err.str()) ;
         }
-            
         
         //
         //Computing the metric factors for 2nd order non-uniform differentials
@@ -825,7 +848,10 @@ c_Species::c_Species(c_Sim *base_simulation, string filename, string species_fil
             // If we want to initialize a hydrostatic atmosphere, then we overwrite the so far given density/pressure data and set every velocity to 0
             //
             if(init_static_atmosphere == 1) {
-                initialize_hydrostatic_atmosphere();
+                initialize_hydrostatic_atmosphere(filename);
+            }
+            else if (init_static_atmosphere == 2) {
+                initialize_exponential_atmosphere();
             }
 
             if(debug > 0) cout<<"        Species["<<species_index<<"] initialized problem 2."<<endl;
@@ -857,7 +883,7 @@ c_Species::c_Species(c_Sim *base_simulation, string filename, string species_fil
 
 
 
-void c_Species::initialize_hydrostatic_atmosphere() {
+void c_Species::initialize_hydrostatic_atmosphere(string filename) {
     
     if(debug > 0) cout<<"            ATTENTION: Initializing hydrostatic construction for species "<<speciesname<<" and overwriting prior initial values."<<endl;
     
@@ -868,6 +894,8 @@ void c_Species::initialize_hydrostatic_atmosphere() {
     double metric_inner;
     //double residual;
     double metric_outer;
+    
+    double dphi_factor = read_parameter_from_file<double>(filename,"PARI_DPHI_FACTOR", debug, 1.).value;
     //
     // Start with the outermost cell and build up a hydrostatic atmosphere
     // Fulfilling KKM16, Eqn. 17
@@ -879,12 +907,14 @@ void c_Species::initialize_hydrostatic_atmosphere() {
     //
     for(int i=num_cells+1; i>=0; i--) {
             
+        if(base->temperature_model == 'P')
             prim[i].temperature = - 1.0 * base->phi[i] / (cv * gamma_adiabat) + const_T_space;
-            //prim[i].temperature = const_T_space;
+        else
+            prim[i].temperature = const_T_space;
             
             //Add temperature bumps and troughs
-            prim[i].temperature += TEMPERATURE_BUMP_STRENGTH * 4.  * exp( - pow(base->x_i12[i] - 1.e-1 ,2.) / (0.1) );
-            prim[i].temperature -= TEMPERATURE_BUMP_STRENGTH * 15. * exp( - pow(base->x_i12[i] - 7.e-3 ,2.) / (1.5e-3) );
+            //prim[i].temperature += TEMPERATURE_BUMP_STRENGTH * 4.  * exp( - pow(base->x_i12[i] - 1.e-1 ,2.) / (0.1) );
+            //prim[i].temperature -= TEMPERATURE_BUMP_STRENGTH * 15. * exp( - pow(base->x_i12[i] - 7.e-3 ,2.) / (1.5e-3) );
 
     }
     
@@ -904,6 +934,10 @@ void c_Species::initialize_hydrostatic_atmosphere() {
         eos->get_p_over_rho_analytic(&T_inner, &factor_inner);
         
         metric_outer = (base->phi[i+1] - base->phi[i]) * base->omegaplus[i+1] * base->dx[i+1] / (base->dx[i+1] + base->dx[i]);
+        
+        //if(i==num_cells || i==num_cells-1)
+        //    metric_inner = dphi_factor * (base->phi[i+1] - base->phi[i]) * base->omegaminus[i]  * base->dx[i]   / (base->dx[i+1] + base->dx[i]);
+        //else
         metric_inner = (base->phi[i+1] - base->phi[i]) * base->omegaminus[i]  * base->dx[i]   / (base->dx[i+1] + base->dx[i]);
         
         temp_rhofinal = u[i+1].u1 * (factor_outer + metric_outer) / (factor_inner - metric_inner);
@@ -919,13 +953,16 @@ void c_Species::initialize_hydrostatic_atmosphere() {
             
             char a;
             cout.precision(16);
-            cout<<"NEGATIVE DENSITY IN INIT HYDROSTATIC i="<<i<<endl;
+            cout<<"NEGATIVE DENSITY IN INIT HYDROSTATIC i="<<i<<"/"<<num_cells<<endl;
             if((factor_inner - metric_inner) < 0) {
                 
                 cout<<"     Negative denominator detected. Product (gamma-1)*cv*T_inner is too small for chosen discretization."<<endl;
                 
             }
             cout<<endl;
+            cout<<"     dphi debug: phi["<<i+1<<"] = "<<base->phi[i+1]<<" phi["<<i<<"] = "<<base->phi[i]<<" num_cells = "<<num_cells<<endl;
+            cout<<"     metric_inner debug: dPhi = "<<(base->phi[i+1] - base->phi[i])<<" dx[i+1]+dx[i] = "<<(base->dx[i+1] + base->dx[i])<<" omega*dx  = "<<base->omegaminus[i]  * base->dx[i]<<endl;
+            cout<<"     factor_inner debug: gamma-1 = "<<(gamma_adiabat-1.)<<" cv = "<<cv<<" T_inner = "<<T_inner<<endl;
             cout<<"     metric_outer = "<< metric_outer << " metric_inner = "<<metric_inner <<endl;
             cout<<"     factor_outer = "<< factor_outer << " factor_inner = "<<factor_inner <<endl;
             cout<<"     factor_outer+metric_outer = "<< (factor_outer + metric_outer) << " factor_inner-metric_inner = "<<( factor_inner - metric_inner) <<endl;
@@ -980,6 +1017,29 @@ void c_Species::initialize_hydrostatic_atmosphere() {
     
     //TODO:Give some measure if hydrostatic construction was also successful, and give warning if not.
 
+}
+
+void c_Species::initialize_exponential_atmosphere() {
+    
+    for(int i=num_cells+1; i>=0; i--) {
+            prim[i].temperature = const_T_space;
+    }
+    
+    
+    for(int i=num_cells; i>=0; i--)  {
+        double temp_rhofinal = u[i].u1*std::exp(-1./550e5*(base->x_i[i] - base->x_i[num_cells]));
+        
+        u[i] = AOS(temp_rhofinal, 0., cv * temp_rhofinal * prim[i].temperature) ;
+    }
+    cout<<endl<<endl;
+    cout<<"            Ended expoenential density construction for species "<<speciesname<<endl;
+    cout<<"            Ended expoenential density construction for species "<<speciesname<<endl;
+    cout<<"            Ended expoenential density construction for species "<<speciesname<<endl;
+    cout<<"            Ended expoenential density construction for species "<<speciesname<<endl;
+    cout<<"            Ended expoenential density construction for species "<<speciesname<<endl;
+    cout<<"            Ended expoenential density construction for species "<<speciesname<<endl;
+    cout<<"            Ended expoenential density construction for species "<<speciesname<<endl;
+    cout<<endl<<endl;
 }
 
 

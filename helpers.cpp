@@ -15,9 +15,6 @@
 #include <stdexcept>
 #include "aiolos.h"
 
-
-
-
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 //
 // CFL Timestep

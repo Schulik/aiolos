@@ -11,11 +11,8 @@
 
 #define EIGEN_RUNTIME_NO_MALLOC
 
-
 #include <cassert>
 #include "aiolos.h"
-
-
 
         ///////////////////////////////////////////////////////////
         //
@@ -95,7 +92,7 @@ void c_Sim::update_opacities() {
                 radial_optical_depth(j,b) = radial_optical_depth(j+1,b) + cell_optical_depth(j,b);
                 
             //
-            // Afyter the total optical depth per band is known, we assign the fractional optical depths
+            // After the total optical depth per band is known, we assign the fractional optical depths
             // Maybe merge with previous loop for optimization
             //
             
@@ -103,7 +100,7 @@ void c_Sim::update_opacities() {
                     species[s].fraction_total_opacity(j,b) = species[s].opacity(j,b) * species[s].u[j].u1 * dx[j] / cell_optical_depth(j,b);
             
             //
-            // Now compute the attentiation of solar radiation and then assign the lost energy back to individual species in a manner that conserves energy
+            // Now compute the attenuation of solar radiation and then assign the lost energy back to individual species in a manner that conserves energy
             //
             
             S_band(j,b)  = solar_heating(b) * std::exp(-radial_optical_depth(j,b));
@@ -112,7 +109,7 @@ void c_Sim::update_opacities() {
                 cout<<" in cell ["<<j<<"] band ["<<b<<"] top-of-the-atmosphere heating = "<<solar_heating(b)<<" tau_rad(j,b) = "<<radial_optical_depth(j,b)<<" exp(tau) = "<<std::exp(-radial_optical_depth(j,b))<<endl;
             
             if(j<num_cells+1)
-                dS_band(j,b) = (surf[j+1] * S_band(j+1,b) - surf[j] * S_band(j,b))/vol[j];
+                dS_band(j,b) = (surf[j+1] * S_band(j+1,b) - surf[j] * S_band(j,b))/vol[j]/4.;
             else
                 dS_band(j,b) = 0;
             
@@ -160,12 +157,12 @@ void c_Species::update_opacities() {
         
         if(is_dust_like == 0) {
             
-            //is_gas_like: implement pressure broadening
+            //is_gas_like: Either constant or read-in opacities, with additional pressure broadening as suggested by Robinson & Catling 2013 Nat.Geo
             for(int j=0; j< num_cells+2; j++) {
                 for(int b=0; b<num_bands; b++) {
                     
-                    opacity(j,b)        = opacity_avg(b) * (1. + pressure_broadening_factor * prim[j].pressure/1e5); //interpol_opacity(j,b); 
-                    opacity_planck(j,b) = opacity_avg(b) * (1. + pressure_broadening_factor * prim[j].pressure/1e5); //opacity(j,b);
+                    opacity(j,b)        = opacity_avg(b) * (1. + pressure_broadening_factor * prim[j].pres/1e5); //interpol_opacity(j,b); 
+                    opacity_planck(j,b) = opacity_avg(b) * (1. + pressure_broadening_factor * prim[j].pres/1e5); //opacity(j,b);
                 }
             }
             
@@ -370,7 +367,7 @@ void c_Sim::update_fluxes_FLD() {
                     int idx_rb = j*num_vars + b ; 
 
                     // TODO multiply by fraction in band.
-                    double fac = species[s].opacity(j, b) * sigma_rad*Ts*Ts*Ts / pi; // * compute_planck_function_integral3(l_i[b], l_i[b+1], species[s].prim[j].temperature);
+                    double fac = species[s].opacity(j, b) * sigma_rad*Ts*Ts*Ts / pi * compute_planck_function_integral3(l_i[b], l_i[b+1], species[s].prim[j].temperature);
                     
                     d[idx_s ] += 16 * pi * fac / species[s].cv ;
                     d[idx_sb] = - 4 * pi * species[s].opacity(j, b) / species[s].cv ;
@@ -387,7 +384,6 @@ void c_Sim::update_fluxes_FLD() {
                         cout<<" radiation part2, t = "<<steps<<" b["<<b<<"] i["<<j<<"] s["<<s<<"] l/d/u/r_rs/rs_rb = "<<d[idx_s]<<"/"<<d[idx_sb]<<"/"<<d[idx_b]<<"/"<<d[idx_bs]<<"/"<<r[idx_rs]<<"/"<<r[idx_rb]<<" opac = "<<vol[j] * rhos * species[s].opacity(j, b)<<endl;
                 }
             }
-            
     }
     if(debug > 4) {
         char stepstop;
