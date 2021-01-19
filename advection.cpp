@@ -354,7 +354,7 @@ AOS c_Species::hllc_flux(int j)
 {
     int jleft = j, jright = j+1;
     AOS flux;
-    int option;
+    int option = 0;
     
     //Speed of gas
     double ul = prim_r[jleft].speed;  

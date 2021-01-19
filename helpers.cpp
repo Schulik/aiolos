@@ -156,16 +156,16 @@ vector<string> stringsplit(const string& str, const string& delim)
 
 double compute_planck_function_integral(double lmin, double lmax, double temperature) {
     
-    int num_steps=3;
-    double dloggrid = pow(lmax/lmin, 1./((double)num_steps));
+    //int num_steps=3;
+    //double dloggrid = pow(lmax/lmin, 1./((double)num_steps));
     double l1;
     double l2;
     double l_avg;
     double l_avginv;
     double expfactor;
-    double lam_db = h_planck*c_light/(kb*temperature)/angstroem;
-    double prefactor;
-    double tempresult = 0;
+    //double lam_db = h_planck*c_light/(kb*temperature)/angstroem;
+    //double prefactor;
+    //double tempresult = 0;
     
     l1        = lmin ;//* pow(dloggrid,(double)i);
     l2        = lmax ;//l1 * dloggrid;
@@ -186,8 +186,8 @@ double compute_planck_function_integral2(double lmin, double lmax, double temper
     double l_avg;
     double l_avginv;
     double expfactor;
-    double lam_db = h_planck*c_light/(kb*temperature)/angstroem;
-    double prefactor;
+    //double lam_db = h_planck*c_light/(kb*temperature)/angstroem;
+    //double prefactor;
     double tempresult = 0;
     //cout<<"    In compute_planck lmin/lmax/dloggrid = "<<lmin<<"/"<<lmax<<"/"<<dloggrid<<" ";
             
@@ -217,8 +217,8 @@ double c_Sim::compute_planck_function_integral3(double lmin, double lmax, double
     double lT_min = lmin * temperature;
     double lT_max = lmax * temperature;
     double m;
-    int imin;
-    int imax;
+    int imin = 0;
+    int imax = num_plancks;
     
     if(debug > 1)
         cout<<endl<<"Planck Integral3, lmin/lmax/t = "<<lmin<<"/"<<lmax<<"/"<<temperature;
@@ -286,11 +286,11 @@ void c_Species::compute_analytic_solution() {
         double D      = pow(rrc,-4.) * std::exp(4.*(1.-1./rrc)-1. );
         
         if(base->x_i12[i] < bondi_radius) {
-            u_analytic[i] = 0.;//prim[num_cells].sound_speed * std::sqrt( - gsl_sf_lambert_W0(-D) ); 
+            u_analytic[i] = D;//prim[num_cells].sound_speed * std::sqrt( - gsl_sf_lambert_W0(-D) ); 
         }
         else {
             
-            u_analytic[i] = 0.;//prim[num_cells].sound_speed * std::sqrt( - gsl_sf_lambert_Wm1(-D) ); 
+            u_analytic[i] = D;//prim[num_cells].sound_speed * std::sqrt( - gsl_sf_lambert_Wm1(-D) ); 
         }
     
     

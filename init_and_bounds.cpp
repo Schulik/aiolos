@@ -14,9 +14,9 @@
 
 c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, int debug) {
 
-    
         if(debug > 0) cout<<"Init position 0."<<endl;
         
+        steps = -1;
         this->debug      = debug ;
         simname          = filename_solo;
         this->workingdir = workingdir;
@@ -45,6 +45,9 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
         R_star           = read_parameter_from_file<double>(filename,"PARI_RSTAR", debug, 1.).value;
         UV_star          = read_parameter_from_file<double>(filename,"PARI_UVSTAR", debug, 1.).value;
         num_bands        = read_parameter_from_file<int>(filename,"PARI_NUM_BANDS", debug, 1).value;
+        T_core           = read_parameter_from_file<double>(filename,"PARI_TPLANET", debug, 200.).value;
+        use_planetary_temperature = read_parameter_from_file<int>(filename,"USE_PLANET_TEMPERATURE", debug, 0).value;
+        core_cv           = read_parameter_from_file<double>(filename,"PARI_CORE_CV", debug, 1.e9).value;
         
         radiation_matter_equilibrium_test = read_parameter_from_file<int>(filename,"RAD_MATTER_EQUI_TEST", debug, 0).value;
         radiation_diffusion_test_linear   = read_parameter_from_file<int>(filename,"RAD_DIFF_TEST_LIN", debug, 0).value;
@@ -68,10 +71,13 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
             dx0              = domain_min;
             
             if(type_of_grid==2) {
-                    grid2_extension        = read_parameter_from_file<double>(filename,"GRID2_EXTENSION", debug, 99.e99).value;
+                    grid2_transition       = read_parameter_from_file<double>(filename,"GRID2_TRANSITION", debug, 99.e99).value;
                     grid2_cells_per_decade = read_parameter_from_file<double>(filename,"GRID2_CELLS_PER_DECADE", debug, 10).value;
                     
-                    num_cells  += (int) ( (log10f(grid2_extension) - log10f(domain_max)) * grid2_cells_per_decade );
+                    num_cells          = (int) ( (log10f(grid2_transition) - log10f(domain_min)) * cells_per_decade );
+                    grid2_transition_i = num_cells + num_ghosts;
+                    num_cells         += (int) ( (log10f(domain_max) - log10f(grid2_transition)) * grid2_cells_per_decade );
+                    
             }
             cout<<"Domain specifics:  "<<domain_min<<" | . .  .  "<<num_cells<<" nonuniform cells .       .             .     | "<<domain_max<<endl;
         }
@@ -242,21 +248,19 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
             double dlogx  = pow(10.,1./cells_per_decade);
             double dlogx2 = pow(10.,1./grid2_cells_per_decade);
             
-            //x_i[0] = domain_min / std::pow(dlogx, (num_ghosts-1)) ;
-            x_i[0] = domain_min - dx0*(num_ghosts-1) ;
+            x_i[0] = domain_min / std::pow(dlogx, (num_ghosts-1)) ;
             for(int i=1; i<= num_cells; i++) {
                 
-                if(x_i[i-1] < domain_max)
+                if(x_i[i-1] < grid2_transition)
                     x_i[i]   =  x_i[i-1] * dlogx;
                 else
                     x_i[i]   =  x_i[i-1] * dlogx2;
             }
             
             //Assign the last boundary as domain maximum as long as nonuniform grid is in the test-phase
-            grid2_transition = domain_max;
+            //grid2_transition = domain_max;
             domain_max       = x_i[num_cells];
             cout<<"We have a changed DOMAIN MAX = "<<domain_max<<endl;
-            
             
         }
         //Uniform grid
@@ -279,6 +283,8 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
         dx[0] = dx[1]*dx[1]/dx[2] ;
         dx[num_cells+1] = dx[num_cells]*dx[num_cells]/dx[num_cells-1];
 
+        R_core = dx[1];
+        
         // Surface areas
         switch (geometry) {
             case Geometry::cartesian:
@@ -438,7 +444,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
         
         dt = get_cfl_timestep();
         
-        if(debug > 0) cout<<"Init: Finished Init."<<endl;
+        if(debug > 0) cout<<"Init: Finished Init. Got initial dt = "<<dt<<" This is only temporary dt_init, not used for the first timestep."<<endl;
         //
         // Matrix init via Eigen
         //
@@ -487,12 +493,6 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
     previous_monitor_J = std::vector<double>(num_bands) ;
     previous_monitor_T = std::vector<double>(num_species) ;
     
-    //F_up    = Eigen::MatrixXd::Zero(num_cells, num_bands);      //num_cells * num_bands each
-    //F_down  = Eigen::MatrixXd::Zero(num_cells, num_bands);
-    //F_plus  = Eigen::MatrixXd::Zero(num_cells, num_bands);
-    //F_minus = Eigen::MatrixXd::Zero(num_cells, num_bands);
-    //dJrad   = Eigen::MatrixXd::Zero(num_cells+2, num_bands);
-    //S_total = Eigen::VectorXd::Zero(num_cells+2,  1);
     solar_heating = Eigen::VectorXd::Zero(num_bands,  1);
     S_band        = Eigen::MatrixXd::Zero(num_cells+2, num_bands);
     dS_band       = Eigen::MatrixXd::Zero(num_cells+2, num_bands);
@@ -506,7 +506,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
     double lmin, lmax;
     double dlogx = pow(lmaxglobal/lminglobal, 1./((double)num_plancks));
     lT_spacing     = dlogx;
-    double lT_crit = 14387.770; //=hc/k_b, in units of mum K
+    //double lT_crit = 14387.770; //=hc/k_b, in units of mum K
     double lumi100 = sigma_rad * pow(100.,4.) / pi;
     
     for(int p = 0; p < num_plancks; p++) {
@@ -517,11 +517,12 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
         dsum_planck = compute_planck_function_integral2(lmin, lmax, 100.) / lumi100;
         sum_planck += dsum_planck;
         
-        planck_matrix(p,1) = sum_planck;
-        planck_matrix(p,0) = lmax*100.;
+        planck_matrix(p,0) = lmax*100.;  // Wavelength
+        planck_matrix(p,1) = sum_planck; // Planck integral until this matrix element
         
-        if(debug > 2)
-            cout<<" in planck_matrix, lT = "<<planck_matrix(p,0)<<" percentile = "<<planck_matrix(p,1)<<endl;
+        
+        //if(debug > 2)
+        //   cout<<" in planck_matrix, lT = "<<planck_matrix(p,0)<<" percentile = "<<planck_matrix(p,1)<<endl;
     }
     
     if(debug > 0) cout<<"Init: Assigning stellar luminosities 1."<<endl;
@@ -553,7 +554,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
             
         }
     }
-    cout<<"TOTAL SOLAR HEATING / Lumi = "<<templumi<<" lumi = "<<(templumi*4.*pi*rsolar*rsolar*pi)<< " also sigmarad2/sigmarad = "<<sigma_rad2/sigma_rad<<endl;
+    cout<<"TOTAL SOLAR HEATING / Lumi = "<<templumi<<" lumi = "<<(templumi*4.*pi*rsolar*rsolar*pi)<<endl;
     
     double totallumi = 0;
     double totallumiincr = 0;
@@ -565,36 +566,6 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
     }
     cout<<" Total lumi / sigma T^4/pi is = "<<totallumi<<endl;
     
-    //   /(sigma_rad*pow(T_star,4.)*4.*pi*pow(R_star*rsolar,2.))
-    /*
-    cout<<" Earth planck integrals: 288K between 5.03 and 79.5 "<<compute_planck_function_integral3(5.03,79.5,288)<<endl;
-    cout<<" Earth planck integrals: 288K between 0 and 5.03 "<<compute_planck_function_integral3(0.,5.03,288)<<endl;
-    cout<<" Earth planck integrals: 288K between 79.5 and infty "<<compute_planck_function_integral3(79.5,999999999.,288)<<endl;
-    
-    cout<<" Sun between 251 and 3961 nm "<<compute_planck_function_integral3(0.251,3.961,5777)<<endl;
-    cout<<" Sun between 0 and 251 nm "<<compute_planck_function_integral3(0., 0.251,5777)<<endl;
-    cout<<" Sun between 3961 and infty nm "<<compute_planck_function_integral3(3.961,99999999999.,5777)<<endl;
-    
-    cout<<" Sum for the sun = "<<compute_planck_function_integral3(0.251,3.961,5777) + compute_planck_function_integral3(0., 0.251,5777) + compute_planck_function_integral3(3.961,99999999999.,5777)<<endl;
-    
-    cout<<" BB integral for T= 2.7 K "<<compute_planck_function_integral3(lminglobal,lmaxglobal,2.7)<<endl;
-    cout<<" BB integral for T= 1e9 K "<<compute_planck_function_integral3(lminglobal,lmaxglobal,1e9)<<endl;
-    cout<<endl<<" ############################ init 0"<<endl;
-    */
-    
-    /*
-    i_wien = -1;
-    for(int p = 0; p < num_plancks && i_wien == -1; p++) {
-        if (planck_matrix(p,0) < 0.2 * lT_crit )
-            i_wien = p;
-    }
-    
-    i_rayleighjeans = -1;
-    for(int p = 0; p < num_plancks && i_rayleighjeans == -1; p++) {
-        if (planck_matrix(p,0) > 1. * lT_crit )
-            i_rayleighjeans = p;
-    }
-    */
     total_opacity        = Eigen::MatrixXd::Zero(num_cells+2, num_bands);
     cell_optical_depth   = Eigen::MatrixXd::Zero(num_cells+2, num_bands);
     radial_optical_depth = Eigen::MatrixXd::Zero(num_cells+2, num_bands);
@@ -622,11 +593,11 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
             for(int s = 0; s< num_species; s++){
                 
                 //Jrad_FLD(j,0) += rad_energy_multipier * sigma_rad*pow(species[s].prim[j].temperature,4) / pi;
-                
+                //cout<<" Assigning value j = "<<j<<" species = "<<s<<" with rad_energy_multiplier = "<<rad_energy_multiplier<<" and T = "<<species[s].prim[j].temperature<<endl;
                 Jrad_init(j,0) = rad_energy_multiplier * c_light /4. /pi;
                 
                 if(radiation_matter_equilibrium_test == 0)
-                    Jrad_FLD(j,0)  = rad_energy_multiplier * sigma_rad*pow(species[s].prim[j].temperature,4) / pi; //What happens for several species? Average temperature?
+                    Jrad_FLD(j,0)  = rad_energy_multiplier * sigma_rad*pow(species[s].prim[j].temperature,4) / pi;
                     
                 else if(radiation_matter_equilibrium_test == 1)
                     Jrad_FLD(j,0) = Jrad_init(j,0);
@@ -654,9 +625,9 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
                 }
                  
                 
-                //if(j==5)
-                if(debug > 1 && j==5) {
-                    cout<<" Jrad("<<j<<","<<0<<") = "<<Jrad_FLD(j,0)<<" dJrad_species["<<s<<"] = "<<rad_energy_multiplier * compute_planck_function_integral3(l_i[0], l_i[1], species[s].prim[j].temperature)<<" T_rad = "<<pow(pi*Jrad_FLD(j,0)/sigma_rad,0.25)<<endl;
+                if(debug > 1) {
+                //if(debug > 1 && j==5) {
+                    cout<<" Jrad("<<j<<","<<0<<") = "<<Jrad_FLD(j,0)<<" dJrad_species["<<s<<"] = "<<rad_energy_multiplier * compute_planck_function_integral3(l_i[0], l_i[1], species[s].prim[j].temperature)<<" T_rad = "<<pow(pi*Jrad_FLD(j,0)/sigma_rad,0.25)<<" at Tgas = "<<species[s].prim[j].temperature<<endl;
                 }
                     
             }
@@ -672,7 +643,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
                     //Jrad_FLD(j,b) += rad_energy_multipier * compute_planck_function_integral(l_i[b], l_i[b+1], species[s].prim[j].temperature);
                     //if(debug >= 0 && j==1)
                      if(debug > 1 && j==5) {
-                        cout<<" Jrad("<<j<<","<<b<<") = "<<Jrad_FLD(j,b)<<" dJrad_species["<<s<<"] = "<<rad_energy_multiplier * compute_planck_function_integral3(l_i[b], l_i[b+1], species[s].prim[j].temperature)<<endl; 
+                        cout<<" Jrad("<<j<<","<<b<<") = "<<Jrad_FLD(j,b)<<" dJrad_species["<<s<<"] = "<<rad_energy_multiplier * compute_planck_function_integral3(l_i[b], l_i[b+1], species[s].prim[j].temperature)<<" at T ="<<species[s].prim[j].temperature<<endl; 
                      }
                         
                 }
@@ -743,7 +714,7 @@ c_Species::c_Species(c_Sim *base_simulation, string filename, string species_fil
         flux            = init_AOS(num_cells+1);
 
         //
-        // Determine which equation of states we are using, and assign thermodynamic variables
+        // Determine which equation of states we are using, and assign thermodynamic variables: heat capacity, adiabatic ratio, and equation of state
         //
         
         //Gas species
@@ -908,18 +879,23 @@ void c_Species::initialize_hydrostatic_atmosphere(string filename) {
     for(int i=num_cells+1; i>=0; i--) {
             
         if(base->temperature_model == 'P')
-            prim[i].temperature = - 1.0 * base->phi[i] / (cv * gamma_adiabat) + const_T_space;
+            prim[i].temperature = - dphi_factor * base->phi[i] / (cv * gamma_adiabat) + const_T_space;
         else
             prim[i].temperature = const_T_space;
             
             //Add temperature bumps and troughs
             //prim[i].temperature += TEMPERATURE_BUMP_STRENGTH * 4.  * exp( - pow(base->x_i12[i] - 1.e-1 ,2.) / (0.1) );
             //prim[i].temperature -= TEMPERATURE_BUMP_STRENGTH * 15. * exp( - pow(base->x_i12[i] - 7.e-3 ,2.) / (1.5e-3) );
-
     }
     
     //At this point, the right ghost cell is already initialized, so we can just build up a hydrostatic state from there
-    for(int i=num_cells; i>=0; i--)  {
+    int iter_start;
+    if(base->type_of_grid==2)
+        iter_start = base->grid2_transition_i;
+    else
+        iter_start = num_cells;
+    
+    for(int i=iter_start; i>=0; i--)  {
         
         //
         // Construct next density as to fulfil the hydrostatic condition
@@ -944,6 +920,7 @@ void c_Species::initialize_hydrostatic_atmosphere(string filename) {
         
         u[i] = AOS(temp_rhofinal, 0., cv * temp_rhofinal * T_inner) ;
         
+        //cout<<"    HYDROSTATIC: i/r[i]/rho/T = "<<i<<"/"<<base->x_i[i]<<"/"<<temp_rhofinal<<"/"<<prim[i].temperature<<endl;
         //
         // Debug info
         // 
@@ -977,6 +954,15 @@ void c_Species::initialize_hydrostatic_atmosphere(string filename) {
         }
     }
     
+    if(base->type_of_grid == 2) {
+        
+        for(int i = iter_start+1; i<num_cells+1; i++) {
+            double rr = pow(base->x_i[i]/base->x_i[iter_start],3.);
+            u[i] = AOS(u[iter_start].u1 / rr, 0., cv * u[iter_start].u1 / rr * const_T_space) ;
+            
+        }
+    }
+    
     if(u[2].u1 > 1e40) {
         cout<<"    ---WARNING---"<<endl;
         cout<<"    IN CONSTRUCT HYDROSTATIC:"<<endl;
@@ -985,6 +971,7 @@ void c_Species::initialize_hydrostatic_atmosphere(string filename) {
         cout<<"    Be advised, your solution is probably about to unphysically explode."<<endl;
     }
         
+    
   
     compute_pressure(u);
     for(int i=num_cells; i>=0; i--)  {

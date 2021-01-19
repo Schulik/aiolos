@@ -230,8 +230,8 @@ public:
     double domain_min, domain_max;
     double cells_per_decade;
     double grid2_cells_per_decade;
-    double grid2_extension;
     double grid2_transition;
+    int grid2_transition_i;
     
     int type_of_grid;       //0 = cartesian, 1 = log
     std::vector<double> x_i;    		//The cell boundaries
@@ -343,6 +343,12 @@ public:
     double UV_star;
     double R_star;
     
+    double T_core;  //Internal heat flux
+    double T_surface; //Radiation flux making it through the atmosphere
+    double R_core;
+    double core_cv; //Heat capacity of the surface layer
+    
+    int use_planetary_temperature;
     int radiation_matter_equilibrium_test; //If set to 1, sets J = J_init in update_radiation()
     int radiation_diffusion_test_linear;
     int radiation_diffusion_test_nonlinear;
@@ -618,9 +624,11 @@ public:
     void update_opacities();
     double interpol_opacity(int j, int b) {
         
-        int index_l = base->l_i[b] ;
-        int index_u = base->l_i[b+1];
+        cout<<" j/b="<<j<<"/"<<b<<endl;
+        //int index_l = base->l_i[b] ;
+        //int index_u = base->l_i[b+1];
         
+        return 1.;
     }
     
     //

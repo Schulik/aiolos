@@ -25,7 +25,7 @@
 void c_Sim::transport_radiation() {
         
         int iters = 0;
-        double epsilon_rad = 1.;
+        //double epsilon_rad = 1.;
         
         if(steps == 1)
             cout<<"   in transport_radiation, before loop, steps = "<<steps<<endl;
@@ -109,13 +109,41 @@ void c_Sim::update_opacities() {
                 cout<<" in cell ["<<j<<"] band ["<<b<<"] top-of-the-atmosphere heating = "<<solar_heating(b)<<" tau_rad(j,b) = "<<radial_optical_depth(j,b)<<" exp(tau) = "<<std::exp(-radial_optical_depth(j,b))<<endl;
             
             if(j<num_cells+1)
-                dS_band(j,b) = (surf[j+1] * S_band(j+1,b) - surf[j] * S_band(j,b))/vol[j]/4.;
+                dS_band(j,b) = (surf[j+1] * S_band(j+1,b) - surf[j] * S_band(j,b))/vol[j]/4.; //       4pi J = c Erad
             else
                 dS_band(j,b) = 0;
             
             for(int s=0; s<num_species; s++)
                 species[s].dS(j)  += dS_band(j,b) * species[s].fraction_total_opacity(j,b);
         }
+    }
+    
+    //Compute surface temperature from remaining solar flux and core flux
+    double cooling_time  = 1e9 / core_cv;
+    double J_remnant = 0;
+    double T_rad_remnant;
+    double T_target;
+    
+    for(int b = 0; b < num_bands; b++) {
+        J_remnant += S_band(1,b);
+    }
+    T_rad_remnant = pow(pi * J_remnant / sigma_rad, 0.25);
+    
+    T_target      = pow(pow(T_core,4.) + pow(T_rad_remnant,4.), 0.25);
+    T_surface     = T_target; //+ (T_surface - T_target)*std::exp(-dt/cooling_time);
+    
+    //Set planetary temperature (computed in update_opacities)
+    if(use_planetary_temperature == 1) {
+        
+        for(int s=0; s<num_species; s++) {
+            species[s].prim[num_ghosts-1].temperature = T_surface;
+            species[s].prim[0].temperature            = T_surface;
+        }
+        for(int b=0; b<num_bands; b++) {
+            Jrad_FLD(num_ghosts-1, b) = sigma_rad * pow(T_surface,4.) * pow(R_core,2.) * compute_planck_function_integral3(l_i[b], l_i[b+1], T_surface) ;
+            Jrad_FLD(0, b)            = sigma_rad * pow(T_surface,4.) * pow(R_core,2.) * compute_planck_function_integral3(l_i[b], l_i[b+1], T_surface) ;
+        }
+        //cout<<"t ="<<globalTime<<" Jrad(0,b) = "<<Jrad_FLD(0, 0)<<" Tsurface = "<<T_surface<<" Tcore = "<<T_core<<" T_rad_remnant = "<<T_rad_remnant<<endl;
     }
     
     if(debug >= 1) {
@@ -165,9 +193,6 @@ void c_Species::update_opacities() {
                     opacity_planck(j,b) = opacity_avg(b) * (1. + pressure_broadening_factor * prim[j].pres/1e5); //opacity(j,b);
                 }
             }
-            
-            
-            
         }
         else { //is_dust_like
             
@@ -207,7 +232,6 @@ void c_Species::update_opacities() {
 
 void c_Sim::update_fluxes_FLD() {
     
-    
     // If test, then set J to initial values before computing on
     if(radiation_matter_equilibrium_test == 1) {
         
@@ -218,7 +242,6 @@ void c_Sim::update_fluxes_FLD() {
         }
     }
     
-
     auto flux_limiter = [](double R) {
         if (R <= 2)
             return 2 / (3 + std::sqrt(9 + 10*R*R)) ;
@@ -265,16 +288,18 @@ void c_Sim::update_fluxes_FLD() {
         }
         
         // Boundaries:
-        
-        for (int j=0l; j < num_ghosts; j++) {
-            int idx = j*stride + b*(num_vars + 1) ;
-            int idx_r = j*num_vars + b ;
-            // Left boundary:
-            //    Reflecting / no flux
-            l[idx] = 0 ;
-            d[idx] = +1 ;
-            u[idx] = -1 ;
-            r[idx_r] = 0 ;
+        // Left boundary:
+        //    Reflecting / no flux or planetary temperature
+        if(use_planetary_temperature == 0) {
+            for (int j=0l; j < num_ghosts; j++) {
+                int idx = j*stride + b*(num_vars + 1) ;
+                int idx_r = j*num_vars + b ;
+                
+                l[idx] = 0 ;
+                d[idx] = +1 ;
+                u[idx] = -1 ;
+                r[idx_r] = 0 ; 
+            }
         }
         
         //   Right boundary: reflective?
@@ -413,6 +438,7 @@ void c_Sim::update_fluxes_FLD() {
        //     std::cout <<  "\t" << species[s].prim[j].temperature << "\n" ;
         }
     }
+    
     
     // Update energies. 
     // TODO: We should add cv * (Tf - Ti) to u to conserve energy properly.
