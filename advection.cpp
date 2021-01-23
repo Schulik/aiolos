@@ -67,11 +67,15 @@ void c_Sim::execute() {
             
         dt = get_cfl_timestep();
         dt = std::min(dt, t_max - globalTime) ;
-        if(steps > 0)
+        if(steps > 1)
+        //if(steps > 1e6)
             dt = std::min(dt, timestep_rad2) ;
         else
             dt = 1e-20;
         
+//         if(steps == 1e6) 
+//             cout<<"Radiative equilibrium phase over."<<endl;
+//         
         //
         // Save internal energy before we update it
         //

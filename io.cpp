@@ -533,6 +533,19 @@ void c_Sim::print_diagnostic_file(int outputnumber) {
                 for(int s=0; s<num_species; s++)
                     outfileDiagnostic<<'\t'<<species[s].prim[i].temperature; //col 6-...: all species temperatures 
                 
+                //Fluxes
+                
+//                 for(int b=0; b<num_bands; b++) {
+//                     
+//                     double dx      = (x_i12[i+1]-x_i12[i]) ;
+//                     double tau_inv = 0.5 / (dx * (total_opacity(i,b) + total_opacity(i+1,b))) ;
+//                     double R       = 2 * tau_inv * std::abs(Jrad_FLD(i+1,b) - Jrad_FLD(i,b)) / (Jrad_FLD(i+1,b) + Jrad_FLD(i, b) + 1e-300) ;
+//                     double D       = 1. * surf[i] * flux_limiter(R) * tau_inv;
+//                     double F       = 0.5 * D * (Jrad_FLD(i+1,b) - Jrad_FLD(i,b)) * 4 * pi / c_light;
+//                     
+//                     outfileDiagnostic<<'\t'<<F;
+//                 }
+                
                 outfileDiagnostic<<endl;
             }
             

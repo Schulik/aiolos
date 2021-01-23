@@ -103,13 +103,14 @@ void c_Sim::update_opacities() {
             // Now compute the attenuation of solar radiation and then assign the lost energy back to individual species in a manner that conserves energy
             //
             
-            S_band(j,b)  = solar_heating(b) * std::exp(-radial_optical_depth(j,b));
+            S_band(j,b) = solar_heating(b) * std::exp(-10.*radial_optical_depth(j,b));
             
             if(debug >= 1)
                 cout<<" in cell ["<<j<<"] band ["<<b<<"] top-of-the-atmosphere heating = "<<solar_heating(b)<<" tau_rad(j,b) = "<<radial_optical_depth(j,b)<<" exp(tau) = "<<std::exp(-radial_optical_depth(j,b))<<endl;
             
             if(j<num_cells+1)
-                dS_band(j,b) = (surf[j+1] * S_band(j+1,b) - surf[j] * S_band(j,b))/vol[j]/4.; //       4pi J = c Erad
+                //dS_band(j,b) = (surf[j+1] * S_band(j+1,b) - surf[j] * S_band(j,b))/vol[j]/4.; //       4pi J = c Erad
+                dS_band(j,b) = (S_band(j+1,b) - S_band(j,b))/dx[j]/4.; //       4pi J = c Erad
             else
                 dS_band(j,b) = 0;
             
@@ -136,11 +137,11 @@ void c_Sim::update_opacities() {
     if(use_planetary_temperature == 1) {
         
         for(int s=0; s<num_species; s++) {
-            species[s].prim[num_ghosts-1].temperature = T_surface;
-            species[s].prim[0].temperature            = T_surface;
+            species[s].prim[1].temperature = T_surface;
+            species[s].prim[0].temperature = T_surface;
         }
         for(int b=0; b<num_bands; b++) {
-            Jrad_FLD(num_ghosts-1, b) = sigma_rad * pow(T_surface,4.) * pow(R_core,2.) * compute_planck_function_integral3(l_i[b], l_i[b+1], T_surface) ;
+            Jrad_FLD(1, b)            = sigma_rad * pow(T_surface,4.) * pow(R_core,2.) * compute_planck_function_integral3(l_i[b], l_i[b+1], T_surface) ;
             Jrad_FLD(0, b)            = sigma_rad * pow(T_surface,4.) * pow(R_core,2.) * compute_planck_function_integral3(l_i[b], l_i[b+1], T_surface) ;
         }
         //cout<<"t ="<<globalTime<<" Jrad(0,b) = "<<Jrad_FLD(0, 0)<<" Tsurface = "<<T_surface<<" Tcore = "<<T_core<<" T_rad_remnant = "<<T_rad_remnant<<endl;
@@ -203,7 +204,6 @@ void c_Species::update_opacities() {
                     opacity_planck(j,b) = opacity_avg(b); //opacity(j,b);
                 }
             }
-            
         }
         
         if(debug > 3) {
@@ -215,8 +215,8 @@ void c_Species::update_opacities() {
         
         for(int j=0; j< num_cells+2; j++) {
             for(int b=0; b<num_bands; b++) {
-                opacity(j,b)        = const_opacity; 
-                opacity_planck(j,b) = const_opacity; 
+                opacity(j,b)        = const_opacity * (1. + pressure_broadening_factor * prim[j].pres/1e5); 
+                opacity_planck(j,b) = const_opacity * (1. + pressure_broadening_factor * prim[j].pres/1e5); 
             }
         }
         
@@ -283,14 +283,12 @@ void c_Sim::update_fluxes_FLD() {
                 if(debug > 1)
                     cout<<" radiation part 0. t,j,b="<<steps<<","<<j<<","<<b<<" tau_inv/R/D = "<<tau_inv<<"/"<<R<<"/"<<D<<" J/J = "<<Jrad_FLD(j+1,b)<<"/"<<Jrad_FLD(j,b)<<endl;
             }
-            
-
         }
         
         // Boundaries:
         // Left boundary:
         //    Reflecting / no flux or planetary temperature
-        if(use_planetary_temperature == 0) {
+        //if(use_planetary_temperature == 0) {
             for (int j=0l; j < num_ghosts; j++) {
                 int idx = j*stride + b*(num_vars + 1) ;
                 int idx_r = j*num_vars + b ;
@@ -300,7 +298,7 @@ void c_Sim::update_fluxes_FLD() {
                 u[idx] = -1 ;
                 r[idx_r] = 0 ; 
             }
-        }
+        //}
         
         //   Right boundary: reflective?
         //if(geometry == Geometry::cartesian) {

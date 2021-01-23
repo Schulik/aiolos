@@ -42,8 +42,8 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
         lambda_max       = read_parameter_from_file<double>(filename,"PARI_LAM_MAX", debug, 10.).value;
         lambda_per_decade= read_parameter_from_file<double>(filename,"PARI_LAM_PER_DECADE", debug, 10.).value;
         T_star           = read_parameter_from_file<double>(filename,"PARI_TSTAR", debug, 5777.).value;
-        R_star           = read_parameter_from_file<double>(filename,"PARI_RSTAR", debug, 1.).value;
-        UV_star          = read_parameter_from_file<double>(filename,"PARI_UVSTAR", debug, 1.).value;
+        R_star           = read_parameter_from_file<double>(filename,"PARI_RSTAR", debug, 0.).value;
+        UV_star          = read_parameter_from_file<double>(filename,"PARI_UVSTAR", debug, 0.).value;
         num_bands        = read_parameter_from_file<int>(filename,"PARI_NUM_BANDS", debug, 1).value;
         T_core           = read_parameter_from_file<double>(filename,"PARI_TPLANET", debug, 200.).value;
         use_planetary_temperature = read_parameter_from_file<int>(filename,"USE_PLANET_TEMPERATURE", debug, 0).value;
@@ -97,8 +97,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
         t_max       = read_parameter_from_file<double>(filename,"PARI_TIME_TMAX", debug).value;
         output_time = read_parameter_from_file<double>(filename,"PARI_TIME_OUTPUT", debug).value; 
         monitor_time = read_parameter_from_file<double>(filename,"PARI_TIME_DT", debug).value;
-        CFL_break_time = read_parameter_from_file<double>(filename,"CFL_BREAK_TIME", debug, 
-                                                          std::numeric_limits<double>::max()).value ;
+        CFL_break_time = read_parameter_from_file<double>(filename,"CFL_BREAK_TIME", debug, std::numeric_limits<double>::max()).value ;
         
         globalTime = 0.0;    
         timecount = 0;
@@ -131,6 +130,8 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
         do_hydrodynamics  = read_parameter_from_file<int>(filename,"DO_HYDRO", debug, 1).value;
         rad_solver_max_iter = read_parameter_from_file<int>(filename,"MAX_RAD_ITER", debug, 1).value;
         
+        planet_semimajor= read_parameter_from_file<double>(filename,"PARI_PLANET_DIST", debug, 1.).value; //in Earth masses
+        
         if(problem_number == 2)
             monitor_output_index = num_cells/2; //TODO: Replace with index of sonic radius for dominant species?
         else
@@ -140,7 +141,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
             
             planet_mass     = read_parameter_from_file<double>(filename,"PARI_PLANET_MASS", debug, 1).value; //in Earth masses
             planet_mass     *= mearth;
-            planet_semimajor= read_parameter_from_file<double>(filename,"PARI_PLANET_DIST", debug, 1.).value; //in Earth masses
+            
             planet_position = read_parameter_from_file<double>(filename,"PARI_PLANET_POS", debug, 0.).value;  //inside the simulation domain
             rs              = read_parameter_from_file<double>(filename,"PARI_SMOOTHING_LENGTH", debug, 0.).value; //Gravitational smoothing length in hill 
             rs_time         = read_parameter_from_file<double>(filename,"PARI_SMOOTHING_TIME", debug, 0.).value; //Time until we reach rs starting at rs_at_moment
@@ -283,7 +284,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
         dx[0] = dx[1]*dx[1]/dx[2] ;
         dx[num_cells+1] = dx[num_cells]*dx[num_cells]/dx[num_cells-1];
 
-        R_core = dx[1];
+        R_core = x_i[1];
         
         // Surface areas
         switch (geometry) {
@@ -540,7 +541,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
             solar_heating(b)  = sigma_rad * pow(T_star,4.) * pow(R_star*rsolar,2.)/pow(planet_semimajor*au,2.)  + UV_star * 1.;
             templumi += solar_heating(b);
             
-            cout<<" Solar heating is "<<solar_heating(b)<<endl;
+            cout<<" Solar heating is "<<solar_heating(b)<<" T_star = "<<T_star<<" pow(R_star*rsolar,2.) "<<pow(R_star*rsolar,2.)<<" pow(planet_semimajor*au,2.) "<<planet_semimajor<<endl;
         }
         else{
             cout<<"SOLAR HEATING in bin "<<b;
@@ -957,8 +958,8 @@ void c_Species::initialize_hydrostatic_atmosphere(string filename) {
     if(base->type_of_grid == 2) {
         
         for(int i = iter_start+1; i<num_cells+1; i++) {
-            double rr = pow(base->x_i[i]/base->x_i[iter_start],3.);
-            u[i] = AOS(u[iter_start].u1 / rr, 0., cv * u[iter_start].u1 / rr * const_T_space) ;
+            double rr = pow(base->x_i[i]/base->x_i[iter_start],5.);
+            u[i] = AOS(u[iter_start].u1 / rr, 0., cv * u[iter_start].u1 / rr * prim[i].temperature) ;
             
         }
     }
@@ -1019,12 +1020,6 @@ void c_Species::initialize_exponential_atmosphere() {
         u[i] = AOS(temp_rhofinal, 0., cv * temp_rhofinal * prim[i].temperature) ;
     }
     cout<<endl<<endl;
-    cout<<"            Ended expoenential density construction for species "<<speciesname<<endl;
-    cout<<"            Ended expoenential density construction for species "<<speciesname<<endl;
-    cout<<"            Ended expoenential density construction for species "<<speciesname<<endl;
-    cout<<"            Ended expoenential density construction for species "<<speciesname<<endl;
-    cout<<"            Ended expoenential density construction for species "<<speciesname<<endl;
-    cout<<"            Ended expoenential density construction for species "<<speciesname<<endl;
     cout<<"            Ended expoenential density construction for species "<<speciesname<<endl;
     cout<<endl<<endl;
 }
