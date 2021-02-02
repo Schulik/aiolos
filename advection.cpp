@@ -50,6 +50,16 @@ void c_Sim::execute() {
     cout<<"    hill radius: " <<scale_rh << "cm = "<< scale_rh/au <<" au = "<<scale_rh/scale_rb<< " rb" << endl;
     cout<<"    velocities: vk = "<<scale_vk<<" cm/s, vk/cs = "<<scale_vk/scale_cs<<", cs = "<<scale_cs<< "cm/s" << endl;
     cout<<"    times, rb/cs/yr = "<<scale_time/year<<" rh/cs/yr"<<scale_rh/scale_cs/year<<endl;
+    //cout<<" FIrst species mass: "<<species[0].mass_amu<<endl;
+//     cout<<" "<<endl;
+//     cout<<" Initiating malygin opacities"<<endl;
+//     init_malygin_opacities();
+//     cout<<" pressure_manual = "<<species[0].prim[3].density * species[0].prim[3].temperature * kb / (40.*amu)<<" pressure_true = "<<species[0].prim[3].pres <<endl;
+//     cout<<endl;
+//     kappa_landscape();
+//     cout<<" test planck opacity = "<<opacity_semenov_malygin(0,    species[0].prim[3].temperature, species[0].prim[3].density, species[0].prim[3].pres);
+//     cout<<" test rosseland opacity = "<<opacity_semenov_malygin(1, species[0].prim[3].temperature, species[0].prim[3].density, species[0].prim[3].pres);
+//     
     
     ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~////
     //                                                                         //
@@ -58,8 +68,11 @@ void c_Sim::execute() {
     ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~////
     for (globalTime = 0; (globalTime < t_max) && (steps < maxsteps); ) {
         
-        //if(steps == 2013270) 
-        //    debug = 4;
+        //if(steps > 17964) 
+        //    cout<<" steps "<<steps<<endl;
+        
+        //if(steps > 18024) 
+        //    debug = 2;
         
         if(steps==0)
             for(int s = 0; s < num_species; s++)
@@ -141,7 +154,7 @@ void c_Sim::execute() {
         // Step 0: If no gas movement is desired, set all velocity changes to 0
         //
         
-        if (do_hydrodynamics == 1) {
+        if (do_hydrodynamics == 1 && output_counter > 2) {
         
             for(int s = 0; s < num_species; s++)
                 species[s].execute(species[s].u, species[s].dudt[0]);
@@ -187,6 +200,9 @@ void c_Sim::execute() {
                     compute_friction_numerical();
             }
         }
+        
+        //if(globalTime > 2.4e6)
+        //    use_rad_fluxes = 1;
         
         if(use_rad_fluxes==1)
             transport_radiation();

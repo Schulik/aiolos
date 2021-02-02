@@ -74,6 +74,7 @@ const int debug2 = 0;
 ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 double delta_ij(int i, int j);
+double lint(double xa, int N, double* X, double* RI);
 
 //
 // Functions mimicking certain numpy functionalities
@@ -82,7 +83,7 @@ std::vector<double> np_zeros(int);
 std::vector<double> np_ones(int);
 std::vector<double> np_somevalue(int, double);
 
-double compute_planck_function_integral(double lmin, double lmax, double temperature);
+//double compute_planck_function_integral(double lmin, double lmax, double temperature);
 double compute_planck_function_integral2(double lmin, double lmax, double temperature);
 
 //
@@ -174,7 +175,6 @@ void update_cons_prim_after_friction(AOS* cons, AOS_prim* prim, double dEkin, do
 
 class c_Species;
 
-
 ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -217,6 +217,7 @@ public:
     std::vector<c_Species> species;
     
     int num_bands;
+    int num_solarbands;
     int num_plancks = 512;
     int i_wien;
     int i_rayleighjeans;
@@ -259,6 +260,7 @@ public:
     double cflfactor;
     double t_max;
     double timestep_rad2;
+    double energy_epsilon;
     double globalTime;
     double output_time;
     double monitor_time;
@@ -347,6 +349,7 @@ public:
     double T_surface; //Radiation flux making it through the atmosphere
     double R_core;
     double core_cv; //Heat capacity of the surface layer
+    double bond_albedo;
     
     int use_planetary_temperature;
     int radiation_matter_equilibrium_test; //If set to 1, sets J = J_init in update_radiation()
@@ -356,13 +359,7 @@ public:
     
     std::vector<double> previous_monitor_J;
     std::vector<double> previous_monitor_T;
-    
-    //Eigen::MatrixXd F_up;      //num_cells * num_bands each
-    //Eigen::MatrixXd F_down;
-    //Eigen::MatrixXd F_plus;
-    //Eigen::MatrixXd F_minus;
-    //Eigen::MatrixXd dJrad;
-    //Eigen::MatrixXd S_total;
+
     Eigen::MatrixXd S_band;
     Eigen::MatrixXd dS_band;
     Eigen::MatrixXd solar_heating;
@@ -370,15 +367,21 @@ public:
     Eigen::MatrixXd total_opacity;
     Eigen::MatrixXd cell_optical_depth;
     Eigen::MatrixXd radial_optical_depth;
-
+    
+    Eigen::MatrixXd total_opacity_twotemp;
+    Eigen::MatrixXd cell_optical_depth_twotemp;
+    Eigen::MatrixXd radial_optical_depth_twotemp;
+    
+    double *data_opacity[4], *opa_gas_tscale, *opa_gas_pscale, *opa_gas_ross, *opa_gas_planck;
+    int opacity_gas_rows = 126, opacity_gas_cols = 94;
+    double const_opacity_solar_factor;
+    
     Eigen::MatrixXd T_FLD ;
     Eigen::MatrixXd T_FLD2 ;
     Eigen::MatrixXd T_FLD3 ;
     
     Eigen::MatrixXd planck_matrix;
-    
     Eigen::MatrixXd Etot_corrected ;
-    
     Eigen::MatrixXd Jrad_FLD ;
 
     BlockTriDiagSolver<Eigen::Dynamic> tridiag ;
@@ -390,20 +393,6 @@ public:
     
     int rad_solver_max_iter = 1;
     double epsilon_rad_min = 1e-1;  // Some convergence measure for the radiation solver, if needed
-    
-    void fill_alpha_basis_arrays(int j);
-    void fill_rad_basis_arrays(int, double, Eigen::MatrixXd &, Eigen::MatrixXd &);
-    void compute_alpha_matrix(int j, int actually_compute_beta);
-    
-    void transport_radiation();     //  Called if use_rad_fluxes == 1
-    void update_opacities();
-    void update_fluxes(double timestep);           //  Called from transport_radiation#   
-    void update_fluxes_FLD();           //  Called from transport_radiation#
-    void update_fluxes_FLD2(double, Eigen::MatrixXd &,Eigen::MatrixXd &,Eigen::MatrixXd &);           //  Called from transport_radiation#
-    void update_temperatures(double, Eigen::MatrixXd &,Eigen::MatrixXd &,Eigen::MatrixXd &);
-    void correct_totalenergy(double, Eigen::MatrixXd &);
-    //AOS source_radflux(int i);
-    double compute_planck_function_integral3(double lmin, double lmax, double temperature);
     
     ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     //
@@ -434,20 +423,41 @@ public:
     double get_max_soundspeed();
     double get_cfl_timestep();
     
+    void print_monitor(int i);
+    void print_diagnostic_file(int i);
+    
     //
-    // Source terms
+    // Friction
     //
     void compute_friction_analytical(); 
     void compute_friction_numerical(); 
+    
+    void fill_alpha_basis_arrays(int j);
+    void fill_rad_basis_arrays(int, double, Eigen::MatrixXd &, Eigen::MatrixXd &);
+    void compute_alpha_matrix(int j, int actually_compute_beta);
     
     //Gravity
     void init_grav_pot();
     void update_mass_and_pot();
     double get_phi_grav(double &r, double &mass);
     
-    void print_monitor(int i);
-    void print_diagnostic_file(int i);
- 
+    //Opacities 
+    void init_malygin_opacities();
+    double opacity_semenov_malygin(int rosseland, double temperature, double rho, double pressure) ;
+    double get_gas_malygin(int rosseland, double rho, double T_gas, double pressure);
+    double freedman_opacity(double P, double T, double _Z);
+    void kappa_landscape();
+    
+    //Radiation transport 
+    void transport_radiation();     //  Called if use_rad_fluxes == 1
+    void update_opacities();
+    
+    void update_fluxes(double timestep);           //  Called from transport_radiation#   
+    void update_fluxes_FLD();           //  Called from transport_radiation#
+    void update_fluxes_FLD2(double, Eigen::MatrixXd &,Eigen::MatrixXd &,Eigen::MatrixXd &);           //  Called from transport_radiation#
+    void update_temperatures(double, Eigen::MatrixXd &,Eigen::MatrixXd &,Eigen::MatrixXd &);
+    double compute_planck_function_integral3(double lmin, double lmax, double temperature);
+    
     
 public:
     
@@ -517,11 +527,14 @@ public:
     std::vector<AOS> flux;
     std::vector<double> u_analytic;
     
-    Eigen::MatrixXd opacity_data;   //superhigh-res lamdba grid, resolution dependent on minimum wl-distance in opacity data
-    Eigen::MatrixXd opacity;        //num_cells * num_bands
-    Eigen::VectorXd opacity_avg; //num_bands
+    Eigen::MatrixXd opacity_data;  //superhigh-res lamdba grid, resolution dependent on minimum wl-distance in opacity data
+    Eigen::VectorXd opacity_avg;   //num_bands, this is the non-weighted average of opacity_data over the bands.
+    
+    Eigen::MatrixXd opacity;        //num_cells * num_bands, stands in for the Rosseland mean
     Eigen::MatrixXd opacity_planck; //num_cells * num_bands
-    Eigen::MatrixXd fraction_total_opacity; //num_cells * num_bands
+    Eigen::MatrixXd opacity_twotemp;//num_cells * num_bands
+    
+    Eigen::MatrixXd fraction_total_opacity; //num_cells * num_bands, what fraction of the total opacity is represented by this species in this cell. gives heating of the species
     Eigen::MatrixXd dS;
     double dlogOpa;
     
@@ -533,9 +546,11 @@ public:
     double bondi_radius;
     
     double const_T_space;
+    double const_rho_scale;
     double const_opacity;
     int    is_dust_like;
     double pressure_broadening_factor;
+    double pressure_broadening_exponent;
     
     ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     //
@@ -583,6 +598,7 @@ public:
     void initialize_space_test(AOS background);
     void initialize_custom_setup();
     void initialize_hydrostatic_atmosphere(string);
+    void initialize_hydrostatic_atmosphere_iter(string);
     void initialize_exponential_atmosphere();
     void initialize_sound_wave();
     void compute_analytic_solution();
@@ -630,6 +646,7 @@ public:
         
         return 1.;
     }
+    double planck_opacity_at_T(double T);
     
     //
     // Equations of state

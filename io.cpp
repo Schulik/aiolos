@@ -430,13 +430,13 @@ void c_Species::print_AOS_component_tofile(int timestepnumber) {
                 Stot += base->S_band(i,b);
             }
             
-            outfile<<base->x_i12[i]<<'\t'<<u[i].u1<<'\t'<<u[i].u2<<'\t'<<u[i].u3<<'\t'<<flux[i].u1<<'\t'<<flux[i].u2<<'\t'<<flux[i].u3<<'\t'<<balance1<<'\t'<<balance2<<'\t'<<balance3<<'\t'<<prim[i].pres<<'\t'<<u[i].u2/u[i].u1<<'\t'<<prim[i].temperature <<'\t'<<timesteps[i]<<'\t'<<base->phi[i]<<'\t'<<prim[i].sound_speed<<'\t'<<1.<<'\t'<<u_analytic[i]<<'\t'<<base->alphas_sample(i)<<'\t'<<hydrostat3<<'\t'<<base->enclosed_mass[i]-base->planet_mass<<'\t'<<Jtot<<'\t'<<Stot<<endl;
+            outfile<<base->x_i12[i]<<'\t'<<u[i].u1<<'\t'<<u[i].u2<<'\t'<<u[i].u3<<'\t'<<flux[i].u1<<'\t'<<flux[i].u2<<'\t'<<flux[i].u3<<'\t'<<balance1<<'\t'<<balance2<<'\t'<<balance3<<'\t'<<prim[i].pres<<'\t'<<u[i].u2/u[i].u1<<'\t'<<prim[i].temperature <<'\t'<<timesteps[i]<<'\t'<<base->phi[i]<<'\t'<<prim[i].sound_speed<<'\t'<<de_e[i]<<'\t'<<u_analytic[i]<<'\t'<<base->alphas_sample(i)<<'\t'<<hydrostat3<<'\t'<<base->enclosed_mass[i]-base->planet_mass<<'\t'<<Jtot<<'\t'<<Stot<<endl;
         }
         
         //Print right ghost stuff
         outfile<<base->x_i12[num_cells+1]<<'\t'<<u[num_cells+1].u1<<'\t'<<u[num_cells+1].u2<<'\t'<<u[num_cells+1].u3<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<prim[num_cells+1].pres<<'\t'<<u[num_cells+1].u2/u[num_cells+1].u1<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<base->phi[num_cells+1]<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<endl;
    
-        cout<<"    Sucessfully written file "<<filename<<" for species = "<<speciesname<<" at time "<<base->globalTime<<" and dt="<<base->dt<<", cflfactor = "<<base->cflfactor<<endl;
+        cout<<"    Sucessfully written file "<<filename<<" for species = "<<speciesname<<" t = "<<base->globalTime<<" dt = "<<base->dt<<", cfl = "<<base->cflfactor<<" steps = "<<base->steps<<endl;
     }
     else cout << "Unable to open file" << filename << endl; 
     outfile.close();
@@ -524,6 +524,8 @@ void c_Sim::print_diagnostic_file(int outputnumber) {
                 for(int b=0; b<num_bands; b++) {
                     for(int s=0; s<num_species; s++) {
                         outfileDiagnostic<<'\t'<<species[s].opacity(i,b);
+                        outfileDiagnostic<<'\t'<<species[s].opacity_planck(i,b);
+                        outfileDiagnostic<<'\t'<<species[s].opacity_twotemp(i,b);
                     }
                 }
                 

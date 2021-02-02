@@ -39,7 +39,7 @@ double c_Sim::get_cfl_timestep() {
         }
     }
     
-    timestep_rad2 = dt / maxde * 0.01;
+    timestep_rad2 = dt / maxde * energy_epsilon;
 
     //
     // Compute individual max wave crossing timesteps per cell

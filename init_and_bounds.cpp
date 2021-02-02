@@ -98,6 +98,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
         output_time = read_parameter_from_file<double>(filename,"PARI_TIME_OUTPUT", debug).value; 
         monitor_time = read_parameter_from_file<double>(filename,"PARI_TIME_DT", debug).value;
         CFL_break_time = read_parameter_from_file<double>(filename,"CFL_BREAK_TIME", debug, std::numeric_limits<double>::max()).value ;
+        energy_epsilon = read_parameter_from_file<double>(filename,"ENERGY_EPSILON", debug, 0.01).value;
         
         globalTime = 0.0;    
         timecount = 0;
@@ -125,10 +126,15 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
         rad_energy_multiplier=read_parameter_from_file<double>(filename,"PARI_RAD_MULTIPL", debug, 1.).value;
         collision_model   = read_parameter_from_file<char>(filename,"PARI_COLL_MODEL", debug, 'C').value;
         opacity_model     = read_parameter_from_file<char>(filename,"PARI_OPACITY_MODEL", debug, 'C').value;
+        if(opacity_model == 'M')
+            init_malygin_opacities();
+        
+        const_opacity_solar_factor = read_parameter_from_file<double>(filename,"CONSTOPA_SOLAR_FACTOR", debug, 1.).value;;
         temperature_model = read_parameter_from_file<char>(filename,"INIT_TEMPERATURE_MODEL", debug, 'P').value;
         friction_solver   = read_parameter_from_file<int>(filename,"FRICTION_SOLVER", debug, 0).value;
         do_hydrodynamics  = read_parameter_from_file<int>(filename,"DO_HYDRO", debug, 1).value;
         rad_solver_max_iter = read_parameter_from_file<int>(filename,"MAX_RAD_ITER", debug, 1).value;
+        bond_albedo       = read_parameter_from_file<double>(filename,"BOND_ALBEDO", debug, 0.).value; 
         
         planet_semimajor= read_parameter_from_file<double>(filename,"PARI_PLANET_DIST", debug, 1.).value; //in Earth masses
         
@@ -538,7 +544,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
         if(debug > 0) cout<<"Init: Assigning stellar luminosities. b ="<<b<<endl;
         
         if(num_bands == 1) {
-            solar_heating(b)  = sigma_rad * pow(T_star,4.) * pow(R_star*rsolar,2.)/pow(planet_semimajor*au,2.)  + UV_star * 1.;
+            solar_heating(b)  = sigma_rad * pow(T_star,4.) * pow(R_star*rsolar,2.)/pow(planet_semimajor*au,2.) + UV_star * 1.;
             templumi += solar_heating(b);
             
             cout<<" Solar heating is "<<solar_heating(b)<<" T_star = "<<T_star<<" pow(R_star*rsolar,2.) "<<pow(R_star*rsolar,2.)<<" pow(planet_semimajor*au,2.) "<<planet_semimajor<<endl;
@@ -571,6 +577,10 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
     cell_optical_depth   = Eigen::MatrixXd::Zero(num_cells+2, num_bands);
     radial_optical_depth = Eigen::MatrixXd::Zero(num_cells+2, num_bands);
 
+    total_opacity_twotemp        = Eigen::MatrixXd::Zero(num_cells+2, num_bands);
+    cell_optical_depth_twotemp   = Eigen::MatrixXd::Zero(num_cells+2, num_bands);
+    radial_optical_depth_twotemp = Eigen::MatrixXd::Zero(num_cells+2, num_bands);
+    
     T_FLD          = Eigen::MatrixXd::Zero(num_cells+2, num_species);
     T_FLD2         = Eigen::MatrixXd::Zero(num_cells+2, num_species);
     T_FLD3         = Eigen::MatrixXd::Zero(num_cells+2, num_species);
@@ -689,8 +699,10 @@ c_Species::c_Species(c_Sim *base_simulation, string filename, string species_fil
         boundary_left  = read_parameter_from_file<BoundaryType>(filename,"PARI_BOUND_TYPE_LEFT", debug, BoundaryType::fixed).value;
         boundary_right = read_parameter_from_file<BoundaryType>(filename,"PARI_BOUND_TYPE_RIGHT", debug, BoundaryType::fixed).value;
         const_T_space  = read_parameter_from_file<double>(filename,"PARI_CONST_TEMP", debug, 1.).value;
-        TEMPERATURE_BUMP_STRENGTH  = read_parameter_from_file<double>(filename,"TEMPERATURE_BUMP_STRENGTH", debug, 0.).value; 
-        pressure_broadening_factor = read_parameter_from_file<double>(filename,"PRESSURE_BROADENING", debug, 0.).value; 
+        TEMPERATURE_BUMP_STRENGTH    = read_parameter_from_file<double>(filename,"TEMPERATURE_BUMP_STRENGTH", debug, 0.).value; 
+        pressure_broadening_factor   = read_parameter_from_file<double>(filename,"PRESSURE_BROADENING", debug, 0.).value; 
+        pressure_broadening_exponent = read_parameter_from_file<double>(filename,"BROADENING_EXP", debug, 1.).value; 
+        
         
         if(debug > 0) cout<<"        Species["<<species_index<<"] Init: Finished reading boundaries."<<endl;
         if(debug > 0) cout<<"         Boundaries used in species["<<speciesname<<"]: "<<boundary_left<<" / "<<boundary_right<<endl;
@@ -823,6 +835,7 @@ c_Species::c_Species(c_Sim *base_simulation, string filename, string species_fil
                 initialize_hydrostatic_atmosphere(filename);
             }
             else if (init_static_atmosphere == 2) {
+                const_rho_scale = read_parameter_from_file<double>(filename,"CONST_RHO_SCALE", debug, 550.e5).value;
                 initialize_exponential_atmosphere();
             }
 
@@ -849,6 +862,7 @@ c_Species::c_Species(c_Sim *base_simulation, string filename, string species_fil
         
         opacity                = Eigen::MatrixXd::Zero(num_cells+2, num_bands); //num_cells * num_bands
         opacity_planck         = Eigen::MatrixXd::Zero(num_cells+2, num_bands); //num_cells * num_bands
+        opacity_twotemp        = Eigen::MatrixXd::Zero(num_cells+2, num_bands); //num_cells * num_bands
         fraction_total_opacity = Eigen::MatrixXd::Zero(num_cells+2, num_bands); //num_cells * num_bands
     
 }
@@ -971,9 +985,7 @@ void c_Species::initialize_hydrostatic_atmosphere(string filename) {
         cout<<"    The well-balanced scheme seems to be unable to compensate minor velocity fluctuations under those circumstances."<<endl;
         cout<<"    Be advised, your solution is probably about to unphysically explode."<<endl;
     }
-        
     
-  
     compute_pressure(u);
     for(int i=num_cells; i>=0; i--)  {
         primlast[i].internal_energy = prim[i].internal_energy;
@@ -1009,19 +1021,192 @@ void c_Species::initialize_hydrostatic_atmosphere(string filename) {
 
 void c_Species::initialize_exponential_atmosphere() {
     
+    //cout<<" temperatures : ";
+    
     for(int i=num_cells+1; i>=0; i--) {
             prim[i].temperature = const_T_space;
+            //cout<<prim[i].temperature<<" ";
     }
     
+    //cout<<endl<<" scale_H : "<<const_rho_scale<<endl;
+    //cout<<" densities : ";
     
     for(int i=num_cells; i>=0; i--)  {
-        double temp_rhofinal = u[i].u1*std::exp(-1./550e5*(base->x_i[i] - base->x_i[num_cells]));
+        double temp_rhofinal = u[i].u1*std::exp(-1./const_rho_scale*(base->x_i[i] - base->x_i[num_cells]));
         
         u[i] = AOS(temp_rhofinal, 0., cv * temp_rhofinal * prim[i].temperature) ;
+        
+        //cout<<temp_rhofinal<<" ";
     }
     cout<<endl<<endl;
     cout<<"            Ended expoenential density construction for species "<<speciesname<<endl;
     cout<<endl<<endl;
+}
+
+
+
+void c_Species::initialize_hydrostatic_atmosphere_iter(string filename) {
+    
+    if(debug > 0) cout<<"            ATTENTION: Initializing hydrostatic construction for species "<<speciesname<<" and overwriting prior initial values."<<endl;
+    
+    double temp_rhofinal;
+    double factor_inner, factor_outer;
+    double T_inner;
+    double T_outer;
+    double metric_inner;
+    //double residual;
+    double metric_outer;
+    
+    double dphi_factor = read_parameter_from_file<double>(filename,"PARI_DPHI_FACTOR", debug, 1.).value;
+    //
+    // Start with the outermost cell and build up a hydrostatic atmosphere
+    // Fulfilling KKM16, Eqn. 17
+    //
+    //long double residual  = 0.;
+    
+    //
+    // First, initialize (adiabatic) temperature
+    //
+    for(int i=num_cells+1; i>=0; i--) {
+            
+        if(base->temperature_model == 'P')
+            prim[i].temperature = - dphi_factor * base->phi[i] / (cv * gamma_adiabat) + const_T_space;
+        else
+            prim[i].temperature = const_T_space;
+            
+            //Add temperature bumps and troughs
+            //prim[i].temperature += TEMPERATURE_BUMP_STRENGTH * 4.  * exp( - pow(base->x_i12[i] - 1.e-1 ,2.) / (0.1) );
+            //prim[i].temperature -= TEMPERATURE_BUMP_STRENGTH * 15. * exp( - pow(base->x_i12[i] - 7.e-3 ,2.) / (1.5e-3) );
+    }
+    
+    int max_init_iters = 5;
+    
+    for(int iter = 0; iter < max_init_iters; iter++) {
+            
+        //loop
+        
+        //At this point, the right ghost cell is already initialized, so we can just build up a hydrostatic state from there
+        int iter_start;
+        if(base->type_of_grid==2)
+            iter_start = base->grid2_transition_i;
+        else
+            iter_start = num_cells;
+        
+        for(int i=iter_start; i>=0; i--)  {
+            
+            //
+            // Construct next density as to fulfil the hydrostatic condition
+            //
+            T_outer = prim[i+1].temperature ;
+            T_inner = prim[i].temperature ;
+
+            //factor_outer = (gamma_adiabat-1.) * cv * T_outer; 
+            //factor_inner = (gamma_adiabat-1.) * cv * T_inner; 
+            
+            eos->get_p_over_rho_analytic(&T_outer, &factor_outer);
+            eos->get_p_over_rho_analytic(&T_inner, &factor_inner);
+            
+            metric_outer = (base->phi[i+1] - base->phi[i]) * base->omegaplus[i+1] * base->dx[i+1] / (base->dx[i+1] + base->dx[i]);
+            
+            //if(i==num_cells || i==num_cells-1)
+            //    metric_inner = dphi_factor * (base->phi[i+1] - base->phi[i]) * base->omegaminus[i]  * base->dx[i]   / (base->dx[i+1] + base->dx[i]);
+            //else
+            metric_inner = (base->phi[i+1] - base->phi[i]) * base->omegaminus[i]  * base->dx[i]   / (base->dx[i+1] + base->dx[i]);
+            
+            temp_rhofinal = u[i+1].u1 * (factor_outer + metric_outer) / (factor_inner - metric_inner);
+            
+            u[i] = AOS(temp_rhofinal, 0., cv * temp_rhofinal * T_inner) ;
+            
+            if(i==5 || i==iter_start-5)
+                cout<<" iteration "<<iter<<" i = "<<i<<" rho = "<<temp_rhofinal<<" T = "<<T_inner<<endl;
+            
+            //cout<<"    HYDROSTATIC: i/r[i]/rho/T = "<<i<<"/"<<base->x_i[i]<<"/"<<temp_rhofinal<<"/"<<prim[i].temperature<<endl;
+            //
+            // Debug info
+            // 
+            //if( (i==20 || i== num_cells-20) && debug >= 0) {
+            //if( i==300 ) {
+            if(temp_rhofinal < 0) {
+                
+                char a;
+                cout.precision(16);
+                cout<<"NEGATIVE DENSITY IN INIT HYDROSTATIC i="<<i<<"/"<<num_cells<<endl;
+                if((factor_inner - metric_inner) < 0) {
+                    
+                    cout<<"     Negative denominator detected. Product (gamma-1)*cv*T_inner is too small for chosen discretization."<<endl;
+                    
+                }
+                cout<<endl;
+                cout<<"     dphi debug: phi["<<i+1<<"] = "<<base->phi[i+1]<<" phi["<<i<<"] = "<<base->phi[i]<<" num_cells = "<<num_cells<<endl;
+                cout<<"     metric_inner debug: dPhi = "<<(base->phi[i+1] - base->phi[i])<<" dx[i+1]+dx[i] = "<<(base->dx[i+1] + base->dx[i])<<" omega*dx  = "<<base->omegaminus[i]  * base->dx[i]<<endl;
+                cout<<"     factor_inner debug: gamma-1 = "<<(gamma_adiabat-1.)<<" cv = "<<cv<<" T_inner = "<<T_inner<<endl;
+                cout<<"     metric_outer = "<< metric_outer << " metric_inner = "<<metric_inner <<endl;
+                cout<<"     factor_outer = "<< factor_outer << " factor_inner = "<<factor_inner <<endl;
+                cout<<"     factor_outer+metric_outer = "<< (factor_outer + metric_outer) << " factor_inner-metric_inner = "<<( factor_inner - metric_inner) <<endl;
+                cout<<"     RATIO = "<< ((factor_outer + metric_outer)/ (factor_inner - metric_inner)) <<endl;
+                //cout<<"In hydostatic init: factor_dens = "<< (2.* factor_outer / delta_phi + 1.) / (2. * factor_inner / delta_phi - 1.) <<endl;
+                cout<<"     Ratio of densities inner/outer = "<< temp_rhofinal/u[i+1].u1 <<endl;
+                cout<<"     Ratio of temperatures inner/outer = "<<T_inner/T_outer<<" t_inner ="<<T_inner<<" t_outer ="<<T_outer<<endl;
+                cout<<"     Ratio of pressures inner/outer = "<<cv * temp_rhofinal * T_inner /u[i+1].u3<<endl;
+                cout<<"     Resulting density == "<<temp_rhofinal<<endl;
+                cout<<"     density before "<<u[i+1].u1<<endl;
+                cin>>a;
+            }
+        }
+        
+        base->transport_radiation();
+        // \loop
+        
+        if(base->type_of_grid == 2) {
+            
+            for(int i = iter_start+1; i<num_cells+1; i++) {
+                double rr = pow(base->x_i[i]/base->x_i[iter_start],5.);
+                u[i] = AOS(u[iter_start].u1 / rr, 0., cv * u[iter_start].u1 / rr * prim[i].temperature) ;
+                
+            }
+        }
+        
+        if(u[2].u1 > 1e40) {
+            cout<<"    ---WARNING---"<<endl;
+            cout<<"    IN CONSTRUCT HYDROSTATIC:"<<endl;
+            cout<<"    species["<<speciesname<<"] has reached a very high initial density  of > 1e40 at the inner boundary."<<endl;
+            cout<<"    The well-balanced scheme seems to be unable to compensate minor velocity fluctuations under those circumstances."<<endl;
+            cout<<"    Be advised, your solution is probably about to unphysically explode."<<endl;
+        }
+        
+        compute_pressure(u);
+        for(int i=num_cells; i>=0; i--)  {
+            primlast[i].internal_energy = prim[i].internal_energy;
+        }
+        
+    }
+    
+    //
+    // Apply multiplicators for over/underdensities just below and above the sonic point
+    //
+    if(base->init_wind==1) {
+        double csi              = prim[num_cells-1].sound_speed;
+        double smoothed_factor;
+        bondi_radius = base->planet_mass*G / (pow(csi,2.)); //Most restrictive sonic point, as we are not quite isothermal
+    
+        for( int i = 1; i < num_cells + 1; i++) {
+            smoothed_factor = density_excess * (1./(1.+std::exp(-(base->x_i12[i] - bondi_radius)/(0.01 * bondi_radius )) ) ); 
+            
+            u[i].u1 = u[i].u1 * (1. + smoothed_factor);
+            
+            u[i].u3 = u[i].u3 * (1. + smoothed_factor);
+            if(i==1)
+                cout<<"In initwind: First smoothed factor = "<<smoothed_factor<<endl;
+        }
+        
+        cout<<"            Ended hydrostatic construction for species "<<speciesname<<", last smoothed factor was "<<smoothed_factor<<" while  density_excess="<<density_excess<<" r_b="<<bondi_radius<<endl;
+    }
+    else
+        cout<<"            Ended hydrostatic construction for species "<<speciesname<<endl;
+    
+    
+    //TODO:Give some measure if hydrostatic construction was also successful, and give warning if not.
+
 }
 
 

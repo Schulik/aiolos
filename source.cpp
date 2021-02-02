@@ -88,7 +88,6 @@
     // Initialize the gravity array with a non-self gravitating solution
     //
     // takes: r as single value
-    // void correct_totalenergy(double, Eigen::MatrixXd &);
     // Options: linear gravity and 1/r gravity with gravitational smoothing from Klahr&Kley 2006
     //
     double c_Sim::get_phi_grav(double &r, double &mass) {
