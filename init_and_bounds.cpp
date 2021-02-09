@@ -984,9 +984,9 @@ void c_Species::initialize_hydrostatic_atmosphere(string filename) {
     base->density_floor = read_parameter_from_file<double>(filename,"DENSITY_FLOOR", debug, 1.e-20).value;
     cout<<"FIXING SMALL DENSITIES to density floor ="<<base->density_floor<<endl;
     for(int i = 0; i<num_cells+1; i++) {
-            if(u[i].u1 < density_floor) {
+            if(u[i].u1 < base->density_floor) {
                 //cout<<"FIXING SMALL DENSITIES in i ="<<i<<endl;
-                u[i] = AOS(density_floor, 0., cv * density_floor * prim[i].temperature) ;
+                u[i] = AOS(base->density_floor, 0., cv * base->density_floor * prim[i].temperature) ;
             }
                 
             

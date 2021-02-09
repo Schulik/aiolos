@@ -568,7 +568,12 @@ void c_Sim::print_diagnostic_file(int outputnumber) {
                 for(int b=0; b<num_bands; b++) {
                     
                     double dx      = (x_i12[i+1]-x_i12[i]) ;
-                    double tau_inv = 0.5 / (dx * (total_opacity(i,b) + total_opacity(i+1,b))) ;
+                    
+                    double rhokr   = max(2.*(total_opacity(i,b)*total_opacity(i+1,b))/(total_opacity(i,b) + total_opacity(i+1,b)), 4./3./dx );
+                           rhokr   = min( 0.5*( total_opacity(i,b) + total_opacity(i+1,b)) , rhokr);
+                    double tau_inv = 0.5 / (dx * rhokr) ;
+                
+                    //double tau_inv = 0.5 / (dx * (total_opacity(i,b) + total_opacity(i+1,b))) ;
                     double R       = 2 * tau_inv * std::abs(Jrad_FLD(i+1,b) - Jrad_FLD(i,b)) / (Jrad_FLD(i+1,b) + Jrad_FLD(i, b) + 1e-300) ;
                     double flux_limiter = 0;
                     if (R <= 2)
