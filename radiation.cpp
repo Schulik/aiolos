@@ -98,8 +98,7 @@ void c_Sim::update_opacities() {
                 radial_optical_depth(j,b)         = radial_optical_depth(j+1,b)         + cell_optical_depth(j,b);
                 radial_optical_depth_twotemp(j,b) = radial_optical_depth_twotemp(j+1,b) + cell_optical_depth_twotemp(j,b);
             }
-                
-                
+            
             //
             // After the total optical depth per band is known, we assign the fractional optical depths
             // Maybe merge with previous loop for optimization
@@ -120,12 +119,34 @@ void c_Sim::update_opacities() {
             
             if(j<num_cells+1)
                 //dS_band(j,b) = (surf[j+1] * S_band(j+1,b) - surf[j] * S_band(j,b))/vol[j]/4.; //       4pi J = c Erad
-                dS_band(j,b) = (S_band(j+1,b) - S_band(j,b))/dx[j]/4. * (1. - bond_albedo); //       4pi J = c Erad
+                //dS_band(j,b) = (S_band(j+1,b) - S_band(j,b))/dx[j]/4. * (1. - bond_albedo); //       4pi J = c Erad
+                dS_band(j,b) = solar_heating(b) * (-exp(-const_opacity_solar_factor*radial_optical_depth_twotemp(j+1,b)) * 
+                               expm1( const_opacity_solar_factor* ( radial_optical_depth_twotemp(j+1,b) - radial_optical_depth_twotemp(j,b))) ) /dx[j]/4. * (1.-bond_albedo);
             else
                 dS_band(j,b) = 0;
             
+            if(const_opacity_solar_factor*radial_optical_depth_twotemp(j,b))
+            
             for(int s=0; s<num_species; s++)
                 species[s].dS(j)  += dS_band(j,b) * species[s].fraction_total_opacity(j,b);
+        }
+    }
+    
+    //Initialize optically thin regions with low energy density
+    if((steps==0) && (init_J_factor > 0.)) {
+        
+        cout<<" Setting J to custom values. init_J_factor = "<<init_J_factor<<" and init_T_temp ="<<init_T_temp<<endl;
+        
+        for(int j = num_cells + 1; j>0; j--) {
+            for(int b=0; b<num_bands; b++) {
+                
+                if(radial_optical_depth(j,b) < 1.) 
+                    Jrad_FLD(j,b) *= init_J_factor/pow(x_i[j]/x_i[34] ,2.);
+                    
+                for(int s=0; s<num_species; s++)
+                    species[s].prim[j].temperature = init_T_temp;
+                
+            }
         }
     }
     
@@ -138,6 +159,12 @@ void c_Sim::update_opacities() {
     for(int b = 0; b < num_bands; b++) {
         J_remnant += S_band(1,b);
     }
+    for(int s=0; s<num_species; s++) {
+        species[s].prim[num_cells].temperature   = species[s].const_T_space;
+        species[s].prim[num_cells+1].temperature = species[s].const_T_space;
+        //species[s].prim[num_cells+2].temperature = species[s].const_T_space;
+    }
+    
     T_rad_remnant = pow(pi * J_remnant / sigma_rad, 0.25);
     
     T_target      = pow(pow(T_core,4.) + pow(T_rad_remnant,4.), 0.25);
@@ -162,17 +189,15 @@ void c_Sim::update_opacities() {
         for(int b=0; b<num_bands;b++) {
            cout<<" in band ["<<b<<"] top-of-the-atmosphere heating = "<<solar_heating(b)<<endl;
         }
-        
+        cout<<"    in update opa "<<endl;
         for(int j=num_cells; j>0; j--) {
             
-            cout<<"    in update opa "<<endl;
-            
             for(int b=0; b<num_bands;b++) {
-                cout<<"    band ["<<b<<"][j="<<j<<"] = "<<S_band(j,b)<<" banddS = "<<dS_band(j,b)<<" tau = "<<radial_optical_depth(j,b);
+                cout<<"    band ["<<b<<"][j="<<j<<"] = "<<S_band(j,b)<<" dS = "<<dS_band(j,b)<<" tau = "<<radial_optical_depth(j,b);
                 for(int s=0; s<num_species; s++) {
-                     cout<<" dS_fraction["<<species[s].speciesname<<"] = "<<(species[s].fraction_total_opacity(j,b))<<" opa = "<<species[s].opacity(j,b)<<" total opa(j+1)"<<total_opacity(j+1,b)<<" rho/T = "<<species[s].prim[j].density<<"/"<<species[s].prim[j].temperature<<" x = "<<x_i12[j];
+                     cout<<" dS_fract["<<species[s].speciesname<<"] = "<<(species[s].fraction_total_opacity(j,b))<<" opa = "<<species[s].opacity(j,b)<<" total opa(j+1)"<<total_opacity(j+1,b)<<" rho/T = "<<species[s].prim[j].density<<"/"<<species[s].prim[j].temperature<<" x = "<<x_i12[j];
                 }
-                cout<<endl;
+                //cout<<endl;
             }
             cout<<endl;
         }
@@ -226,7 +251,10 @@ void c_Sim::update_fluxes_FLD() {
             // Flux across right boundary
             if (j > 0 && j < num_cells + 1) {
                 double dx      = (x_i12[j+1]-x_i12[j]) ;
-                double tau_inv = 0.5 / (dx * (total_opacity(j,b) + total_opacity(j+1,b))) ;
+                double rhokr   = max(2.*(total_opacity(j,b)*total_opacity(j+1,b))/(total_opacity(j,b) + total_opacity(j+1,b)), 4./3./dx );
+                       rhokr   = min( 0.5*( total_opacity(j,b) + total_opacity(j+1,b)) , rhokr);
+                double tau_inv = 0.5 / (dx * rhokr) ;
+                //double tau_inv = 0.5 / (dx * (total_opacity(j,b) + total_opacity(j+1,b))) ;
                 double R       = 2 * tau_inv * std::abs(Jrad_FLD(j+1,b) - Jrad_FLD(j,b)) / (Jrad_FLD(j+1,b) + Jrad_FLD(j, b) + 1e-300) ;
                 double D       = 1. * surf[j] * flux_limiter(R) * tau_inv;
 
@@ -237,7 +265,7 @@ void c_Sim::update_fluxes_FLD() {
                 l[idx+stride] = -D ;
                 
                 if(debug > 1)
-                    cout<<" radiation part 0. t,j,b="<<steps<<","<<j<<","<<b<<" tau_inv/R/D = "<<tau_inv<<"/"<<R<<"/"<<D<<" J/J = "<<Jrad_FLD(j+1,b)<<"/"<<Jrad_FLD(j,b)<<endl;
+                    cout<<" radiation part 0. t,j,b="<<steps<<","<<j<<","<<b<<" tau_inv/R/D = "<<tau_inv<<"/"<<R<<"/"<<D<<" J/J/dJ = "<<Jrad_FLD(j+1,b)<<"/"<<Jrad_FLD(j,b)<<"/"<<(Jrad_FLD(j+1,b)-Jrad_FLD(j,b))<<" flux = "<<D*(Jrad_FLD(j+1,b)-Jrad_FLD(j,b))<<endl;
             }
         }
         
@@ -329,24 +357,25 @@ void c_Sim::update_fluxes_FLD() {
             for (int s=0; s < num_species; s++) {
                 
                 if(debug > 1) {
-                        cout<<" Going into integral."<<endl;
-                        cout<<" opa    = "<<species[s].opacity_planck(j, 0)<<endl;
-                        cout<<" temper = "<<species[s].prim[j].temperature<<endl;
+                        cout<<" Going into radpart 2. ";
+                        cout<<" opa    = "<<species[s].opacity_planck(j, 0);
+                        cout<<" temper = "<<species[s].prim[j].temperature;
                         cout<<" dens   = "<<species[s].prim[j].density<<endl;
-                        
                 }
                 
                 int idx_s  = j*stride + (s + num_bands) * (num_vars+1) ;
                 int idx_rs = j*num_vars + (s + num_bands) ;
-
+                
+                
                 double Ts = species[s].prim[j].temperature ;
                 double rhos = species[s].prim[j].density ;
 
                 d[idx_s ] = 1 / dt ;
                 r[idx_rs] = Ts / dt ;
-
+                r[idx_rs] += species[s].dS(j) / species[s].u[j].u1 / species[s].cv; //* 4. * pi /c_light
+                
                 if (j < num_ghosts || j >= num_cells + 2-num_ghosts) continue ;
-
+                
                 for(int b=0; b<num_bands; b++) {
                     int idx_b  = j*stride + b * (num_vars+1) ;
                     int idx_bs = j*stride + b * num_vars + (s + num_bands) ; 
@@ -358,7 +387,6 @@ void c_Sim::update_fluxes_FLD() {
                     d[idx_s ] += 16 * pi * fac / species[s].cv ;
                     d[idx_sb] = - 4 * pi * species[s].opacity_planck(j, b) / species[s].cv ;
                     r[idx_rs] += 12 * pi * fac * Ts / species[s].cv ;
-                    r[idx_rs] += species[s].dS(j)  / species[s].u[j].u1 / species[s].cv; //* 4. * pi /c_light
 
                     //cout<<" in rad matrix["<<j<<"]: term1 = "<<12 * pi * fac * Ts / species[s].cv<<" term2 = "<<species[s].dS(j)  / species[s].u[j].u1 / species[s].cv<<endl;
                     
@@ -410,3 +438,23 @@ void c_Sim::update_fluxes_FLD() {
         }
 
 }
+
+//
+//
+// This requires 8-12 species that we track, besides neutral H/He.
+// The couplings between high-energy radiation, ionization and heating happens in this routine.
+//
+// For this we assume a fixed ordering and numbering of species, as follows:
+// 0   1   2   3   4    5    6       7    8     9    10    11
+// H0  H+  H-  He  He+  H++  He 23S  H2   H2+   H3+  HeH+  e-
+//
+// Heating and cooling rates according to Black (1981), the physical state of primordial intergalactic clouds
+//
+// void do_highenergy_sourcing() {
+//     
+//     
+//     //
+//     dS[j] += number_dens[0] * number_dens[11] 1.27e-21 pow(Temperature, 0.5) * exp(-157809.1/Temperature)
+//     
+// 
+// }

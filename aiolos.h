@@ -375,6 +375,8 @@ public:
     double *data_opacity[4], *opa_gas_tscale, *opa_gas_pscale, *opa_gas_ross, *opa_gas_planck;
     int opacity_gas_rows = 126, opacity_gas_cols = 94;
     double const_opacity_solar_factor;
+    double init_J_factor;
+    double init_T_temp;
     
     Eigen::MatrixXd T_FLD ;
     Eigen::MatrixXd T_FLD2 ;
@@ -393,6 +395,7 @@ public:
     
     int rad_solver_max_iter = 1;
     double epsilon_rad_min = 1e-1;  // Some convergence measure for the radiation solver, if needed
+    double density_floor;
     
     ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     //
@@ -451,6 +454,8 @@ public:
     //Radiation transport 
     void transport_radiation();     //  Called if use_rad_fluxes == 1
     void update_opacities();
+    
+    void do_highenergy_sourcing();
     
     void update_fluxes(double timestep);           //  Called from transport_radiation#   
     void update_fluxes_FLD();           //  Called from transport_radiation#

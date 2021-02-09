@@ -29,6 +29,12 @@ void c_Sim::execute() {
     double output_counter = 0;
     double monitor_counter= 0;
     const int maxsteps = 1e9;
+    
+    int crashed_T = 0, crashed_J = 0;
+    int crash_T_imin = num_cells+2, crash_T_imax = 0, crash_T_numcells = 0;
+    int crash_J_imin = num_cells+2, crash_J_imax = 0, crash_J_numcells = 0;
+    double crashtime;
+    int crashtime_already_assigned = 0;
         
     cout<<endl<<"Beginning main loop with num_cells="<<num_cells<<" and timestep="<<dt<<" cflfactor="<<cflfactor<<" and num_species = "<<num_species<<endl;
     if(num_species == 0) 
@@ -115,13 +121,13 @@ void c_Sim::execute() {
         // zeroth output has the initialized conserved values, but already the first fluxes.
         //
         
-         if(steps==0 || steps==1) {
+         if(steps==0 || steps==1 || steps==2) {
              for(int s=0; s<num_species; s++) {
                 species[s].print_AOS_component_tofile((int) output_counter);
             }
             print_monitor((int)monitor_counter);
-            if(steps==1)
-                print_diagnostic_file((int)output_counter);
+            //if(steps==1 || steps==2)
+            print_diagnostic_file((int)output_counter);
             
             monitor_counter+=1.;
             output_counter +=1.;
@@ -215,23 +221,60 @@ void c_Sim::execute() {
         if(debug > 1)
             cout<<"timestep in execute()="<<dt<<" stepnum "<<steps<<" totaltime"<<globalTime<<endl;
         
+        //
+        // Detection of negative J and T and soft exit
+        //
         for(int s = 0; s < num_species; s++) {
             for(int i=num_cells; i>=0; i--)  {
                     if(species[s].prim[i].temperature < 0) {
-                        cout<<" NEGATIVE TEMPERATURE at timestep, s/i = "<<s<<"/"<<i<<" in execute()="<<dt<<" stepnum "<<steps<<" totaltime"<<globalTime<<endl;
-                        cout<<" Writing crash dump into last output and exiting program."<<endl;
-                        globalTime = 1.1*t_max;
+                        
+                        if(crashtime_already_assigned == 0) {
+                            crashtime = globalTime;
+                            crashtime_already_assigned = 1;
+                        }
+                        
+                        crashed_T = s+1;
+                        crash_T_imin = (i<crash_T_imin)? i : crash_T_imin;
+                        crash_T_imax = (i>crash_T_imax)? i : crash_T_imax;
+                        crash_T_numcells++;
+                        
+                        //cout<<" NEGATIVE TEMPERATURE at s/i = "<<s<<"/"<<i<<" in timestep="<<dt<<" stepnum "<<steps<<" totaltime "<<globalTime<<endl;
+                        globalTime = 1.1*t_max; //This secures that the program exits smoothly after the crash
                     }
+                    
             }
             
+            if(crashed_T > 0) {
+                cout<<endl<<">>> CRASH <<< DUE TO NEGATIVE TEMPERATURES, crash_imin/imax = "<<crash_T_imin<<"/"<<crash_T_imax<<" num of crashed cells/total cells = "<<crash_T_numcells<<"/"<<num_cells<<"  crashed species number = "<<crashed_T-1<<endl; 
+                cout<<" @dt="<<dt<<" stepnum "<<steps<<" Crashtime "<<crashtime<<endl;
+                cout<<"Writing crash dump into last output and exiting program."<<endl;
+            } 
+                    
         }
         for(int b = 0; b < num_bands; b++) {
             for(int i=num_cells; i>=0; i--)  {
                     if(Jrad_FLD(i,b) < 0) {
-                        cout<<" NEGATIVE RAD DENSITY at timestep, b/i = "<<b<<"/"<<i<<" in execute()="<<dt<<" stepnum "<<steps<<" totaltime"<<globalTime<<endl;
-                        cout<<" Writing crash dump into last output and exiting program."<<endl;
+                        
+                        if(crashtime_already_assigned == 0) {
+                            crashtime = globalTime;
+                            crashtime_already_assigned = 1;
+                        }
+                        
+                        crashed_J = b+1;
+                        crash_J_imin = (i<crash_J_imin)? i : crash_J_imin;
+                        crash_J_imax = (i>crash_J_imax)? i : crash_J_imax;
+                        crash_J_numcells++;
+                        
+                        //cout<<" NEGATIVE RAD DENSITY at b/i = "<<b<<"/"<<i<<"  at timestep "<<dt<<" stepnum "<<steps<<" totaltime "<<globalTime<<endl;
+                        //cout<<" Writing crash dump into last output and exiting program."<<endl;
                         globalTime = 1.1*t_max;
                     }
+            }
+            
+            if(crashed_J > 0) {
+                cout<<endl<<">>> CRASH <<< DUE TO NEGATIVE J, crash_imin/imax = "<<crash_J_imin<<"/"<<crash_J_imax<<" num of crashed cells/total cells = "<<crash_J_numcells<<"/"<<num_cells<<"  crashed band number = "<<crashed_J-1<<endl; 
+                cout<<" @dt="<<dt<<" stepnum "<<steps<<" Crashtime "<<crashtime<<endl;
+                cout<<"Writing crash dump into last output and exiting program."<<endl;
             }
         }
         

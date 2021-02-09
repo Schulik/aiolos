@@ -569,7 +569,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
         
         totallumiincr = compute_planck_function_integral3(l_i[b], l_i[b+1], T_star);
         totallumi     += totallumiincr;
-        cout<<" INIT BANDS, b = "<<b<<" l_i[b] = "<<l_i[b]<<" l_i[b+1] = "<<l_i[b+1]<<" l_i12[b] = "<<l_i12[b]<<" fraction = "<<totallumiincr<<endl;
+        cout<<" INIT BANDS, b = "<<b<<" l_i[b] = "<<l_i[b]<<" l_i[b+1] = "<<l_i[b+1]<<" l_i12[b] = "<<l_i12[b]<<" fraction = "<<totallumiincr<<" fraction for T=1430 K = "<<compute_planck_function_integral3(l_i[b], l_i[b+1], 1430.)<<endl;
     }
     cout<<" Total lumi / sigma T^4/pi is = "<<totallumi<<endl;
     
@@ -597,6 +597,8 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
     
     double rade_l = read_parameter_from_file<double>(filename,"PARI_RADSHOCK_ERL", debug, 1.).value;
     double rade_r = read_parameter_from_file<double>(filename,"PARI_RADSHOCK_ERR", debug, 1.).value;
+    init_J_factor = read_parameter_from_file<double>(filename,"INIT_J_FACTOR", debug, -1.).value;
+    init_T_temp   = read_parameter_from_file<double>(filename,"INIT_T_TEMP", debug, 1000.).value;
     
     for(int j = 0; j < num_cells+1; j++) {
         
@@ -646,7 +648,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
             
             for(int b = 0; b < num_bands; b++) {
                 for(int s = 0; s< num_species; s++){
-                    Jrad_FLD(j,b)  = rad_energy_multiplier * compute_planck_function_integral3(l_i[b], l_i[b+1], species[s].prim[j].temperature);
+                    Jrad_FLD(j,b)  = rad_energy_multiplier * compute_planck_function_integral3(l_i[b], l_i[b+1], species[s].prim[j].temperature) * sigma_rad*pow(species[s].prim[j].temperature,4) / pi;
                     if(Jrad_FLD(j,b) < 1e-50)
                         Jrad_FLD(j,b) = 1e-50;
                     
@@ -976,6 +978,18 @@ void c_Species::initialize_hydrostatic_atmosphere(string filename) {
             u[i] = AOS(u[iter_start].u1 / rr, 0., cv * u[iter_start].u1 / rr * prim[i].temperature) ;
             
         }
+    }
+    
+    //makeshift density fix
+    base->density_floor = read_parameter_from_file<double>(filename,"DENSITY_FLOOR", debug, 1.e-20).value;
+    cout<<"FIXING SMALL DENSITIES to density floor ="<<base->density_floor<<endl;
+    for(int i = 0; i<num_cells+1; i++) {
+            if(u[i].u1 < density_floor) {
+                //cout<<"FIXING SMALL DENSITIES in i ="<<i<<endl;
+                u[i] = AOS(density_floor, 0., cv * density_floor * prim[i].temperature) ;
+            }
+                
+            
     }
     
     if(u[2].u1 > 1e40) {

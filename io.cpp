@@ -207,8 +207,17 @@ void c_Species::read_species_data(string filename, int species_index) {
                 //cout<<" i = "<<i<<" wl = "<<wl<<" opa = "<<opacity_data(i,1)<<endl;
                 
                 if( wl < lmax && wl > lmin) {
-                    opacity_avg(b) += opacity_data(i,1); 
-                    wlcount++;
+                    
+                    if(opacity_data(i,1) > 1e10 || opacity_data(i,1) < 1.1e-20) {
+                        
+                        //cout<<"Band opacity_data("<<i<<",1) = "<<opacity_data(i,1)<<"is faulty! wlcount ="<<wlcount<<endl;
+                        //cout<<" Band b, lmax "<<lmax<<" opa_data(0,0) = "<<opacity_data(0,0)<<endl;
+                        //cout<<" Band b, lmin "<<lmin<<" opa_data(-1,0) = "<<opacity_data(num_tmp_lambdas,0)<<endl;
+                        
+                    } else {
+                        opacity_avg(b) += opacity_data(i,1); 
+                        wlcount++;
+                    }
                 }
                 if(i==0) {
                     
@@ -219,22 +228,36 @@ void c_Species::read_species_data(string filename, int species_index) {
                 }
             }
             
-            if(wlcount > 0)
+            if(wlcount > 0) {
                 opacity_avg(b) /= (double)wlcount;
+            }
+            else 
+                cout<<" Band "<<b<<" has wlcount==0!"<<endl;
+                
             
             //
             // For bands which have no opacity data given / first and last band, we assume the nearest datapoint
             //
             if(lmax < opacity_data(0,0) ) {
                 opacity_avg(b) = opacity_data(0,1);
+                cout<<" Band b, lmax "<<lmax<<"< opa_data(0,0)"<<opacity_data(0,0)<<endl;
             }
             if(lmin > opacity_data(num_tmp_lambdas-1,0) ) {
                 opacity_avg(b) = opacity_data(num_tmp_lambdas-1,1);
+                cout<<" Band b, lmin "<<lmin<<"< opa_data(-1,0)"<<opacity_data(num_tmp_lambdas,0)<<endl;
+            }
+            
+            
+            if(opacity_avg(b) > 1e10 || opacity_avg(b) < 0.) {
+                
+                cout<<"Band b = "<<b<<"is faulty! opacity = "<<opacity_avg(b)<<" wlcount ="<<wlcount<<endl;
+                cout<<" Band b, lmax "<<lmax<<" opa_data(0,0) = "<<opacity_data(0,0)<<endl;
+                cout<<" Band b, lmin "<<lmin<<" opa_data(-1,0) = "<<opacity_data(num_tmp_lambdas,0)<<endl;
             }
             
             
         }
-        cout<<"pos4"<<endl;
+        //cout<<"pos4"<<endl;
         //Done! Now debug plot stuff
         cout<<"Done reading in data for species = "<<species_index<<" avg opacities per band = ";
         for(int b = 0; b < num_bands; b++) {
@@ -486,7 +509,7 @@ void c_Sim::print_diagnostic_file(int outputnumber) {
                     Jtot += Jrad_FLD(i,b)/c_light*4.*pi;
                     Stot += S_band(i,b);
                 }
-                outfileDiagnostic<<x_i12[i]<<'\t'<<Jtot<<'\t'<<Stot;
+                outfileDiagnostic<<x_i12[i]<<'\t'<<Jtot<<'\t'<<Stot; //Rows 1 2 3
                 
                 //Radiation field
                 for(int b=0; b<num_bands; b++) {
@@ -535,7 +558,31 @@ void c_Sim::print_diagnostic_file(int outputnumber) {
                 for(int s=0; s<num_species; s++)
                     outfileDiagnostic<<'\t'<<species[s].prim[i].temperature; //col 6-...: all species temperatures 
                 
+                //Pressure
+                double tempP = 0.;
+                for(int s=0; s<num_species; s++)
+                        tempP += species[s].prim[i].pres;
+                outfileDiagnostic<<'\t'<<tempP;
+                
                 //Fluxes
+                for(int b=0; b<num_bands; b++) {
+                    
+                    double dx      = (x_i12[i+1]-x_i12[i]) ;
+                    double tau_inv = 0.5 / (dx * (total_opacity(i,b) + total_opacity(i+1,b))) ;
+                    double R       = 2 * tau_inv * std::abs(Jrad_FLD(i+1,b) - Jrad_FLD(i,b)) / (Jrad_FLD(i+1,b) + Jrad_FLD(i, b) + 1e-300) ;
+                    double flux_limiter = 0;
+                    if (R <= 2)
+                        flux_limiter = 2 / (3 + std::sqrt(9 + 10*R*R)) ;
+                    else 
+                        flux_limiter = 10 / (10*R + 9 + std::sqrt(81 + 180*R)) ;
+                    
+                    double D       = surf[i] * flux_limiter * tau_inv;
+                    double flux    = D * (Jrad_FLD(i+1,b) - Jrad_FLD(i,b));
+
+                    outfileDiagnostic<<'\t'<<flux;
+                }
+                
+                
                 
 //                 for(int b=0; b<num_bands; b++) {
 //                     
