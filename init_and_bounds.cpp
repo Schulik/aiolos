@@ -41,9 +41,13 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
         lambda_min       = read_parameter_from_file<double>(filename,"PARI_LAM_MIN", debug, 1e-1).value;
         lambda_max       = read_parameter_from_file<double>(filename,"PARI_LAM_MAX", debug, 10.).value;
         lambda_per_decade= read_parameter_from_file<double>(filename,"PARI_LAM_PER_DECADE", debug, 10.).value;
+        star_mass        =  read_parameter_from_file<double>(filename,"PARI_MSTAR", debug, 1.).value;
+        star_mass        *= msolar;
         T_star           = read_parameter_from_file<double>(filename,"PARI_TSTAR", debug, 5777.).value;
         R_star           = read_parameter_from_file<double>(filename,"PARI_RSTAR", debug, 0.).value;
         UV_star          = read_parameter_from_file<double>(filename,"PARI_UVSTAR", debug, 0.).value;
+        X_star           = read_parameter_from_file<double>(filename,"PARI_XSTAR", debug, 0.).value;
+        Lyalpha_star     = read_parameter_from_file<double>(filename,"PARI_LYASTAR", debug, 0.).value;
         num_bands        = read_parameter_from_file<int>(filename,"PARI_NUM_BANDS", debug, 1).value;
         T_core           = read_parameter_from_file<double>(filename,"PARI_TPLANET", debug, 200.).value;
         use_planetary_temperature = read_parameter_from_file<int>(filename,"USE_PLANET_TEMPERATURE", debug, 0).value;
@@ -119,10 +123,12 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
         
         problem_number    = read_parameter_from_file<int>(filename,"PARI_PROBLEM_NUMBER", debug).value;
         use_self_gravity  = read_parameter_from_file<int>(filename,"PARI_SELF_GRAV_SWITCH", debug, 0).value;
+        use_tides         = read_parameter_from_file<int>(filename,"USE_TIDES", debug, 0).value;
         use_linear_gravity= read_parameter_from_file<int>(filename,"PARI_LINEAR_GRAV", debug, 0).value;
         use_rad_fluxes    = read_parameter_from_file<int>(filename,"PARI_USE_RADIATION", debug, 0).value;
         init_wind         = read_parameter_from_file<int>(filename,"PARI_INIT_WIND", debug, 0).value;
         alpha_collision   = read_parameter_from_file<double>(filename,"PARI_ALPHA_COLL", debug, 0).value;
+        mdot              = read_parameter_from_file<double>(filename,"PARI_MDOT", debug, 1e-20).value;
         rad_energy_multiplier=read_parameter_from_file<double>(filename,"PARI_RAD_MULTIPL", debug, 1.).value;
         collision_model   = read_parameter_from_file<char>(filename,"PARI_COLL_MODEL", debug, 'C').value;
         opacity_model     = read_parameter_from_file<char>(filename,"PARI_OPACITY_MODEL", debug, 'C').value;
@@ -133,10 +139,11 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
         temperature_model = read_parameter_from_file<char>(filename,"INIT_TEMPERATURE_MODEL", debug, 'P').value;
         friction_solver   = read_parameter_from_file<int>(filename,"FRICTION_SOLVER", debug, 0).value;
         do_hydrodynamics  = read_parameter_from_file<int>(filename,"DO_HYDRO", debug, 1).value;
+        photochemistry_level = read_parameter_from_file<int>(filename,"PHOTOCHEM_LEVEL", debug, 0).value;
+        
         rad_solver_max_iter = read_parameter_from_file<int>(filename,"MAX_RAD_ITER", debug, 1).value;
         bond_albedo       = read_parameter_from_file<double>(filename,"BOND_ALBEDO", debug, 0.).value; 
-        
-        planet_semimajor= read_parameter_from_file<double>(filename,"PARI_PLANET_DIST", debug, 1.).value; //in Earth masses
+        planet_semimajor= read_parameter_from_file<double>(filename,"PARI_PLANET_DIST", debug, 1.).value; //in AU
         
         if(problem_number == 2)
             monitor_output_index = num_cells/2; //TODO: Replace with index of sonic radius for dominant species?
@@ -220,9 +227,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
                 l_i12[b]  = pow( 10., 0.5 * (std::log10(l_i[b]) + std::log10(l_i[b+1])));   
                 
             }
-            
         }
-        
         
         /*
         cout<<"   ATTENTION: Bands go from "<<l_i[0]<<" till "<<l_i[num_bands]<<", while lmin/lmax was given as "<<lambda_min<<"/"<<lambda_max<<endl;
@@ -527,10 +532,24 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
         planck_matrix(p,0) = lmax*100.;  // Wavelength
         planck_matrix(p,1) = sum_planck; // Planck integral until this matrix element
         
-        
         //if(debug > 2)
         //   cout<<" in planck_matrix, lT = "<<planck_matrix(p,0)<<" percentile = "<<planck_matrix(p,1)<<endl;
     }
+    
+//     debug = 4;
+//     char inpit;
+//     cout<<" Attempting to debug extreme temperatures:"<<endl;
+//     cout<<compute_planck_function_integral3(l_i[0], l_i[1], 5777);
+//     cin>>inpit;
+//     double temp2 = 1e-40;
+//     for(int i = 0; i<80; i++) {
+//             cout<<"Energy fraction in global band at T = "<<temp2<<": "<<compute_planck_function_integral3(l_i[0], l_i[1], temp2)<<" planck2 "<<compute_planck_function_integral2(l_i[0], l_i[1], temp2)/(sigma_rad * pow(temp2,4.) / pi)<<endl;
+//             temp2 *= 10.;
+//     }
+    
+    //cout<<"Energy fraction in global band at T = 1e-40: "<<compute_planck_function_integral3(l_i[0], l_i[1], 1e-40)<<endl;
+    //cin>>inpit;
+    
     
     if(debug > 0) cout<<"Init: Assigning stellar luminosities 1."<<endl;
     for(int s=0; s<num_species; s++) {
@@ -554,8 +573,20 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
             cout<<" from/to lmin/lmax"<<l_i[b];
             cout<<"/"<<l_i[b+1]<<" with T_star = "<<T_star;
             
-            solar_heating(b)  = sigma_rad * pow(T_star,4.) * pow(R_star*rsolar,2.)/pow(planet_semimajor*au,2.) * compute_planck_function_integral3(l_i[b], l_i[b+1], T_star)  + UV_star * 1.;
+            solar_heating(b)  = sigma_rad * pow(T_star,4.) * pow(R_star*rsolar,2.)/pow(planet_semimajor*au,2.) * compute_planck_function_integral3(l_i[b], l_i[b+1], T_star);
             templumi += solar_heating(b);
+            
+            if(l_i[b+1] < 1e-1 && l_i[b+1] > 1e-2) { //Detect the EUV band 
+                solar_heating(b) += UV_star/(4.*pi*pow(planet_semimajor*au,2.));
+                cout<<endl<<" band "<<b<<" detected as UV band. Assigning UV flux "<<UV_star/(4.*pi*pow(planet_semimajor*au,2.))<<" based on UV lumi "<<UV_star<<endl;
+            }
+                
+            
+            if(l_i[b+1] <= 1e-2 ) { //Detect the X ray band
+                solar_heating(b) += X_star/(4.*pi*pow(planet_semimajor*au,2.));
+                cout<<endl<<" band "<<b<<" detected as X band. Assigning X flux "<<X_star/(4.*pi*pow(planet_semimajor*au,2.))<<" based on X lumi "<<X_star<<endl;
+            } 
+                
             
             cout<<" is "<<solar_heating(b)<<endl;
             
@@ -907,7 +938,7 @@ void c_Species::initialize_hydrostatic_atmosphere(string filename) {
     
     //At this point, the right ghost cell is already initialized, so we can just build up a hydrostatic state from there
     int iter_start;
-    if(base->type_of_grid==2)
+    if(base->type_of_grid==-2)
         iter_start = base->grid2_transition_i;
     else
         iter_start = num_cells;
@@ -971,7 +1002,7 @@ void c_Species::initialize_hydrostatic_atmosphere(string filename) {
         }
     }
     
-    if(base->type_of_grid == 2) {
+    if(base->type_of_grid == -2) {
         
         for(int i = iter_start+1; i<num_cells+1; i++) {
             double rr = pow(base->x_i[i]/base->x_i[iter_start],5.);

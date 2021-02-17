@@ -96,7 +96,7 @@ void c_Species::read_species_data(string filename, int species_index) {
     opacity_avg            = Eigen::VectorXd::Zero(num_bands); //num_cells * num_bands
     
     //if(num_opacity_datas > -1) 
-    if(base->opacity_model == 'P') {
+    if(base->opacity_model == 'P' || base->opacity_model == 'M') {
         
         cout<<"Physical opacity chosen & enough data to read in files. Reading file = "<<("inputdata/" +opacity_data_string)<<endl;
         //
@@ -548,7 +548,7 @@ void c_Sim::print_diagnostic_file(int outputnumber) {
                     for(int s=0; s<num_species; s++) {
                         outfileDiagnostic<<'\t'<<species[s].opacity(i,b);
                         outfileDiagnostic<<'\t'<<species[s].opacity_planck(i,b);
-                        outfileDiagnostic<<'\t'<<species[s].opacity_twotemp(i,b);
+                        outfileDiagnostic<<'\t'<<const_opacity_solar_factor*species[s].opacity_twotemp(i,b);
                     }
                 }
                 

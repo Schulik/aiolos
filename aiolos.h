@@ -55,6 +55,7 @@ const double angstroem= 1e-4; //cm
 const double ergcm2_to_wattperm2 = 1e-3;
 const double sigma_rad = 5.670374419e-5;   //erg cm-2 s-1 K-4
 const double sigma_rad2= 2*h_planck*c_light*c_light/pow(angstroem,4.);
+const double K_to_eV = 8.621738e-5;
 
 // For entropy computation, to be set to sensible parameters e.g. at setting of initial conditions
 const double P_ref   = 1e-20;
@@ -75,6 +76,7 @@ const int debug2 = 0;
 
 double delta_ij(int i, int j);
 double lint(double xa, int N, double* X, double* RI);
+double logint(double xa, int N, double* X, double* RI);
 
 //
 // Functions mimicking certain numpy functionalities
@@ -206,6 +208,7 @@ public:
     int use_rad_fluxes;
     int suppress_warnings;
     int do_hydrodynamics;
+    int photochemistry_level;
 
     ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     //
@@ -291,6 +294,7 @@ public:
     //
     
     double star_mass;
+    int    use_tides;
     
     double planet_mass;     //in Earth masses
     double planet_position; //inside the simulation domain
@@ -343,6 +347,8 @@ public:
     //
     double T_star;
     double UV_star;
+    double X_star;
+    double Lyalpha_star;
     double R_star;
     
     double T_core;  //Internal heat flux
@@ -454,6 +460,8 @@ public:
     //Radiation transport 
     void transport_radiation();     //  Called if use_rad_fluxes == 1
     void update_opacities();
+    
+    void do_photochemistry();
     
     void do_highenergy_sourcing();
     

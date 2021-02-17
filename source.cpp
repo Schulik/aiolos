@@ -14,9 +14,6 @@
 #include <cassert>
 #include "aiolos.h"
 
-
-
-
 ///////////////////////////////////////////////////////////
 //
 // Chapter on gravitation
@@ -78,6 +75,10 @@
             else
                 phi[i]           = get_phi_grav(x_i12[i], enclosed_mass[0]);
             
+            //if use tidal gravity
+            if(use_tides == 1)
+                phi[i] -= 3.*G*star_mass*x_i12[i]*x_i12[i]/pow(planet_semimajor*au,3.);
+            //            -G*mass/abs(r-planet_position);
         }
         
         if(debug >= 3)

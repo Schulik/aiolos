@@ -78,7 +78,7 @@ double c_Sim::get_cfl_timestep() {
     if ( minstep > t_max)
         return t_max * 1e-2;
     
-    return minstep;
+    return min(minstep, dt*2);
 }
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -223,7 +223,6 @@ double c_Sim::compute_planck_function_integral3(double lmin, double lmax, double
     if(debug > 1)
         cout<<endl<<"Planck Integral3, lmin/lmax/t = "<<lmin<<"/"<<lmax<<"/"<<temperature;
     
-    
     //
     // Lower power
     //
@@ -231,6 +230,9 @@ double c_Sim::compute_planck_function_integral3(double lmin, double lmax, double
         m    = planck_matrix(0,1) / planck_matrix(0,0);
         
         power_min = planck_matrix(0,1) + m * lT_min;
+        
+        if(lT_max < planck_matrix(0,0)) //Do this only in the lowermost band
+            return 1.;
     }
     else {
         imin = std::log(lT_min/planck_matrix(0,0)) / std::log(lT_spacing);
@@ -247,6 +249,9 @@ double c_Sim::compute_planck_function_integral3(double lmin, double lmax, double
     //
     if(lmax * temperature > planck_matrix(num_plancks-1,0)) {
         power_max = 1.;
+        
+        if(lT_min > planck_matrix(num_plancks-1,0)) //Do this only in the uppermost band
+            return 1;
     }
     else {
         
@@ -257,7 +262,7 @@ double c_Sim::compute_planck_function_integral3(double lmin, double lmax, double
     }
     
     if(debug > 1)
-        cout<<"/"<<imax<<" P(imin)/P(imax) = "<<power_min<<"/"<<power_max<<" = "<<power_max-power_min<<endl; 
+        cout<<" / "<<" P(imin="<<imin<<")/P(imax="<<imax<<") = "<<power_min<<"/"<<power_max<<" = "<<power_max-power_min<<endl; 
     
     return power_max - power_min;
     

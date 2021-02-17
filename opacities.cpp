@@ -43,6 +43,23 @@ double lint(double xa, int N, double* X, double* RI) {
     return (RI[i2] - RI[i1]) / (X[i2] - X[i1]) * (xa - X[i1]) + RI[i1];
 }
 
+double logint(double xa, int N, double* X, double* RI) {
+    int i2, i1, i;
+    if(xa < X[0])
+        xa = X[0];
+    else if (xa > X[N])
+        xa = X[N];
+
+    // Find position the two 
+    for(i = 0; i < N; i++) {
+        if(xa >= X[i]) {
+            i1 = i;
+            i2 = i+1;
+        }
+    }
+    //Left and right boundaries are known, interpolate linearly
+    return std::pow(10, (std::log10(RI[i2]) - std::log10(RI[i1])) / (std::log10(X[i2]) - std::log10(X[i1])) * (std::log10(xa) - std::log10(X[i1])) + std::log10(RI[i1]) );
+}
 
 void c_Species::update_opacities() {
     /*
@@ -116,7 +133,7 @@ void c_Species::update_opacities() {
             for(int b=0; b<num_bands; b++) {
                 opacity(j,b)        = base->opacity_semenov_malygin(1, prim[j].temperature, prim[j].density, prim[j].pres); 
                 opacity_planck(j,b) = base->opacity_semenov_malygin(0, prim[j].temperature, prim[j].density, prim[j].pres);
-                opacity_twotemp(j,b)= base->opacity_semenov_malygin(0, base->T_star, prim[j].density, prim[j].density * prim[j].temperature * kb/(mass_amu*amu));
+                opacity_twotemp(j,b)= opacity_avg(b); //base->opacity_semenov_malygin(0, base->T_star, prim[j].density, prim[j].density * prim[j].temperature * kb/(mass_amu*amu));
                 //opacity_twotemp(j,b)= base->opacity_semenov_malygin(1, prim[j].temperature, prim[j].density, prim[j].pres); 
             }
         }
@@ -548,12 +565,12 @@ void c_Sim::kappa_landscape()
     double opa_planck_semenov[arraysize];
     double opa_planck_twotemp[arraysize];
   	double temperature[arraysize];
-	double density[9]={2e-18,2e-16,2e-14,2e-12,2e-10,2e-8,2e-6,2e-4,2e-2};
+	double density[21]={1e-18,1e-17,1e-16,1e-15,1e-14,1e-13,1e-12,3e-12,6e-12,1e-11,1e-10,1e-9,1e-8,1e-7,1e-6,1e-5,1e-4,1e-3,1e-2};
 	
 	printf("In kappa landscape.\n");
 	fflush (stdout);
 	
-	for(j = 0; j < 9; j++) {
+	for(j = 0; j < 21; j++) {
 	   recentdens = density[j];
 	   printf("Doing density %e \n",density[j]);
 		fflush (stdout);

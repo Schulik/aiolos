@@ -25,7 +25,6 @@
 void c_Sim::transport_radiation() {
         
         int iters = 0;
-        //double epsilon_rad = 1.;
         
         if(steps == 1)
             cout<<"   in transport_radiation, before loop, steps = "<<steps<<endl;
@@ -36,15 +35,15 @@ void c_Sim::transport_radiation() {
             if(steps == 1)
                 cout<<"   in transport_radiation, in loop, steps = "<<steps<<endl;
             
-            update_opacities();
+            update_opacities(); //Contains solar absorption 
+            
+            if(photochemistry_level > 0 && steps > 1)
+                do_photochemistry();
             
             if(debug >= 1)
                 cout<<"   in transport_radiation, after update opacities."<<endl;
             
-            update_fluxes_FLD();
-            
-            //update_fluxes_FLD(1.0*dt,   Jrad_FLD, Jrad_FLD2, T_FLD); //J_in, J_out, T_in
-            //update_temperatures(1.0*dt, Jrad_FLD2, T_FLD, T_FLD2); // J_in,  T_in, T_out
+            update_fluxes_FLD(); //Contains radiation transport and sourcing
             
             if(steps == -1 || steps == -2) {
                 cout<<"   in transport_radiation, after update fluxes."<<endl;
@@ -114,18 +113,20 @@ void c_Sim::update_opacities() {
             
             S_band(j,b) = solar_heating(b) * std::exp(-const_opacity_solar_factor*radial_optical_depth_twotemp(j,b));
             
+            //if(steps == 0)
+            //    cout<<"IN SOLAR HEATING, const_opacity_solar_factor = "<<const_opacity_solar_factor<<endl;
+            
             if(debug >= 1)
                 cout<<" in cell ["<<j<<"] band ["<<b<<"] top-of-the-atmosphere heating = "<<solar_heating(b)<<" tau_rad(j,b) = "<<radial_optical_depth(j,b)<<" exp(tau) = "<<std::exp(-radial_optical_depth(j,b))<<endl;
             
             if(j<num_cells+1)
                 //dS_band(j,b) = (surf[j+1] * S_band(j+1,b) - surf[j] * S_band(j,b))/vol[j]/4.; //       4pi J = c Erad
                 //dS_band(j,b) = (S_band(j+1,b) - S_band(j,b))/dx[j]/4. * (1. - bond_albedo); //       4pi J = c Erad
-                dS_band(j,b) = solar_heating(b) * (-exp(-const_opacity_solar_factor*radial_optical_depth_twotemp(j+1,b)) * 
-                               expm1( const_opacity_solar_factor* ( radial_optical_depth_twotemp(j+1,b) - radial_optical_depth_twotemp(j,b))) ) /dx[j]/4. * (1.-bond_albedo);
+                dS_band(j,b) = solar_heating(b) * (-exp(-const_opacity_solar_factor*radial_optical_depth_twotemp(j+1,b)) * expm1( const_opacity_solar_factor* ( radial_optical_depth_twotemp(j+1,b) - radial_optical_depth_twotemp(j,b))) ) /dx[j]/4. * (1.-bond_albedo);
             else
                 dS_band(j,b) = 0;
             
-            if(const_opacity_solar_factor*radial_optical_depth_twotemp(j,b))
+            //if(const_opacity_solar_factor*radial_optical_depth_twotemp(j,b))
             
             for(int s=0; s<num_species; s++)
                 species[s].dS(j)  += dS_band(j,b) * species[s].fraction_total_opacity(j,b);
@@ -135,7 +136,7 @@ void c_Sim::update_opacities() {
     //Initialize optically thin regions with low energy density
     if((steps==0) && (init_J_factor > 0.)) {
         
-        cout<<" Setting J to custom values. init_J_factor = "<<init_J_factor<<" and init_T_temp ="<<init_T_temp<<endl;
+        cout<<" Setting J to custom values. init_J_factor = "<<init_J_factor<<" and init_T_temp ="<<init_T_temp<<" const_opacity_solar_factor = "<<const_opacity_solar_factor<<endl;
         
         for(int j = num_cells + 1; j>0; j--) {
             for(int b=0; b<num_bands; b++) {
@@ -438,23 +439,3 @@ void c_Sim::update_fluxes_FLD() {
         }
 
 }
-
-//
-//
-// This requires 8-12 species that we track, besides neutral H/He.
-// The couplings between high-energy radiation, ionization and heating happens in this routine.
-//
-// For this we assume a fixed ordering and numbering of species, as follows:
-// 0   1   2   3   4    5    6       7    8     9    10    11
-// H0  H+  H-  He  He+  H++  He 23S  H2   H2+   H3+  HeH+  e-
-//
-// Heating and cooling rates according to Black (1981), the physical state of primordial intergalactic clouds
-//
-// void do_highenergy_sourcing() {
-//     
-//     
-//     //
-//     dS[j] += number_dens[0] * number_dens[11] 1.27e-21 pow(Temperature, 0.5) * exp(-157809.1/Temperature)
-//     
-// 
-// }

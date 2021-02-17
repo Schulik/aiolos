@@ -43,7 +43,7 @@ void c_Sim::execute() {
     //
     // Compute real, physical scales for orientation
     //
-    star_mass = 1. * msolar;
+    
     scale_cs = std::sqrt(species[0].gamma_adiabat * (species[0].gamma_adiabat - 1.) * species[0].cv * species[0].prim[num_cells].temperature); // cm/s
     scale_rb = G*planet_mass / scale_cs / scale_cs; 
     scale_rh = planet_semimajor * au * pow(planet_mass / (3.* star_mass ),0.333333333333333333);
@@ -62,7 +62,7 @@ void c_Sim::execute() {
 //     init_malygin_opacities();
 //     cout<<" pressure_manual = "<<species[0].prim[3].density * species[0].prim[3].temperature * kb / (40.*amu)<<" pressure_true = "<<species[0].prim[3].pres <<endl;
 //     cout<<endl;
-//     kappa_landscape();
+//    kappa_landscape();
 //     cout<<" test planck opacity = "<<opacity_semenov_malygin(0,    species[0].prim[3].temperature, species[0].prim[3].density, species[0].prim[3].pres);
 //     cout<<" test rosseland opacity = "<<opacity_semenov_malygin(1, species[0].prim[3].temperature, species[0].prim[3].density, species[0].prim[3].pres);
 //     
@@ -201,7 +201,7 @@ void c_Sim::execute() {
         if (do_hydrodynamics == 1) {
             if(alpha_collision > 0 && num_species > 1) {
                 if(friction_solver == 0)
-                    compute_friction_analytical(); 
+                    compute_friction_analytical();
                 else
                     compute_friction_numerical();
             }
@@ -211,7 +211,7 @@ void c_Sim::execute() {
         //    use_rad_fluxes = 1;
         
         if(use_rad_fluxes==1)
-            transport_radiation();
+            transport_radiation(); //Also contains photochemistry
         
         steps++;
         
