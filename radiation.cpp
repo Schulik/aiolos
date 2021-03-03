@@ -37,9 +37,6 @@ void c_Sim::transport_radiation() {
             
             update_opacities(); //Contains solar absorption 
             
-            if(photochemistry_level > 0 && steps > 1)
-                do_photochemistry();
-            
             if(debug >= 1)
                 cout<<"   in transport_radiation, after update opacities."<<endl;
             
@@ -53,8 +50,6 @@ void c_Sim::transport_radiation() {
             iters++;
         }
 }
-
-
 
 //
 // Computation of opacities based on material properties
@@ -143,7 +138,7 @@ void c_Sim::update_opacities() {
                 
                 if(radial_optical_depth(j,b) < 1.) 
                     Jrad_FLD(j,b) *= init_J_factor/pow(x_i[j]/x_i[34] ,2.);
-                    
+                
                 for(int s=0; s<num_species; s++)
                     species[s].prim[j].temperature = init_T_temp;
                 
@@ -194,7 +189,7 @@ void c_Sim::update_opacities() {
         for(int j=num_cells; j>0; j--) {
             
             for(int b=0; b<num_bands;b++) {
-                cout<<"    band ["<<b<<"][j="<<j<<"] = "<<S_band(j,b)<<" dS = "<<dS_band(j,b)<<" tau = "<<radial_optical_depth(j,b);
+                cout<<"    band ["<<b<<"][j="<<j<<"] = "<<S_band(j,b)<<" dS = "<<dS_band(j,b)<<" tau = "<<const_opacity_solar_factor*radial_optical_depth_twotemp(j,b);
                 for(int s=0; s<num_species; s++) {
                      cout<<" dS_fract["<<species[s].speciesname<<"] = "<<(species[s].fraction_total_opacity(j,b))<<" opa = "<<species[s].opacity(j,b)<<" total opa(j+1)"<<total_opacity(j+1,b)<<" rho/T = "<<species[s].prim[j].density<<"/"<<species[s].prim[j].temperature<<" x = "<<x_i12[j];
                 }

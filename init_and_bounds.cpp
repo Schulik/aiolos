@@ -436,6 +436,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
             throw std::invalid_argument(err.str()) ;
         }
 
+        init_T_temp   = read_parameter_from_file<double>(filename,"INIT_T_TEMP", debug, 1000.).value;
 
         if(debug > 0) cout<<"Init: About to setup species with num_species = "<<num_species<<endl;
         
@@ -629,7 +630,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
     double rade_l = read_parameter_from_file<double>(filename,"PARI_RADSHOCK_ERL", debug, 1.).value;
     double rade_r = read_parameter_from_file<double>(filename,"PARI_RADSHOCK_ERR", debug, 1.).value;
     init_J_factor = read_parameter_from_file<double>(filename,"INIT_J_FACTOR", debug, -1.).value;
-    init_T_temp   = read_parameter_from_file<double>(filename,"INIT_T_TEMP", debug, 1000.).value;
+    
     
     for(int j = 0; j < num_cells+1; j++) {
         
@@ -689,14 +690,16 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
                      if(debug > 1 && j==5) {
                         cout<<" Jrad("<<j<<","<<b<<") = "<<Jrad_FLD(j,b)<<" dJrad_species["<<s<<"] = "<<rad_energy_multiplier * compute_planck_function_integral3(l_i[b], l_i[b+1], species[s].prim[j].temperature)<<" at T ="<<species[s].prim[j].temperature<<endl; 
                      }
-                        
                 }
             }
-            
-            
         }
         
     }
+        
+        
+        
+        
+        
     
     cout<<" IN INIT: FINISHED INIT. RETURNING TO MAIN NOW."<<endl;
 }
@@ -767,13 +770,13 @@ c_Species::c_Species(c_Sim *base_simulation, string filename, string species_fil
         if(is_dust_like == 0) {
             cv            = 0.5 * degrees_of_freedom * Rgas / mass_amu; 
             gamma_adiabat = (degrees_of_freedom + 2.)/ degrees_of_freedom;
-            eos           = new IdealGas_EOS(degrees_of_freedom, cv, mass_amu) ;
+            eos           = new IdealGas_EOS(degrees_of_freedom, cv, mass_amu*amu) ;
         }
         //Dust species
         else {
             cv            = 1.5 * Rgas / mass_amu; // 3 Degrees of freedom per atom (high T limit of debye theory)
             gamma_adiabat = (degrees_of_freedom + 2.)/ degrees_of_freedom; // Total degrees of freedom per grain
-            eos           = new IdealGas_EOS(degrees_of_freedom, cv, mass_amu) ;
+            eos           = new IdealGas_EOS(degrees_of_freedom, cv, mass_amu*amu) ;
         }
         
         if(debug >= 0) cout<<"        Species["<<species_index<<"] got a gamma_adiabatic = "<<gamma_adiabat<<" and cv = "<<cv<<endl;
@@ -1007,9 +1010,9 @@ void c_Species::initialize_hydrostatic_atmosphere(string filename) {
         for(int i = iter_start+1; i<num_cells+1; i++) {
             double rr = pow(base->x_i[i]/base->x_i[iter_start],5.);
             u[i] = AOS(u[iter_start].u1 / rr, 0., cv * u[iter_start].u1 / rr * prim[i].temperature) ;
-            
         }
     }
+    
     
     //makeshift density fix
     base->density_floor = read_parameter_from_file<double>(filename,"DENSITY_FLOOR", debug, 1.e-20).value;
@@ -1019,9 +1022,26 @@ void c_Species::initialize_hydrostatic_atmosphere(string filename) {
                 //cout<<"FIXING SMALL DENSITIES in i ="<<i<<endl;
                 u[i] = AOS(base->density_floor, 0., cv * base->density_floor * prim[i].temperature) ;
             }
-                
-            
     }
+    
+    if(base->init_T_temp > 2.7) {
+            cout<<" In INIT: Overwriting T with user-defined temperature:"<<base->init_T_temp;
+            
+            for(int i=num_cells; i>=0; i--)  {
+                
+                //if(x_i12[i]<2.e10) {
+                    
+                    double temprho = u[i].u1;
+                
+                    u[i] = AOS(temprho, 0., cv * temprho * base->init_T_temp) ;
+                //}
+                
+                //prim[i].temperature = base->init_T_temp;
+            }
+        }
+        else
+            cout<<" In INIT:NO TOverwriting T with user-defined temperature:"<<base->init_T_temp;
+    
     
     if(u[2].u1 > 1e40) {
         cout<<"    ---WARNING---"<<endl;
@@ -1058,6 +1078,8 @@ void c_Species::initialize_hydrostatic_atmosphere(string filename) {
     }
     else
         cout<<"            Ended hydrostatic construction for species "<<speciesname<<endl;
+    
+    
     
     
     //TODO:Give some measure if hydrostatic construction was also successful, and give warning if not.
@@ -1232,7 +1254,7 @@ void c_Species::initialize_hydrostatic_atmosphere_iter(string filename) {
     if(base->init_wind==1) {
         double csi              = prim[num_cells-1].sound_speed;
         double smoothed_factor;
-        bondi_radius = base->planet_mass*G / (pow(csi,2.)); //Most restrictive sonic point, as we are not quite isothermal
+        bondi_radius = 0.1*base->planet_mass*G / (pow(csi,2.)); //Most restrictive sonic point, as we are not quite isothermal
     
         for( int i = 1; i < num_cells + 1; i++) {
             smoothed_factor = density_excess * (1./(1.+std::exp(-(base->x_i12[i] - bondi_radius)/(0.01 * bondi_radius )) ) ); 

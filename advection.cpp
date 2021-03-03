@@ -94,6 +94,9 @@ void c_Sim::execute() {
         
 //         if(steps == 1e6) 
 //             cout<<"Radiative equilibrium phase over."<<endl;
+        
+        if(globalTime < 3.e0)
+            cout<<" steps "<<steps<<" globalTime "<<globalTime<<" dt "<<dt<<endl;
 //         
         //
         // Save internal energy before we update it
@@ -213,6 +216,10 @@ void c_Sim::execute() {
         if(use_rad_fluxes==1)
             transport_radiation(); //Also contains photochemistry
         
+        //Photochemistry
+        if(photochemistry_level > 0 && steps > 1)
+            do_photochemistry();
+            
         steps++;
         
         if(steps==1)
