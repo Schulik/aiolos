@@ -68,7 +68,7 @@ void c_Sim::do_photochemistry() {
                 double dtau;
                 double timescale, timestep;
                 
-                int maxiter = 1e4;
+                int maxiter = 1e2;
                 int iter = 0;
                 //S_band(j,b)  = solar_heating(b) * std::exp(-const_opacity_solar_factor*radial_optical_depth_twotemp(j,b));
                 
@@ -101,12 +101,12 @@ void c_Sim::do_photochemistry() {
                     
                     //recombination= 2.59e13  * pow(species[0].prim[j].temperature/1.e4, -0.7) * number_dens_array[1] /(total);
                     
-                    //x_eq = 
-                    ionfraction  = (gamma + collisions * number_dens_array[2]) / (gamma + number_dens_array[2] * (collisions + recombination));
+                    x_eq = (gamma + collisions * number_dens_array[2]) / (gamma + number_dens_array[2] * (collisions + recombination));
+                    //ionfraction  = (gamma + collisions * number_dens_array[2]) / (gamma + number_dens_array[2] * (collisions + recombination));
                     timescale    = 1./ (gamma + number_dens_array[2] * (collisions + recombination));
                     timestep = 1e-10; //10.*dt
                     
-                    //ionfraction  = x_eq + (ionfraction - x_eq) * (1.-std::exp(-timestep/timescale) )*timescale/timestep; 
+                    ionfraction  = x_eq + (ionfraction - x_eq) * (1.-std::exp(-timestep/timescale) )*timescale/timestep; 
                     
                     number_dens_array[0]  = (1. - ionfraction) * total;
                     number_dens_array[1]  = ionfraction * total;
@@ -135,11 +135,13 @@ void c_Sim::do_photochemistry() {
                     dS_band(j,b) = gamma * number_dens_array[0] - cooling_coll - cooling_rec; //No explicit free-free & ly-alpha for now
                 else
                     dS_band(j,b) = 0;
+                
+                //species[0].dS(j)  += dS_band(j,b) * species[s].fraction_total_opacity(j,b);
                     
                 //Temporary heating fraction
-                species[0].dS(j)  += dS_band(j,b) * (1-ionfraction);
-                species[1].dS(j)  += dS_band(j,b) * ionfraction * 0.5;
-                species[2].dS(j)  += dS_band(j,b) * ionfraction * 0.5;
+                species[0].dS(j)  += 0.; //dS_band(j,b) * (1-ionfraction);
+                species[1].dS(j)  += dS_band(j,b) * ionfraction * 0.01;
+                species[2].dS(j)  += dS_band(j,b) * ionfraction * 0.99;
                 
                 if(j==num_cells+1) 
                     radial_optical_depth_twotemp(j,b) = 0.;
@@ -178,10 +180,7 @@ void c_Sim::do_photochemistry() {
                 char stopchar;
                 cin>>stopchar;
             }
-            
-            
         }
-        
     }
     
     //cout<<endl;

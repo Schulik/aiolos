@@ -31,7 +31,9 @@ double c_Sim::get_cfl_timestep() {
     
     for(int s = 0; s < num_species; s++) {
         for(int i=num_cells; i>=0; i--)  {
-            species[s].de_e[i] = (species[s].primlast[i].internal_energy - species[s].prim[i].internal_energy)/species[s].prim[i].internal_energy;
+            species[s].de_e[i] = std::abs(species[s].primlast[i].internal_energy - species[s].prim[i].internal_energy)/species[s].prim[i].internal_energy;
+            
+            species[s].timesteps_de[i] = dt / species[s].de_e[i] * energy_epsilon;
             
             maxde = (species[s].de_e[i] > maxde)?species[s].de_e[i]:maxde;
             if(debug > 2)
@@ -75,8 +77,8 @@ double c_Sim::get_cfl_timestep() {
     minstep = cflfactor / minstep;
     
     //Check if the simulation step is too large (e.g. when v=0 in most of the domain), then make the step artificially smaller
-    if ( minstep > t_max)
-        return t_max * 1e-2;
+    //if ( minstep > t_max)
+    //    return t_max * 1e-2;
     
     return min(minstep, dt*2);
 }

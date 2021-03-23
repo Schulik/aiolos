@@ -95,7 +95,7 @@ void c_Sim::execute() {
 //         if(steps == 1e6) 
 //             cout<<"Radiative equilibrium phase over."<<endl;
         
-        if(globalTime < 3.e0)
+        if(globalTime < 1.e-6)
             cout<<" steps "<<steps<<" globalTime "<<globalTime<<" dt "<<dt<<endl;
 //         
         //
@@ -201,7 +201,7 @@ void c_Sim::execute() {
         for(int s = 0; s < num_species; s++)
             species[s].compute_pressure(species[s].u);
         
-        if (do_hydrodynamics == 1) {
+        if (do_hydrodynamics == 1 && steps >= 10) {
             if(alpha_collision > 0 && num_species > 1) {
                 if(friction_solver == 0)
                     compute_friction_analytical();

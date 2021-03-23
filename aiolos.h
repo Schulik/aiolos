@@ -311,6 +311,7 @@ public:
     
     std::vector<double> phi;
     std::vector<double> enclosed_mass;
+    std::vector<double> enclosed_mass_tmp;
     
     //
     // Friction
@@ -341,6 +342,7 @@ public:
     Vector_t radiation_T3_vector;
     
     Eigen::VectorXd alphas_sample;
+    Eigen::VectorXd friction_sample;
     
     //
     // Radiation
@@ -575,6 +577,7 @@ public:
     std::vector<double> timesteps_cs;
     std::vector<double> timesteps_rad;
     std::vector<double> finalstep;
+    std::vector<double> timesteps_de;
     double snd_crs_time;
 
     std::vector<AOS_prim> prim ;

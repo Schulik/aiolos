@@ -189,8 +189,9 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
         omegaminus = np_zeros(num_cells+2);
         source_pressure_prefactor_left    = np_zeros(num_cells+2);
         source_pressure_prefactor_right   = np_zeros(num_cells+2);
-        enclosed_mass   = np_zeros(num_cells+2);
-        phi             = np_zeros(num_cells+2);
+        enclosed_mass     = np_zeros(num_cells+2);
+        enclosed_mass_tmp = np_zeros(num_cells+2);
+        phi               = np_zeros(num_cells+2);
         
         if(num_bands < 1) {
             cout<<" In INIT RADIATION, invalid num_bands = "<<num_bands<<" changing to num_bands = 1."<<endl;
@@ -466,6 +467,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
 
 
         alphas_sample  = Eigen::VectorXd::Zero(num_cells+2);
+        friction_sample  = Eigen::VectorXd::Zero(num_cells+2);
         
         if(num_species >= 1) {
             friction_matrix_T     = Matrix_t::Zero(num_species, num_species);
@@ -790,10 +792,11 @@ c_Species::c_Species(c_Sim *base_simulation, string filename, string species_fil
         prim_r = std::vector<AOS_prim>(num_cells+2);
         temp_temperature = std::vector<double>(num_cells+2);
         
-        timesteps    = np_zeros(num_cells+2);		    
-        timesteps_cs = np_zeros(num_cells+2);	
+        timesteps     = np_zeros(num_cells+2);		    
+        timesteps_cs  = np_zeros(num_cells+2);	
         timesteps_rad = np_zeros(num_cells+2);
-        finalstep    = np_zeros(num_cells+2);
+        finalstep     = np_zeros(num_cells+2);
+        timesteps_de  = np_zeros(num_cells+2);
         
         //////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         //
