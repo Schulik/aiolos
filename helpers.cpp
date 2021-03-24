@@ -216,14 +216,27 @@ double c_Sim::compute_planck_function_integral3(double lmin, double lmax, double
     
     double power_min;
     double power_max;
-    double lT_min = lmin * temperature;
-    double lT_max = lmax * temperature;
+    double lT_min;
+    double lT_max;
+    
+    if(temperature < 2.71) {
+        lT_min = lmin * 2.71;
+        lT_max = lmax * 2.71;
+        
+    } else {
+        lT_min = lmin * temperature;
+        lT_max = lmax * temperature;
+    }
+    
     double m;
     int imin = 0;
     int imax = num_plancks;
     
-    if(debug > 1)
-        cout<<endl<<"Planck Integral3, lmin/lmax/t = "<<lmin<<"/"<<lmax<<"/"<<temperature;
+    //if();
+    //if(debug > 1)
+    //int temp_imin = std::log(lT_min/planck_matrix(0,0)) / std::log(lT_spacing);
+    //if( steps >= 3927 && temp_imin < 0 )
+    //    cout<<"Planck Integral3, lmin/lmax/t = "<<lmin<<"/"<<lmax<<"/"<<temperature<<" lT_min / P00 = "<<lT_min<<" / "<<planck_matrix(0,0)<<" imin = "<<temp_imin<<endl;
     
     //
     // Lower power
@@ -238,7 +251,7 @@ double c_Sim::compute_planck_function_integral3(double lmin, double lmax, double
     }
     else {
         imin = std::log(lT_min/planck_matrix(0,0)) / std::log(lT_spacing);
-        m    = (planck_matrix(imin+1,1) - planck_matrix(imin,1)) / (planck_matrix(imin+1,0)-planck_matrix(imin,0));
+        m    = (planck_matrix(imin+1,1) - planck_matrix(imin,1)) / (planck_matrix(imin+1,0)-planck_matrix(imin,0)); //valgrind marks memory leak here
         
         power_min = planck_matrix(imin,1) + m * (lT_min - planck_matrix(imin,0));
     }

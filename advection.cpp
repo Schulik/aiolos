@@ -33,7 +33,7 @@ void c_Sim::execute() {
     int crashed_T = 0, crashed_J = 0;
     int crash_T_imin = num_cells+2, crash_T_imax = 0, crash_T_numcells = 0;
     int crash_J_imin = num_cells+2, crash_J_imax = 0, crash_J_numcells = 0;
-    double crashtime;
+    double crashtime, crashed_temperature;
     int crashtime_already_assigned = 0;
         
     cout<<endl<<"Beginning main loop with num_cells="<<num_cells<<" and timestep="<<dt<<" cflfactor="<<cflfactor<<" and num_species = "<<num_species<<endl;
@@ -95,8 +95,10 @@ void c_Sim::execute() {
 //         if(steps == 1e6) 
 //             cout<<"Radiative equilibrium phase over."<<endl;
         
-        if(globalTime < 1.e-6)
+        if(globalTime < 1.e0) {
             cout<<" steps "<<steps<<" globalTime "<<globalTime<<" dt "<<dt<<endl;
+        }
+            
 //         
         //
         // Save internal energy before we update it
@@ -233,13 +235,14 @@ void c_Sim::execute() {
         //
         for(int s = 0; s < num_species; s++) {
             for(int i=num_cells; i>=0; i--)  {
-                    if(species[s].prim[i].temperature < 0) {
+                    if(species[s].prim[i].temperature < 0 || std::isnan(species[s].prim[i].temperature) ) {
                         
                         if(crashtime_already_assigned == 0) {
                             crashtime = globalTime;
                             crashtime_already_assigned = 1;
                         }
                         
+                        crashed_temperature = species[s].prim[i].temperature;
                         crashed_T = s+1;
                         crash_T_imin = (i<crash_T_imin)? i : crash_T_imin;
                         crash_T_imax = (i>crash_T_imax)? i : crash_T_imax;
@@ -252,7 +255,7 @@ void c_Sim::execute() {
             }
             
             if(crashed_T > 0) {
-                cout<<endl<<">>> CRASH <<< DUE TO NEGATIVE TEMPERATURES, crash_imin/imax = "<<crash_T_imin<<"/"<<crash_T_imax<<" num of crashed cells/total cells = "<<crash_T_numcells<<"/"<<num_cells<<"  crashed species number = "<<crashed_T-1<<endl; 
+                cout<<endl<<">>> CRASH <<< DUE TO NEGATIVE TEMPERATURES, crash_imin/imax = "<<crash_T_imin<<"/"<<crash_T_imax<<" sample T ="<<crashed_temperature<<" num of crashed cells/total cells = "<<crash_T_numcells<<"/"<<num_cells<<"  crashed species number = "<<crashed_T-1<<endl; 
                 cout<<" @dt="<<dt<<" stepnum "<<steps<<" Crashtime "<<crashtime<<endl;
                 cout<<"Writing crash dump into last output and exiting program."<<endl;
             } 

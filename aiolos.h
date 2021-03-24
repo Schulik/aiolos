@@ -55,7 +55,10 @@ const double angstroem= 1e-4; //cm
 const double ergcm2_to_wattperm2 = 1e-3;
 const double sigma_rad = 5.670374419e-5;   //erg cm-2 s-1 K-4
 const double sigma_rad2= 2*h_planck*c_light*c_light/pow(angstroem,4.);
-const double K_to_eV = 8.621738e-5;
+const double K_to_eV    = 8.621738e-5;
+const double ev_to_K    = 1./K_to_eV;
+const double de_broglie_e = 2.*pi* amu/2000.*kb/h_planck/h_planck;
+const double de_broglie_p = 2.*pi* amu * kb/h_planck/h_planck;
 
 // For entropy computation, to be set to sensible parameters e.g. at setting of initial conditions
 const double P_ref   = 1e-20;
