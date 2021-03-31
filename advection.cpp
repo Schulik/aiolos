@@ -28,6 +28,8 @@ void c_Sim::execute() {
     steps = 0;
     double output_counter = 0;
     double monitor_counter= 0;
+    const double dt_initial = 1e-20;
+    double next_print_time  = dt_initial;
     const int maxsteps = 1e9;
     
     int crashed_T = 0, crashed_J = 0;
@@ -80,9 +82,12 @@ void c_Sim::execute() {
         //if(steps > 18024) 
         //    debug = 2;
         
-        if(steps==0)
+        if(steps==0) {
             for(int s = 0; s < num_species; s++)
                 species[s].compute_pressure(species[s].u);
+            compute_total_pressure();
+        }
+            
             
         dt = get_cfl_timestep();
         dt = std::min(dt, t_max - globalTime) ;
@@ -90,13 +95,15 @@ void c_Sim::execute() {
         //if(steps > 1e6)
             dt = std::min(dt, timestep_rad2) ;
         else
-            dt = 1e-20;
+            dt = dt_initial;
         
 //         if(steps == 1e6) 
 //             cout<<"Radiative equilibrium phase over."<<endl;
         
-        if(globalTime < 1.e0) {
-            cout<<" steps "<<steps<<" globalTime "<<globalTime<<" dt "<<dt<<endl;
+        if( globalTime > next_print_time) {
+        //if(steps > 3700) {
+            cout<<" Beginning step "<<steps<<" @ globalTime "<<globalTime<<" dt "<<dt<<endl;
+            next_print_time *= 10.;
         }
             
 //         
@@ -161,6 +168,11 @@ void c_Sim::execute() {
         //
         ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~////
         
+        
+        //if(steps >= 4345)
+        //    debug = 2;
+        
+        
         //
         // Step 0: If no gas movement is desired, set all velocity changes to 0
         //
@@ -177,11 +189,11 @@ void c_Sim::execute() {
         }
         
         if (order == IntegrationType::first_order) {
-            globalTime += dt ;
+            globalTime += dt;
         }
         else if (order == IntegrationType::second_order) {
             // 2nd step evaluated at t+dt
-            globalTime += dt ;
+            globalTime += dt;
 
             if(use_self_gravity==1)
                 update_mass_and_pot();
@@ -202,6 +214,7 @@ void c_Sim::execute() {
         
         for(int s = 0; s < num_species; s++)
             species[s].compute_pressure(species[s].u);
+        compute_total_pressure();
         
         if (do_hydrodynamics == 1 && steps >= 10) {
             if(alpha_collision > 0 && num_species > 1) {
@@ -219,8 +232,14 @@ void c_Sim::execute() {
             transport_radiation(); //Also contains photochemistry
         
         //Photochemistry
-        if(photochemistry_level > 0 && steps > 1)
+        if(photochemistry_level > 0 && steps > 1 && globalTime > 1.e-4) {
+            
+            //debug=2;
+            
             do_photochemistry();
+            
+        }
+            
             
         steps++;
         
@@ -251,7 +270,6 @@ void c_Sim::execute() {
                         //cout<<" NEGATIVE TEMPERATURE at s/i = "<<s<<"/"<<i<<" in timestep="<<dt<<" stepnum "<<steps<<" totaltime "<<globalTime<<endl;
                         globalTime = 1.1*t_max; //This secures that the program exits smoothly after the crash
                     }
-                    
             }
             
             if(crashed_T > 0) {

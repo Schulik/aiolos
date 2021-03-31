@@ -192,6 +192,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
         enclosed_mass     = np_zeros(num_cells+2);
         enclosed_mass_tmp = np_zeros(num_cells+2);
         phi               = np_zeros(num_cells+2);
+        total_pressure    = np_zeros(num_cells+2);
         
         if(num_bands < 1) {
             cout<<" In INIT RADIATION, invalid num_bands = "<<num_bands<<" changing to num_bands = 1."<<endl;

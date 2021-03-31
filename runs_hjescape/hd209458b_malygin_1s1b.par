@@ -67,7 +67,7 @@ PARI_GEOMETRY           2
 PARI_CELLS_PER_DECADE   1000
 #Domain min/max are 8 me core radius for earth density, and 100*hill radius
 PARI_DOMAIN_MIN         9.473e9
-PARI_DOMAIN_MAX         10.697e11
+PARI_DOMAIN_MAX         15.697e11
 
 #Scenarios
 PARI_INIT_WIND          1

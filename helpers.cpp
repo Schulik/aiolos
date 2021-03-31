@@ -30,7 +30,7 @@ double c_Sim::get_cfl_timestep() {
     double maxde = 0;
     
     for(int s = 0; s < num_species; s++) {
-        for(int i=num_cells; i>=0; i--)  {
+        for(int i=num_cells-1; i>=0; i--)  {
             species[s].de_e[i] = std::abs(species[s].primlast[i].internal_energy - species[s].prim[i].internal_energy)/species[s].prim[i].internal_energy;
             
             species[s].timesteps_de[i] = dt / species[s].de_e[i] * energy_epsilon;

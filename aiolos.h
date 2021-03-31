@@ -315,6 +315,7 @@ public:
     std::vector<double> phi;
     std::vector<double> enclosed_mass;
     std::vector<double> enclosed_mass_tmp;
+    std::vector<double> total_pressure;
     
     //
     // Friction
@@ -439,6 +440,16 @@ public:
     
     void print_monitor(int i);
     void print_diagnostic_file(int i);
+    
+    void compute_total_pressure() {
+        /*for(int i=num_cells; i>=0; i--)  {
+            
+            total_pressure[i] = 0.;
+            for(int s = 0; s < num_species; s++) {
+                total_pressure[i] += species[s].prim[i].pressure;
+            }
+        }*/
+    }
     
     //
     // Friction
