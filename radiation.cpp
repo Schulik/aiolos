@@ -114,12 +114,22 @@ void c_Sim::update_opacities() {
             if(debug >= 1)
                 cout<<" in cell ["<<j<<"] band ["<<b<<"] top-of-the-atmosphere heating = "<<solar_heating(b)<<" tau_rad(j,b) = "<<radial_optical_depth(j,b)<<" exp(tau) = "<<std::exp(-radial_optical_depth(j,b))<<endl;
             
-            if(j<num_cells+1)
-                //dS_band(j,b) = (surf[j+1] * S_band(j+1,b) - surf[j] * S_band(j,b))/vol[j]/4.; //       4pi J = c Erad
-                //dS_band(j,b) = (S_band(j+1,b) - S_band(j,b))/dx[j]/4. * (1. - bond_albedo); //       4pi J = c Erad
-                dS_band(j,b) = solar_heating(b) * (-exp(-const_opacity_solar_factor*radial_optical_depth_twotemp(j+1,b)) * expm1( const_opacity_solar_factor* ( radial_optical_depth_twotemp(j+1,b) - radial_optical_depth_twotemp(j,b))) ) /dx[j]/4. * (1.-bond_albedo);
-            else
-                dS_band(j,b) = 0;
+            if(steps > -1) {
+                        
+                if(j<num_cells+1)
+                    //dS_band(j,b) = (surf[j+1] * S_band(j+1,b) - surf[j] * S_band(j,b))/vol[j]/4.; //       4pi J = c Erad
+                    //dS_band(j,b) = (S_band(j+1,b) - S_band(j,b))/dx[j]/4. * (1. - bond_albedo); //       4pi J = c Erad
+                    dS_band(j,b) = solar_heating(b) * (-exp(-const_opacity_solar_factor*radial_optical_depth_twotemp(j+1,b)) * expm1( const_opacity_solar_factor* ( radial_optical_depth_twotemp(j+1,b) - radial_optical_depth_twotemp(j,b))) ) /dx[j]/4. * (1.-bond_albedo);
+                else
+                    dS_band(j,b) = 0;
+                
+                dS_band_zero(j,b) = dS_band(j,b);
+            }
+            else 
+                dS_band(j,b) = dS_band_zero(j,b);
+            
+            
+            
             
             //if(const_opacity_solar_factor*radial_optical_depth_twotemp(j,b))
             
@@ -252,7 +262,7 @@ void c_Sim::update_fluxes_FLD() {
                 double tau_inv = 0.5 / (dx * rhokr) ;
                 //double tau_inv = 0.5 / (dx * (total_opacity(j,b) + total_opacity(j+1,b))) ;
                 double R       = 2 * tau_inv * std::abs(Jrad_FLD(j+1,b) - Jrad_FLD(j,b)) / (Jrad_FLD(j+1,b) + Jrad_FLD(j, b) + 1e-300) ;
-                double D       = 1. * surf[j] * flux_limiter(R) * tau_inv;
+                double D       = no_rad_trans * surf[j] * flux_limiter(R) * tau_inv;
 
                 // divergence terms
                 u[idx] = -D ;

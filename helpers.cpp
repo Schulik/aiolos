@@ -80,7 +80,7 @@ double c_Sim::get_cfl_timestep() {
     //if ( minstep > t_max)
     //    return t_max * 1e-2;
     
-    return min(minstep, dt*2);
+    return min(minstep, dt*1.1);
 }
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

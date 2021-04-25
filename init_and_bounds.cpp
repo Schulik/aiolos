@@ -134,8 +134,12 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
         opacity_model     = read_parameter_from_file<char>(filename,"PARI_OPACITY_MODEL", debug, 'C').value;
         if(opacity_model == 'M')
             init_malygin_opacities();
+        cout<<" CHOSEN OPACITY MODEL = "<<opacity_model<<endl;
         
-        const_opacity_solar_factor = read_parameter_from_file<double>(filename,"CONSTOPA_SOLAR_FACTOR", debug, 1.).value;;
+        no_rad_trans               = read_parameter_from_file<double>(filename,"NO_RAD_TRANS", debug, 1.).value;
+        const_opacity_solar_factor = read_parameter_from_file<double>(filename,"CONSTOPA_SOLAR_FACTOR", debug, 1.).value;
+        const_opacity_rosseland_factor = read_parameter_from_file<double>(filename,"CONSTOPA_ROSS_FACTOR", debug, 1.).value;
+        const_opacity_planck_factor = read_parameter_from_file<double>(filename,"CONSTOPA_PLANCK_FACTOR", debug, 1.).value;
         temperature_model = read_parameter_from_file<char>(filename,"INIT_TEMPERATURE_MODEL", debug, 'P').value;
         friction_solver   = read_parameter_from_file<int>(filename,"FRICTION_SOLVER", debug, 0).value;
         do_hydrodynamics  = read_parameter_from_file<int>(filename,"DO_HYDRO", debug, 1).value;
@@ -512,6 +516,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
     solar_heating = Eigen::VectorXd::Zero(num_bands,  1);
     S_band        = Eigen::MatrixXd::Zero(num_cells+2, num_bands);
     dS_band       = Eigen::MatrixXd::Zero(num_cells+2, num_bands);
+    dS_band_zero  = Eigen::MatrixXd::Zero(num_cells+2, num_bands);
     planck_matrix = Eigen::MatrixXd::Zero(num_plancks, 2);
     
     //

@@ -62,6 +62,7 @@ double logint(double xa, int N, double* X, double* RI) {
 }
 
 void c_Species::update_opacities() {
+    
     /*
     else if(base->radiation_matter_equilibrium_test == 4){ //The nonlinear commercon radiative diffusion test
                 opacity(j,b)        = 1e11/this->u[j].u1*pow(base->Jrad_FLD(j,b)/c_light*4.*pi, -1.5 );
@@ -131,9 +132,15 @@ void c_Species::update_opacities() {
         
         for(int j=0; j< num_cells+2; j++) {
             for(int b=0; b<num_bands; b++) {
-                opacity(j,b)        = base->opacity_semenov_malygin(1, prim[j].temperature, prim[j].density, prim[j].pres); 
-                opacity_planck(j,b) = base->opacity_semenov_malygin(0, prim[j].temperature, prim[j].density, prim[j].pres);
-                opacity_twotemp(j,b)= opacity_avg(b); //base->opacity_semenov_malygin(0, base->T_star, prim[j].density, prim[j].density * prim[j].temperature * kb/(mass_amu*amu));
+                opacity(j,b)        = base->const_opacity_rosseland_factor * base->opacity_semenov_malygin(1, prim[j].temperature, prim[j].density, prim[j].pres); 
+                opacity_planck(j,b) = base->const_opacity_planck_factor * base->opacity_semenov_malygin(0, prim[j].temperature, prim[j].density, prim[j].pres);
+                
+                if(b == num_bands-1)
+                    opacity_twotemp(j,b) = base->const_opacity_planck_factor * opacity_avg(b); 
+                else
+                    opacity_twotemp(j,b) = opacity_avg(b); 
+                
+                //base->opacity_semenov_malygin(0, base->T_star, prim[j].density, prim[j].density * prim[j].temperature * kb/(mass_amu*amu));
                 //opacity_twotemp(j,b)= base->opacity_semenov_malygin(1, prim[j].temperature, prim[j].density, prim[j].pres); 
             }
         }
@@ -146,7 +153,7 @@ void c_Species::update_opacities() {
             for(int b=0; b<num_bands; b++) {
                 opacity(j,b)        = const_opacity * (1. + pressure_broadening_factor * pow(prim[j].pres/1e5, pressure_broadening_exponent)); 
                 opacity_planck(j,b) = const_opacity * (1. + pressure_broadening_factor * pow(prim[j].pres/1e5, pressure_broadening_exponent)); 
-                opacity_twotemp(j,b)= const_opacity * (1. + pressure_broadening_factor * pow(prim[j].pres/1e5, pressure_broadening_exponent)); 
+                opacity_twotemp(j,b)= opacity_avg(b) * (1. + pressure_broadening_factor * pow(prim[j].pres/1e5, pressure_broadening_exponent)); 
             }
         }
         

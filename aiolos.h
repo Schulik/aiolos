@@ -11,7 +11,7 @@
 #include <vector>
 #include <math.h>
 #include <type_traits>
-#include <gsl/gsl_sf_lambert.h>
+//#include <gsl/gsl_sf_lambert.h>
 #include <Eigen/Core>
 #include <Eigen/Dense>
 #include <Eigen/LU>
@@ -367,13 +367,16 @@ public:
     int radiation_matter_equilibrium_test; //If set to 1, sets J = J_init in update_radiation()
     int radiation_diffusion_test_linear;
     int radiation_diffusion_test_nonlinear;
+    double no_rad_trans;      // Multiplier for the div F radiation transport in the radiation solver to compare to models which don't cool thermally
     double CFL_break_time; //Numerical time after which cflfactor=0.9. Used in get_cfl_timestep()
+    
     
     std::vector<double> previous_monitor_J;
     std::vector<double> previous_monitor_T;
 
     Eigen::MatrixXd S_band;
     Eigen::MatrixXd dS_band;
+    Eigen::MatrixXd dS_band_zero;
     Eigen::MatrixXd solar_heating;
     
     Eigen::MatrixXd total_opacity;
@@ -387,6 +390,8 @@ public:
     double *data_opacity[4], *opa_gas_tscale, *opa_gas_pscale, *opa_gas_ross, *opa_gas_planck;
     int opacity_gas_rows = 126, opacity_gas_cols = 94;
     double const_opacity_solar_factor;
+    double const_opacity_rosseland_factor;
+    double const_opacity_planck_factor;
     double init_J_factor;
     double init_T_temp;
     
