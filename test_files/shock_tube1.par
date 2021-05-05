@@ -38,6 +38,7 @@ PARI_TIME_DT            1e-3
 PARI_CFLFACTOR          0.9
 PARI_TIME_TMAX          0.2
 PARI_TIME_OUTPUT        0.2
+DT_MIN_INIT             0.2
 
 #Physical parameters
 PARI_PLANET_POS         0.

@@ -465,9 +465,6 @@ void c_Sim::compute_alpha_matrix(int j) { //Called in compute_friction() and com
                         
                         //alpha_local *= (fi + fj)/(fi * muj + fj * mui);
                         alpha_local *= alpha_collision;
-                        
-                        //cout<<" alpha_local = "<<alpha_local<<" T = "<<species[si].prim[j].temperature<< " n="<<numdens_vector(si)<<" mass="<<mass_vector(si)<<" b = "<<coll_b<<" n^1/3 = "<<pow(numdens_vector3(sj),0.3333333333333)<<" n^-1/3"<<(1./pow(numdens_vector3(sj),0.3333333333333))<<endl;
-                        
                     }
                     
                     if(si==0 && sj == 1) {

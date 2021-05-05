@@ -48,6 +48,7 @@ tests: $(TEST_OBJ) makefile aiolos.h
 	./tests > /dev/null
 	cd test_files ; python test_shock_tube.py
 	cd test_files ; python test_steady_state.py
+	cd test_files ; python test_drag.py
 	cd test_files ; python test_dustywave.py
 	cd test_files ; python test_dustyshock.py
 	cd test_files ; python test_conservation.py

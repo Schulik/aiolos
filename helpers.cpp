@@ -35,7 +35,7 @@ double c_Sim::get_cfl_timestep() {
             
             species[s].timesteps_de[i] = dt / species[s].de_e[i] * energy_epsilon;
             
-            maxde = (species[s].de_e[i] > maxde)?species[s].de_e[i]:maxde;
+            maxde = std::max(species[s].de_e[i], maxde) ;
             if(debug > 2)
                 cout<<" steps "<<steps<<" species "<<s<<" i = "<<i<<" de/e = "<<species[s].de_e[i]<<" de/e/cflfactor = "<<species[s].de_e[i]/cflfactor<<endl;
         }
@@ -75,10 +75,6 @@ double c_Sim::get_cfl_timestep() {
     
     //Invert and apply CFL secutiry factor
     minstep = cflfactor / minstep;
-    
-    //Check if the simulation step is too large (e.g. when v=0 in most of the domain), then make the step artificially smaller
-    //if ( minstep > t_max)
-    //    return t_max * 1e-2;
     
     return min(minstep, dt*max_timestep_change);
 }

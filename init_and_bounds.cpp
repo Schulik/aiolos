@@ -465,6 +465,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
         for(int s = 0; s < num_species; s++)
             species[s].compute_pressure(species[s].u);
         
+        dt = t_max ; // Old value needed by get_cfl_timestep()
         dt = get_cfl_timestep();
         
         if(debug > 0) cout<<"Init: Finished Init. Got initial dt = "<<dt<<" This is only temporary dt_init, not used for the first timestep."<<endl;

@@ -51,9 +51,12 @@ int main()
     count += !run_test("soundwave_128.par") ;
     count += !run_test("soundwave_256.par") ;
     count += !run_test("soundwave_512.par") ;
-
-    count += !run_test("friction_6spc.par",
-		       "friction_6spc.spc") ;
+    
+    count += !run_test("friction_2spc.par", "friction_2spc.spc") ;
+    count += !run_test("friction_2spc_an.par", "friction_2spc.spc") ;
+    count += !run_test("friction_2spc_phys.par", "friction_2spc.spc") ;
+    count += !run_test("friction_2spc_phys_an.par", "friction_2spc.spc") ;
+    count += !run_test("friction_6spc.par", "friction_6spc.spc") ;
     
     count += !run_test("dustywave_nonstiff.par") ;
     count += !run_test("dustywave_stiff.par") ;
