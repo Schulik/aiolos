@@ -482,7 +482,7 @@ void c_Sim::compute_alpha_matrix(int j) { //Called in compute_friction() and com
                     else if(si > sj)
                        friction_coefficients(si,sj) = friction_coeff_mask(si,sj) * alpha_local;
                     else
-                       friction_coefficients(si,sj) = friction_coeff_mask(si,sj) * alpha_local  * dens_vector(sj) / dens_vector(si) ;
+                       friction_coefficients(si,sj) = friction_coeff_mask(si,sj) * alpha_local  * dens_vector(si) / dens_vector(sj) ;
 
                    
                    if(debug >= 1 && j==700 && steps == 10) {
