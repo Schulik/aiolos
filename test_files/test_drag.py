@@ -14,9 +14,9 @@ def check_drag(problem, spc, L1_target=None):
     final = load_aiolos_snap(snap_file)
 
     L1 = [
-        np.abs(final['density'] - 0*exact['density']).mean(),
-        np.abs(final['momentum'] - 0*exact['momentum']).mean(),        
-        np.abs(final['pressure'] - 0*exact['pressure']).mean(),
+        np.abs(final['density'] - exact['density']).mean(),
+        np.abs(final['momentum'] - exact['momentum']).mean(),        
+        np.abs(final['pressure'] - exact['pressure']).mean(),
     ]
 
     if L1_target is not None:
