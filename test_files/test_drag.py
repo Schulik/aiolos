@@ -28,7 +28,7 @@ def check_drag(problem, spc, L1_target=None):
             print('Test {} L1 check passed'.format(problem))
         else:
             print('Test {} L1 checked failed:'.format(problem))
-        print('\tL1={}, target={}'.format(L1, L1_target))
+            print('\tL1={}, target={}'.format(L1, L1_target))
     else:
         print('Test {} L1 values:'.format(problem))
         print('\tL1={}'.format(L1))
