@@ -468,7 +468,8 @@ public:
     
     void fill_alpha_basis_arrays(int j);
     void fill_rad_basis_arrays(int, double, Eigen::MatrixXd &, Eigen::MatrixXd &);
-    void compute_alpha_matrix(int j, int actually_compute_beta);
+    void compute_alpha_matrix(int j);
+    void compute_collisional_heat_exchange_matrix(int j, Eigen::MatrixXd &) ;
     
     //Gravity
     void init_grav_pot();

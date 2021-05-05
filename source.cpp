@@ -191,9 +191,11 @@
                     muj  = species[1].mass_amu*amu / mtot;
                     
                     coll_b      = 5.0e17 * std::pow(meanT/300., 0.75) ;     // from Zahnle & Kasting 1986 Tab. 1
+
+                    alpha = kb * meanT * species[1].prim[j].number_density / (m0 * coll_b) ; // From Burgers book, or Schunk & Nagy.
+                    //alpha_local = kb * meanT /(mumass * coll_b); 
                         
-                    alpha = (fi + fj)/(fi * muj + fj * mui);
-                    alpha *= kb * meanT /(mumass * coll_b);
+                    //alpha *= (fi + fj)/(fi * muj + fj * mui);
                     alpha *= alpha_collision;
                 }
                 
@@ -222,10 +224,11 @@
                     cin>>a;
                 }
                 
-                species[0].prim[j].internal_energy += dt * alpha * (species[1].mass_amu/(species[0].mass_amu+species[1].mass_amu))  * pow( v1a - v2a, 2.);
-                species[1].prim[j].internal_energy += dt * alpha * eps * (species[0].mass_amu/(species[0].mass_amu+species[1].mass_amu))  * pow( v1a - v2a, 2.);
-                
-                
+                double v_half = 0.5*(v1a + v1b) - 0.5*(v2a + v2b) ;
+                double v_end  = v1a - v2a ;
+
+                species[0].prim[j].internal_energy += dt * alpha * (species[1].mass_amu/(species[0].mass_amu+species[1].mass_amu)) * v_half * v_end ;
+                species[1].prim[j].internal_energy += dt * alpha * eps * (species[0].mass_amu/(species[0].mass_amu+species[1].mass_amu)) * v_half * v_end ;
             }
             
             if(debug > 0) {
@@ -350,7 +353,7 @@ void c_Sim::compute_friction_numerical() {
     for(int j=0; j <= num_cells+1; j++){
 
         fill_alpha_basis_arrays(j);
-        compute_alpha_matrix(j, friction_solver);
+        compute_alpha_matrix(j);
                 
         if(debug >= 1 && j==1200 && steps == 10)  {
             cout<<"    Computed coefficient matrix ="<<endl<<friction_coefficients<<endl;
@@ -394,14 +397,14 @@ void c_Sim::compute_friction_numerical() {
             double temp = 0;
             
             for(int sj=0; sj<num_species; sj++) {
-                        double v_end = friction_vec_output(si) - friction_vec_output(sj) ;
-                        double v_half = 0.5*(v_end + friction_vec_input(si) - friction_vec_input(sj)) ; 
-                                                       
-                        temp += dt * friction_coefficients(si,sj) * (species[sj].mass_amu/(species[sj].mass_amu+species[si].mass_amu)) * v_half * v_end ;
-                        
-                        if(si==0 && sj == 1) {
-                            friction_sample(j) = alphas_sample(j) * (friction_vec_input(si) - friction_vec_input(sj));
-                        }
+                double v_end = friction_vec_output(si) - friction_vec_output(sj) ;
+                double v_half = 0.5*(v_end + friction_vec_input(si) - friction_vec_input(sj)) ; 
+                                               
+                temp += dt * friction_coefficients(si,sj) * (species[sj].mass_amu/(species[sj].mass_amu+species[si].mass_amu)) * v_half * v_end ;
+                
+                if(si==0 && sj == 1) {
+                    friction_sample(j) = alphas_sample(j) * (friction_vec_input(si) - friction_vec_input(sj));
+                }
             }
             species[si].prim[j].internal_energy += temp;
         }
@@ -429,7 +432,7 @@ void c_Sim::fill_alpha_basis_arrays(int j) { //Called in compute_friction() in s
     }
 }
     
-void c_Sim::compute_alpha_matrix(int j, int actually_compute_beta) { //Called in compute_friction() and compute_radiation() in source.cpp
+void c_Sim::compute_alpha_matrix(int j) { //Called in compute_friction() and compute_radiation() in source.cpp
         
         double alpha_local;
         double coll_b;
@@ -456,8 +459,10 @@ void c_Sim::compute_alpha_matrix(int j, int actually_compute_beta) { //Called in
                         
                         coll_b      = 5.0e17 * std::pow(meanT/300., 0.75) ;     // from Zahnle & Kasting 1986 Tab. 1
                         
-                        alpha_local = (fi + fj)/(fi * muj + fj * mui);
-                        alpha_local *= kb * meanT /(mumass * coll_b);
+                        alpha_local = kb * meanT * numdens_vector(sj) / (mass_vector(si) * coll_b) ; // From Burgers book, or Schunk & Nagy.
+                        //alpha_local = kb * meanT /(mumass * coll_b); 
+                        
+                        //alpha_local *= (fi + fj)/(fi * muj + fj * mui);
                         alpha_local *= alpha_collision;
                         
                         //cout<<" alpha_local = "<<alpha_local<<" T = "<<species[si].prim[j].temperature<< " n="<<numdens_vector(si)<<" mass="<<mass_vector(si)<<" b = "<<coll_b<<" n^1/3 = "<<pow(numdens_vector3(sj),0.3333333333333)<<" n^-1/3"<<(1./pow(numdens_vector3(sj),0.3333333333333))<<endl;
@@ -471,40 +476,14 @@ void c_Sim::compute_alpha_matrix(int j, int actually_compute_beta) { //Called in
                             cout<<"    spec "<<species[si].speciesname<<" j = "<<j<<" alpha_local = "<<alpha_local<<endl;
                     }
                     
-                    if(actually_compute_beta == 1) {
-                        if(si==sj)
-                           friction_coefficients(si,sj) = 0.;
-                        else if(si > sj)
-                           friction_coefficients(si,sj) = friction_coeff_mask(si,sj) * alpha_local;
-                        else
-                           friction_coefficients(si,sj) = friction_coeff_mask(si,sj) * alpha_local  * dens_vector(sj) / dens_vector(si) ;
-                        
-                    }
-                   else if(actually_compute_beta == 2) {
-                        if(si==sj)
-                           friction_coefficients(si,sj) = 0.;
-                        else if(si > sj)
-                           friction_coefficients(si,sj) = friction_coeff_mask(si,sj) * alpha_local / dens_vector(sj);
-                        else
-                           friction_coefficients(si,sj) = friction_coeff_mask(si,sj) * alpha_local / dens_vector(si);
-                   }
-                   else if(actually_compute_beta == 3) {
-                        if(si==sj)
-                           friction_coefficients(si,sj) = 0.;
-                        else if(si > sj)
-                           friction_coefficients(si,sj) = friction_coeff_mask(si,sj) * alpha_local * dens_vector(sj) / dens_vector(si);
-                        else
-                           friction_coefficients(si,sj) = friction_coeff_mask(si,sj) * alpha_local;
-                   }
-                    else if(actually_compute_beta == 4) {
-                        if(si==sj)
-                           friction_coefficients(si,sj) = 0.;
-                        else if(si < sj)
-                           friction_coefficients(si,sj) = friction_coeff_mask(si,sj) * alpha_local;
-                        else
-                           friction_coefficients(si,sj) = friction_coeff_mask(si,sj) * alpha_local * dens_vector(sj) / dens_vector(si);
-                        
-                   }
+                    // Fill alpha_ij and alpha_ji
+                    if(si==sj)
+                       friction_coefficients(si,sj) = 0.;
+                    else if(si > sj)
+                       friction_coefficients(si,sj) = friction_coeff_mask(si,sj) * alpha_local;
+                    else
+                       friction_coefficients(si,sj) = friction_coeff_mask(si,sj) * alpha_local  * dens_vector(sj) / dens_vector(si) ;
+
                    
                    if(debug >= 1 && j==700 && steps == 10) {
                         cout<<" debug alpha matrix(si="<<si<<",sj="<<sj<<") = "<<friction_coefficients(si,sj)<<" mask = "<<friction_coeff_mask(si,sj)<<" alpha_local = "<<alpha_local<<" 1/eps = "<<(dens_vector(si) / dens_vector(sj))<<" eps ="<<(dens_vector(sj) / dens_vector(si))<<endl;
@@ -515,3 +494,14 @@ void c_Sim::compute_alpha_matrix(int j, int actually_compute_beta) { //Called in
 }
 
 
+void c_Sim::compute_collisional_heat_exchange_matrix(int j, Eigen::MatrixXd& heat_mat) {
+    
+    // Get the alpha matrix
+    compute_alpha_matrix(j) ;
+
+    // Convert to collision matrix
+    for(int si=0; si<num_species; si++)
+        for(int sj=0; sj<num_species; sj++)
+            heat_mat(si, sj) = friction_coefficients(si, sj) *
+                dens_vector(si) * 3 * kb / (mass_vector(si) + mass_vector(sj)) ;
+}
