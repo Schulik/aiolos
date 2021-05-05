@@ -40,7 +40,10 @@ void c_Sim::transport_radiation() {
             if(debug >= 1)
                 cout<<"   in transport_radiation, after update opacities."<<endl;
             
-            update_fluxes_FLD(); //Contains radiation transport and sourcing
+            if(radiation_solver == 0)
+                update_fluxes_FLD(); //Contains radiation transport and sourcing
+            else 
+                update_fluxes_simple();
             
             if(steps == -1 || steps == -2) {
                 cout<<"   in transport_radiation, after update fluxes."<<endl;
@@ -51,9 +54,21 @@ void c_Sim::transport_radiation() {
         }
 }
 
+//////////////////////////////////////////////////////////////////
 //
-// Computation of opacities based on material properties
+// void update_opacities():
+//      Computation of opacities based on material properties.
+//      Furthermore the attenuation of solar radiation is ray-traced,
+//      flux loss per cell per band is computed and assigned to individual species based on 
 //
+//
+//
+//
+//
+//
+//
+//
+//////////////////////////////////////////////////////////////////
 
 void c_Sim::update_opacities() {
     
@@ -388,15 +403,15 @@ void c_Sim::update_fluxes_FLD() {
                     int idx_sb = j*stride + (s + num_bands) * num_vars + b ;
                     int idx_rb = j*num_vars + b ; 
                         
-                    double fac = species[s].opacity_planck(j, b) * sigma_rad*Ts*Ts*Ts / pi * compute_planck_function_integral3(l_i[b], l_i[b+1], species[s].prim[j].temperature);
+                    double fac = no_rad_trans * species[s].opacity_planck(j, b) * sigma_rad*Ts*Ts*Ts / pi * compute_planck_function_integral3(l_i[b], l_i[b+1], species[s].prim[j].temperature);
                     
                     d[idx_s ] += 16 * pi * fac / species[s].cv ;
-                    d[idx_sb] = - 4 * pi * species[s].opacity_planck(j, b) / species[s].cv ;
+                    d[idx_sb] = - 4 * pi * species[s].opacity_planck(j, b)  * no_rad_trans / species[s].cv ;
                     r[idx_rs] += 12 * pi * fac * Ts / species[s].cv ;
 
                     //cout<<" in rad matrix["<<j<<"]: term1 = "<<12 * pi * fac * Ts / species[s].cv<<" term2 = "<<species[s].dS(j)  / species[s].u[j].u1 / species[s].cv<<endl;
                     
-                    d[idx_b ] += vol[j] * rhos * species[s].opacity_planck(j, b) ;
+                    d[idx_b ] += vol[j] * rhos * species[s].opacity_planck(j, b) * no_rad_trans;
                     d[idx_bs] = - 4 * vol[j] * rhos * fac ;
                     r[idx_rb] -=  3 * vol[j] * rhos * fac * Ts ;
                     
@@ -443,4 +458,24 @@ void c_Sim::update_fluxes_FLD() {
             species[si].eos->compute_conserved(&(species[si].prim[0]), &(species[si].u[0]), num_cells+2);        
         }
 
+}
+
+
+void c_Sim::update_fluxes_simple() {
+    
+    //Compute change in energy
+    for (int j=0; j < num_cells+2; j++) {
+        for(int s=0; s<num_species; s++)
+            species[s].prim[j].temperature += species[s].dS(j) * dt  / species[s].u[j].u1 / species[s].cv ;
+    }
+    
+    
+    // Update Temperatures
+    for(int si=0; si<num_species; si++) {
+            species[si].eos->update_eint_from_T(&(species[si].prim[0]), num_cells+2);
+            species[si].eos->update_p_from_eint(&(species[si].prim[0]), num_cells+2);
+            species[si].eos->compute_conserved(&(species[si].prim[0]), &(species[si].u[0]), num_cells+2);        
+    }
+    
+    
 }

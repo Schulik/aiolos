@@ -189,7 +189,7 @@
                     mtot = species[0].mass_amu*amu + species[1].mass_amu*amu;
                     mui  = species[0].mass_amu*amu / mtot;
                     muj  = species[1].mass_amu*amu / mtot;
-                        
+                    
                     coll_b      = 5.0e17 * std::pow(meanT/300., 0.75) ;     // from Zahnle & Kasting 1986 Tab. 1
                         
                     alpha = (fi + fj)/(fi * muj + fj * mui);

@@ -12,7 +12,7 @@
 
 double MonotonizedCentralSlope(double ql, double qm, double qr, 
                                double cF=2, double cB=2, double dxF=1, double dxB=1) {
-    // From Mignone's reconstruction paper
+    // From Mignone's (2005) reconstruction paper
 
     double dF = (qr - qm) / dxF ;
     double dB = (qm - ql) / dxB ;

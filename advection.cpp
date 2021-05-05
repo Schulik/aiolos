@@ -28,7 +28,7 @@ void c_Sim::execute() {
     steps = 0;
     double output_counter = 0;
     double monitor_counter= 0;
-    const double dt_initial = 1e-20;
+    const double dt_initial = dt_min_init;
     double next_print_time  = dt_initial;
     const int maxsteps = 1e9;
     

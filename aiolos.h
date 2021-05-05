@@ -11,7 +11,7 @@
 #include <vector>
 #include <math.h>
 #include <type_traits>
-//#include <gsl/gsl_sf_lambert.h>
+#include <gsl/gsl_sf_lambert.h>
 #include <Eigen/Core>
 #include <Eigen/Dense>
 #include <Eigen/LU>
@@ -265,6 +265,8 @@ public:
     double dt;
     double cflfactor;
     double t_max;
+    double max_timestep_change;
+    double dt_min_init;
     double timestep_rad2;
     double energy_epsilon;
     double globalTime;
@@ -363,13 +365,13 @@ public:
     double core_cv; //Heat capacity of the surface layer
     double bond_albedo;
     
+    int radiation_solver;
     int use_planetary_temperature;
     int radiation_matter_equilibrium_test; //If set to 1, sets J = J_init in update_radiation()
     int radiation_diffusion_test_linear;
     int radiation_diffusion_test_nonlinear;
     double no_rad_trans;      // Multiplier for the div F radiation transport in the radiation solver to compare to models which don't cool thermally
     double CFL_break_time; //Numerical time after which cflfactor=0.9. Used in get_cfl_timestep()
-    
     
     std::vector<double> previous_monitor_J;
     std::vector<double> previous_monitor_T;
@@ -421,7 +423,8 @@ public:
     ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     
     int init_wind;
-    double mdot;
+    double init_mdot;
+    double init_sonic_radius;
     double T_increment;
     double alpha_collision;
     
@@ -445,6 +448,7 @@ public:
     
     void print_monitor(int i);
     void print_diagnostic_file(int i);
+    
     
     void compute_total_pressure() {
         /*for(int i=num_cells; i>=0; i--)  {
@@ -488,6 +492,7 @@ public:
     
     void update_fluxes(double timestep);           //  Called from transport_radiation#   
     void update_fluxes_FLD();           //  Called from transport_radiation#
+    void update_fluxes_simple();           //  Called from transport_radiation#
     void update_fluxes_FLD2(double, Eigen::MatrixXd &,Eigen::MatrixXd &,Eigen::MatrixXd &);           //  Called from transport_radiation#
     void update_temperatures(double, Eigen::MatrixXd &,Eigen::MatrixXd &,Eigen::MatrixXd &);
     double compute_planck_function_integral3(double lmin, double lmax, double temperature);
@@ -612,8 +617,6 @@ public:
     //
     ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     
-    int  init_static_atmosphere;
-    
     //Wave tests
     int    USE_WAVE;
     double WAVE_AMPLITUDE;
@@ -637,6 +640,9 @@ public:
     void initialize_exponential_atmosphere();
     void initialize_sound_wave();
     void compute_analytic_solution();
+    
+    int  init_static_atmosphere;
+    void init_analytic_wind_solution();
     
     
     ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

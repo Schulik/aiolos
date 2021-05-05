@@ -80,7 +80,7 @@ double c_Sim::get_cfl_timestep() {
     //if ( minstep > t_max)
     //    return t_max * 1e-2;
     
-    return min(minstep, dt*1.1);
+    return min(minstep, dt*max_timestep_change);
 }
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -318,3 +318,35 @@ void c_Species::compute_analytic_solution() {
     
 }
 
+void c_Species::init_analytic_wind_solution() {
+    
+    //cout<<"In compute_analytic_solution."<<endl;
+    double sonic_radius = base->init_sonic_radius;
+    
+    double ufinal = 0;
+    
+    for(int i=1;i<=num_cells;i++) {
+        double sound_speed  = prim[i].sound_speed; // std::sqrt(base->planet_mass/(2. * sonic_radius) );
+        double rrc    = base->x_i12[i]/sonic_radius;
+        double D      = pow(rrc,-4.) * std::exp(4.*(1.-1./rrc)-1. );
+        
+        if(base->x_i12[i] < sonic_radius) {
+            ufinal = sound_speed * std::sqrt( - gsl_sf_lambert_W0(-D) ); 
+        }
+        else {
+            
+            ufinal = sound_speed * std::sqrt( - gsl_sf_lambert_Wm1(-D) ); 
+        }
+        
+        prim[i].speed = ufinal;
+    }
+    
+   // compute_pressure(u);
+  //  for(int i=num_cells; i>=0; i--)  {
+  //      primlast[i].internal_energy = prim[i].internal_energy;
+ //   }
+ //   
+ //   AOS_prim prim(u1 * initial_fraction, u2, u3);
+ 
+    eos->compute_conserved(&(prim[0]), &(u[0]), num_cells);
+}
