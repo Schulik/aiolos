@@ -46,12 +46,13 @@ aiolos: $(OBJ) makefile
 tests: $(TEST_OBJ) makefile aiolos.h
 	$(CXX) -o  $@  $(TEST_OBJ) $(CXXFLAGS) $(LDFLAGS)
 	./tests > /dev/null
-	cd test_files ; python test_shock_tube.py
-	cd test_files ; python test_steady_state.py
-	cd test_files ; python test_drag.py
-	cd test_files ; python test_dustywave.py
-	cd test_files ; python test_dustyshock.py
-	cd test_files ; python test_conservation.py
+	cd test_files ; python3 test_shock_tube.py -p
+	cd test_files ; python3 test_steady_state.py
+	cd test_files ; python3 test_drag.py
+	cd test_files ; python3 test_dustywave.py -p 
+	cd test_files ; python3 test_dustyshock.py -p
+	cd test_files ; python3 test_conservation.py
+	cd test_files ; python3 test_irradiation.py -p
 
 clean:
 	rm -f *.o test_files/*.o problems/*.o test_files/*dat

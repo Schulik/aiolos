@@ -66,6 +66,8 @@ int main()
     count += !run_test("planet_cartesian.par") ;
     count += !run_test("planet_spherical.par") ;
 
+    count += !run_test("irradiation.par", "irradiation.spc") ;
+
     
     return count ;
 }

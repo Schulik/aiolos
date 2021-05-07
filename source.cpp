@@ -496,8 +496,18 @@ void c_Sim::compute_collisional_heat_exchange_matrix(int j, Eigen::MatrixXd& hea
     compute_alpha_matrix(j) ;
 
     // Convert to collision matrix
-    for(int si=0; si<num_species; si++)
-        for(int sj=0; sj<num_species; sj++)
-            heat_mat(si, sj) = friction_coefficients(si, sj) *
+    for(int si=0; si<num_species; si++) {
+        double diag_sum = 0 ;
+        for(int sj=0; sj<num_species; sj++) {
+            double term = friction_coefficients(si, sj) *
                 dens_vector(si) * 3 * kb / (mass_vector(si) + mass_vector(sj)) ;
+
+            heat_mat(si, sj) = term ;
+            diag_sum += term ;
+        }
+        // Set the diagonal to sum of Ti terms. 
+        heat_mat(si, si) -= diag_sum ;
+    }
+
+
 }
