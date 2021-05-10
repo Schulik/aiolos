@@ -37,12 +37,17 @@ def check_collisional_heating_2spc(problem, L1_target=None):
 
 
     alpha = float(params['PARI_ALPHA_COLL'])
-    cv1 = 0.5 * species[0].dof / species[0].mass
-    cv2 = 0.5 * species[1].dof / species[1].mass
+    d1 = ICs[0]['density'][1:-1].mean()
+    T1 = ICs[0]['temperature'][1:-1].mean()
+    d2 = ICs[1]['density'][1:-1].mean()
+    T2 = ICs[1]['temperature'][1:-1].mean()
+
+    cv1 = 0.5 * species[0].dof * d1 / species[0].mass
+    cv2 = 0.5 * species[1].dof * d2 / species[1].mass
     T1 = ICs[0]['temperature'][1:-1].mean()
     T2 = ICs[1]['temperature'][1:-1].mean()
 
-    aij_dt = 3 * alpha * tmax / (species[0].mass + species[1].mass)
+    aij_dt = 3 * alpha * d1 * tmax / (species[0].mass + species[1].mass)
 
     T1_an, T2_an = _solution_2sp(aij_dt, cv1, cv2, T1, T2) 
 
