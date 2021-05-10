@@ -35,8 +35,7 @@ def check_conservation(problem, species='hydrogen.spc', L1_target=None):
         final[0] += snap['density'][num_bound:-num_bound].sum()
         final[1] += snap['momentum'][num_bound:-num_bound].sum()
         final[2] += snap['energy'][num_bound:-num_bound].sum()
-        if int(params.get('PARI_USE_RADIATION',0)):
-            print('T:', snap['temperature'][num_bound:-num_bound].mean())
+
 
     # Radiative energy:
     if int(params.get('PARI_USE_RADIATION',0)):
@@ -50,9 +49,7 @@ def check_conservation(problem, species='hydrogen.spc', L1_target=None):
         df = load_aiolos_diag(diag + '_t-1.dat')
         for i in range(N):
             final[2] += df['J{}'.format(i)][num_bound-1:-num_bound+1].sum()/c4pi
-            J = df['J{}'.format(i)][num_bound:-num_bound].mean()
-            T = snap['temperature'][num_bound:-num_bound].mean()
-            print('Trad', (J*np.pi/5.67e-5)**0.25)
+
 
     if init[1] != 0:
         L1 = list([abs(1-x2/x1) for x1,x2 in zip(init, final)])
@@ -98,5 +95,5 @@ if __name__ == "__main__":
     check_conservation("collheat_2spc", "collheat_2spc.spc",
                        L1_target=[4e-16, 4e-14, 2e-13])
     
-    check_conservation("collheat_2spc_rad", "collheat_2spc_rad.spc",
+    check_conservation("collheat_2spc_rad", "collheat_2spc.spc",
                        L1_target=[4e-16, 1e-18, 1e-5])

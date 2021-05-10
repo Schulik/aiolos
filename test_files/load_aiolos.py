@@ -93,7 +93,7 @@ if __name__ == "__main__":
 
     for snap in sys.argv[1:]:
         data = load_aiolos_snap(snap)
-        plt.plot(data['x'], data['density'],
+        plt.plot(data['x'], data['velocity'],
                  marker='+', ls='', label=snap)
         
 

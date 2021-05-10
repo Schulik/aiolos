@@ -46,7 +46,7 @@ PARI_TIME_OUTPUT        5.0
 #Scenarios
 TEMPERATURE_BUMP_STRENGTH 0.
 WAVE_USE                0
-PARI_INIT_WIND          1
+PARI_INIT_WIND          0
 PARI_ALPHA_COLL         0.1
 
 #Physical parameters
