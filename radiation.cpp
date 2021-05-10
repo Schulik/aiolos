@@ -180,11 +180,12 @@ void c_Sim::update_opacities() {
     for(int b = 0; b < num_bands; b++) {
         J_remnant += S_band(1,b);
     }
-    for(int s=0; s<num_species; s++) {
-        species[s].prim[num_cells].temperature   = species[s].const_T_space;
-        species[s].prim[num_cells+1].temperature = species[s].const_T_space;
-        //species[s].prim[num_cells+2].temperature = species[s].const_T_space;
-    }
+    
+    for(int s=0; s<num_species; s++) 
+        if (species[s].const_T_space > 0) {
+            species[s].prim[num_cells].temperature   = species[s].const_T_space;
+            species[s].prim[num_cells+1].temperature = species[s].const_T_space;
+        }
     
     T_rad_remnant = pow(pi * J_remnant / sigma_rad, 0.25);
     
@@ -294,7 +295,7 @@ void c_Sim::update_fluxes_FLD() {
         // Left boundary:
         //    Reflecting / no flux or planetary temperature
         //if(use_planetary_temperature == 0) {
-            for (int j=0l; j < num_ghosts; j++) {
+            for (int j=0; j < num_ghosts; j++) {
                 int idx = j*stride + b*(num_vars + 1) ;
                 int idx_r = j*num_vars + b ;
                 
@@ -307,7 +308,7 @@ void c_Sim::update_fluxes_FLD() {
         
         //   Right boundary: reflective?
         //if(geometry == Geometry::cartesian) {
-        if(false) {
+        if(closed_radiative_boundaries) {
 
             int Ncell = num_cells - 2*(num_ghosts - 1);
             for (int j=0; j < num_ghosts; j++) {
@@ -425,9 +426,9 @@ void c_Sim::update_fluxes_FLD() {
 
                 for (int si=0; si < num_species; si++) { 
                     int idx  = j*stride + (si + num_bands) * num_vars + num_bands;
-                    for (int sj=0; sj < num_species; sj++)
-                        // Check si and sj are in the correct order here
+                    for (int sj=0; sj < num_species; sj++) {
                         d[idx+sj] -= friction_coefficients(si,sj) ;
+                    }
                 }
             }
         }
@@ -436,7 +437,7 @@ void c_Sim::update_fluxes_FLD() {
         char stepstop;
         cin>>stepstop;
     }
-    
+
     // TODO:
     //   Add collision terms here
 
@@ -457,7 +458,6 @@ void c_Sim::update_fluxes_FLD() {
 
         for(int s=0; s<num_species; s++) {
             species[s].prim[j].temperature = r[j*num_vars + (s + num_bands)] ;
-       //     std::cout <<  "\t" << species[s].prim[j].temperature << "\n" ;
         }
     }
     
@@ -465,10 +465,10 @@ void c_Sim::update_fluxes_FLD() {
     // Update energies. 
     // TODO: We should add cv * (Tf - Ti) to u to conserve energy properly.
     for(int si=0; si<num_species; si++) {
-            species[si].eos->update_eint_from_T(&(species[si].prim[0]), num_cells+2);
-            species[si].eos->update_p_from_eint(&(species[si].prim[0]), num_cells+2);
-            species[si].eos->compute_conserved(&(species[si].prim[0]), &(species[si].u[0]), num_cells+2);        
-        }
+        species[si].eos->update_eint_from_T(&(species[si].prim[0]), num_cells+2);
+        species[si].eos->update_p_from_eint(&(species[si].prim[0]), num_cells+2);
+        species[si].eos->compute_conserved(&(species[si].prim[0]), &(species[si].u[0]), num_cells+2);        
+    }
 
 }
 

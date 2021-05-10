@@ -142,6 +142,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
         
         no_rad_trans               = read_parameter_from_file<double>(filename,"NO_RAD_TRANS", debug, 1.).value;
         radiation_solver           = read_parameter_from_file<int>(filename,"RADIATION_SOLVER", debug, 0).value;
+        closed_radiative_boundaries = read_parameter_from_file<int>(filename,"PARI_CLOSED_RADIATIVE_BOUND", debug, 0).value;
         const_opacity_solar_factor = read_parameter_from_file<double>(filename,"CONSTOPA_SOLAR_FACTOR", debug, 1.).value;
         const_opacity_rosseland_factor = read_parameter_from_file<double>(filename,"CONSTOPA_ROSS_FACTOR", debug, 1.).value;
         const_opacity_planck_factor = read_parameter_from_file<double>(filename,"CONSTOPA_PLANCK_FACTOR", debug, 1.).value;
@@ -749,6 +750,7 @@ c_Species::c_Species(c_Sim *base_simulation, string filename, string species_fil
         
         boundary_left  = read_parameter_from_file<BoundaryType>(filename,"PARI_BOUND_TYPE_LEFT", debug, BoundaryType::fixed).value;
         boundary_right = read_parameter_from_file<BoundaryType>(filename,"PARI_BOUND_TYPE_RIGHT", debug, BoundaryType::fixed).value;
+
         const_T_space  = read_parameter_from_file<double>(filename,"PARI_CONST_TEMP", debug, 1.).value;
         TEMPERATURE_BUMP_STRENGTH    = read_parameter_from_file<double>(filename,"TEMPERATURE_BUMP_STRENGTH", debug, 0.).value; 
         pressure_broadening_factor   = read_parameter_from_file<double>(filename,"PRESSURE_BROADENING", debug, 0.).value; 
@@ -1265,6 +1267,7 @@ void c_Species::apply_boundary_right(std::vector<AOS>& u) {
             for (int i=0; i < num_ghosts; i++) {
                 int iact = Ncell + num_ghosts-1 -i ;
                 int igh = Ncell + num_ghosts +i;
+
                 u[igh]     = u[iact]; 
                 u[igh].u2 *= -1;
                 base->phi[igh]   = base->phi[iact] ; //TODO: This will be called many times, too many!

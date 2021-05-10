@@ -369,6 +369,7 @@ public:
     
     int radiation_solver;
     int use_planetary_temperature;
+    int closed_radiative_boundaries ;
     int radiation_matter_equilibrium_test; //If set to 1, sets J = J_init in update_radiation()
     int radiation_diffusion_test_linear;
     int radiation_diffusion_test_nonlinear;

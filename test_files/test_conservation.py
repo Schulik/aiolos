@@ -3,7 +3,7 @@ import sys, os
 import numpy as np
 
 from load_aiolos import (
-    load_aiolos_snap, load_aiolos_params, load_aiolos_species
+    load_aiolos_snap, load_aiolos_params, load_aiolos_species, load_aiolos_diag
 )
 
 def check_conservation(problem, species='hydrogen.spc', L1_target=None):
@@ -35,10 +35,34 @@ def check_conservation(problem, species='hydrogen.spc', L1_target=None):
         final[0] += snap['density'][num_bound:-num_bound].sum()
         final[1] += snap['momentum'][num_bound:-num_bound].sum()
         final[2] += snap['energy'][num_bound:-num_bound].sum()
+        if int(params.get('PARI_USE_RADIATION',0)):
+            print('T:', snap['temperature'][num_bound:-num_bound].mean())
 
+    # Radiative energy:
+    if int(params.get('PARI_USE_RADIATION',0)):
+        c4pi = 2.99792458e10/(4*np.pi)
+        N = int(params.get('NUM_BANDS', 1))
+        diag = 'diagnostic_' + problem
+        d0 = load_aiolos_diag(diag + '_t0.dat')
+        for i in range(N):
+            init[2] += d0['J{}'.format(i)][num_bound-1:-num_bound+1].sum()/c4pi
 
-    L1 = list([abs(1-x2/x1) for x1,x2 in zip(init, final)])
+        df = load_aiolos_diag(diag + '_t-1.dat')
+        for i in range(N):
+            final[2] += df['J{}'.format(i)][num_bound-1:-num_bound+1].sum()/c4pi
+            J = df['J{}'.format(i)][num_bound:-num_bound].mean()
+            T = snap['temperature'][num_bound:-num_bound].mean()
+            print('Trad', (J*np.pi/5.67e-5)**0.25)
 
+    if init[1] != 0:
+        L1 = list([abs(1-x2/x1) for x1,x2 in zip(init, final)])
+    else:
+        L1 = [abs(1-final[0]/init[0]),
+              abs(final[1]-init[1]),
+              abs(1-final[2]/init[2])]
+
+        
+        
     if L1_target is not None:
         passed = True
         for l1, target in zip(L1, L1_target):
@@ -74,3 +98,5 @@ if __name__ == "__main__":
     check_conservation("collheat_2spc", "collheat_2spc.spc",
                        L1_target=[4e-16, 4e-14, 2e-13])
     
+    check_conservation("collheat_2spc_rad", "collheat_2spc_rad.spc",
+                       L1_target=[4e-16, 1e-18, 1e-5])
