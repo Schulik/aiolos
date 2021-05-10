@@ -42,7 +42,7 @@ def check_collisional_heating_2spc(problem, L1_target=None):
     T1 = ICs[0]['temperature'][1:-1].mean()
     T2 = ICs[1]['temperature'][1:-1].mean()
 
-    aij_dt = 3 * alpha * ICs[0]['density'][1:-1].mean() * tmax / (species[0].mass + species[1].mass)
+    aij_dt = 3 * alpha * tmax / (species[0].mass + species[1].mass)
 
     T1_an, T2_an = _solution_2sp(aij_dt, cv1, cv2, T1, T2) 
 
