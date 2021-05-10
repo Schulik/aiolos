@@ -53,6 +53,7 @@ tests: $(TEST_OBJ) makefile aiolos.h
 	cd test_files ; python3 test_dustyshock.py -p
 	cd test_files ; python3 test_conservation.py
 	cd test_files ; python3 test_irradiation.py -p
+	cd test_files ; python3 test_coll_heating.py
 
 clean:
 	rm -f *.o test_files/*.o problems/*.o test_files/*dat

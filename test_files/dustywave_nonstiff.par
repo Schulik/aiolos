@@ -21,6 +21,8 @@ PARI_NUM_SPECIES        2
 PARI_ALPHA_COLL         10.0
 PARI_COLL_MODEL         C
 FRICTION_SOLVER         1
+PARI_USE_COLL_HEAT      0
+
 
 #Numerical parameters
 PARI_BOUND_TYPE_LEFT    4

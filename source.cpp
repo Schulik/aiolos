@@ -429,6 +429,7 @@ void c_Sim::fill_alpha_basis_arrays(int j) { //Called in compute_friction() in s
         dens_vector(si)        =  species[si].u[j].u1; 
         numdens_vector(si)     =  species[si].prim[j].number_density; 
         mass_vector(si)        =  species[si].mass_amu*amu;
+        temperature_vector(si) =  species[si].prim[j].temperature;
     }
 }
     
@@ -456,7 +457,7 @@ void c_Sim::compute_alpha_matrix(int j) { //Called in compute_friction() and com
                         mui  = mass_vector(si) / mtot;
                         muj  = mass_vector(sj) / mtot;
                         mumass = mass_vector(si) * mass_vector(sj) / (mass_vector(si) + mass_vector(sj));
-                        meanT  = (mass_vector(sj)*species[si].prim[j].temperature + mass_vector(si)*species[sj].prim[j].temperature) / (mass_vector(si) + mass_vector(sj)); //Mean collisional mu and T from Schunk 1980
+                        meanT  = (mass_vector(sj)*temperature_vector(si) + mass_vector(si)*temperature_vector(sj)) / (mass_vector(si) + mass_vector(sj)); //Mean collisional mu and T from Schunk 1980
                         
                         coll_b      = 5.0e17 * std::pow(meanT/300., 0.75) ;     // from Zahnle & Kasting 1986 Tab. 1
                         
@@ -490,7 +491,7 @@ void c_Sim::compute_alpha_matrix(int j) { //Called in compute_friction() and com
 }
 
 
-void c_Sim::compute_collisional_heat_exchange_matrix(int j, Eigen::MatrixXd& heat_mat) {
+void c_Sim::compute_collisional_heat_exchange_matrix(int j) {
     
     // Get the alpha matrix
     compute_alpha_matrix(j) ;
@@ -499,15 +500,58 @@ void c_Sim::compute_collisional_heat_exchange_matrix(int j, Eigen::MatrixXd& hea
     for(int si=0; si<num_species; si++) {
         double diag_sum = 0 ;
         for(int sj=0; sj<num_species; sj++) {
-            double term = friction_coefficients(si, sj) *
-                dens_vector(si) * 3 * kb / (mass_vector(si) + mass_vector(sj)) ;
+            friction_coefficients(si, sj) *= 
+                dens_vector(si) * 3 * kb / (species[si].cv * (mass_vector(si) + mass_vector(sj))) ;
 
-            heat_mat(si, sj) = term ;
-            diag_sum += term ;
+            diag_sum += friction_coefficients(si, sj) ;
         }
         // Set the diagonal to sum of Ti terms. 
-        heat_mat(si, si) -= diag_sum ;
+        friction_coefficients(si, si) -= diag_sum ;
     }
 
+}
+
+void c_Sim::compute_collisional_heat_exchange() {
+    Eigen::internal::set_is_malloc_allowed(false) ;
+    
+    if (num_species == 1)
+        return ;
+
+    if(debug > 0) 
+        cout << "in compute_collisional_heat_exchange, num_species = "
+             << num_species << endl;
+    
+    for(int j=0; j <= num_cells+1; j++){
+
+        fill_alpha_basis_arrays(j);
+        compute_collisional_heat_exchange_matrix(j);
+
+        // Solve implicit equation for new temperature
+        friction_matrix_T = identity_matrix - friction_coefficients * dt;
+        
+        LU.compute(friction_matrix_T) ;
+        friction_vec_input.noalias() = LU.solve(temperature_vector);
+        
+
+        // Set friction_vec_output to dT/dt:
+        friction_vec_output = 
+            friction_coefficients * friction_vec_input ;
+
+        //
+        // Update internal energy (dE = Cv dT/dt * dt)
+        //
+        for(int si=0; si<num_species; si++) 
+            species[si].prim[j].internal_energy += 
+                species[si].cv*friction_vec_output(si)*dt;   
+    }
+
+    //
+    // Update conserved quantities
+    //
+    for(int si=0; si<num_species; si++) {
+        species[si].eos->update_p_from_eint(&(species[si].prim[0]), num_cells+2);
+        species[si].eos->compute_conserved(&(species[si].prim[0]), &(species[si].u[0]), num_cells+2);        
+    }
 
 }
+

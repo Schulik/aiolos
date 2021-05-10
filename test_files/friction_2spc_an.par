@@ -7,6 +7,8 @@
 PARI_PROBLEM_NUMBER     1
 PARI_NUM_SPECIES        2
 FRICTION_SOLVER         0
+PARI_USE_COLL_HEAT      0
+
 #
 # Problem numbers explained: shock_tube, no grav = 1, planet with grav = 2
 #

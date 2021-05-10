@@ -374,7 +374,7 @@ void c_Sim::update_fluxes_FLD() {
     
     if(radiation_matter_equilibrium_test <= 2) { //radtests 3 and 4 are delta-radiation peaks without energy-matter coupling
         
-        for (int j=0; j < num_cells+2; j++)
+        for (int j=0; j < num_cells+2; j++) {
             for (int s=0; s < num_species; s++) {
                 
                 if(debug > 1) {
@@ -419,6 +419,18 @@ void c_Sim::update_fluxes_FLD() {
                         cout<<" radiation part2, t = "<<steps<<" b["<<b<<"] i["<<j<<"] s["<<s<<"] l/d/u/r_rs/rs_rb = "<<d[idx_s]<<"/"<<d[idx_sb]<<"/"<<d[idx_b]<<"/"<<d[idx_bs]<<"/"<<r[idx_rs]<<"/"<<r[idx_rb]<<" opac = "<<vol[j] * rhos * species[s].opacity(j, b)<<endl;
                 }
             }
+            if (use_collisional_heating && num_species > 1) {
+                fill_alpha_basis_arrays(j);
+                compute_collisional_heat_exchange_matrix(j);
+
+                for (int si=0; si < num_species; si++) { 
+                    int idx  = j*stride + (si + num_bands) * num_vars + num_bands;
+                    for (int sj=0; sj < num_species; sj++)
+                        // Check si and sj are in the correct order here
+                        d[idx+sj] -= friction_coefficients(si,sj) ;
+                }
+            }
+        }
     }
     if(debug > 4) {
         char stepstop;

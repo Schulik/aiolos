@@ -99,7 +99,6 @@ def check_dusty_shock(L1s=None):
     t  = float(params['PARI_TIME_TMAX'])
 
     x = gas['x']
-    xa = x - x0
     
     L1 = [
         np.abs(gas ['density']  - exact.density(x-x0, t)).mean(),

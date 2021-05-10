@@ -128,6 +128,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
         use_tides         = read_parameter_from_file<int>(filename,"USE_TIDES", debug, 0).value;
         use_linear_gravity= read_parameter_from_file<int>(filename,"PARI_LINEAR_GRAV", debug, 0).value;
         use_rad_fluxes    = read_parameter_from_file<int>(filename,"PARI_USE_RADIATION", debug, 0).value;
+        use_collisional_heating = read_parameter_from_file<int>(filename,"PARI_USE_COLL_HEAT", debug, 1).value;
         init_wind         = read_parameter_from_file<int>(filename,"PARI_INIT_WIND", debug, 0).value;
         alpha_collision   = read_parameter_from_file<double>(filename,"PARI_ALPHA_COLL", debug, 0).value;
         //init_mdot              = read_parameter_from_file<double>(filename,"PARI_MDOT", debug, -1.).value;
@@ -489,6 +490,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
             dens_vector           = Vector_t(num_species);
             numdens_vector        = Vector_t(num_species);
             mass_vector           = Vector_t(num_species);
+            temperature_vector    = Vector_t(num_species);
 
             identity_matrix       = Matrix_t::Identity(num_species, num_species);
             unity_vector          = Vector_t::Ones(num_species);

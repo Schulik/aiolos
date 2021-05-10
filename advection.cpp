@@ -131,8 +131,8 @@ void c_Sim::execute() {
         // zeroth output has the initialized conserved values, but already the first fluxes.
         //
         
-         if(steps==0 || steps==1 || steps==2) {
-             for(int s=0; s<num_species; s++) {
+        if(steps==0 || ((steps==1 || steps==2) && debug > 0)) {
+            for(int s=0; s<num_species; s++) {
                 species[s].print_AOS_component_tofile((int) output_counter);
             }
             print_monitor((int)monitor_counter);
@@ -175,7 +175,7 @@ void c_Sim::execute() {
         // Step 0: If no gas movement is desired, set all velocity changes to 0
         //
         
-        if (do_hydrodynamics == 1 && output_counter > 2) {
+        if (do_hydrodynamics == 1) {
         
             for(int s = 0; s < num_species; s++)
                 species[s].execute(species[s].u, species[s].dudt[0]);
@@ -223,11 +223,11 @@ void c_Sim::execute() {
             }
         }
         
-        //if(globalTime > 2.4e6)
-        //    use_rad_fluxes = 1;
         
         if(use_rad_fluxes==1)
-            transport_radiation(); //Also contains photochemistry
+            transport_radiation(); //Also contains collisional heating and photochemistry
+        else if (use_collisional_heating)
+            compute_collisional_heat_exchange() ;
         
         //Photochemistry
         if(photochemistry_level > 0 && steps > 1 && globalTime > 1.e-4) {

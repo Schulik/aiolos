@@ -58,6 +58,8 @@ int main()
     count += !run_test("friction_2spc_phys_an.par", "friction_2spc.spc") ;
     count += !run_test("friction_6spc.par", "friction_6spc.spc") ;
     
+    count += !run_test("collheat_2spc.par", "collheat_2spc.spc") ;
+
     count += !run_test("dustywave_nonstiff.par") ;
     count += !run_test("dustywave_stiff.par") ;
 

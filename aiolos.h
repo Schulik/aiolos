@@ -212,6 +212,7 @@ public:
     int suppress_warnings;
     int do_hydrodynamics;
     int photochemistry_level;
+    int use_collisional_heating;
 
     ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     //
@@ -339,6 +340,7 @@ public:
     Vector_t dens_vector;
     Vector_t numdens_vector;
     Vector_t mass_vector;
+    Vector_t temperature_vector;
 
     Matrix_t radiation_matrix_T;
     Matrix_t radiation_matrix_M;
@@ -469,7 +471,8 @@ public:
     void fill_alpha_basis_arrays(int j);
     void fill_rad_basis_arrays(int, double, Eigen::MatrixXd &, Eigen::MatrixXd &);
     void compute_alpha_matrix(int j);
-    void compute_collisional_heat_exchange_matrix(int j, Eigen::MatrixXd &) ;
+    void compute_collisional_heat_exchange_matrix(int j) ;
+    void compute_collisional_heat_exchange(); 
     
     //Gravity
     void init_grav_pot();
