@@ -500,8 +500,8 @@ void c_Sim::compute_collisional_heat_exchange_matrix(int j) {
     for(int si=0; si<num_species; si++) {
         double diag_sum = 0 ;
         for(int sj=0; sj<num_species; sj++) {
-            friction_coefficients(si, sj) *= dens_vector(si) * 3 * kb / 
-                (dens_vector(si)*species[si].cv * (mass_vector(si) + mass_vector(sj))) ;
+            friction_coefficients(si, sj) *= 
+                3 * kb / (species[si].cv * (mass_vector(si) + mass_vector(sj))) ;
 
             diag_sum += friction_coefficients(si, sj) ;
         }
@@ -542,7 +542,7 @@ void c_Sim::compute_collisional_heat_exchange() {
         //
         for(int si=0; si<num_species; si++) 
             species[si].prim[j].internal_energy += 
-                species[si].cv*friction_vec_output(si)*dt;   
+                species[si].cv*friction_vec_output(si)*dt;
     }
 
     //
