@@ -81,7 +81,7 @@ if __name__ == "__main__":
        
     check_conservation("soundwave_128", L1_target=[5e-16, 2e-11,3e-16]) 
     
-    check_conservation("dustywave_stiff", L1_target=[4e-16, 2e-8, 2e-14]) 
+    check_conservation("dustywave_stiff", L1_target=[5e-16, 5e-8, 2e-14]) 
     check_conservation("dustywave_nonstiff", L1_target=[4e-16, 2e-10, 2e-14]) 
     
     check_conservation("friction_6spc", "friction_6spc.spc",

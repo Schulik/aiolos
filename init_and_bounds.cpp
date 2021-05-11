@@ -793,7 +793,7 @@ c_Species::c_Species(c_Sim *base_simulation, string filename, string species_fil
         else {
             cv            = 1.5 * Rgas / mass_amu; // 3 Degrees of freedom per atom (high T limit of debye theory)
             gamma_adiabat = (degrees_of_freedom + 2.)/ degrees_of_freedom; // Total degrees of freedom per grain
-            eos           = new IdealGas_EOS(degrees_of_freedom, cv, mass_amu*amu) ;
+            eos           = new IdealGas_EOS(degrees_of_freedom, cv, mass_amu*amu*degrees_of_freedom/3) ;
         }
         
         if(debug >= 0) cout<<"        Species["<<species_index<<"] got a gamma_adiabatic = "<<gamma_adiabat<<" and cv = "<<cv<<endl;
@@ -841,8 +841,8 @@ c_Species::c_Species(c_Sim *base_simulation, string filename, string species_fil
             u3r *= initial_fraction;
             
             if (is_dust_like) { 
-                u3l *= 2 / mass_amu ;
-                u3r *= 2 / mass_amu ;
+                u3l *= 3 / degrees_of_freedom ;
+                u3r *= 3 / degrees_of_freedom ;
             } 
             
             if(base->init_wind) {
@@ -1190,9 +1190,9 @@ void c_Species::initialize_sound_wave() {
     double cs = 1.0 * (base->domain_max - base->domain_min) ;
     double p0 = rho0*cs*cs/(gamma_adiabat) ;
 
-    // Assume gas is H2
+    // Make dust / gas temperatures similar
     if (is_dust_like)
-        p0 *= 2 / mass_amu ;
+        p0 *= 3 / degrees_of_freedom ;
 
     for(int i=0; i<=num_cells+1; i++) {
         double kx = 2*M_PI * (i+0.5 - base->num_ghosts) / double(num_cells - 2*(base->num_ghosts-1)) ;

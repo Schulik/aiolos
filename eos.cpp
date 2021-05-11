@@ -108,7 +108,7 @@ void Polytropic_EOS::compute_primitive(const AOS* cons, AOS_prim* prim, int num_
     for (int i=0; i < num_cells; i++) {
         prim[i].density = cons[i].u1;
         prim[i].speed = cons[i].u2 / cons[i].u1 ;
-        prim[i].pres = _K0 * std::pow(cons[i].u1, 1 - 1/_gamma) ;
+        prim[i].pres = _K0 * std::pow(cons[i].u1, _gamma) ;
     }
 }
 

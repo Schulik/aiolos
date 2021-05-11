@@ -178,8 +178,8 @@ void c_Species::update_opacities() {
             }
             
         } else {
-            // Choose some low value for a gas opacity
-            for(int j=0; j< num_cells+2; j++) {
+            // Choose some low value for a gas species
+            for(int j=0; j< num_cells+2; j++)
                 for(int b=0; b<num_bands; b++) {
                     opacity(j,b)         = 1e-20 ;
                     opacity_planck(j,b)  = 1e-20 ;
