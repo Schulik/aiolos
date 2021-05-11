@@ -21,3 +21,9 @@ void c_Species::user_initial_conditions(){
         "hydro::user_initial_conditions() not implemented. You must provide this "
         "method if you want to use user defined initial conditions.") ;
 }
+
+void c_Species::user_opacity() {
+    throw std::runtime_error(
+        "hydro::user_opacity() not implemented. You must provide this "
+        "method if you want to use user defined initial conditions.") ;
+}

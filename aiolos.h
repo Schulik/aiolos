@@ -711,6 +711,7 @@ public:
     void apply_boundary_right(std::vector<AOS>& u);
     void user_boundary_left(std::vector<AOS>& u);
     void user_boundary_right(std::vector<AOS>& u);
+    void user_opacity() ;
 
     void user_initial_conditions();
     

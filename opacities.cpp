@@ -62,14 +62,12 @@ double logint(double xa, int N, double* X, double* RI) {
 }
 
 void c_Species::update_opacities() {
-    
-    /*
-    else if(base->radiation_matter_equilibrium_test == 4){ //The nonlinear commercon radiative diffusion test
-                opacity(j,b)        = 1e11/this->u[j].u1*pow(base->Jrad_FLD(j,b)/c_light*4.*pi, -1.5 );
-                opacity_planck(j,b) = 1e11/this->u[j].u1*pow(base->Jrad_FLD(j,b)/c_light*4.*pi, -1.5 );                
-            }*/
-    
-    if(base->opacity_model == 'P') {
+
+    if (base->opacity_model == 'U') {
+        // User-defined opacities
+        user_opacity() ;
+    } 
+    else if(base->opacity_model == 'P') {
         
         if(is_dust_like == 0) {
             
