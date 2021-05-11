@@ -145,6 +145,52 @@ void c_Species::update_opacities() {
         
         
     }
+    else if  (base->opacity_model == 'D') {
+
+        // Toy model due to single grain size.
+        if (is_dust_like) {
+            const double RHO = 1, BETA=1;
+            double size = std::pow(3/(4*M_PI)*mass_amu*amu/RHO,1/3.) ;
+            
+            double k0 = 3/(4*RHO*size) ;
+            double T0 = 1/(2*M_PI * 3.475 * size) ;
+            
+            double ks ;
+            if (BETA == 1) 
+                ks = k0 * base->T_star / (T0 + base->T_star) ;
+            else
+                ks = k0 / (1 + std::pow(base->T_star/T0, -BETA)) ;
+
+            for(int j=0; j< num_cells+2; j++) {
+                double k ;
+                double T = prim[j].temperature ;
+
+                if (BETA == 1) 
+                    k = k0 * T / (T0 + T) ;
+                else
+                    k = k0 / (1 + std::pow(T/T0, -BETA)) ;
+
+                for(int b=0; b<num_bands; b++) {
+                    opacity(j,b)         = k ;
+                    opacity_planck(j,b)  = k ; 
+                    opacity_twotemp(j,b) = ks ;
+                }
+            }
+            
+        } else {
+            // Choose some low value for a gas opacity
+            for(int j=0; j< num_cells+2; j++) {
+                for(int b=0; b<num_bands; b++) {
+                    opacity(j,b)         = 1e-20 ;
+                    opacity_planck(j,b)  = 1e-20 ;
+                    opacity_twotemp(j,b) = 1e-20 ;
+                }
+        }
+        
+        if(debug > 3) {
+            cout<<" Simple dust model opacities used, and species["<<this_species_index<<"] is_dust_like ="<<is_dust_like<<endl;
+        }
+    }
     else { //opacity_model == 'C', the default
         
         for(int j=0; j< num_cells+2; j++) {
