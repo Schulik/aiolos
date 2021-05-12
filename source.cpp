@@ -177,26 +177,41 @@
                 if(collision_model == 'C') {
                     alpha = alpha_collision;
                 } else {
-                    
+                    // Physical model       
                     m0  = species[0].mass_amu*amu;
                     m1  = species[1].mass_amu*amu;
                     mumass = m0 * m1 / (m0 + m1);
-                    meanT  = (m1 * species[0].prim[j].temperature + m0 * species[1].prim[j].temperature) / (m0 + m1);
-                    
-                    ntot = species[0].prim[j].number_density + species[1].prim[j].number_density;
-                    fi   = species[0].prim[j].number_density / ntot;
-                    fj   = species[1].prim[j].number_density / ntot;
-                    mtot = species[0].mass_amu*amu + species[1].mass_amu*amu;
-                    mui  = species[0].mass_amu*amu / mtot;
-                    muj  = species[1].mass_amu*amu / mtot;
-                    
-                    coll_b      = 5.0e17 * std::pow(meanT/300., 0.75) ;     // from Zahnle & Kasting 1986 Tab. 1
-
-                    alpha = kb * meanT * species[1].prim[j].number_density / (m0 * coll_b) ; // From Burgers book, or Schunk & Nagy.
-                    //alpha_local = kb * meanT /(mumass * coll_b); 
+                    meanT  = (m1 * species[0].prim[j].temperature + m0 * species[1].prim[j].temperature) / (m0 + m1);             
+                    if (species[0].is_dust_like || species[1].is_dust_like) {
+                        // Use Epstein drag law (Hard sphere model)
+                        double RHO_DUST = 1;
+                        double s0=0, s1=0 ;
+                        if (species[0].is_dust_like)
+                            s0 = std::pow(3*m0/(4*M_PI*RHO_DUST), 1/3.) ;
+                        if (species[0].is_dust_like)
+                            s1 = std::pow(3*m1/(4*M_PI*RHO_DUST), 1/3.) ;
                         
-                    //alpha *= (fi + fj)/(fi * muj + fj * mui);
-                    alpha *= alpha_collision;
+                        double A = M_PI*(s0+s1)*(s0+s1) ;
+                        double v_th = std::sqrt(8*kb*meanT/(M_PI * mumass)) ;
+
+                        alpha = 4/3. * species[1].prim[j].density * v_th * A/(m0+m1) ;
+                    } else {
+                        // Gas-gas collisions. Used binary diffusion coefficient                        
+                        ntot = species[0].prim[j].number_density + species[1].prim[j].number_density;
+                        fi   = species[0].prim[j].number_density / ntot;
+                        fj   = species[1].prim[j].number_density / ntot;
+                        mtot = species[0].mass_amu*amu + species[1].mass_amu*amu;
+                        mui  = species[0].mass_amu*amu / mtot;
+                        muj  = species[1].mass_amu*amu / mtot;
+                        
+                        coll_b      = 5.0e17 * std::pow(meanT/300., 0.75) ;     // from Zahnle & Kasting 1986 Tab. 1
+
+                        alpha = kb * meanT * species[1].prim[j].number_density / (m0 * coll_b) ; // From Burgers book, or Schunk & Nagy.
+                        //alpha_local = kb * meanT /(mumass * coll_b); 
+                            
+                        //alpha *= (fi + fj)/(fi * muj + fj * mui);
+                        alpha *= alpha_collision;
+                    }
                 }
                 
                 alphas_sample(j) = alpha;
@@ -449,23 +464,41 @@ void c_Sim::compute_alpha_matrix(int j) { //Called in compute_friction() and com
                         if (si > sj) alpha_local *= dens_vector(sj) / dens_vector(si) ;
                     }
                     else {
-                        
-                        ntot = numdens_vector(si) + numdens_vector(sj);
-                        fi   = numdens_vector(si) / ntot;
-                        fj   = numdens_vector(sj) / ntot;
+                        // Physical drag law
                         mtot = mass_vector(si) + mass_vector(sj);
                         mui  = mass_vector(si) / mtot;
                         muj  = mass_vector(sj) / mtot;
                         mumass = mass_vector(si) * mass_vector(sj) / (mass_vector(si) + mass_vector(sj));
                         meanT  = (mass_vector(sj)*temperature_vector(si) + mass_vector(si)*temperature_vector(sj)) / (mass_vector(si) + mass_vector(sj)); //Mean collisional mu and T from Schunk 1980
                         
-                        coll_b      = 5.0e17 * std::pow(meanT/300., 0.75) ;     // from Zahnle & Kasting 1986 Tab. 1
-                        
-                        alpha_local = kb * meanT * numdens_vector(sj) / (mass_vector(si) * coll_b) ; // From Burgers book, or Schunk & Nagy.
-                        //alpha_local = kb * meanT /(mumass * coll_b); 
-                        
-                        //alpha_local *= (fi + fj)/(fi * muj + fj * mui);
-                        alpha_local *= alpha_collision;
+                        if (species[si].is_dust_like || species[sj].is_dust_like) {
+                            // Use Epstein drag law (Hard sphere model)
+                            double RHO_DUST = 1;
+                            double s0=0, s1=0 ;
+                            if (species[si].is_dust_like)
+                                s0 = std::pow(3*mass_vector(si)/(4*M_PI*RHO_DUST), 1/3.) ;
+                            if (species[sj].is_dust_like)
+                                s1 = std::pow(3*mass_vector(sj)/(4*M_PI*RHO_DUST), 1/3.) ;
+                            
+                            double A = M_PI*(s0+s1)*(s0+s1) ;
+                            double v_th = std::sqrt(8*kb*meanT/(M_PI * mumass)) ;
+
+                            alpha_local = 4/3. * dens_vector(sj) * v_th * A / mtot ;
+                        } else {
+                            // Gas-gas collisions. Used binary diffusion coefficient                        
+
+                            ntot = numdens_vector(si) + numdens_vector(sj);
+                            fi   = numdens_vector(si) / ntot;
+                            fj   = numdens_vector(sj) / ntot;
+                            
+                            coll_b      = 5.0e17 * std::pow(meanT/300., 0.75) ;     // from Zahnle & Kasting 1986 Tab. 1
+                            
+                            alpha_local = kb * meanT * numdens_vector(sj) / (mass_vector(si) * coll_b) ; // From Burgers book, or Schunk & Nagy.
+                            //alpha_local = kb * meanT /(mumass * coll_b); 
+                            
+                            //alpha_local *= (fi + fj)/(fi * muj + fj * mui);
+                            alpha_local *= alpha_collision;
+                        }
                     }
                     
                     if(si==0 && sj == 1) {

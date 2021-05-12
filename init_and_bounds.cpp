@@ -171,8 +171,14 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
             rs_at_moment    = 0.2;
             
         } else {
-            planet_mass = planet_position = rs = rs_time = 0 ;
-            rs_at_moment = 0.2 ;
+            
+            planet_mass     = read_parameter_from_file<double>(filename,"PARI_PLANET_MASS", debug, 0).value; //in Earth masses
+            planet_mass     *= mearth;
+            
+            planet_position = read_parameter_from_file<double>(filename,"PARI_PLANET_POS", debug, 0.).value;  //inside the simulation domain
+            rs              = read_parameter_from_file<double>(filename,"PARI_SMOOTHING_LENGTH", debug, 0.).value; //Gravitational smoothing length in hill 
+            rs_time         = read_parameter_from_file<double>(filename,"PARI_SMOOTHING_TIME", debug, 0.).value; //Time until we reach rs starting at rs_at_moment
+            rs_at_moment    = 0.2;
         }
         
         if(use_self_gravity)
@@ -792,8 +798,9 @@ c_Species::c_Species(c_Sim *base_simulation, string filename, string species_fil
         //Dust species
         else {
             cv            = 1.5 * Rgas / mass_amu; // 3 Degrees of freedom per atom (high T limit of debye theory)
+            mass_amu      = mass_amu * degrees_of_freedom/3 ; // Convert to mass of grain in amu
             gamma_adiabat = (degrees_of_freedom + 2.)/ degrees_of_freedom; // Total degrees of freedom per grain
-            eos           = new IdealGas_EOS(degrees_of_freedom, cv, mass_amu*amu*degrees_of_freedom/3) ;
+            eos           = new IdealGas_EOS(degrees_of_freedom, cv, mass_amu*amu) ;
         }
         
         if(debug >= 0) cout<<"        Species["<<species_index<<"] got a gamma_adiabatic = "<<gamma_adiabat<<" and cv = "<<cv<<endl;
@@ -904,6 +911,9 @@ c_Species::c_Species(c_Sim *base_simulation, string filename, string species_fil
         else if (base->problem_number == 3) {
             initialize_sound_wave() ;
         }
+        else if (base->problem_number == 0) {
+            user_initial_conditions() ;
+        } 
         else 
             initialize_default_test();
         

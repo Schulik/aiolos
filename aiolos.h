@@ -269,6 +269,7 @@ public:
     double max_timestep_change;
     double dt_min_init;
     double timestep_rad2;
+    double cfl_step ;
     double energy_epsilon;
     double globalTime;
     double output_time;

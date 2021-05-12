@@ -99,8 +99,8 @@ void c_Sim::execute() {
 //             cout<<"Radiative equilibrium phase over."<<endl;
         
         if( globalTime > next_print_time) {
-        //if(steps > 3700) {
-            cout<<" Beginning step "<<steps<<" @ globalTime "<<globalTime<<" dt "<<dt<<endl;
+            cout<<" Beginning step "<<steps<<" @ globalTime "<<globalTime<<" dt "<<dt;
+            cout<< ", CFL " << cfl_step << ", radiative dt " << timestep_rad2 << "\n";
             next_print_time *= 10.;
         }
             

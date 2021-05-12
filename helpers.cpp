@@ -74,9 +74,9 @@ double c_Sim::get_cfl_timestep() {
         cflfactor = 0.9;
     
     //Invert and apply CFL secutiry factor
-    minstep = cflfactor / minstep;
+    cfl_step = cflfactor / minstep;
     
-    return min(minstep, dt*max_timestep_change);
+    return min(cfl_step, dt*max_timestep_change);
 }
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -214,6 +214,9 @@ double c_Sim::compute_planck_function_integral3(double lmin, double lmax, double
     double power_max;
     double lT_min;
     double lT_max;
+
+    if (num_bands == 1)
+        return 1 ;
     
     if(temperature < 2.71) {
         lT_min = lmin * 2.71;

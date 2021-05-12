@@ -396,7 +396,9 @@ void c_Sim::update_fluxes_FLD() {
                 r[idx_rs] = Ts / dt ;
                 r[idx_rs] += species[s].dS(j) / species[s].u[j].u1 / species[s].cv; //* 4. * pi /c_light
                 
-                if (j < num_ghosts || j >= num_cells + 2-num_ghosts) continue ;
+                //if (j < num_ghosts || j >= num_cells + 2-num_ghosts) continue ;
+                //if (j < num_ghosts ) continue ;
+
                 
                 for(int b=0; b<num_bands; b++) {
                     int idx_b  = j*stride + b * (num_vars+1) ;
@@ -409,7 +411,8 @@ void c_Sim::update_fluxes_FLD() {
                     d[idx_s ] += 16 * pi * fac / species[s].cv ;
                     d[idx_sb] = - 4 * pi * species[s].opacity_planck(j, b)  * no_rad_trans / species[s].cv ;
                     r[idx_rs] += 12 * pi * fac * Ts / species[s].cv ;
-
+                    
+                    if (j < num_ghosts || j >= num_cells + 2-num_ghosts) continue ;
                     //cout<<" in rad matrix["<<j<<"]: term1 = "<<12 * pi * fac * Ts / species[s].cv<<" term2 = "<<species[s].dS(j)  / species[s].u[j].u1 / species[s].cv<<endl;
                     
                     d[idx_b ] += vol[j] * rhos * species[s].opacity_planck(j, b) * no_rad_trans;
