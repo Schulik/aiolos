@@ -26,8 +26,8 @@ def test_structure(sim, Tint, L1_target, make_plots):
     data = load_aiolos_diag(filename)
 
 
-    gamma0 = (data['kappa_PTsun0'] / data['kappa_P0'])[-1]
-    gamma1 = (data['kappa_PTsun1'] / data['kappa_P1'])[-1]
+    gamma0 = (data['kappa_PTsun0_0'] / data['kappa_P0_0'])[-1]
+    gamma1 = (data['kappa_PTsun1_0'] / data['kappa_P1_0'])[-1]
 
 
     Tirr40 = 0.25*data['S0'][-1]/sigma_rad
@@ -37,7 +37,7 @@ def test_structure(sim, Tint, L1_target, make_plots):
     T_guillot = Guillot_2band(tau, Tint**4, Tirr40, gamma0, Tirr41, gamma1)
 
     idx = (tau < 100) & (tau > 1e-10)
-    L1 = np.abs(1 - data['T_gas'][idx]/T_guillot[idx]).mean()
+    L1 = np.abs(1 - data['T_gas0'][idx]/T_guillot[idx]).mean()
 
     if L1 <= L1_target:
         print('Irradiation test L1 check passed')
@@ -48,7 +48,7 @@ def test_structure(sim, Tint, L1_target, make_plots):
     if make_plots:
         import matplotlib.pyplot as plt
              
-        plt.semilogy(data['T_gas'], tau, label='sim')
+        plt.semilogy(data['T_gas0'], tau, label='sim')
         plt.loglog(T_guillot, tau, 'k--', label='Guillot (2010), $f_H=1$')
 
         ylim = plt.ylim()
