@@ -343,8 +343,7 @@ void c_Sim::update_fluxes_FLD() {
 
             int idx = (num_cells+1)*stride + b*(num_vars + 1) ;
             int idx_r = (num_cells+1)*num_vars + b ;  
-            l[idx] = -1;
-            d[idx] = 1;
+            l[idx] = -d[idx];
             u[idx] = 0;
             r[idx_r] = 0 ;
         }
