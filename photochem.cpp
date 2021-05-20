@@ -246,8 +246,8 @@ void c_Sim::do_photochemistry() {
             }
 
             for(int s=0; s<num_species; s++) {
-                species[s].eos->compute_primitive(&(species[s].u[0]), &(species[s].prim[0]), num_cells+1) ;
-                species[s].eos->compute_auxillary(&(species[s].prim[0]), num_cells+1) ;
+                species[s].eos->compute_primitive(&(species[s].u[0]), &(species[s].prim[0]), num_cells+2) ;
+                species[s].eos->compute_auxillary(&(species[s].prim[0]), num_cells+2) ;
             }
             
             if(debug==2) {

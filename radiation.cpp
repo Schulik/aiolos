@@ -300,8 +300,7 @@ void c_Sim::update_fluxes_FLD() {
                 int idx_r = j*num_vars + b ;
                 
                 l[idx] = 0 ;
-                d[idx] = +1 ;
-                u[idx] = -1 ;
+                u[idx] = -d[idx] ;
                 r[idx_r] = 0 ; 
             }
         //}
@@ -317,8 +316,7 @@ void c_Sim::update_fluxes_FLD() {
                 int idx = i*stride + b*(num_vars + 1) ;
                 int idx_r = i*num_vars + b ;    
 
-                l[idx] = -1;
-                d[idx] = +1 ;
+                l[idx] = -d[idx] ;
                 u[idx] = 0 ;
                 r[idx_r] = 0 ;
             }
@@ -440,9 +438,6 @@ void c_Sim::update_fluxes_FLD() {
         char stepstop;
         cin>>stepstop;
     }
-
-    // TODO:
-    //   Add collision terms here
 
     tridiag.factor_matrix(&l[0], &d[0], &u[0]) ;
     tridiag.solve(&r[0], &r[0]) ; // Solve in place (check it works)
