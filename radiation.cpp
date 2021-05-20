@@ -136,7 +136,8 @@ void c_Sim::update_opacities() {
                     //dS_band(j,b) = (S_band(j+1,b) - S_band(j,b))/dx[j]/4. * (1. - bond_albedo); //       4pi J = c Erad
                     dS_band(j,b) = solar_heating(b) * (-exp(-const_opacity_solar_factor*radial_optical_depth_twotemp(j+1,b)) * expm1( const_opacity_solar_factor* ( radial_optical_depth_twotemp(j+1,b) - radial_optical_depth_twotemp(j,b))) ) /dx[j]/4. * (1.-bond_albedo);
                 else
-                    dS_band(j,b) = 0;
+                    // Use optically thin limit  
+                    dS_band(j,b) = solar_heating(b)*const_opacity_solar_factor*total_opacity_twotemp(j,b)/4;
                 
                 dS_band_zero(j,b) = dS_band(j,b);
             }
