@@ -135,4 +135,4 @@ if __name__ == "__main__":
     
     if args.make_plots:
         f = plot_dusty_shock()
-        f.show()
+        #f.show()

@@ -28,7 +28,42 @@ def load_aiolos_params(filename):
             params[key.strip()] = val.strip()
     return params
 
+def load_aiolos_diag(filename):
+    # Work out the number of bands:
+    with open(filename) as f:
+        line = f.readline()
+        cols = len(line.strip().split())
+        bands = (cols - 6) // 10
 
+    # Construct the dtype:
+    def add_cols(name, dt='f8'):
+        return [ (name + str(i), dt) for i in range(bands)]
+    def add_kappa_cols():
+        cols = []
+        for i in range(bands):
+            cols += [('kappa_R' + str(i), 'f8')]
+            cols += [('kappa_P' + str(i), 'f8')]
+            cols += [('kappa_P(Tsun)' + str(i), 'f8')]
+        return cols
+        
+    dtype = [('x',    'f8'),
+             ('Jtot', 'f8'),
+             ('Stot', 'f8')]
+    dtype += add_cols('J')
+    dtype += add_cols('S')
+    dtype += add_cols('dS')
+    dtype += add_cols('rho_kappaR')
+    dtype += add_cols('tau_cell')
+    dtype += add_cols('tau_radial')
+    dtype += add_kappa_cols()
+    dtype += [('T_rad', 'f8'),
+              ('T_gas', 'f8'),
+              ('pressure', 'f8')]
+    dtype += add_cols('Flux')
+
+    # Load the data
+    return np.genfromtxt(filename, dtype=dtype)
+    
 class Species:
     def __init__(self, name, mass, dof, is_dust):
         self.name = name
