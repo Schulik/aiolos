@@ -2,10 +2,10 @@
 # Parameterfile for atmosphere simulations
 # Do not use tabs, only white spaces as value separators
 #
-PARI_TIME_TMAX          5.02e7
-CFL_BREAK_TIME          1e3
-PARI_TIME_OUTPUT        5.0e7
-PARI_CFLFACTOR          0.9
+PARI_TIME_TMAX          1.0002e10
+CFL_BREAK_TIME          1e999
+PARI_TIME_OUTPUT        1.0e9
+PARI_CFLFACTOR          0.5
 PARI_TIME_DT            1e10
 PARI_DPHI_FACTOR        1.0
 # Control parameters
@@ -18,10 +18,10 @@ PARI_NUM_SPECIES        2
 PARI_NUM_BANDS          1
 DO_HYDRO                1
 #CONST_TEMP         1430.
-PARI_CONST_TEMP         10000.
+PARI_CONST_TEMP         8000.
 INIT_TEMPERATURE_MODEL  C
 INIT_J_FACTOR           1e0
-INIT_T_TEMP             10000.
+INIT_T_TEMP             8000.
 USE_TIDES               0
 CONSTOPA_SOLAR_FACTOR   1.e4
 
@@ -69,10 +69,10 @@ PARI_BOUND_TYPE_RIGHT   1
 PARI_DOMAIN_DX          1e-3
 PARI_GRID_TYPE          1
 PARI_GEOMETRY           2
-PARI_CELLS_PER_DECADE   200
+PARI_CELLS_PER_DECADE   100
 #Domain min/max are 8 me core radius for earth density, and 100*hill radius
 PARI_DOMAIN_MIN         9.073e9
-PARI_DOMAIN_MAX         10.697e11
+PARI_DOMAIN_MAX         10.0e11
 
 #Scenarios
 PARI_INIT_WIND          1
