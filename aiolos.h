@@ -212,6 +212,7 @@ public:
     int suppress_warnings;
     int do_hydrodynamics;
     int photochemistry_level;
+    int use_ke_fix;
 
     ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     //
@@ -324,6 +325,7 @@ public:
     //
     
     int friction_solver;
+    double friction_heating_multiplier;
     
     using Matrix_t = Eigen::Matrix<double, NUM_SPECIES,NUM_SPECIES, Eigen::RowMajor>;
     using Vector_t = Eigen::Matrix<double, NUM_SPECIES, 1>;
@@ -423,6 +425,7 @@ public:
     ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     
     int init_wind;
+    int init_const_ratios;
     double init_mdot;
     double init_sonic_radius;
     double T_increment;

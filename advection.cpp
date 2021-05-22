@@ -37,6 +37,7 @@ void c_Sim::execute() {
     int crash_J_imin = num_cells+2, crash_J_imax = 0, crash_J_numcells = 0;
     double crashtime, crashed_temperature;
     int crashtime_already_assigned = 0;
+    char debugchar;
         
     cout<<endl<<"Beginning main loop with num_cells="<<num_cells<<" and timestep="<<dt<<" cflfactor="<<cflfactor<<" and num_species = "<<num_species<<endl;
     if(num_species == 0) 
@@ -131,7 +132,7 @@ void c_Sim::execute() {
         // zeroth output has the initialized conserved values, but already the first fluxes.
         //
         
-         if(steps==0 || steps==1 || steps==2) {
+         if(steps==0 || steps==1) {
              for(int s=0; s<num_species; s++) {
                 species[s].print_AOS_component_tofile((int) output_counter);
             }
@@ -170,6 +171,18 @@ void c_Sim::execute() {
         //if(steps >= 4345)
         //    debug = 2;
         
+        for(int s=0; s<num_species;s++) {
+            for(int j=num_cells+2; j>=0; j--)  {
+                if(species[s].prim[j].temperature < 0.) {
+                cout<<" AT START, neg T in species "<<s<<", cell "<<j<<" steps= "<<steps<<endl;
+                cin>>debugchar;
+                }
+                if(species[s].prim[j].internal_energy < 0.) {
+                cout<<" AT START, neg internal energy in species "<<s<<", cell "<<j<<" steps= "<<steps<<endl;
+                cin>>debugchar;
+                }
+            }
+        }
         
         //
         // Step 0: If no gas movement is desired, set all velocity changes to 0
@@ -183,6 +196,19 @@ void c_Sim::execute() {
             for(int s=0; s < num_species; s++) {
                 for(int j=0; j < num_cells+2; j++)
                     species[s].u[j] = species[s].u[j] + species[s].dudt[0][j]*dt ;
+            }
+        }
+        
+        for(int s=0; s<num_species;s++) {
+            for(int j=num_cells+2; j>=0; j--)  {
+                if(species[s].prim[j].temperature < 0.) {
+                cout<<" AFTER HYDRO1, neg T in species "<<s<<", cell "<<j<<" steps= "<<steps<<endl;
+                cin>>debugchar;
+                }
+                if(species[s].prim[j].internal_energy < 0.) {
+                cout<<" AFTER HYDRO1, neg internal energy in species "<<s<<", cell "<<j<<" steps= "<<steps<<endl;
+                cin>>debugchar;
+                }
             }
         }
         
@@ -210,9 +236,64 @@ void c_Sim::execute() {
             }
         }
         
+        for(int s=0; s<num_species;s++) {
+            for(int j=num_cells+2; j>=0; j--)  {
+                if(species[s].prim[j].temperature < 0.) {
+                    cout<<" AFTER HYDRO2, neg T in species "<<s<<", cell "<<j<<" steps= "<<steps<<endl;
+                    cin>>debugchar;
+                    
+                    char alpha;
+                    cout<<"Debuggin fluxes in cell i= "<<j<<" for species "<<species[s].speciesname<<" at time "<<steps<<endl; 
+                    cout<<"     fl.u1 = "<<species[s].flux[j-2].u1<<": u-1.u1 = "<<species[s].u[j-1].u1<<endl;
+                    cout<<"     fl.u2 = "<<species[s].flux[j-2].u2<<": u-1.u2 = "<<species[s].u[j-1].u2<<endl;
+                    cout<<"     fl.u3 = "<<species[s].flux[j-2].u3<<": u-1.u3 = "<<species[s].u[j-1].u3<<endl;
+                    cout<<"     fl.u1 = "<<species[s].flux[j].u1<<": u.u1 = "<<species[s].u[j].u1<<endl;
+                    cout<<"     fl.u2 = "<<species[s].flux[j].u2<<": u.u2 = "<<species[s].u[j].u2<<endl;
+                    cout<<"     fl.u3 = "<<species[s].flux[j].u3<<": u.u3 = "<<species[s].u[j].u3<<endl;
+                    cout<<"     prim.p = "<<species[s].prim[j].pres<<" ";
+                    cout<<"     prim.e = "<<species[s].prim[j].internal_energy<<" ";
+                    cout<<"     prim.T = "<<species[s].prim[j].temperature<<" ";
+                    cout<<"     Cartesian fluxes: Fl-Fr+s = "<<((species[s].flux[j-1].u2 - species[s].flux[j].u2)/dx[j] + species[s].source[j].u2)<<endl;
+                    cout<<"     D_surface/volume="<<(0.5*(surf[j]-surf[j-1])/vol[j])<<" vs. 1/dx="<<(1./dx[j])<<" AL = "<<surf[j]<<" AR = "<<surf[j-1]<<" VOL = "<<vol[j]<<endl;
+                    cout<<endl;
+                    cout<<"     Reminder, the following three lines must be +- equal for well-balancing:"<<endl;
+                    cout<<"     s = "<<species[s].source[j].u1<<"/"<<species[s].source[j].u2<<"/"<<species[s].source[j].u3<<endl;
+                    cout<<"     Al*Fl - Ar*Fr + sP = "<<((species[s].flux[j-1].u2 * surf[j-1] - species[s].flux[j].u2 * surf[j]) / vol[j] + species[s].source_pressure[j].u2)<<endl;
+                    cout<<"     dP/dr = "<<((species[s].prim_l[j].pres - species[s].prim_r[j].pres)/dx[j])<<endl;
+                    cout<<" "<<endl;
+                    cout<<"     sP = "<<"/"<<species[s].source_pressure[j].u1<<"/"<<species[s].source_pressure[j].u2<<"/"<<species[s].source_pressure[j].u3<<endl;
+                    cout<<"     Al*Fl - Ar*Fr = "<<((species[s].flux[j-1].u2 * surf[j-1] - species[s].flux[j].u2 * surf[j]) /vol[j])<<endl;
+                    cout<<"     dP/dr + S = "<<((species[s].prim_l[j].pres - species[s].prim_r[j].pres)/dx[j] + species[s].source[j].u2)<<endl;
+                    cout<<endl;
+                    cout<<"     Al*Fl - Ar*Fr + s = "<<((species[s].flux[j-1].u2 * surf[j-1] - species[s].flux[j].u2 * surf[j]) / vol[j] + (species[s].source[j].u2))<<endl;
+                    cout<<"     u1 : Al*Fl - Ar*Fr + s + sP = "<<((species[s].flux[j-1].u1 * surf[j-1] - species[s].flux[j].u1 * surf[j]) / vol[j] + (species[s].source[j].u1 +species[s].source_pressure[j].u1))<<endl;
+                    cout<<"     u2 : Al*Fl - Ar*Fr + s + sP = "<<((species[s].flux[j-1].u2 * surf[j-1] - species[s].flux[j].u2 * surf[j]) / vol[j] + (species[s].source[j].u2 +species[s].source_pressure[j].u2))<<endl;
+                    cout<<"     u3 : Al*Fl - Ar*Fr + s + sP = "<<((species[s].flux[j-1].u3 * surf[j-1] - species[s].flux[j].u3 * surf[j]) / vol[j] + (species[s].source[j].u3 +species[s].source_pressure[j].u3))<<endl;
+                    cin>>alpha;
+                }
+                if(species[s].prim[j].internal_energy < 0.) {
+                    cout<<" AFTER HYDRO2, neg internal energy in species "<<s<<", cell "<<j<<" steps= "<<steps<<endl;
+                    cin>>debugchar;
+                }
+            }
+        }
+        
         for(int s = 0; s < num_species; s++)
             species[s].compute_pressure(species[s].u);
         compute_total_pressure();
+        
+        for(int s=0; s<num_species;s++) {
+            for(int j=num_cells+2; j>=0; j--)  {
+                if(species[s].prim[j].temperature < 0.) {
+                cout<<" AFTER PRESS, neg T in species "<<s<<", cell "<<j<<" steps= "<<steps<<endl;
+                cin>>debugchar;
+                }
+                if(species[s].prim[j].internal_energy < 0.) {
+                cout<<" AFTER PRESS, neg internal energy in species "<<s<<", cell "<<j<<" steps= "<<steps<<endl;
+                cin>>debugchar;
+                }
+            }
+        }
         
         if (do_hydrodynamics == 1 && steps >= 10) {
             if(alpha_collision > 0 && num_species > 1) {
@@ -220,6 +301,19 @@ void c_Sim::execute() {
                     compute_friction_analytical();
                 else
                     compute_friction_numerical();
+            }
+        }
+        
+        for(int s=0; s<num_species;s++) {
+            for(int j=num_cells; j>=0; j--)  {
+                if(species[s].prim[j].temperature < 0.) {
+                cout<<" AFTER FRICTION, neg T in species "<<s<<", cell "<<j<<" steps= "<<steps<<endl;
+                cin>>debugchar;
+                }
+                if(species[s].prim[j].internal_energy < 0.) {
+                cout<<" AFTER FRICTIOn, neg internal energy in species "<<s<<", cell "<<j<<" steps= "<<steps<<endl;
+                cin>>debugchar;
+                }
             }
         }
         
@@ -271,7 +365,7 @@ void c_Sim::execute() {
             }
             
             if(crashed_T > 0) {
-                cout<<endl<<">>> CRASH <<< DUE TO NEGATIVE TEMPERATURES, crash_imin/imax = "<<crash_T_imin<<"/"<<crash_T_imax<<" sample T ="<<crashed_temperature<<" num of crashed cells/total cells = "<<crash_T_numcells<<"/"<<num_cells<<"  crashed species number = "<<crashed_T-1<<endl; 
+                cout<<endl<<">>> CRASH <<< DUE TO NEGATIVE TEMPERATURES, crash_imin/imax = "<<crash_T_imin<<"/"<<crash_T_imax<<" sample T ="<<crashed_temperature<<" num of crashed cells/total cells = "<<crash_T_numcells<<"/"<<num_cells<<"  crashed species name = "<<species[crashed_T-1].speciesname<<endl; 
                 cout<<" @dt="<<dt<<" stepnum "<<steps<<" Crashtime "<<crashtime<<endl;
                 cout<<"Writing crash dump into last output and exiting program."<<endl;
             } 
@@ -403,7 +497,7 @@ void c_Species::execute(std::vector<AOS>& u_in, std::vector<AOS>& dudt) {
         //flux[0] = AOS(0,0,0);
         //flux[1] = AOS(0,0,0);
         
-        for(int j=1; j<=num_cells; j++) {
+        for(int j=1; j<=num_cells+1; j++) {
             dudt[j] = (flux[j-1] * base->surf[j-1] - flux[j] * base->surf[j]) / base->vol[j] + (source[j] + source_pressure[j]) ;
             
             //if( (debug > 1) && ( j==1 || j==num_cells || j==(num_cells/2) )) {

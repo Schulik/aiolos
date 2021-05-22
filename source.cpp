@@ -193,6 +193,7 @@
                     coll_b      = 5.0e17 * std::pow(meanT/300., 0.75) ;     // from Zahnle & Kasting 1986 Tab. 1
 
                     alpha = kb * meanT * species[1].prim[j].number_density / (m0 * coll_b) ; // From Burgers book, or Schunk & Nagy.
+                    //alpha = kb * meanT * species[0].prim[j].number_density / (m1 * coll_b) ; // From Burgers book, or Schunk & Nagy.
                     //alpha_local = kb * meanT /(mumass * coll_b); 
                         
                     //alpha *= (fi + fj)/(fi * muj + fj * mui);
@@ -214,10 +215,10 @@
                 species[0].prim[j].speed = v1a;
                 species[1].prim[j].speed = v2a;
                 
-                if(debug >= 1 && j==1200 && steps == 10) {
+                if(debug >= 0 && j==1200 && steps == 2000) {
                     cout<<" v1b, v2b = "<<v1b<<" "<<v2b<<endl<<" v1a, v2a = "<<v1a<<" "<<v2a<<endl;
-                    cout<<" dv1, dv2 = "<<v1a-v1b<<" "<<v2a-v2b<<endl;
-                    cout<<" dp1, dp2 = "<<(v1a-v1b)*species[0].u[j].u1 + (v2a-v2b)*species[1].u[j].u1<<endl;
+                    cout<<" dv1, dv2 = "<<v1a-v1b<<" "<<v2a-v2b<<" dp1, dp2 = "<<(v1a-v1b)*species[0].u[j].u1<<" "<<(v2a-v2b)*species[1].u[j].u1<<endl;
+                    cout<<" dp1 + dp2 = "<<(v1a-v1b)*species[0].u[j].u1 + (v2a-v2b)*species[1].u[j].u1<<endl;
                     cout<<"    dt*alpha = "<<dt*alpha<<" alpha = "<<alpha<<" eps = "<<species[1].u[j].u1/species[0].u[j].u1<<endl;
                     
                     char a;
@@ -227,8 +228,17 @@
                 double v_half = 0.5*(v1a + v1b) - 0.5*(v2a + v2b) ;
                 double v_end  = v1a - v2a ;
 
-                species[0].prim[j].internal_energy += dt * alpha * (species[1].mass_amu/(species[0].mass_amu+species[1].mass_amu)) * v_half * v_end ;
-                species[1].prim[j].internal_energy += dt * alpha * eps * (species[0].mass_amu/(species[0].mass_amu+species[1].mass_amu)) * v_half * v_end ;
+                species[0].prim[j].internal_energy += friction_heating_multiplier * dt * alpha * (species[1].mass_amu/(species[0].mass_amu+species[1].mass_amu)) * v_half * v_end ;
+                species[1].prim[j].internal_energy += friction_heating_multiplier * dt * alpha * eps * (species[0].mass_amu/(species[0].mass_amu+species[1].mass_amu)) * v_half * v_end ;
+            
+                if(species[0].prim[j].internal_energy < 0.) {
+                    cout<<" IN FRICTION, neg internal energy in species 0, cell "<<j<<endl;
+                }
+                if(species[1].prim[j].internal_energy < 0.) {
+                    cout<<" IN FRICTION, neg internal energy in species 1, cell "<<j<<endl;
+                }
+                    
+                
             }
             
             if(debug > 0) {
@@ -370,7 +380,7 @@ void c_Sim::compute_friction_numerical() {
         LU.compute(friction_matrix_T) ;
         friction_vec_output.noalias() = LU.solve(friction_vec_input);
         
-        if(debug >= 1 && j==700 && steps == 10) {
+        if(debug >= 1 && j==36 && steps == 126235) {
             
             cout<<"    T = "<<endl<<friction_matrix_T<<endl;
             cout<<" a10/a01 = "<<friction_matrix_T(0,1)/friction_matrix_T(1,0)<<" dens(0)/dens(1) = "<<dens_vector(1)/dens_vector(0)<<" dt*a*eps = "<<friction_coefficients(0,1) * dt * dens_vector(0)/dens_vector(1)<<endl;
@@ -406,7 +416,7 @@ void c_Sim::compute_friction_numerical() {
                     friction_sample(j) = alphas_sample(j) * (friction_vec_input(si) - friction_vec_input(sj));
                 }
             }
-            species[si].prim[j].internal_energy += temp;
+            species[si].prim[j].internal_energy += friction_heating_multiplier * temp;
         }
         
     }

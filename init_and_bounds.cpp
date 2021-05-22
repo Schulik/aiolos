@@ -129,6 +129,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
         use_linear_gravity= read_parameter_from_file<int>(filename,"PARI_LINEAR_GRAV", debug, 0).value;
         use_rad_fluxes    = read_parameter_from_file<int>(filename,"PARI_USE_RADIATION", debug, 0).value;
         init_wind         = read_parameter_from_file<int>(filename,"PARI_INIT_WIND", debug, 0).value;
+        init_const_ratios = read_parameter_from_file<int>(filename,"INIT_CONST_RATIOS", debug, 0).value;
         alpha_collision   = read_parameter_from_file<double>(filename,"PARI_ALPHA_COLL", debug, 0).value;
         //init_mdot              = read_parameter_from_file<double>(filename,"PARI_MDOT", debug, -1.).value;
         init_sonic_radius = read_parameter_from_file<double>(filename,"INIT_SONIC_RADIUS", debug, -1e10).value;
@@ -146,7 +147,9 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
         const_opacity_planck_factor = read_parameter_from_file<double>(filename,"CONSTOPA_PLANCK_FACTOR", debug, 1.).value;
         temperature_model = read_parameter_from_file<char>(filename,"INIT_TEMPERATURE_MODEL", debug, 'P').value;
         friction_solver   = read_parameter_from_file<int>(filename,"FRICTION_SOLVER", debug, 0).value;
+        friction_heating_multiplier = read_parameter_from_file<double>(filename,"FRICTION_HEATING_MUL", debug, 1.).value;
         do_hydrodynamics  = read_parameter_from_file<int>(filename,"DO_HYDRO", debug, 1).value;
+        use_ke_fix        = read_parameter_from_file<int>(filename,"USE_KE_FIX", debug, 0).value;
         photochemistry_level = read_parameter_from_file<int>(filename,"PHOTOCHEM_LEVEL", debug, 0).value;
         
         rad_solver_max_iter = read_parameter_from_file<int>(filename,"MAX_RAD_ITER", debug, 1).value;
@@ -987,7 +990,14 @@ void c_Species::initialize_hydrostatic_atmosphere(string filename) {
         //else
         metric_inner = (base->phi[i+1] - base->phi[i]) * base->omegaminus[i]  * base->dx[i]   / (base->dx[i+1] + base->dx[i]);
         
-        temp_rhofinal = u[i+1].u1 * (factor_outer + metric_outer) / (factor_inner - metric_inner);
+        //
+        // Here we assign the hydrostatically constructed density profile. Except we want all species in all cells to initially have the same density ratio w.r.t species[0].
+        // Then we set simply the same density profile, and the other species are later anyway modified by their RELATIVE_AMOUNT modifiers
+        //
+        if(base->init_const_ratios == 1 && this_species_index > 0)
+            temp_rhofinal = base->species[0].u[i].u1 * initial_fraction;   
+        else
+            temp_rhofinal = u[i+1].u1 * (factor_outer + metric_outer) / (factor_inner - metric_inner);
         
         u[i] = AOS(temp_rhofinal, 0., cv * temp_rhofinal * T_inner);
         
@@ -1252,10 +1262,16 @@ void c_Species::apply_boundary_right(std::vector<AOS>& u) {
             for (int i=Ncell+num_ghosts; i < Ncell+2*num_ghosts; i++) {
                 AOS_prim prim ;
                 eos->compute_primitive(&u[i-1],&prim, 1) ;
+                double temp_p;
                 double dphi = (base->phi[i] - base->phi[i-1]) / (base->dx[i-1] + base->dx[i]) ;
                 dphi *= (base->omegaplus[i]*base->dx[i] + base->omegaminus[i-1]*base->dx[i-1]) ;
+                temp_p = prim.pres;
                 prim.pres = prim.pres -  prim.density * dphi ;
-                prim.pres    = std::max( prim.pres, 0.0) ;
+                
+                prim.pres   = std::max( prim.pres, 0.0) ;
+                //if(prim.pres < 0.)
+                //    prim.pres = temp_p;
+                
                 eos->compute_conserved(&prim, &u[i], 1) ;
             }
             break ;
@@ -1265,7 +1281,7 @@ void c_Species::apply_boundary_right(std::vector<AOS>& u) {
                 int igh = Ncell + num_ghosts +i;
                 u[igh]     = u[iact]; 
                 u[igh].u2 *= -1;
-                base->phi[igh]   = base->phi[iact] ; //TODO: This will be called many times, too many!
+                base->phi[igh]   = base->phi[iact] ;
             }
             break;
         case BoundaryType::fixed:
