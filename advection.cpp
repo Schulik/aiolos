@@ -224,20 +224,14 @@ void c_Sim::execute() {
         }
         
         
+        
+        if(photochemistry_level > 0)         
+            do_photochemistry();
+
         if(use_rad_fluxes==1)
             transport_radiation(); //Also contains collisional heating and photochemistry
         else if (use_collisional_heating)
             compute_collisional_heat_exchange() ;
-        
-        //Photochemistry
-        if(photochemistry_level > 0 && steps > 1 && globalTime > 1.e-4) {
-            
-            //debug=2;
-            
-            do_photochemistry();
-            
-        }
-            
             
         steps++;
         
