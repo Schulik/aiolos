@@ -116,7 +116,10 @@ class C2Ray_HOnly_ionization {
        x0(nX[1] / (nX[0] + nX[1])),
        R(H_radiative_recombination(Te)),
        C(H_collisional_ionization(Te)),
-       B(H_threebody_recombination(Te)){};
+       B(H_threebody_recombination(Te))
+    {
+        C = std::max(C, 1e-20*R) ;
+    };
 
     // Computes <x_e> - xe, the residual in the average electron abundance
     double operator()(double xe) const { return _xe_average(xe) - xe; }
