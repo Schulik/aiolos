@@ -90,7 +90,7 @@ if __name__ == "__main__":
     check_conservation("friction_2spc", "friction_2spc.spc",
                        L1_target=[4e-16,3e-14,3e-13])
     check_conservation("friction_2spc_phys", "friction_2spc.spc",
-                       L1_target=[4e-16,1e-15,3e-14])
+                       L1_target=[4e-16,2e-15,2e-13])
 
     check_conservation("collheat_2spc", "collheat_2spc.spc",
                        L1_target=[4e-16, 4e-14, 2e-13])

@@ -213,6 +213,7 @@ public:
     int do_hydrodynamics;
     int photochemistry_level;
     int use_collisional_heating;
+    int use_drag_predictor_step;
 
     ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     //
@@ -469,6 +470,15 @@ public:
     //
     void compute_friction_analytical(); 
     void compute_friction_numerical(); 
+
+    void compute_drag_update() {
+        if(alpha_collision > 0 && num_species > 1) {
+            if(friction_solver == 0)
+                compute_friction_analytical();
+            else
+                compute_friction_numerical();
+        }
+    } ;
     
     void fill_alpha_basis_arrays(int j);
     void fill_rad_basis_arrays(int, double, Eigen::MatrixXd &, Eigen::MatrixXd &);
@@ -565,7 +575,7 @@ public:
     double mass_amu;
     double initial_fraction;
     
-    std::vector<AOS> u;              // Conserved hyperbolic variables: density, mass flux, energy density
+    std::vector<AOS> u, u0;          // Conserved hyperbolic variables: density, mass flux, energy density
     std::vector<AOS> dudt[2];        // Time derivative of u at each stage ;      
     std::vector<AOS> source;         // Gravitational source term
     std::vector<AOS> source_pressure;// Geometric source term
@@ -715,6 +725,7 @@ public:
     void user_opacity() ;
 
     void user_initial_conditions();
+    void user_species_loop_function() ;
     
     ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     //

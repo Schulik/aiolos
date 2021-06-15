@@ -129,6 +129,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
         use_linear_gravity= read_parameter_from_file<int>(filename,"PARI_LINEAR_GRAV", debug, 0).value;
         use_rad_fluxes    = read_parameter_from_file<int>(filename,"PARI_USE_RADIATION", debug, 0).value;
         use_collisional_heating = read_parameter_from_file<int>(filename,"PARI_USE_COLL_HEAT", debug, 1).value;
+        use_drag_predictor_step = read_parameter_from_file<int>(filename, "PARI_SECONDORDER_DRAG", debug, 0).value;
         init_wind         = read_parameter_from_file<int>(filename,"PARI_INIT_WIND", debug, 0).value;
         alpha_collision   = read_parameter_from_file<double>(filename,"PARI_ALPHA_COLL", debug, 0).value;
         //init_mdot              = read_parameter_from_file<double>(filename,"PARI_MDOT", debug, -1.).value;
@@ -779,6 +780,7 @@ c_Species::c_Species(c_Sim *base_simulation, string filename, string species_fil
         if(debug > 0) cout<<"        Species["<<species_index<<"] Init: Done reading species data."<<endl;
         
         u               = init_AOS(num_cells+2); //Conserved hyperbolic variables: density, mass flux, energy density
+        u0              = init_AOS(num_cells+2); //Conserved hyperbolic variables: density, mass flux, energy density
         dudt[0]         = init_AOS(num_cells+2);
         dudt[1]         = init_AOS(num_cells+2);
         source          = init_AOS(num_cells+2);  

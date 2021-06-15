@@ -14,9 +14,9 @@ def check_steady_state(problem, L1_target=None):
     final = load_aiolos_snap(snap_file)
 
     L1 = [
-        np.abs(final['density'] - IC['density']).mean(),
-        np.abs(final['momentum'] - IC['momentum']).mean(),        
-        np.abs(final['pressure'] - IC['pressure']).mean(),
+        np.abs((final['density'] - IC['density'])[2:-2]).mean(),
+        np.abs((final['momentum'] - IC['momentum'])[2:-2]).mean(),        
+        np.abs((final['pressure'] - IC['pressure'])[2:-2]).mean(),
     ]
 
     if L1_target is not None:

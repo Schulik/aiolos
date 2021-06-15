@@ -181,6 +181,7 @@ void c_Sim::execute() {
                 species[s].execute(species[s].u, species[s].dudt[0]);
             
             for(int s=0; s < num_species; s++) {
+                species[s].u0 = species[s].u ;
                 for(int j=0; j < num_cells+2; j++)
                     species[s].u[j] = species[s].u[j] + species[s].dudt[0][j]*dt ;
             }
@@ -197,14 +198,27 @@ void c_Sim::execute() {
                 update_mass_and_pot();
 
             if (do_hydrodynamics == 1) {
-            
+
+                if (use_drag_predictor_step) {
+                    for(int s = 0; s < num_species; s++)
+                        species[s].compute_pressure(species[s].u);
+                    compute_total_pressure();
+                
+                    compute_drag_update() ;
+                    if (use_collisional_heating)
+                        compute_collisional_heat_exchange() ;
+                }
+
                 for(int s = 0; s < num_species; s++)
                     species[s].execute(species[s].u, species[s].dudt[1]);
-                
+
                 for(int s = 0; s < num_species; s++){
                     for(int j = 0; j < num_cells+2; j++) {
-                        species[s].u[j] += (species[s].dudt[1][j] -  species[s].dudt[0][j])*dt / 2 ; 
+                        // Need to re-compute u[j] if it was updated in the drag-predictor
+                        if (use_drag_predictor_step)
+                            species[s].u[j] = species[s].u0[j] + species[s].dudt[0][j]*dt ;
                         
+                        species[s].u[j] += (species[s].dudt[1][j] - species[s].dudt[0][j])*dt / 2 ;  
                     }
                 }
             }
@@ -214,14 +228,8 @@ void c_Sim::execute() {
             species[s].compute_pressure(species[s].u);
         compute_total_pressure();
         
-        if (do_hydrodynamics == 1 && steps >= 10) {
-            if(alpha_collision > 0 && num_species > 1) {
-                if(friction_solver == 0)
-                    compute_friction_analytical();
-                else
-                    compute_friction_numerical();
-            }
-        }
+        if (do_hydrodynamics == 1)
+            compute_drag_update() ;
         
         
         
@@ -232,6 +240,9 @@ void c_Sim::execute() {
             transport_radiation(); //Also contains collisional heating and photochemistry
         else if (use_collisional_heating)
             compute_collisional_heat_exchange() ;
+            
+        for(int s = 0; s < num_species; s++)
+            species[s].user_species_loop_function() ;
             
         steps++;
         

@@ -204,7 +204,7 @@
                         mui  = species[0].mass_amu*amu / mtot;
                         muj  = species[1].mass_amu*amu / mtot;
                         
-                        coll_b      = 5.0e17 * std::pow(meanT/300., 0.75) ;     // from Zahnle & Kasting 1986 Tab. 1
+                        coll_b      = 5.0e17 * std::pow(meanT, 0.75) ;     // from Zahnle & Kasting 1986 Tab. 1
 
                         alpha = kb * meanT * species[1].prim[j].number_density / (m0 * coll_b) ; // From Burgers book, or Schunk & Nagy.
                         //alpha_local = kb * meanT /(mumass * coll_b); 
@@ -491,7 +491,7 @@ void c_Sim::compute_alpha_matrix(int j) { //Called in compute_friction() and com
                             fi   = numdens_vector(si) / ntot;
                             fj   = numdens_vector(sj) / ntot;
                             
-                            coll_b      = 5.0e17 * std::pow(meanT/300., 0.75) ;     // from Zahnle & Kasting 1986 Tab. 1
+                            coll_b      = 5.0e17 * std::pow(meanT, 0.75) ;     // from Zahnle & Kasting 1986 Tab. 1
                             
                             alpha_local = kb * meanT * numdens_vector(sj) / (mass_vector(si) * coll_b) ; // From Burgers book, or Schunk & Nagy.
                             //alpha_local = kb * meanT /(mumass * coll_b); 

@@ -26,7 +26,7 @@ class Brent {
 
         double EPS = std::numeric_limits<double>::epsilon();
         double c = b, fc = fb;
-        double d, e;
+        double d=0, e=0;
         for (int i = 0; i < _max_iter; i++) {
             // Order interval
             if (fb * fc > 0) {
