@@ -1,13 +1,16 @@
-In order to execute Aiolos in multispecies mode, type:
+In order to install and run Aiolos, we recommend the following steps:
 
-   ./aiolos -par planet_spherical.par -spc mix1.spc
+1.) Clone this git repository (This presumably has just been done) via 'git clone https://github.com/Schulik/aiolos/'
+2.) Install the EIGEN library via https://eigen.tuxfamily.org
+3.) Compile, details below
+4.) Run, details below
 
-with the *.par and the *.spc file present into the command line.
 
+************************************
+*** Compilation
+************************************
 
-Compilation
-
-aiolos can be compiled with make and gcc, just type make. If you wish to provide
+aiolos can be compiled with make and gcc, just type 'make'. If you wish to provide
 your own initial conditions or boundary conditions, add them to your own problem
 file, e.g. "problems/my_problem.cpp". These can then be compiled into aiolos
 via:
@@ -15,7 +18,7 @@ via:
     make PROBLEM=my_problem
 
 
-Fixed number of species
+* Fixed number of species
 
 By default, aiolos is compiled in a flexible mode that can run problesm with any
 number of input species. However, a significant (10-20%) speed up can be
@@ -25,4 +28,13 @@ done via:
      make PROBLEM=my_problem NUM_SPECIES=4
 
 where the "4" refers to a target of 4 species total.
+
+************************************
+*** In order to execute Aiolos mode, type:
+************************************
+
+   ./aiolos -par planet_spherical.par -spc mix1.spc
+
+with the *.par and the *.spc file present into the command line.
+
 
