@@ -2,9 +2,9 @@
 # Parameterfile for atmosphere simulations
 # Do not use tabs, only white spaces as value separators
 #
-PARI_TIME_TMAX          5.02e10
+PARI_TIME_TMAX          1.02e9
 CFL_BREAK_TIME          1e999
-PARI_TIME_OUTPUT        1.0e9
+PARI_TIME_OUTPUT        1.0e8
 PARI_CFLFACTOR          0.5
 PARI_TIME_DT            1e10
 PARI_DPHI_FACTOR        1.0
