@@ -896,7 +896,6 @@ c_Species::c_Species(c_Sim *base_simulation, string filename, string species_fil
             if(base->init_sonic_radius > 0. && base->init_wind == 2){
                 init_analytic_wind_solution();
             }
-                
 
             if(debug > 0) cout<<"        Species["<<species_index<<"] initialized problem 2."<<endl;
         }
@@ -907,15 +906,18 @@ c_Species::c_Species(c_Sim *base_simulation, string filename, string species_fil
             initialize_default_test();
         
         
+        
         USE_WAVE = read_parameter_from_file<int>(filename,"WAVE_USE", debug, 0).value; 
         if(USE_WAVE==1) {
             WAVE_AMPLITUDE = read_parameter_from_file<double>(filename,"WAVE_AMPLITUDE", debug).value; 
             WAVE_PERIOD    = read_parameter_from_file<double>(filename,"WAVE_PERIOD", debug).value; 
         }
         
-        // Apply boundary conditions
+        // Apply boundary conditions and save the initial density, should it be needed for inflow boundaries
+        init_prim_max = prim[2];
         apply_boundary_left(u) ;
         apply_boundary_right(u) ;
+        
         
         if(debug > 0) cout<<"        Species["<<species_index<<"]: Init done."<<endl;
         
@@ -1055,22 +1057,31 @@ void c_Species::initialize_hydrostatic_atmosphere(string filename) {
     }
     
     if(base->init_T_temp > 2.7) {
-            cout<<" In INIT: Overwriting T with user-defined temperature:"<<base->init_T_temp;
             
+            double bondi_radius;
+            double cs = std::sqrt(prim[num_cells-1].temperature/2000.)*2.88e5;
+                
+            if(base->init_sonic_radius>0)
+                bondi_radius = base->init_sonic_radius;
+            else
+                bondi_radius = base->planet_mass*G / (2.*pow(cs ,2.)); //Most restrictive sonic point, as we are not quite isothermal
+            
+            cout<<" In INIT: Overwriting T with user-defined temperature:"<<base->init_T_temp<<" and r_B = "<<bondi_radius<<endl;
+                
             for(int i=num_cells; i>=0; i--)  {
                 
-                //if(x_i12[i]<2.e10) {
-                    
+                if(base->x_i12[i]>bondi_radius) {
+                
                     double temprho = u[i].u1;
                 
                     u[i] = AOS(temprho, 0., cv * temprho * base->init_T_temp) ;
-                //}
+                }
                 
                 //prim[i].temperature = base->init_T_temp;
             }
         }
         else
-            cout<<" In INIT:NO TOverwriting T with user-defined temperature:"<<base->init_T_temp;
+            cout<<" In INIT:NO TOverwriting T with user-defined temperature:"<<base->init_T_temp<<endl;
     
     
     if(u[2].u1 > 1e40) {
@@ -1097,7 +1108,7 @@ void c_Species::initialize_hydrostatic_atmosphere(string filename) {
         if(base->init_sonic_radius>0)
             bondi_radius = base->init_sonic_radius;
         else
-            bondi_radius = base->planet_mass*G / (pow(csi,2.)); //Most restrictive sonic point, as we are not quite isothermal
+            bondi_radius = base->planet_mass*G / (2.*pow(csi,2.)); //Most restrictive sonic point, as we are not quite isothermal
         
         for( int i = 1; i < num_cells + 1; i++) {
             smoothed_factor = density_excess * (1./(1.+std::exp(-(base->x_i12[i] - bondi_radius)/(0.01 * bondi_radius )) ) ); 
@@ -1220,11 +1231,24 @@ void c_Species::apply_boundary_left(std::vector<AOS>& u) {
         case BoundaryType::open:
             for (int i=num_ghosts; i > 0; i--) {
                 AOS_prim prim ;
-                eos->compute_primitive(&u[i],&prim, 1) ;
+                
+                if(this_species_index == 0)
+                    prim = init_prim_max;
+                else
+                    prim = init_prim_max; //eos->compute_primitive(&u[i],&prim, 1) ;
+                
                 double dphi = (base->phi[i] - base->phi[i-1]) / (base->dx[i-1] + base->dx[i]) ;
                 dphi       *= (base->omegaplus[i]*base->dx[i] + base->omegaminus[i-1]*base->dx[i-1]) ;
                 prim.pres   = prim.pres + prim.density * dphi ;
                 prim.pres   = std::max( prim.pres, 0.0) ;
+                double mdot = u[num_cells/2].u2 * base->x_i12[num_cells/2] * base->x_i12[num_cells/2];
+                double r2   = base->x_i12[i] * base->x_i12[i];
+                
+                if(this_species_index == 0)
+                    prim.speed  = std::fabs(mdot/r2/prim.density);
+                else
+                    prim.speed  = 0.;
+                
                 eos->compute_conserved(&prim, &u[i-1], 1) ;
             }
             break ;
@@ -1238,8 +1262,37 @@ void c_Species::apply_boundary_left(std::vector<AOS>& u) {
             }
             break;
         case BoundaryType::fixed:
-            for (int i=0; i < num_ghosts; i++)
-                u[i]     = SHOCK_TUBE_UL;
+            if(base->problem_number == 0) {
+                for (int i=0; i < num_ghosts; i++)
+                    u[i]     = SHOCK_TUBE_UL;
+            }
+            else {
+                
+                for (int i=num_ghosts; i > 0; i--) {
+                    AOS_prim prim ;
+                    
+                    if(this_species_index == 0)
+                        prim = init_prim_max;
+                    else
+                        prim = init_prim_max; //eos->compute_primitive(&u[i],&prim, 1) ;
+                    
+                    double dphi = (base->phi[i] - base->phi[i-1]) / (base->dx[i-1] + base->dx[i]) ;
+                    dphi       *= (base->omegaplus[i]*base->dx[i] + base->omegaminus[i-1]*base->dx[i-1]) ;
+                    prim.pres   = prim.pres + prim.density * dphi ;
+                    prim.pres   = std::max( prim.pres, 0.0) ;
+                    double mdot = u[num_cells/2].u2 * base->x_i12[num_cells/2] * base->x_i12[num_cells/2];
+                    double r2   = base->x_i12[i] * base->x_i12[i];
+                    
+                    if(this_species_index == 0)
+                        prim.speed  = std::fabs(mdot/r2/prim.density);
+                    else
+                        prim.speed  = 0.;
+                    
+                    eos->compute_conserved(&prim, &u[i-1], 1) ;
+                }
+                
+            }
+            
             break;
         case BoundaryType::periodic:
             for (int i=0; i < num_ghosts; i++) {

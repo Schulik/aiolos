@@ -587,6 +587,7 @@ public:
     
     double density_excess;
     double bondi_radius;
+    AOS_prim init_prim_max;
     
     double const_T_space;
     double const_rho_scale;

@@ -216,6 +216,7 @@ void c_Sim::execute() {
             globalTime += dt;
         }
         else if (order == IntegrationType::second_order) {
+        //else if (false) {
             // 2nd step evaluated at t+dt
             globalTime += dt;
 
@@ -235,6 +236,7 @@ void c_Sim::execute() {
                 }
             }
         }
+        
         
         for(int s=0; s<num_species;s++) {
             for(int j=num_cells+2; j>=0; j--)  {
@@ -331,8 +333,31 @@ void c_Sim::execute() {
             do_photochemistry();
             
         }
+        
+        //Heuristic temperature fix for the secondary species in case isothermal sim is wanted
+        if(init_T_temp > 2.7) {
+            for(int s = 0; s < num_species; s++) {
+                double cs = std::sqrt(species[s].const_T_space/2000.)*2.88e5;
+                double bondi_radius = planet_mass*G / (2.*pow(cs ,2.));
+                
+                for(int i=num_cells+1; i>=0; i--)  {
+                        
+                        //if(x_i12[i]<bondi_radius) {
+                        
+                            double temprho = species[s].u[i].u1;
+                            AOS TMP = species[s].u[i];
+                        
+                            species[s].u[i] = AOS(TMP.u1, TMP.u2, species[s].cv * TMP.u1 * init_T_temp + 0.5 * TMP.u2*TMP.u2/TMP.u1) ;
+                        //}
+                        
+                        //prim[i].temperature = base->init_T_temp;
+                    }
+            }
             
             
+        }
+        
+        
         steps++;
         
         if(steps==1)
