@@ -306,8 +306,10 @@ void c_Sim::do_photochemistry() {
                     TX[0] += (1 - nX[0] / nX_new[0]) * (TX[1] + TX[2] - 2 * TX[0]);
                 } else {
                     // Net ionization:
-                    uX[1] += (1 - nX[1] / nX_new[1]) * (uX[0] - uX[1]) / 2;
-                    uX[2] += (1 - nX[1] / nX_new[1]) * (uX[0] - uX[2]) / 2;
+                    double f1 = species[1].cv / species[0].cv;
+                    double f2 = species[2].cv / species[0].cv;
+                    uX[1] += (1 - nX[1] / nX_new[1]) * (f1*uX[0] - uX[1]) / 2;
+                    uX[2] += (1 - nX[1] / nX_new[1]) * (f2*uX[0] - uX[2]) / 2;
                     TX[1] += (1 - nX[1] / nX_new[1]) * (TX[0] - TX[1]) / 2;
                     TX[2] += (1 - nX[1] / nX_new[1]) * (TX[0] - TX[2]) / 2;
                 }
