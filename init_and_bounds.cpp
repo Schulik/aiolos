@@ -142,6 +142,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
         cout<<" CHOSEN OPACITY MODEL = "<<opacity_model<<endl;
         
         no_rad_trans               = read_parameter_from_file<double>(filename,"NO_RAD_TRANS", debug, 1.).value;
+        photocooling_multiplier    = read_parameter_from_file<double>(filename,"PHOTOCOOL_MULTIPLIER", debug, 1.).value;
         radiation_solver           = read_parameter_from_file<int>(filename,"RADIATION_SOLVER", debug, 0).value;
         closed_radiative_boundaries = read_parameter_from_file<int>(filename,"PARI_CLOSED_RADIATIVE_BOUND", debug, 0).value;
         const_opacity_solar_factor = read_parameter_from_file<double>(filename,"CONSTOPA_SOLAR_FACTOR", debug, 1.).value;

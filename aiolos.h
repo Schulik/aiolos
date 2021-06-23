@@ -377,6 +377,7 @@ public:
     int radiation_diffusion_test_nonlinear;
     double no_rad_trans;      // Multiplier for the div F radiation transport in the radiation solver to compare to models which don't cool thermally
     double CFL_break_time; //Numerical time after which cflfactor=0.9. Used in get_cfl_timestep()
+    double photocooling_multiplier;
     
     std::vector<double> previous_monitor_J;
     std::vector<double> previous_monitor_T;

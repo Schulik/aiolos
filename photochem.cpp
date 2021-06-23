@@ -88,7 +88,7 @@ double HOnly_cooling(const std::array<double, 3> nX, double Te) {
     term = 1.426e-27 * 1.3 * sqrt(Te) ;
     cooling += nX[1] * term  ;
 
-    return cooling;
+    return 1.*cooling;
 }
 
 /* class C2Ray_HOnly_ionization
@@ -300,7 +300,9 @@ void c_Sim::do_photochemistry() {
 
                 if (nX_new[0] > nX[0]) {
                     // Net recombination:
-                    uX[0] += (1 - nX[0] / nX_new[0]) * (uX[1] + uX[2] - 2 * uX[0]);
+                    double f1 = species[0].cv / species[1].cv;
+                    double f2 = species[0].cv / species[2].cv;
+                    uX[0] += (1 - nX[0] / nX_new[0]) * (f1*uX[1] + f2*uX[2] - 2 * uX[0]);
                     TX[0] += (1 - nX[0] / nX_new[0]) * (TX[1] + TX[2] - 2 * TX[0]);
                 } else {
                     // Net ionization:
@@ -379,8 +381,7 @@ void c_Sim::do_photochemistry() {
             for (int s = 0; s < num_species; s++) {
                 species[s].eos->update_p_from_eint(&species[s].prim[0], num_cells + 2);
                 species[s].eos->compute_auxillary(&species[s].prim[0], num_cells + 2);
-                species[s].eos->compute_conserved(
-                    &species[s].prim[0], &species[s].u[0], num_cells + 2);
+                species[s].eos->compute_conserved(&species[s].prim[0], &species[s].u[0], num_cells + 2);
             }
         }
     }
