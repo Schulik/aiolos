@@ -1152,7 +1152,7 @@ void c_Species::initialize_exponential_atmosphere() {
 
 
 
-void c_Species::initialize_hydrostatic_atmosphere_iter(string filename) {
+void c_Species::initialize_hydrostatic_atmosphere_iter(string /*filename*/) {
     
 }
 

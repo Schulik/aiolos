@@ -173,7 +173,6 @@ void c_Sim::update_opacities() {
     }
     
     //Compute surface temperature from remaining solar flux and core flux
-    double cooling_time  = 1e9 / core_cv;
     double J_remnant = 0;
     double T_rad_remnant;
     double T_target;

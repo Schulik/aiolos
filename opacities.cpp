@@ -320,7 +320,7 @@ void c_Sim::init_malygin_opacities()
 //This function uses the data for *opa_gas_tscale, *opa_gas_pscale, *opa_gas_ross, *opa_gas_planck
 // and interpolates them bilinearly on the given grid
 
-double c_Sim::get_gas_malygin(int rosseland, double rho, double T_gas, double pressure) {
+double c_Sim::get_gas_malygin(int rosseland, double /*rho*/, double T_gas, double pressure) {
 	
   	double tP, tT, denom, fac, tempKappa;	//tempPressure and denominator
   	static double mul1, mul2, mul3, mul4; //temp doubles for the interpolation. static for faster speed
@@ -352,13 +352,15 @@ double c_Sim::get_gas_malygin(int rosseland, double rho, double T_gas, double pr
 	else if (tP > opa_gas_pscale[opacity_gas_rows-1])
 		  tP = opa_gas_pscale[opacity_gas_rows-1];
 
+    Tlow = Thigh = 0 ;
 	for(i = 0; i < opacity_gas_cols; i++) {
-			if(tT >= opa_gas_tscale[i]) {
-			 	Tlow  = i;
-			  	Thigh = i+1;
-			}
+		if(tT >= opa_gas_tscale[i]) {
+		 	Tlow  = i;
+		  	Thigh = i+1;
 		}
-	
+	}
+	assert(Thigh != 0) ;
+
 // 	Alternative grid search in P:
 	fac   = ((double) opacity_gas_rows) / log10( opa_gas_pscale[opacity_gas_rows-1]/opa_gas_pscale[0] );
 	Plow  = (int)(fac*log10(tP/opa_gas_pscale[0] ));
@@ -610,7 +612,7 @@ void c_Sim::kappa_landscape()
 {
   	int i,j;
 	const int arraysize = 500;
-  	double xxkappa,kappa, recentdens;
+  	double recentdens;
   	double opa_freedman[arraysize];
   	double opa_ross_semenov[arraysize];
     double opa_planck_semenov[arraysize];
