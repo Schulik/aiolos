@@ -38,12 +38,12 @@ TEST_OBJ = $(subst main.o, test_files/main.o, $(OBJ))
 aiolos: $(OBJ) makefile
 	$(CXX) -o $@ $(OBJ) $(CXXFLAGS) $(LDFLAGS)
 
-%.o: %.cpp makefile aiolos.h
+%.o: %.cpp makefile aiolos.h enum.h
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< $(BFLAGS) -o $@ 
 
 .PHONY: tests
 
-tests: $(TEST_OBJ) makefile aiolos.h
+tests: $(TEST_OBJ) makefile aiolos.h 
 	$(CXX) -o  $@  $(TEST_OBJ) $(CXXFLAGS) $(LDFLAGS)
 	./tests > /dev/null
 	cd test_files ; python3 test_shock_tube.py -p

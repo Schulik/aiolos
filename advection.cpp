@@ -223,6 +223,59 @@ void c_Sim::execute() {
                 }
             }
         }
+        else if (order == IntegrationType::third_order) {
+            // 2nd/3rd step evaluated at t+dt
+            globalTime += dt;
+
+            if(use_self_gravity==1)
+                update_mass_and_pot();
+
+            if (do_hydrodynamics == 1) {
+
+                if (use_drag_predictor_step) {
+                    for(int s = 0; s < num_species; s++)
+                        species[s].compute_pressure(species[s].u);
+                    compute_total_pressure();
+                
+                    compute_drag_update() ;
+                    if (use_collisional_heating)
+                        compute_collisional_heat_exchange() ;
+                }
+
+                for(int s = 0; s < num_species; s++) {
+                    species[s].execute(species[s].u, species[s].dudt[1]);
+                    for(int j = 0; j < num_cells+2; j++)
+                        species[s].u[j] = species[s].u0[j]*0.75 +
+                            (species[s].u[j]+species[s].dudt[1][j]*dt) * 0.25 ;
+                }
+                
+                globalTime -= dt/2;
+
+                if(use_self_gravity==1)
+                    update_mass_and_pot();
+
+                if (use_drag_predictor_step) {
+                    dt /= 2 ;
+                    for(int s = 0; s < num_species; s++)
+                        species[s].compute_pressure(species[s].u);
+                    compute_total_pressure();
+                
+                    compute_drag_update() ;
+                    if (use_collisional_heating)
+                        compute_collisional_heat_exchange() ;
+                    dt *= 2 ;
+                }
+
+                for(int s = 0; s < num_species; s++) {
+                    species[s].execute(species[s].u, species[s].dudt[1]);
+                    for(int j = 0; j < num_cells+2; j++)
+                        species[s].u[j] = species[s].u0[j]*(1/3.) +
+                            (species[s].u[j]+species[s].dudt[1][j]*dt) * (2/3.) ;
+                }
+                
+                globalTime += dt/2;
+            }
+        }
         
         for(int s = 0; s < num_species; s++)
             species[s].compute_pressure(species[s].u);

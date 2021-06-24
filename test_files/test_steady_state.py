@@ -45,7 +45,7 @@ if __name__ == "__main__":
     check_steady_state("soundwave_512_H2",[6.69e-10,]*3)
 
     check_steady_state("planet_cartesian_H2", [4e-13, 4e-10, 0.2])
-    check_steady_state("planet_spherical_H2", [8e-13, 2e-10, 0.2])
+    check_steady_state("planet_spherical_H2", [8e-13, 2.2e-10, 0.2])
 
 
 

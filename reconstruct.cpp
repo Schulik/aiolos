@@ -10,7 +10,18 @@
 ///////////////////////////////////////////////////////////
 #include "aiolos.h"
 
-double MonotonizedCentralSlope(double ql, double qm, double qr, 
+struct Qedge {
+    double dQm, dQp ;
+} ;
+
+/* Non-uniform grid factors
+   cF = (x_iVC[i+1] - x_iVC[i]) / (x_i[i] - x_iVC[i]) ;
+   cB = (x_iVC[i] - x_iVC[i-1]) / (x_iVC[i] - x_i[i-1]) ;
+
+   dxF = (x_iVC[i+1] - x_iVC[i]) / (x_i[i] - x_i[i-1]) ;
+   dxB = (x_iVC[i] - x_iVC[i-1]) / (x_i[i] - x_i[i-1]) ;
+*/
+Qedge MonotonizedCentralSlope(double ql, double qm, double qr, 
                                double cF=2, double cB=2, double dxF=1, double dxB=1) {
     // From Mignone's (2005) reconstruction paper
 
@@ -18,7 +29,7 @@ double MonotonizedCentralSlope(double ql, double qm, double qr,
     double dB = (qm - ql) / dxB ;
 
     if (dF*dB < 0)
-        return 0 ;
+        return {0, 0} ;
 
     auto min_mod = [](double l, double r) {
         if (std::abs(l) < std::abs(r))
@@ -27,8 +38,39 @@ double MonotonizedCentralSlope(double ql, double qm, double qr,
             return r; 
     } ;
 
-    return min_mod(0.5*(dF + dB), min_mod(cF*dF, cB*dB)) ;
+    double slope =  min_mod(0.5*(dF + dB), min_mod(cF*dF, cB*dB)) ;
+
+    return Qedge{
+        - slope*dxB/cB,
+        + slope*dxF/cF
+    } ;
 }
+
+
+Qedge WENO3Slope(double ql, double qm, double qr, double dpF, double dmF,
+                 double cF=2, double cB=2, double dxF=1, double dxB=1, double eps=1) {
+
+    double dF = (qr - qm) / dxF ;
+    double dB = (qm - ql) / dxB ;
+    double q2_ref = eps*eps*std::max(qm*qm, std::max(ql*ql, qr*qr)) + 1e-300;
+
+    double dpB = 1 - dpF ;
+    double dmB = 1 - dmF ;
+
+    double wF = 1 + ((dF-dB)*(dF-dB))/(dF*dF + q2_ref) ;
+    double wB = 1 + ((dF-dB)*(dF-dB))/(dB*dB + q2_ref) ;
+
+    dpF *= wF ; dmF *= wF ;
+    dpB *= wB ; dmB *= wB ;
+
+    dpF = dpF / (dpF + dpB) ; 
+    dmF = dmF / (dmF + dmB) ; 
+
+    return Qedge {
+        - (dmF*dF + (1-dmF)*dB)*dxB/cB,
+        + (dpF*dF + (1-dpF)*dB)*dxF/cF
+    } ;
+} 
 
 
 void c_Species::reconstruct_edge_states() {
@@ -55,7 +97,7 @@ void c_Species::reconstruct_edge_states() {
 
     // Step 2: Add 2nd order slope-limited correction
     IntegrationType order = base->order ;
-    if (order == IntegrationType::second_order) {
+    if (order != IntegrationType::first_order) {
         const std::vector<double>& 
             x_i = base->x_i, 
             x_iVC = base->x_iVC,
@@ -76,31 +118,48 @@ void c_Species::reconstruct_edge_states() {
             double cF = (x_iVC[i+1] - x_iVC[i]) / (x_i[i] - x_iVC[i]) ;
             double cB = (x_iVC[i] - x_iVC[i-1]) / (x_iVC[i] - x_i[i-1]) ;
 
-            double dxF = (x_iVC[i+1] - x_iVC[i]) ;
-            double dxB = (x_iVC[i] - x_iVC[i-1]) ;
+            double dxF = (x_iVC[i+1] - x_iVC[i]) / (x_i[i] - x_i[i-1]);
+            double dxB = (x_iVC[i] - x_iVC[i-1]) / (x_i[i] - x_i[i-1]);
+
+            double wp = base->weno_l[i] ;
+            double wm = base->weno_r[i] ;
+            double eps = 20. / num_cells ;
+
 
             // Pressure perturbation
-            double slope ;
-            slope = MonotonizedCentralSlope(
-                prim[i-1].pres - dp_l, prim[i].pres, prim[i+1].pres - dp_r, cF, cB, dxF, dxB) ;
+            Qedge slope ;
+            if (order == IntegrationType::second_order)
+                slope = MonotonizedCentralSlope(
+                    prim[i-1].pres - dp_l, prim[i].pres, prim[i+1].pres - dp_r, cF, cB, dxF, dxB) ;
+            else
+                slope = WENO3Slope(prim[i-1].pres - dp_l, prim[i].pres, prim[i+1].pres - dp_r, 
+                            wp, wm, cF, cB, dxF, dxB, eps) ;
 
-            prim_l[i].pres += slope * (x_i[i-1] - x_iVC[i]) ; 
-            prim_r[i].pres += slope * (x_i[ i ] - x_iVC[i]) ;
+            prim_l[i].pres += slope.dQm ; 
+            prim_r[i].pres += slope.dQp ;
 
 
             // Density
-            slope = MonotonizedCentralSlope(
-                prim[i-1].density, prim[i].density, prim[i+1].density, cF, cB, dxF, dxB) ;
+            if (order == IntegrationType::second_order)
+                slope = MonotonizedCentralSlope(
+                    prim[i-1].density, prim[i].density, prim[i+1].density, cF, cB, dxF, dxB) ;
+            else
+                slope = WENO3Slope(prim[i-1].density, prim[i].density, prim[i+1].density,
+                            wp, wm, cF, cB, dxF, dxB, eps) ;
 
-            prim_l[i].density += slope * (x_i[i-1] - x_iVC[i]) ; 
-            prim_r[i].density += slope * (x_i[ i ] - x_iVC[i]) ;
+            prim_l[i].density += slope.dQm ; 
+            prim_r[i].density += slope.dQp ;
 
             // Speed
-            slope = MonotonizedCentralSlope(
-                prim[i-1].speed, prim[i].speed, prim[i+1].speed, cF, cB, dxF, dxB) ;
+            if (order == IntegrationType::second_order)
+                slope = MonotonizedCentralSlope(
+                    prim[i-1].speed, prim[i].speed, prim[i+1].speed, cF, cB, dxF, dxB) ;
+            else
+                slope = WENO3Slope(prim[i-1].speed, prim[i].speed, prim[i+1].speed,
+                            wp, wm, cF, cB, dxF, dxB, eps) ;
 
-            prim_l[i].speed += slope * (x_i[i-1] - x_iVC[i]) ; 
-            prim_r[i].speed += slope * (x_i[ i ] - x_iVC[i]) ;
+            prim_l[i].speed += slope.dQm ; 
+            prim_r[i].speed += slope.dQp ;
             
             if ((prim_l[i].pres < 0) || (prim_r[i].pres < 0) || 
                 (prim_l[i].density < 0) || (prim_r[i].density < 0))

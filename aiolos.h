@@ -252,6 +252,7 @@ public:
     std::vector<double> omegaminus;
     std::vector<double> source_pressure_prefactor_left;
     std::vector<double> source_pressure_prefactor_right;
+    std::vector<double> weno_l, weno_r; // WENO3 weights
 
     double lminglobal = 1e-6, lmaxglobal = 1e14; //in mum; corresponds to Wien-temperature maxima from 3e9 to 1e-7 K
     double lambda_min, lambda_max, lambda_per_decade;

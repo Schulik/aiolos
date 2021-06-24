@@ -31,7 +31,7 @@ IOS_INPUT(BoundaryType);
 IOS_OUTPUT(BoundaryType);
 
 enum class IntegrationType {
-    first_order = 1, second_order = 2
+    first_order = 1, second_order = 2, third_order = 3,
 } ;
 IOS_INPUT(IntegrationType);
 IOS_OUTPUT(IntegrationType);

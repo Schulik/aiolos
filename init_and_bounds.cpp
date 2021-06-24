@@ -340,6 +340,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
         }
         
         //Compute shell volumes / voluemtric centres
+        std::vector<double> x_bar(num_cells+2) ;
         for(int i=0; i<=num_cells+1; i++) {
             double xl, xr ;
             if (i < num_cells)
@@ -356,18 +357,33 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
             case Geometry::cartesian:
                 vol[i] = xr - xl ;
                 x_iVC[i] = (xr*xr - xl*xl) / (2*vol[i]) ;
+                x_bar[i] = (xr*xr*xr - xl*xl*xl) / (3*vol[i]) ;
                 break;
             case Geometry::cylindrical:
                 vol[i] = M_PI * (xr*xr - xl*xl);
                 x_iVC[i] = 2 * M_PI * (xr*xr*xr - xl*xl*xl) / (3*vol[i]) ;
+                x_bar[i] = 2 * M_PI * (xr*xr*xr*xr - xl*xl*xl*xl) / (4*vol[i]) ;
                 break;
             case Geometry::spherical:
                 vol[i] = (4*M_PI/3) * (xr*xr*xr - xl*xl*xl);
                 x_iVC[i] = (4*M_PI) * (xr*xr*xr*xr - xl*xl*xl*xl) / (4*vol[i]) ;
+                x_bar[i] = (4*M_PI) * (xr*xr*xr*xr*xr - xl*xl*xl*xl*xl) / (5*vol[i]) ;
                 break;
             }
         }
-        
+        // Compute WENO3 weights:
+        weno_l.resize(num_cells+2) ;
+        weno_r.resize(num_cells+2) ;
+        for(int i=1; i<=num_cells; i++) {
+            double DxF = (x_bar[i+1] - x_bar[i]) / (x_iVC[i+1] - x_iVC[i]) ;
+            double DxB = (x_bar[i-1] - x_bar[i]) / (x_iVC[i-1] - x_iVC[i]) ;
+            
+            weno_l[i] = (1 / (x_i[i-1] - x_iVC[i])) * 
+                ((x_i[i-1]*x_i[i-1] - x_bar[i]) - (x_i[i-1] - x_iVC[i])*DxB) / (DxF - DxB) ;
+            weno_r[i] = (1 / (x_i[ i ] - x_iVC[i])) * 
+                ((x_i[ i ]*x_i[ i ] - x_bar[i]) - (x_i[ i ] - x_iVC[i])*DxB) / (DxF - DxB) ;
+        }
+
         //Compute cell mid positions. Ghost cells also have mid positions in order to balance their pressure gradients
         // but need to be calculated after this loop
         for(int i=1; i<num_cells+1; i++) {
