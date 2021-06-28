@@ -240,12 +240,17 @@ void c_Sim::do_photochemistry() {
                     species[1].prim[j].internal_energy,
                     species[2].prim[j].internal_energy};
 
+                std::array<double, 3> vX = {
+                    species[0].prim[j].speed,
+                    species[1].prim[j].speed,
+                    species[2].prim[j].speed};
+
                 std::array<double, 3> TX = {
                     species[0].prim[j].temperature,
                     species[1].prim[j].temperature,
                     species[2].prim[j].temperature};
 
-                std::array<double, 3> mass_array = {
+                std::array<double, 3> mX = {
                     species[0].mass_amu * amu,
                     species[1].mass_amu * amu,
                     species[2].mass_amu * amu};
@@ -259,7 +264,7 @@ void c_Sim::do_photochemistry() {
                 // The local optical depth to ionizing photons
                 // under "all neutral" assumption
                 double dtau = species[0].opacity_twotemp(j, b) *
-                              (nX[0] + nX[1]) * mass_array[0] * dx[j];
+                              (nX[0] + nX[1]) * mX[0] * dx[j];
 
                 dtau = 1.88e-18 * (nX[0] + nX[1]) * dx[j] ;
 
@@ -288,35 +293,34 @@ void c_Sim::do_photochemistry() {
                 dtau *= (1 - x_bar);
                 tau0 += dtau;
 
-                /*
-                std::cout << j << " " << tau0-dtau << " " << dtau << "\n" 
-                    << "\t" << ion.x0 << " " << x_bar << " " << nX_new[1] / (nX[0] + nX[1]) 
-                    << ", " << nX[2] / (nX[0] + nX[1]) << " " << nX_new[2] / (nX[0] + nX[1]) 
-                    << "\n" ;
-                */
-
                 // Next update the primitive quantities (conserved are done at
                 // the end)
 
                 if (nX_new[0] > nX[0]) {
-                    // Net recombination:
+                    // Net recombination - add the energy / momentum to the H atoms
                     double f1 = species[0].cv / species[1].cv;
                     double f2 = species[0].cv / species[2].cv;
-                    uX[0] += (1 - nX[0] / nX_new[0]) * (f1*uX[1] + f2*uX[2] - 2 * uX[0]);
-                    TX[0] += (1 - nX[0] / nX_new[0]) * (TX[1] + TX[2] - 2 * TX[0]);
+                    uX[0] += (1 - nX[0] / nX_new[0]) * (f1*uX[1] + f2*uX[2] - uX[0]);
+                    TX[0] += (1 - nX[0] / nX_new[0]) * (   TX[1] +    TX[2] - TX[0]);
+                    f1 = mX[1]/mX[0] ; f2 = mX[2]/mX[0] ;
+                    vX[0] += (1 - nX[0] / nX_new[0]) * (f1*vX[1] + f2*vX[2] - vX[0]);
                 } else {
-                    // Net ionization:
+                    // Net ionization - add the energy / momentum to the p+/e-
                     double f1 = species[1].cv / species[0].cv;
-                    double f2 = species[2].cv / species[0].cv;
-                    uX[1] += (1 - nX[1] / nX_new[1]) * (f1*uX[0] - uX[1]) / 2;
-                    uX[2] += (1 - nX[1] / nX_new[1]) * (f2*uX[0] - uX[2]) / 2;
-                    TX[1] += (1 - nX[1] / nX_new[1]) * (TX[0] - TX[1]) / 2;
-                    TX[2] += (1 - nX[1] / nX_new[1]) * (TX[0] - TX[2]) / 2;
+                    uX[1] += (1 - nX[1] / nX_new[1]) * (f1*uX[0] - uX[1]);
+                    uX[2] += (1 - nX[2] / nX_new[2]) * ( 0*uX[0] - uX[2]);
+                    TX[1] += (1 - nX[1] / nX_new[1]) * (   TX[0] - TX[1]);
+                    TX[2] += (1 - nX[2] / nX_new[2]) * (      0  - TX[2]);
+
+                    f1 = mX[0]/(mX[1]+mX[2]);
+                    vX[1] += (1 - nX[1] / nX_new[1]) * (f1*vX[0] - vX[1]);
+                    vX[2] += (1 - nX[2] / nX_new[2]) * (f1*vX[0] - vX[2]);
                 }
 
                 for (int s = 0; s < 3; s++) {
                     species[s].prim[j].number_density = nX_new[s];
-                    species[s].prim[j].density = nX_new[s] * mass_array[s];
+                    species[s].prim[j].speed = vX[s] ;
+                    species[s].prim[j].density = nX_new[s] * mX[s];
                     species[s].prim[j].internal_energy = uX[s];
                     species[s].prim[j].temperature = TX[s];
                 }
