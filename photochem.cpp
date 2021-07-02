@@ -106,8 +106,8 @@ double HOnly_cooling(const std::array<double, 3> nX, double Te) {
  */
 class C2Ray_HOnly_ionization {
    public:
-    C2Ray_HOnly_ionization(double Gamma0_, double tau0_, double dt_,
-                           const std::array<double, 3>& nX, double Te)
+    C2Ray_HOnly_ionization(double* Gamma0_,double* tau0_, double dt_,
+                           const std::array<double, 3>& nX, double Te, int num_he_bands_)
      : Gamma0(Gamma0_),
        tau0(tau0_),
        dt(dt_),
@@ -116,7 +116,8 @@ class C2Ray_HOnly_ionization {
        x0(nX[1] / (nX[0] + nX[1])),
        R(H_radiative_recombination(Te)),
        C(H_collisional_ionization(Te)),
-       B(H_threebody_recombination(Te))
+       B(H_threebody_recombination(Te)),
+       num_he_bands(num_he_bands_)
     {
         C = std::max(C, 1e-20*R) ;
     };
@@ -131,7 +132,9 @@ class C2Ray_HOnly_ionization {
         double ne = ne0 + (x - x0) * nH;
 
         // Compute equilibrium
-        double ion = Gamma0/nH * -std::expm1(-tau0 * (1 - x));
+        double ion = 0;
+        for(int b=0; b < num_he_bands; b++)
+            ion += Gamma0[b]/nH * -std::expm1(-tau0[b] * (1 - x));
         double x_eq = (ion + ne * C) / (ion + ne * (C + R + ne * B));
         double t_rat = dt * (ion + ne * (C + R + ne * B));
 
@@ -155,7 +158,11 @@ class C2Ray_HOnly_ionization {
         double ne = ne0 + (x_bar - x0) * nH;
 
         // Compute equilibrium
-        double ion = Gamma0/nH * -std::expm1(-tau0 * (1 - x_bar));
+        double ion = 0.;
+        
+        for(int b=0; b < num_he_bands; b++)
+            Gamma0[b]/nH * -std::expm1(-tau0[b] * (1 - x_bar));
+        
         double x_eq = (ion + ne * C) / (ion + ne * (C + R + ne * B));
         double t_rat = dt * (ion + ne * (C + R + ne * B));
 
@@ -164,7 +171,7 @@ class C2Ray_HOnly_ionization {
         return {nH * (1 - x_new), nH * x_new, nH * (x_new - x0) + ne0};
     }
 
-    double Gamma0, tau0, dt, nH, ne0, x0, R, C, B;
+    double *Gamma0, *tau0, dt, nH, ne0, x0, R, C, B, num_he_bands;
 };
 
 /* class C2Ray_HOnly_heating
@@ -200,8 +207,18 @@ class C2Ray_HOnly_heating {
 
     // Compute the cooling rate give the electron temperature.
     std::array<double, 3> net_heating_rate(double Te) const {
+        //return heating_rate(Te) - cooling_rate(Te);
         return {0.0, 0.0, GammaH - nX[2]*HOnly_cooling(nX, Te)};
     }
+    
+    std::array<double, 3> heating_rate(double Te) const {
+        return {0.0, 0.0, GammaH};
+    }
+    
+    std::array<double, 3> cooling_rate(double Te) const {
+        return {0.0, 0.0, - nX[2]*HOnly_cooling(nX, Te)};
+    }
+    
 
    private:
     Vec3 _compute_T(double Te) const {
@@ -222,14 +239,22 @@ class C2Ray_HOnly_heating {
 
 void c_Sim::do_photochemistry() {
     // cout<<" Doing photochemistry "<<endl;
-
-    update_opacities() ;
-
-    for (int b = 0; b < num_bands; b++) {
-        if (l_i[b + 1] < 0.09116) {  // High-energy band, we have to redo the dS calculation
-                                     // and interate with electrons
-            double tau0 = 0;
+            
+            //double tau0 = 0;
+        
+            for (int b = 0; b < num_he_bands; b++) {
+                radial_optical_depth(num_cells + 1,b)         = 0.;
+                radial_optical_depth_twotemp(num_cells + 1,b) = 0.;
+            }
+            
             for (int j = num_cells + 1; j > 0; j--) {
+                
+                for (int b = 0; b < num_he_bands; b++) {
+                    cell_optical_depth(j,b)           = 0.;
+                    total_opacity(j,b)                = 0 ;
+                    total_opacity_twotemp(j,b)        = 0 ;
+                }
+                
                 std::array<double, 3> nX = {
                     species[0].prim[j].number_density,
                     species[1].prim[j].number_density,
@@ -239,13 +264,18 @@ void c_Sim::do_photochemistry() {
                     species[0].prim[j].internal_energy,
                     species[1].prim[j].internal_energy,
                     species[2].prim[j].internal_energy};
+                    
+                std::array<double, 3> vX = {
+                    species[0].prim[j].speed,
+                    species[1].prim[j].speed,
+                    species[2].prim[j].speed};
 
                 std::array<double, 3> TX = {
                     species[0].prim[j].temperature,
                     species[1].prim[j].temperature,
                     species[2].prim[j].temperature};
 
-                std::array<double, 3> mass_array = {
+                std::array<double, 3> mX = {
                     species[0].mass_amu * amu,
                     species[1].mass_amu * amu,
                     species[2].mass_amu * amu};
@@ -257,19 +287,20 @@ void c_Sim::do_photochemistry() {
                 }
 
                 // The local optical depth to ionizing photons
-                // under "all neutral" assumption
-                double dtau = species[0].opacity_twotemp(j, b) *
-                              (nX[0] + nX[1]) * mass_array[0] * dx[j];
-
-                dtau = 1.88e-18 * (nX[0] + nX[1]) * dx[j] ;
+                // under the "initially all neutral" assumption
 
                 // Assume 20eV photons for now
-                double E_phot = 20 * ev_to_K * kb;  
-                double Gamma0 =
-                    0.25 * solar_heating(b) / E_phot * std::exp(-tau0) / dx[j];
-
+                //double E_phot = 20 * ev_to_K * kb;
+                std::vector<double> dtaus = np_zeros(num_he_bands);
+                std::vector<double> Gamma0  = np_zeros(num_he_bands);
+                //std::array<double, num_he_bands> Gamma0;
+                
+                for (int b = 0; b < num_he_bands; b++) {
+                    Gamma0[b] = 0.25 * solar_heating(b) / photon_energies[b] * std::exp(-radial_optical_depth_twotemp(j,b)) / dx[j];
+                    dtaus[b]  = species[0].opacity_twotemp(j, b) * (nX[0] + nX[1]) * mX[0] * dx[j];
+                }
                 // Update the ionization fractions
-                C2Ray_HOnly_ionization ion(Gamma0, dtau, dt, nX, TX[2]);
+                C2Ray_HOnly_ionization ion(&Gamma0[0], &dtaus[0], dt, nX, TX[2], num_he_bands);
                 Brent root_solver;
                 double xmin = std::max((nX[1] - nX[2]) / (nX[0] + nX[1]), 0.0);
                 
@@ -285,43 +316,52 @@ void c_Sim::do_photochemistry() {
                 std::array<double, 3> nX_bar = ion.nX_average(x_bar);
 
                 // Store the optical depth through this cell:
-                dtau *= (1 - x_bar);
-                tau0 += dtau;
-
-                /*
-                std::cout << j << " " << tau0-dtau << " " << dtau << "\n" 
-                    << "\t" << ion.x0 << " " << x_bar << " " << nX_new[1] / (nX[0] + nX[1]) 
-                    << ", " << nX[2] / (nX[0] + nX[1]) << " " << nX_new[2] / (nX[0] + nX[1]) 
-                    << "\n" ;
-                */
+                for (int b = 0; b < num_he_bands; b++) {
+                    dtaus[b] *= (1 - x_bar);
+                    if(j<num_cells+1)
+                        radial_optical_depth_twotemp(j,b) = radial_optical_depth_twotemp(j+1,b) + dtaus[b];
+                    else
+                        radial_optical_depth_twotemp(j,b) = dtaus[b];
+                }
+                //tau0 += dtau;
 
                 // Next update the primitive quantities (conserved are done at
                 // the end)
 
                 if (nX_new[0] > nX[0]) {
-                    // Net recombination:
+                    // Net recombination - add the energy / momentum to the H atoms
                     double f1 = species[0].cv / species[1].cv;
                     double f2 = species[0].cv / species[2].cv;
-                    uX[0] += (1 - nX[0] / nX_new[0]) * (f1*uX[1] + f2*uX[2] - 2 * uX[0]);
-                    TX[0] += (1 - nX[0] / nX_new[0]) * (TX[1] + TX[2] - 2 * TX[0]);
+                    uX[0] += (1 - nX[0] / nX_new[0]) * (f1*uX[1] + f2*uX[2] - uX[0]);
+                    TX[0] += (1 - nX[0] / nX_new[0]) * (   TX[1] +    TX[2] - TX[0]);
+                    f1 = mX[1]/mX[0] ; f2 = mX[2]/mX[0] ;
+                    vX[0] += (1 - nX[0] / nX_new[0]) * (f1*vX[1] + f2*vX[2] - vX[0]);
                 } else {
-                    // Net ionization:
-                    uX[1] += (1 - nX[1] / nX_new[1]) * (uX[0] - uX[1]) / 2;
-                    uX[2] += (1 - nX[1] / nX_new[1]) * (uX[0] - uX[2]) / 2;
-                    TX[1] += (1 - nX[1] / nX_new[1]) * (TX[0] - TX[1]) / 2;
-                    TX[2] += (1 - nX[1] / nX_new[1]) * (TX[0] - TX[2]) / 2;
+                    // Net ionization - add the energy / momentum to the p+/e-
+                    double f1 = species[1].cv / species[0].cv;
+                    uX[1] += (1 - nX[1] / nX_new[1]) * (f1*uX[0] - uX[1]);
+                    uX[2] += (1 - nX[2] / nX_new[2]) * ( 0*uX[0] - uX[2]);
+                    TX[1] += (1 - nX[1] / nX_new[1]) * (   TX[0] - TX[1]);
+                    TX[2] += (1 - nX[2] / nX_new[2]) * (      0  - TX[2]);
+
+                    f1 = mX[0]/(mX[1]+mX[2]);
+                    vX[1] += (1 - nX[1] / nX_new[1]) * (f1*vX[0] - vX[1]);
+                    vX[2] += (1 - nX[2] / nX_new[2]) * (f1*vX[0] - vX[2]);
                 }
 
                 for (int s = 0; s < 3; s++) {
                     species[s].prim[j].number_density = nX_new[s];
-                    species[s].prim[j].density = nX_new[s] * mass_array[s];
+                    species[s].prim[j].speed = vX[s] ;
+                    species[s].prim[j].density = nX_new[s] * mX[s];
                     species[s].prim[j].internal_energy = uX[s];
                     species[s].prim[j].temperature = TX[s];
                 }
 
-                // Assume 20eV photons for now
-                double GammaH = 0.25 * solar_heating(b) * (1 - 13.6 / 20) *
-                                std::exp(-tau0) * (-std::expm1(-dtau)) / dx[j];
+                double GammaH = 0.;
+                for (int b = 0; b < num_he_bands; b++) {
+                    GammaH += 0.25 * solar_heating(b) * (1 - 13.6 / photon_energies[b]) *
+                                std::exp(-radial_optical_depth_twotemp(j,b)) * (-std::expm1(-dtaus[b])) / dx[j];
+                }
 
                 // Collisional heat exchange:
                 fill_alpha_basis_arrays(j);
@@ -361,19 +401,34 @@ void c_Sim::do_photochemistry() {
                 }
 
                 double Te = root_solver.solve(Te1, Te2, heat);
-                std::array<double, 3> heating = heat.net_heating_rate(Te);
-
+                std::array<double, 3> heating = heat.heating_rate(Te);
+                std::array<double, 3> cooling = heat.cooling_rate(Te);
 
                 /*
                 std::cout << "\t" << TX[2] << " " << Te1 << " " << Te2 << "\n" ; 
                 std::cout << "\t" << Te << "\n" ;
                 */
 
+                //TODO: This might need to be called for all bands. When H, p+ and e- densities changes, so do their opacities across all bands, including low-energy bands.
+                //TODO: This needs to be ~k_rosseland, not k_Planck,solar. However k_rosseland in the UV is needed for this.
+                
+                for (int b = 0; b < num_he_bands; b++) {   
+                    total_opacity(j,b)                = species[0].opacity(j,b)          * (nX[0] + nX[1]) * mX[0]; //TODO: Assign sensible opacities to electrons and protons
+                    total_opacity_twotemp(j,b)        = species[0].opacity_twotemp(j, b) * (nX[0] + nX[1]) * mX[0] ;
+                    cell_optical_depth(j,b)           = dtaus[b];
+                
+                    S_band(j,b) = solar_heating(b) * std::exp(-radial_optical_depth_twotemp(j,b)); //No factor 0.25 here, as we want to see the unaveraged radiation we put in, consistent with low-energy bands
+                    dS_band(j,b) = 0.25 * solar_heating(b) * (1 - 13.6 / photon_energies[b]) *
+                                std::exp(-radial_optical_depth_twotemp(j,b)) * (-std::expm1(-dtaus[b])) / dx[j];
+                }
+                    
                 for (int s = 0; s < 3; s++) { 
-                    if (use_rad_fluxes)
-                        species[s].dS(j) = heating[s];
-                    else
-                        species[s].prim[j].internal_energy += heating[s] * dt / species[s].prim[j].density ;
+                    //Even in cases when radiative transport is not used, we want to document those quanitites in the output
+                    species[s].dG(j) = cooling[s];
+                    species[s].dS(j) = heating[s];
+                    //When the radiative transport is not used, we update the internal energy here in place
+                    //if (!use_rad_fluxes) 
+                    //    species[s].prim[j].internal_energy += (heating[s] + cooling[s]) * dt / species[s].prim[j].density ;
                 }
             }
 
@@ -384,5 +439,5 @@ void c_Sim::do_photochemistry() {
                 species[s].eos->compute_conserved(&species[s].prim[0], &species[s].u[0], num_cells + 2);
             }
         }
-    }
-}
+    //}
+//}

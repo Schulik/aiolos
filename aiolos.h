@@ -88,6 +88,11 @@ std::vector<double> np_zeros(int);
 std::vector<double> np_ones(int);
 std::vector<double> np_somevalue(int, double);
 
+std::vector<int> inp_zeros(int);
+std::vector<int> inp_ones(int);
+std::vector<int> inp_somevalue(int, int);
+
+
 //double compute_planck_function_integral(double lmin, double lmax, double temperature);
 double compute_planck_function_integral2(double lmin, double lmax, double temperature);
 
@@ -225,6 +230,7 @@ public:
     std::vector<c_Species> species;
     
     int num_bands;
+    int num_he_bands;
     int num_solarbands;
     int num_plancks = 512;
     int i_wien;
@@ -369,7 +375,7 @@ public:
     double core_cv; //Heat capacity of the surface layer
     double bond_albedo;
     
-    int radiation_solver;
+    //int radiation_solver;
     int use_planetary_temperature;
     int closed_radiative_boundaries ;
     int radiation_matter_equilibrium_test; //If set to 1, sets J = J_init in update_radiation()
@@ -386,6 +392,10 @@ public:
     Eigen::MatrixXd dS_band;
     Eigen::MatrixXd dS_band_zero;
     Eigen::MatrixXd solar_heating;
+    std::vector<int> BAND_IS_HIGHENERGY;
+    std::vector<double> photon_energies;
+    const int HIGHENERGY_BAND_TRUE = 1;
+    const int HIGHENERGY_BAND_FALSE= 0;
     
     Eigen::MatrixXd total_opacity;
     Eigen::MatrixXd cell_optical_depth;
@@ -500,16 +510,17 @@ public:
     void kappa_landscape();
     
     //Radiation transport 
+    
     void transport_radiation();     //  Called if use_rad_fluxes == 1
+    void reset_dS();
+    void update_dS();
     void update_opacities();
     
     void do_photochemistry();
     
-    void do_highenergy_sourcing();
-    
     void update_fluxes(double timestep);           //  Called from transport_radiation#   
     void update_fluxes_FLD();           //  Called from transport_radiation#
-    void update_fluxes_simple();           //  Called from transport_radiation#
+    void update_temperatures_simple();           //  Called from transport_radiation#
     void update_fluxes_FLD2(double, Eigen::MatrixXd &,Eigen::MatrixXd &,Eigen::MatrixXd &);           //  Called from transport_radiation#
     void update_temperatures(double, Eigen::MatrixXd &,Eigen::MatrixXd &,Eigen::MatrixXd &);
     double compute_planck_function_integral3(double lmin, double lmax, double temperature);
@@ -591,7 +602,8 @@ public:
     Eigen::MatrixXd opacity_twotemp;//num_cells * num_bands
     
     Eigen::MatrixXd fraction_total_opacity; //num_cells * num_bands, what fraction of the total opacity is represented by this species in this cell. gives heating of the species
-    Eigen::MatrixXd dS;
+    Eigen::MatrixXd dS; //Heating, low-energy and high-energy
+    Eigen::MatrixXd dG; //Cooling, high-energy
     double dlogOpa;
     
     //std::vector<double> opticaldepth;

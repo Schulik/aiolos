@@ -232,14 +232,31 @@ void c_Sim::execute() {
             compute_drag_update() ;
         
         
+        if( (photochemistry_level + use_rad_fluxes ) > 0 ) {
+            
+            update_opacities();
+            reset_dS();
+            
+            // Compute high-energy dS and ionization
+            if(photochemistry_level > 0)
+                do_photochemistry();
+            
+            update_dS();               //Compute low-energy dS
+            
+            if(use_rad_fluxes==1) {
+                update_fluxes_FLD();   //FLD Radiation transport, updating Temperatures and photon band energies
+            }
+            else {
+                update_temperatures_simple();//Fast eulerian temperature update, no stability guaranteed!
+                if (use_collisional_heating)
+                    compute_collisional_heat_exchange();
+            }
+                
+            
+            
+            
+        }
         
-        if(photochemistry_level > 0)         
-            do_photochemistry();
-
-        if(use_rad_fluxes==1)
-            transport_radiation(); //Also contains collisional heating and photochemistry
-        else if (use_collisional_heating)
-            compute_collisional_heat_exchange() ;
             
         for(int s = 0; s < num_species; s++)
             species[s].user_species_loop_function() ;

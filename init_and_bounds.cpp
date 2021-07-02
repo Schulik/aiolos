@@ -143,7 +143,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
         
         no_rad_trans               = read_parameter_from_file<double>(filename,"NO_RAD_TRANS", debug, 1.).value;
         photocooling_multiplier    = read_parameter_from_file<double>(filename,"PHOTOCOOL_MULTIPLIER", debug, 1.).value;
-        radiation_solver           = read_parameter_from_file<int>(filename,"RADIATION_SOLVER", debug, 0).value;
+        //radiation_solver           = read_parameter_from_file<int>(filename,"RADIATION_SOLVER", debug, 0).value;
         closed_radiative_boundaries = read_parameter_from_file<int>(filename,"PARI_CLOSED_RADIATIVE_BOUND", debug, 0).value;
         const_opacity_solar_factor = read_parameter_from_file<double>(filename,"CONSTOPA_SOLAR_FACTOR", debug, 1.).value;
         const_opacity_rosseland_factor = read_parameter_from_file<double>(filename,"CONSTOPA_ROSS_FACTOR", debug, 1.).value;
@@ -220,6 +220,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
         
         l_i       = np_zeros(num_bands+1);    // Wavelenght bin boundaries
         l_i12     = np_zeros(num_bands);      // Wavelength bin midpoints or averages
+        BAND_IS_HIGHENERGY = inp_zeros(num_bands); //We save wether a band is a highenergy band. This is important for which solver is activated.
         
         l_i[0]         = lminglobal/100.;     //Transform wavelengths into microns
         l_i[num_bands] = lmaxglobal/100.;
@@ -248,6 +249,25 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
                 
             }
         }
+        
+        //
+        // Assign high and low energy band switches. Those will later decide about the computation of dS and ionization
+        // Low-energy bands directly input solar radiation into the thermal energy. High-energy bands ionize and are therefore more complicated to treat.
+        //
+        num_he_bands = 0;
+        for(int b=0; b<num_bands; b++) {
+            BAND_IS_HIGHENERGY[b] = 0;
+                
+            if(photochemistry_level > 0)
+                if (l_i[b + 1] < 0.09116) {
+                    BAND_IS_HIGHENERGY[b] = 1;
+                    num_he_bands++;
+                }
+        }
+        photon_energies = np_somevalue(num_he_bands, 20 * ev_to_K * kb);
+        cout<<" Num ionization bands = "<<num_he_bands<<endl;
+        char a;
+        cin>>a;
         
         /*
         cout<<"   ATTENTION: Bands go from "<<l_i[0]<<" till "<<l_i[num_bands]<<", while lmin/lmax was given as "<<lambda_min<<"/"<<lambda_max<<endl;
@@ -579,6 +599,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
     if(debug > 0) cout<<"Init: Assigning stellar luminosities 1."<<endl;
     for(int s=0; s<num_species; s++) {
         species[s].dS = Eigen::VectorXd::Zero(num_cells+2,  1);
+        species[s].dG = Eigen::VectorXd::Zero(num_cells+2,  1);
     }
     
     if(debug > 0) cout<<"Init: Assigning stellar luminosities 2."<<endl;
@@ -709,9 +730,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
                         Jrad_FLD(j,b) = 1e-50;
                     
                     Jrad_init(j,b) = Jrad_FLD(j,b);
-                    //Jrad_FLD(j,b) += rad_energy_multipier * compute_planck_function_integral(l_i[b], l_i[b+1], species[s].prim[j].temperature);
-                    //if(debug >= 0 && j==1)
-                     if(debug > 1 && j==5) {
+                    if(debug > 1 && j==5) {
                         cout<<" Jrad("<<j<<","<<b<<") = "<<Jrad_FLD(j,b)<<" dJrad_species["<<s<<"] = "<<rad_energy_multiplier * compute_planck_function_integral3(l_i[b], l_i[b+1], species[s].prim[j].temperature)<<" at T ="<<species[s].prim[j].temperature<<endl; 
                      }
                 }

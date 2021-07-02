@@ -14,46 +14,6 @@
 #include <cassert>
 #include "aiolos.h"
 
-        ///////////////////////////////////////////////////////////
-        //
-        // Chapter on radiative fluxes
-        //
-        //
-        ///////////////////////////////////////////////////////////
-        
-        //void c_Sim::update_radiation(std::vector<AOS>& u)
-void c_Sim::transport_radiation() {
-        
-        int iters = 0;
-        
-        if(steps == 1)
-            cout<<"   in transport_radiation, before loop, steps = "<<steps<<endl;
-        
-        //while( ( iters < rad_solver_max_iter) && (epsilon_rad > epsilon_rad_min) ) {
-        while( iters < 1) {
-
-            if(steps == 1)
-                cout<<"   in transport_radiation, in loop, steps = "<<steps<<endl;
-            
-            update_opacities(); //Contains solar absorption 
-            
-            if(debug >= 1)
-                cout<<"   in transport_radiation, after update opacities."<<endl;
-            
-            if(radiation_solver == 0)
-                update_fluxes_FLD(); //Contains radiation transport and sourcing
-            else 
-                update_fluxes_simple();
-            
-            if(steps == -1 || steps == -2) {
-                cout<<"   in transport_radiation, after update fluxes."<<endl;
-                cout<<"Jrad_FLD2 and T_FLD2= "<<endl<<Jrad_FLD2<<endl<<endl<<T_FLD2<<endl;
-            }
-            
-            iters++;
-        }
-}
-
 //////////////////////////////////////////////////////////////////
 //
 // void update_opacities():
@@ -69,88 +29,99 @@ void c_Sim::transport_radiation() {
 //
 //
 //////////////////////////////////////////////////////////////////
-
-void c_Sim::update_opacities() {
-    
-    //Compute kappa
-    for(int s=0; s<num_species; s++)
-        species[s].update_opacities(); //now to be found in opacities.cpp
-    
-    //Compute dtau = dx * kappa * dens
-    
-    for(int j = num_cells + 1; j>0; j--) {
-        
+void c_Sim::reset_dS() {
+    for(int j = num_cells + 1; j>0; j--)
         for(int s=0; s<num_species; s++)
                 species[s].dS(j)  = 0.;
+}
+
+void c_Sim::update_opacities() {
+ 
+    //
+    // Compute kappa based on a species individual density, temperature, irradiation temperature.
+    // Initial values are valid no matter whether we use the photochemistry module or not.
+    //
+    for(int s=0; s<num_species; s++)
+        species[s].update_opacities(); //now to be found in opacities.cpp
+}
+
+void c_Sim::update_dS() {
+    
+    //
+    // Compute optical depths, solar radiation attenuation and heating function for low-energy bands
+    //
+    for(int j = num_cells + 1; j>0; j--) {
         
         for(int b=0; b<num_bands; b++) {
             
-            cell_optical_depth(j,b)           = 0.;
-            total_opacity(j,b)                = 0 ;
-            total_opacity_twotemp(j,b)        = 0 ;
-            radial_optical_depth(j,b)         = 0.;
-            radial_optical_depth_twotemp(j,b) = 0.;
+            if(!BAND_IS_HIGHENERGY[b]) {
             
-            for(int s=0; s<num_species; s++) {
-                total_opacity(j,b)          += species[s].opacity(j,b)         * species[s].u[j].u1 ;
-                total_opacity_twotemp(j,b)  += species[s].opacity_twotemp(j,b) * species[s].u[j].u1 ;
-                //cell_optical_depth(j,b)  = species[s].opacity(j,b) * species[s].u[j].u1 * dx[j];
-            }
-            cell_optical_depth(j,b)         = total_opacity(j, b)         * dx[j] ;
-            cell_optical_depth_twotemp(j,b) = total_opacity_twotemp(j, b) * dx[j] ;
-            
-            if(j==num_cells+1) {
-                radial_optical_depth(j,b)         = 0.; //cell_optical_depth(j,b);
-                radial_optical_depth_twotemp(j,b) = 0.; //cell_optical_depth(j,b);
-            }
-            else{
-                radial_optical_depth(j,b)         = radial_optical_depth(j+1,b)         + cell_optical_depth(j,b);
-                radial_optical_depth_twotemp(j,b) = radial_optical_depth_twotemp(j+1,b) + cell_optical_depth_twotemp(j,b);
-            }
-            
-            //
-            // After the total optical depth per band is known, we assign the fractional optical depths
-            // Maybe merge with previous loop for optimization
-            //
-            
-            for(int s=0; s<num_species; s++) 
-                species[s].fraction_total_opacity(j,b) = species[s].opacity_twotemp(j,b) * species[s].u[j].u1 * dx[j] / cell_optical_depth_twotemp(j,b);
-                //species[s].fraction_total_opacity(j,b) = species[s].opacity(j,b) * species[s].u[j].u1 * dx[j] / cell_optical_depth(j,b);
-            
-            //
-            // Now compute the attenuation of solar radiation and then assign the lost energy back to individual species in a manner that conserves energy
-            //
-            
-            S_band(j,b) = solar_heating(b) * std::exp(-const_opacity_solar_factor*radial_optical_depth_twotemp(j,b));
-            
-            //if(steps == 0)
-            //    cout<<"IN SOLAR HEATING, const_opacity_solar_factor = "<<const_opacity_solar_factor<<endl;
-            
-            if(debug >= 1)
-                cout<<" in cell ["<<j<<"] band ["<<b<<"] top-of-the-atmosphere heating = "<<solar_heating(b)<<" tau_rad(j,b) = "<<radial_optical_depth(j,b)<<" exp(tau) = "<<std::exp(-radial_optical_depth(j,b))<<endl;
-            
-            if(steps > -1) {
-                        
-                if(j<num_cells+1)
-                    //dS_band(j,b) = (surf[j+1] * S_band(j+1,b) - surf[j] * S_band(j,b))/vol[j]/4.; //       4pi J = c Erad
-                    //dS_band(j,b) = (S_band(j+1,b) - S_band(j,b))/dx[j]/4. * (1. - bond_albedo); //       4pi J = c Erad
-                    dS_band(j,b) = solar_heating(b) * (-exp(-const_opacity_solar_factor*radial_optical_depth_twotemp(j+1,b)) * expm1( const_opacity_solar_factor* ( radial_optical_depth_twotemp(j+1,b) - radial_optical_depth_twotemp(j,b))) ) /dx[j]/4. * (1.-bond_albedo);
-                else
-                    // Use optically thin limit  
-                    dS_band(j,b) = solar_heating(b)*const_opacity_solar_factor*total_opacity_twotemp(j,b)*(1-bond_albedo)/4;
+                cell_optical_depth(j,b)           = 0.;
+                total_opacity(j,b)                = 0 ;
+                total_opacity_twotemp(j,b)        = 0 ;
+                radial_optical_depth(j,b)         = 0.;
+                radial_optical_depth_twotemp(j,b) = 0.;
                 
-                dS_band_zero(j,b) = dS_band(j,b);
+                for(int s=0; s<num_species; s++) {
+                    total_opacity(j,b)          += species[s].opacity(j,b)         * species[s].u[j].u1 ;
+                    total_opacity_twotemp(j,b)  += species[s].opacity_twotemp(j,b) * species[s].u[j].u1 ;
+                    //cell_optical_depth(j,b)  = species[s].opacity(j,b) * species[s].u[j].u1 * dx[j];
+                }
+                cell_optical_depth(j,b)         = total_opacity(j, b)         * dx[j] ;
+                cell_optical_depth_twotemp(j,b) = total_opacity_twotemp(j, b) * dx[j] ;
+                
+                if(j==num_cells+1) {
+                    radial_optical_depth(j,b)         = 0.; //cell_optical_depth(j,b);
+                    radial_optical_depth_twotemp(j,b) = 0.; //cell_optical_depth(j,b);
+                }
+                else{
+                    radial_optical_depth(j,b)         = radial_optical_depth(j+1,b)         + cell_optical_depth(j,b);
+                    radial_optical_depth_twotemp(j,b) = radial_optical_depth_twotemp(j+1,b) + cell_optical_depth_twotemp(j,b);
+                }
+                
+                //
+                // After the total optical depth per band is known, we assign the fractional optical depths
+                // Maybe merge with previous loop for optimization
+                //
+                
+                for(int s=0; s<num_species; s++) 
+                    species[s].fraction_total_opacity(j,b) = species[s].opacity_twotemp(j,b) * species[s].u[j].u1 * dx[j] / cell_optical_depth_twotemp(j,b);
+                    //species[s].fraction_total_opacity(j,b) = species[s].opacity(j,b) * species[s].u[j].u1 * dx[j] / cell_optical_depth(j,b);
+                
+                //
+                // Now compute the attenuation of solar radiation and then assign the lost energy back to individual species in a manner that conserves energy
+                //
+                
+                S_band(j,b) = solar_heating(b) * std::exp(-radial_optical_depth_twotemp(j,b));
+                
+                //if(steps == 0)
+                //    cout<<"IN SOLAR HEATING, const_opacity_solar_factor = "<<const_opacity_solar_factor<<endl;
+                
+                if(debug >= 1)
+                    cout<<" in cell ["<<j<<"] band ["<<b<<"] top-of-the-atmosphere heating = "<<solar_heating(b)<<" tau_rad(j,b) = "<<radial_optical_depth(j,b)<<" exp(tau) = "<<std::exp(-radial_optical_depth(j,b))<<endl;
+                
+                // Regular dS computation
+                if(steps > -1) {
+                            
+                    if(j<num_cells+1)
+                        dS_band(j,b) = 0.25 * solar_heating(b) * (-exp(-radial_optical_depth_twotemp(j+1,b)) * expm1( const_opacity_solar_factor* ( radial_optical_depth_twotemp(j+1,b) - radial_optical_depth_twotemp(j,b))) ) /dx[j] * (1.-bond_albedo);
+                    else
+                        // Use optically thin limit  
+                        dS_band(j,b) = 0.25 * solar_heating(b)*total_opacity_twotemp(j,b)*(1-bond_albedo);
+                    
+                    dS_band_zero(j,b) = dS_band(j,b);
+                
+                    
+                }// Irregular dS computation, in case we want to fix the solar heating function to its initial value
+                else 
+                    dS_band(j,b) = dS_band_zero(j,b);
+                
+                //
+                // In low-energy bands, individual species are heated according to their contribution to the total cell optical depth
+                //
+                for(int s=0; s<num_species; s++)
+                    species[s].dS(j)  += dS_band(j,b) * species[s].fraction_total_opacity(j,b);
             }
-            else 
-                dS_band(j,b) = dS_band_zero(j,b);
-            
-            
-            
-            
-            //if(const_opacity_solar_factor*radial_optical_depth_twotemp(j,b))
-            
-            for(int s=0; s<num_species; s++)
-                species[s].dS(j)  += dS_band(j,b) * species[s].fraction_total_opacity(j,b);
         }
     }
     
@@ -370,7 +341,7 @@ void c_Sim::update_fluxes_FLD() {
         }
     }
 
-    // Step 2: Energy exchange terms
+    // Step 2: Energy exchange terms kappa*rho*(J-B) + dS + Pi + Lambda
     
     if(radiation_matter_equilibrium_test <= 2) { //radtests 3 and 4 are delta-radiation peaks without energy-matter coupling
         
@@ -393,11 +364,7 @@ void c_Sim::update_fluxes_FLD() {
 
                 d[idx_s ] = 1 / dt ;
                 r[idx_rs] = Ts / dt ;
-                r[idx_rs] += species[s].dS(j) / species[s].u[j].u1 / species[s].cv; //* 4. * pi /c_light
-                
-                //if (j < num_ghosts || j >= num_cells + 2-num_ghosts) continue ;
-                //if (j < num_ghosts ) continue ;
-
+                r[idx_rs] += (species[s].dS(j) + species[s].dG(j)) / species[s].u[j].u1 / species[s].cv;
                 
                 for(int b=0; b<num_bands; b++) {
                     int idx_b  = j*stride + b * (num_vars+1) ;
@@ -472,12 +439,12 @@ void c_Sim::update_fluxes_FLD() {
 }
 
 
-void c_Sim::update_fluxes_simple() {
+void c_Sim::update_temperatures_simple() {
     
     //Compute change in energy
     for (int j=0; j < num_cells+2; j++) {
         for(int s=0; s<num_species; s++)
-            species[s].prim[j].temperature += species[s].dS(j) * dt  / species[s].u[j].u1 / species[s].cv ;
+            species[s].prim[j].temperature += (species[s].dS(j) + species[s].dG(j) ) * dt  / species[s].u[j].u1 / species[s].cv ;
     }
     
     

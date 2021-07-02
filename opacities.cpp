@@ -61,6 +61,16 @@ double logint(double xa, int N, double* X, double* RI) {
     return std::pow(10, (std::log10(RI[i2]) - std::log10(RI[i1])) / (std::log10(X[i2]) - std::log10(X[i1])) * (std::log10(xa) - std::log10(X[i1])) + std::log10(RI[i1]) );
 }
 
+///////////////////////////////////////////////////////////
+//
+//
+//
+// update_opacities(): The central source for all opacity information
+//
+//
+//
+///////////////////////////////////////////////////////////
+
 void c_Species::update_opacities() {
 
     if (base->opacity_model == 'U') {
@@ -77,7 +87,7 @@ void c_Species::update_opacities() {
                     
                     opacity(j,b)         = opacity_avg(b) * (1. + pressure_broadening_factor * pow(prim[j].pres/1e5, pressure_broadening_exponent)); 
                     opacity_planck(j,b)  = opacity_avg(b) * (1. + pressure_broadening_factor * pow(prim[j].pres/1e5, pressure_broadening_exponent)); 
-                    opacity_twotemp(j,b) = opacity_avg(b) * (1. + pressure_broadening_factor * pow(prim[j].pres/1e5, pressure_broadening_exponent)); 
+                    opacity_twotemp(j,b) = base->const_opacity_solar_factor * opacity_avg(b) * (1. + pressure_broadening_factor * pow(prim[j].pres/1e5, pressure_broadening_exponent)); 
                 }
             }
         }
@@ -107,7 +117,7 @@ void c_Species::update_opacities() {
                 for(int b=0; b<num_bands; b++) {
                     opacity(j,b)        = base->freedman_opacity(prim[j].pres/1e6, prim[j].temperature, 0.); 
                     opacity_planck(j,b) = base->freedman_opacity(prim[j].pres/1e6, prim[j].temperature, 0.);
-                    opacity_twotemp(j,b)= base->freedman_opacity(prim[j].pres/1e6, prim[j].temperature, 0.);
+                    opacity_twotemp(j,b)= base->const_opacity_solar_factor * base->freedman_opacity(prim[j].pres/1e6, prim[j].temperature, 0.);
                 }
             }
         }
@@ -197,7 +207,7 @@ void c_Species::update_opacities() {
             for(int b=0; b<num_bands; b++) {
                 opacity(j,b)        = const_opacity * (1. + pressure_broadening_factor * pow(prim[j].pres/1e5, pressure_broadening_exponent)); 
                 opacity_planck(j,b) = const_opacity * (1. + pressure_broadening_factor * pow(prim[j].pres/1e5, pressure_broadening_exponent)); 
-                opacity_twotemp(j,b)= opacity_avg(b) * (1. + pressure_broadening_factor * pow(prim[j].pres/1e5, pressure_broadening_exponent)); 
+                opacity_twotemp(j,b)= base->const_opacity_solar_factor * opacity_avg(b) * (1. + pressure_broadening_factor * pow(prim[j].pres/1e5, pressure_broadening_exponent)); 
             }
         }
         
@@ -439,7 +449,7 @@ double c_Sim::opacity_semenov_malygin(int rosseland, double temperature, double 
     // Local variable(s):
 
     double T_ev[4], temp[8], dT[5], tmax1, tmax2, tmin, T1, T2, TD;
-    double T[5], aKrL, aKrR, aKg_ext, AA, BB, FF, kappa_gas, kappa_dust;
+    double T[5], aKrL, aKrR, aKg_ext = 1e-10, AA, BB, FF, kappa_gas, kappa_dust;
     int KK;
     int i, j, iter;
     int smooth;
@@ -649,7 +659,7 @@ void c_Sim::kappa_landscape()
   
   		printf ("Writing opacity landscape for density %e...\n", recentdens);
   		fflush (stdout);
-  		sprintf (name, "kappa_landscape_%e.dat", recentdens);
+  		sprintf (name, "kappa_landscape2_%e.dat", recentdens);
   		//output = fopenp (name, "a");
         output = fopen (name, "a");
  		for(i = 0; i < arraysize; i++) {

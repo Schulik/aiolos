@@ -565,7 +565,6 @@ void c_Sim::compute_collisional_heat_exchange() {
         LU.compute(friction_matrix_T) ;
         friction_vec_input.noalias() = LU.solve(temperature_vector);
         
-
         // Set friction_vec_output to dT/dt:
         friction_vec_output = 
             friction_coefficients * friction_vec_input ;
