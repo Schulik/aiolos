@@ -231,7 +231,6 @@ void c_Sim::execute() {
         if (do_hydrodynamics == 1)
             compute_drag_update() ;
         
-        
         if( (photochemistry_level + use_rad_fluxes ) > 0 ) {
             
             update_opacities();
@@ -251,10 +250,6 @@ void c_Sim::execute() {
                 if (use_collisional_heating)
                     compute_collisional_heat_exchange();
             }
-                
-            
-            
-            
         }
         
             

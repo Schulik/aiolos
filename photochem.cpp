@@ -291,7 +291,7 @@ void c_Sim::do_photochemistry() {
 
                 // Assume 20eV photons for now
                 //double E_phot = 20 * ev_to_K * kb;
-                std::vector<double> dtaus = np_zeros(num_he_bands);
+                std::vector<double> dtaus   = np_zeros(num_he_bands);
                 std::vector<double> Gamma0  = np_zeros(num_he_bands);
                 //std::array<double, num_he_bands> Gamma0;
                 
@@ -315,6 +315,8 @@ void c_Sim::do_photochemistry() {
                 std::array<double, 3> nX_new = ion.nX_new(x_bar);
                 std::array<double, 3> nX_bar = ion.nX_average(x_bar);
 
+                
+                
                 // Store the optical depth through this cell:
                 for (int b = 0; b < num_he_bands; b++) {
                     dtaus[b] *= (1 - x_bar);
@@ -328,7 +330,7 @@ void c_Sim::do_photochemistry() {
                 // Next update the primitive quantities (conserved are done at
                 // the end)
 
-                if (nX_new[0] > nX[0]) {
+                /*if (nX_new[0] > nX[0]) {
                     // Net recombination - add the energy / momentum to the H atoms
                     double f1 = species[0].cv / species[1].cv;
                     double f2 = species[0].cv / species[2].cv;
@@ -347,7 +349,7 @@ void c_Sim::do_photochemistry() {
                     f1 = mX[0]/(mX[1]+mX[2]);
                     vX[1] += (1 - nX[1] / nX_new[1]) * (f1*vX[0] - vX[1]);
                     vX[2] += (1 - nX[2] / nX_new[2]) * (f1*vX[0] - vX[2]);
-                }
+                }*/
 
                 for (int s = 0; s < 3; s++) {
                     species[s].prim[j].number_density = nX_new[s];
@@ -401,7 +403,7 @@ void c_Sim::do_photochemistry() {
                 }
 
                 double Te = root_solver.solve(Te1, Te2, heat);
-                std::array<double, 3> heating = heat.heating_rate(Te);
+                std::array<double, 3> heating = heat.net_heating_rate(Te);
                 std::array<double, 3> cooling = heat.cooling_rate(Te);
 
                 /*
@@ -421,14 +423,16 @@ void c_Sim::do_photochemistry() {
                     dS_band(j,b) = 0.25 * solar_heating(b) * (1 - 13.6 / photon_energies[b]) *
                                 std::exp(-radial_optical_depth_twotemp(j,b)) * (-std::expm1(-dtaus[b])) / dx[j];
                 }
-                    
+                
+                cout<<" j, xbar = "<<j<<", "<<x_bar<<" xH, xp = "<<nX[0]<<", "<<nX[1]<<endl;
+                
                 for (int s = 0; s < 3; s++) { 
                     //Even in cases when radiative transport is not used, we want to document those quanitites in the output
-                    species[s].dG(j) = cooling[s];
+                    //species[s].dG(j) = cooling[s];
                     species[s].dS(j) = heating[s];
                     //When the radiative transport is not used, we update the internal energy here in place
                     //if (!use_rad_fluxes) 
-                    //    species[s].prim[j].internal_energy += (heating[s] + cooling[s]) * dt / species[s].prim[j].density ;
+                    //species[s].prim[j].internal_energy += (heating[s] + 0.*cooling[s]) * dt / species[s].prim[j].density ;
                 }
             }
 

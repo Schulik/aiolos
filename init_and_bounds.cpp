@@ -257,7 +257,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
         num_he_bands = 0;
         for(int b=0; b<num_bands; b++) {
             BAND_IS_HIGHENERGY[b] = 0;
-                
+            
             if(photochemistry_level > 0)
                 if (l_i[b + 1] < 0.09116) {
                     BAND_IS_HIGHENERGY[b] = 1;
@@ -266,9 +266,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
         }
         photon_energies = np_somevalue(num_he_bands, 20 * ev_to_K * kb);
         cout<<" Num ionization bands = "<<num_he_bands<<endl;
-        char a;
-        cin>>a;
-        
+
         /*
         cout<<"   ATTENTION: Bands go from "<<l_i[0]<<" till "<<l_i[num_bands]<<", while lmin/lmax was given as "<<lambda_min<<"/"<<lambda_max<<endl;
         cout<<"   Please confirm this is correct."<<endl;
