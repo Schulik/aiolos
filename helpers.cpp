@@ -47,9 +47,7 @@ double c_Sim::get_cfl_timestep() {
     // Compute individual max wave crossing timesteps per cell
     //  t = delta x / v = delta x / momentum / density
     //
-    double minstep = 0.; 
-    //TODO: Compute sound crossing time for entire domain
-    //double finalstep = 0.;
+    double minstep = 0.;
     
     max_snd_crs_time=0;
     for(int s=0; s < num_species; s++) {
@@ -76,7 +74,10 @@ double c_Sim::get_cfl_timestep() {
     //Invert and apply CFL secutiry factor
     cfl_step = cflfactor / minstep;
     
-    return min(cfl_step, dt*max_timestep_change);
+    if(do_hydrodynamics)
+        return min(cfl_step, dt*max_timestep_change);
+    else
+        return min(timestep_rad2, dt*max_timestep_change);
 }
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

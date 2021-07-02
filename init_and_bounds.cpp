@@ -264,8 +264,13 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
                     num_he_bands++;
                 }
         }
-        photon_energies = np_somevalue(num_he_bands, 20 * ev_to_K * kb);
-        cout<<" Num ionization bands = "<<num_he_bands<<endl;
+        photon_energies = np_somevalue(num_he_bands, 20. * ev_to_K * kb); //20 * ev_to_K * kb
+        for(int b=0; b<num_he_bands; b++) {
+            photon_energies[b] = 1.24/( l_i[b + 1] ) * ev_to_K * kb ;
+            cout<<"Assigned to highenergy band b = "<<b<<" a photon energy of "<<1.24/( std::sqrt(l_i[b + 1]*l_i[b]))<<" eV "<<endl;
+            
+        }
+
 
         /*
         cout<<"   ATTENTION: Bands go from "<<l_i[0]<<" till "<<l_i[num_bands]<<", while lmin/lmax was given as "<<lambda_min<<"/"<<lambda_max<<endl;

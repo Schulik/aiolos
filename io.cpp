@@ -200,7 +200,7 @@ void c_Species::read_species_data(string filename, int species_index) {
             int    wlcount = 0;
             double lmin = base->l_i[b];
             double lmax = base->l_i[b+1];
-            opacity_avg(b) = 1e-20;
+            opacity_avg(b) = 1e+3;
             
             for(int i = 0; i < num_tmp_lambdas; i++) {
                 double wl = opacity_data(i,0);
