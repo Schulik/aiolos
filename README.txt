@@ -30,11 +30,14 @@ done via:
 where the "4" refers to a target of 4 species total.
 
 ************************************
-*** In order to execute Aiolos mode, type:
+*** In order to execute Aiolos, type:
 ************************************
 
-   ./aiolos -par planet_spherical.par -spc mix1.spc
+   ./aiolos -par planet_spherical.par -spc mix3.spc
 
 with the *.par and the *.spc file present into the command line.
+This is a simple hydrostatic test problem, i.e. the initial density profile that is constructed should be kept perfectly.
 
+A simple wind solution:
 
+   ./aiolos -dir test_files/ -par planet_wind.par -spc mix_wind.spc
