@@ -221,6 +221,11 @@ void c_Sim::execute() {
                         species[s].u[j] += (species[s].dudt[1][j] - species[s].dudt[0][j])*dt / 2 ;  
                     }
                 }
+            } else {
+                for(int s = 0; s < num_species; s++) {
+                    species[s].apply_boundary_left(species[s].u) ;
+                    species[s].apply_boundary_right(species[s].u) ;
+                }
             }
         }
         
@@ -288,7 +293,7 @@ void c_Sim::execute() {
             }
             
             if(crashed_T > 0) {
-                cout<<endl<<">>> CRASH <<< DUE TO NEGATIVE TEMPERATURES, crash_imin/imax = "<<crash_T_imin<<"/"<<crash_T_imax<<" sample T ="<<crashed_temperature<<" num of crashed cells/total cells = "<<crash_T_numcells<<"/"<<num_cells<<"  crashed species number = "<<crashed_T-1<<endl; 
+                cout<<endl<<">>> CRASH <<< DUE TO NEGATIVE TEMPERATURES, crash_imin/imax = "<<crash_T_imin<<"/"<<crash_T_imax<<" sample T ="<<crashed_temperature<<" num of crashed cells/total cells = "<<crash_T_numcells<<"/"<<num_cells<<"  crashed species name = "<<species[crashed_T-1].speciesname<<endl; 
                 cout<<" @dt="<<dt<<" stepnum "<<steps<<" Crashtime "<<crashtime<<endl;
                 cout<<"Writing crash dump into last output and exiting program."<<endl;
             } 

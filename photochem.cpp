@@ -36,7 +36,8 @@ double H_radiative_recombination(double T_e) {
     using std::pow;
     double x = 2 * 157807 / T_e;
     // Case B
-    return 2.753e-14 * pow(x, 1.500) / pow(1 + pow(x / 2.740, -0.407), 2.242);
+    //return 2.753e-14 * pow(x, 1.500) / pow(1 + pow(x / 2.740, -0.407), 2.242);
+    return 2.7e-13 * pow(T_e/1e4, -0.9); //MC2009 value
 }
 double H_threebody_recombination(double T_e) {
     using std::pow;
@@ -162,8 +163,6 @@ class C2Ray_HOnly_ionization {
         
         for(int b=0; b < num_he_bands; b++)
             ion += Gamma0[b]/nH * -std::expm1(-tau0[b] * (1 - x_bar));
-        
-        
         
         double x_eq = (ion + ne * C) / (ion + ne * (C + R + ne * B));
         double t_rat = dt * (ion + ne * (C + R + ne * B));
@@ -325,7 +324,7 @@ void c_Sim::do_photochemistry() {
                 for (int b = 0; b < num_he_bands; b++) {
                     dtaus[b] *= (1 - x_bar);
                     if(j<num_cells+1)
-                        radial_optical_depth_twotemp(j,b) = radial_optical_depth_twotemp(j+1,b) + dtaus[b];
+                        radial_optical_depth_twotemp(j,b) = radial_optical_depth_twotemp(j+1,b) + 0.5*dtaus[b];
                     else
                         radial_optical_depth_twotemp(j,b) = dtaus[b];
                 }

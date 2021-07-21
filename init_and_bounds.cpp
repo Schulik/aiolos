@@ -264,10 +264,10 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
                     num_he_bands++;
                 }
         }
-        photon_energies = np_somevalue(num_he_bands, 20. * ev_to_K * kb); //20 * ev_to_K * kb
+        photon_energies = np_somevalue(num_he_bands, 20. * ev_to_K * kb);
         for(int b=0; b<num_he_bands; b++) {
             photon_energies[b] = 1.24/( l_i[b + 1] ) * ev_to_K * kb ;
-            cout<<"Assigned to highenergy band b = "<<b<<" a photon energy of "<<1.24/( std::sqrt(l_i[b + 1]*l_i[b]))<<" eV "<<endl;
+            cout<<"Assigned to highenergy band b = "<<b<<" a photon energy of "<<photon_energies[b]/ev_to_K/kb<<" eV "<<endl;
             
         }
 
@@ -1295,7 +1295,8 @@ void c_Species::apply_boundary_right(std::vector<AOS>& u) {
                 double dphi = (base->phi[i] - base->phi[i-1]) / (base->dx[i-1] + base->dx[i]) ;
                 dphi *= (base->omegaplus[i]*base->dx[i] + base->omegaminus[i-1]*base->dx[i-1]) ;
                 prim.pres = prim.pres -  prim.density * dphi ;
-                prim.pres    = std::max( prim.pres, 0.0) ;
+                prim.pres = std::max( prim.pres, 0.0) ;
+                
                 eos->compute_conserved(&prim, &u[i], 1) ;
             }
             break ;
@@ -1306,7 +1307,7 @@ void c_Species::apply_boundary_right(std::vector<AOS>& u) {
 
                 u[igh]     = u[iact]; 
                 u[igh].u2 *= -1;
-                base->phi[igh]   = base->phi[iact] ; //TODO: This will be called many times, too many!
+                base->phi[igh]   = base->phi[iact] ;
             }
             break;
         case BoundaryType::fixed:
@@ -1317,7 +1318,7 @@ void c_Species::apply_boundary_right(std::vector<AOS>& u) {
             for (int i=Ncell+num_ghosts; i < Ncell+2*num_ghosts; i++) {
                 int iact = i - Ncell;
                 u[i]     = u[iact];
-                base->phi[i]   = base->phi[iact] ; //TODO: This will be called too many times!
+                base->phi[i]   = base->phi[iact] ; 
             }
             break;
     }

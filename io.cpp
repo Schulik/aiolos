@@ -542,7 +542,9 @@ void c_Sim::print_diagnostic_file(int outputnumber) {
                 
                 //Optical depths for solar radiation
                 for(int b=0; b<num_bands; b++) {
-                    outfileDiagnostic<<'\t'<<radial_optical_depth(i,b);
+                    //outfileDiagnostic<<'\t'<<radial_optical_depth(i,b);
+                    outfileDiagnostic<<'\t'<<radial_optical_depth_twotemp(i,b);
+                    
                 }
                 
                 //
