@@ -523,6 +523,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
             numdens_vector        = Vector_t(num_species);
             mass_vector           = Vector_t(num_species);
             temperature_vector    = Vector_t(num_species);
+            temperature_vector_augment    = Vector_t(num_species);
 
             identity_matrix       = Matrix_t::Identity(num_species, num_species);
             unity_vector          = Vector_t::Ones(num_species);

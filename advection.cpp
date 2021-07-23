@@ -158,6 +158,9 @@ void c_Sim::execute() {
             
              monitor_counter += 1.;
         }
+        
+        if(steps > 605e6 )
+            cout<<" Pos 1 BEFORE PHOTOCHEM, T[2] =  "<<species[2].prim[25].temperature<<", p = "<<species[2].prim[25].pres<<", E = "<<species[2].u[25].u3<<", e = "<<species[2].prim[25].internal_energy<<endl;
          
         ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~////
         //
@@ -229,12 +232,22 @@ void c_Sim::execute() {
             }
         }
         
-        for(int s = 0; s < num_species; s++)
+        if(steps > 605e6 )
+            cout<<" Pos 1.5 BEFORE PHOTOCHEM, T[2] =  "<<species[2].prim[25].temperature<<", p = "<<species[2].prim[25].pres<<", E = "<<species[2].u[25].u3<<", e = "<<species[2].prim[25].internal_energy<<endl;
+        
+        for(int s = 0; s < num_species; s++) 
             species[s].compute_pressure(species[s].u);
-        compute_total_pressure();
+            
+        //compute_total_pressure();
+        
+        if(steps > 605e6 )
+            cout<<" Pos 1.75 BEFORE PHOTOCHEM, T[2] =  "<<species[2].prim[25].temperature<<" p = "<<species[2].prim[25].pres<<", E = "<<species[2].u[25].u3<<", e = "<<species[2].prim[25].internal_energy<<endl;
         
         if (do_hydrodynamics == 1)
             compute_drag_update() ;
+        
+        if(steps > 605e6 )
+            cout<<" Pos 2 BEFORE PHOTOCHEM, T[2] =  "<<species[2].prim[25].temperature<<", p = "<<species[2].prim[25].pres<<" E = "<<species[2].u[25].u3<<", e = "<<species[2].prim[25].internal_energy<<endl;
         
         if( (photochemistry_level + use_rad_fluxes ) > 0 ) {
             
@@ -242,6 +255,10 @@ void c_Sim::execute() {
             reset_dS();
             
             // Compute high-energy dS and ionization
+            
+            if(steps > 605e6 )
+                cout<<" Pos 3 BEFORE PHOTOCHEM, T[2] =  "<<species[2].prim[25].temperature<<", p = "<<species[2].prim[25].pres<<" E = "<<species[2].u[25].u3<<", e = "<<species[2].prim[25].internal_energy<<endl;
+            
             if(photochemistry_level > 0)
                 do_photochemistry();
             
@@ -251,12 +268,14 @@ void c_Sim::execute() {
                 update_fluxes_FLD();   //FLD Radiation transport, updating Temperatures and photon band energies
             }
             else {
-                update_temperatures_simple();//Fast eulerian temperature update, no stability guaranteed!
-                if (use_collisional_heating)
-                    compute_collisional_heat_exchange();
+                //update_temperatures_simple();//Fast eulerian temperature update, no stability guaranteed!
+                //if (use_collisional_heating)
+                //    compute_collisional_heat_exchange();
             }
         }
         
+        if(steps > 605e6 )
+            cout<<" Pos 4 AFTER PHOTOCHEM, T[2] =  "<<species[2].prim[25].temperature<<", p = "<<species[2].prim[25].pres<<" E = "<<species[2].u[25].u3<<", e = "<<species[2].prim[25].internal_energy<<endl;
             
         for(int s = 0; s < num_species; s++)
             species[s].user_species_loop_function() ;

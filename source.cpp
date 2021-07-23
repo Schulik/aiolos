@@ -445,6 +445,7 @@ void c_Sim::fill_alpha_basis_arrays(int j) { //Called in compute_friction() in s
         numdens_vector(si)     =  species[si].prim[j].number_density; 
         mass_vector(si)        =  species[si].mass_amu*amu;
         temperature_vector(si) =  species[si].prim[j].temperature;
+        temperature_vector_augment(si) = species[si].prim[j].temperature - dt * (species[si].dS(j) + species[si].dG(j)) / species[si].u[j].u1 / species[si].cv;
     }
 }
     
@@ -563,7 +564,7 @@ void c_Sim::compute_collisional_heat_exchange() {
         friction_matrix_T = identity_matrix - friction_coefficients * dt;
         
         LU.compute(friction_matrix_T) ;
-        friction_vec_input.noalias() = LU.solve(temperature_vector);
+        friction_vec_input.noalias() = LU.solve(temperature_vector_augment);
         
         // Set friction_vec_output to dT/dt:
         friction_vec_output = 
@@ -572,9 +573,10 @@ void c_Sim::compute_collisional_heat_exchange() {
         //
         // Update internal energy (dE = Cv dT/dt * dt)
         //
-        for(int si=0; si<num_species; si++) 
-            species[si].prim[j].internal_energy += 
-                species[si].cv*friction_vec_output(si)*dt;
+        for(int si=0; si<num_species; si++) {
+            species[si].prim[j].internal_energy += species[si].cv*friction_vec_output(si)*dt;
+            species[si].prim[j].temperature     += friction_vec_output(si)*dt;
+        }
     }
 
     //

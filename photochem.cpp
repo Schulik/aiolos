@@ -223,8 +223,6 @@ class C2Ray_HOnly_heating {
         return {0.0, 0.0, - nX[2]*HOnly_cooling(nX, Te)};
     }
     
-
-   private:
     Vec3 _compute_T(double Te) const {
         // Setup RHS
         Vec3 RHS(T.data());
@@ -233,6 +231,9 @@ class C2Ray_HOnly_heating {
         // Solve for temperature
         return coll_mat.partialPivLu().solve(RHS);
     }
+
+   private:
+    
 
    public:
     double GammaH, dt;
@@ -300,7 +301,7 @@ void c_Sim::do_photochemistry() {
                 //std::array<double, num_he_bands> Gamma0;
                 
                 for (int b = 0; b < num_he_bands; b++) {
-                    Gamma0[b] = 0.25 * solar_heating(b) / photon_energies[b] * std::exp(-radial_optical_depth_twotemp(j,b)) / dx[j];
+                    Gamma0[b] = 0.25 * solar_heating(b) / photon_energies[b] * std::exp(-radial_optical_depth_twotemp(j+1,b)) / dx[j];
                     dtaus[b]  = species[0].opacity_twotemp(j, b) * (nX[0] + nX[1]) * mX[0] * dx[j];
                 }
                 
@@ -320,18 +321,22 @@ void c_Sim::do_photochemistry() {
                 std::array<double, 3> nX_new = ion.nX_new(x_bar);
                 std::array<double, 3> nX_bar = ion.nX_average(x_bar);
 
+                if(steps > 605e6 && j == 25)
+                    cout<<" steps, j, G0, xbar = "<<steps<<", "<<j<<", "<<Gamma0[0]<<", "<<x_bar<<";; opdt, dtau, Te, xE = "<<radial_optical_depth_twotemp(j+1,0)<<", "<<dtaus[0]<<", "<<TX[2]<<", "<<nX[2]<<endl;
+
+                
                 // Store the optical depth through this cell:
                 for (int b = 0; b < num_he_bands; b++) {
                     dtaus[b] *= (1 - x_bar);
                     if(j<num_cells+1)
-                        radial_optical_depth_twotemp(j,b) = radial_optical_depth_twotemp(j+1,b) + 0.5*dtaus[b];
+                        radial_optical_depth_twotemp(j,b) = radial_optical_depth_twotemp(j+1,b) + cell_optical_depth_twotemp(j+1,b); // 0.5*dtaus[b];
                     else
                         radial_optical_depth_twotemp(j,b) = dtaus[b];
                 }
                 //tau0 += dtau;
 
                 // Next update the primitive quantities (conserved are done at
-                // the end)
+                // the end) as response of the changing density due to ionization
 
                 if (nX_new[0] > nX[0]) {
                     // Net recombination - add the energy / momentum to the H atoms
@@ -362,9 +367,6 @@ void c_Sim::do_photochemistry() {
                     species[s].prim[j].temperature = TX[s];
                 }
                 
-                //if(globalTime > 1e2)
-                //    cout<<" j, xbar = "<<j<<", "<<Gamma0[0]<<" = Gamma0[0], xH, xP, xE = "<<nX[0]<<", "<<nX[1]<<", "<<nX[2]<<endl;
-
                 double GammaH = 0.;
                 for (int b = 0; b < num_he_bands; b++) {
                     GammaH += 0.25 * solar_heating(b) * (1 - 13.6 * ev_to_K * kb / photon_energies[b]) *
@@ -407,7 +409,12 @@ void c_Sim::do_photochemistry() {
                         << "\t\t" << heat.coll_mat(2,0) << " " <<  heat.coll_mat(2,1) << " " << heat.coll_mat(2,2) << "\n";
                 }
 
-                double Te = root_solver.solve(Te1, Te2, heat);
+                double Te;
+                if(use_rad_fluxes)
+                    Te = min(Te1,Te2);
+                else
+                    Te = root_solver.solve(Te1, Te2, heat);
+                
                 std::array<double, 3> heating = heat.heating_rate(Te);
                 std::array<double, 3> cooling = heat.cooling_rate(Te);
 
@@ -415,6 +422,9 @@ void c_Sim::do_photochemistry() {
                 std::cout << "\t" << TX[2] << " " << Te1 << " " << Te2 << "\n" ; 
                 std::cout << "\t" << Te << "\n" ;
                 */
+                
+                if(steps > 605e6 && j == 25)
+                    cout<<" steps, j, GH, dt= "<<steps<<", "<<j<<", "<<GammaH<<", "<<dt<<";; opdt, dtau, dS[2], dG[2], Te, Tx[2] = "<<radial_optical_depth_twotemp(j+1,0)<<", "<<dtaus[0]<<", "<<heating[2]<<", "<<cooling[2]<<", "<<Te<<", "<<species[2].prim[j].temperature<<endl;
 
                 //TODO: This might need to be called for all bands. When H, p+ and e- densities changes, so do their opacities across all bands, including low-energy bands.
                 //TODO: This needs to be ~k_rosseland, not k_Planck,solar. However k_rosseland in the UV is needed for this.
@@ -422,29 +432,45 @@ void c_Sim::do_photochemistry() {
                 for (int b = 0; b < num_he_bands; b++) {   
                     total_opacity(j,b)                = species[0].opacity(j,b)          * (nX[0] + nX[1]) * mX[0]; //TODO: Assign sensible opacities to electrons and protons
                     total_opacity_twotemp(j,b)        = species[0].opacity_twotemp(j, b) * (nX[0] + nX[1]) * mX[0] ;
-                    cell_optical_depth(j,b)           = dtaus[b];
+                    cell_optical_depth_twotemp(j,b)   = dtaus[b];
                 
                     S_band(j,b) = solar_heating(b) * std::exp(-radial_optical_depth_twotemp(j,b)); //No factor 0.25 here, as we want to see the unaveraged radiation we put in, consistent with low-energy bands
                     dS_band(j,b) = 0.25 * solar_heating(b) * (1 - 13.6 * ev_to_K * kb / photon_energies[b]) *
                                 std::exp(-radial_optical_depth_twotemp(j,b)) * (-std::expm1(-dtaus[b])) / dx[j];
                 }
                 
-                for (int s = 0; s < 3; s++) { 
+                if(use_rad_fluxes==0) {
+                    Eigen::Matrix<double, 3, 1> newT = heat._compute_T(Te);
+                    for (int s = 0; s < 3; s++)
+                        species[s].prim[j].temperature = newT(s);
+                }
+                    //Assign temperatures here directly, done
+                else {}
+                    //Don't assign, but keep dS and temperature exchange terms for later.
+                        
+                    //In case of more species than 3, also keep dS and temperature exchange for later
+                        
+                    //In case you dont use neither photochemistry nor radtrans, you shouoldn't be here, and instead just do a heat exchange solution
+                
+                for (int s = 0; s < 3; s++) {
                     //Even in cases when radiative transport is not used, we want to document those quanitites in the output
                     species[s].dG(j) = cooling[s];
                     species[s].dS(j) = heating[s];
                     //When the radiative transport is not used, we update the internal energy here in place
                     //if (!use_rad_fluxes) 
                     //species[s].prim[j].internal_energy += (heating[s] + 0.*cooling[s]) * dt / species[s].prim[j].density ;
+                    
                 }
             }
 
             // Finally, lets update the conserved quantities
             for (int s = 0; s < num_species; s++) {
+                species[s].eos->update_eint_from_T(&species[s].prim[0], num_cells + 2);
                 species[s].eos->update_p_from_eint(&species[s].prim[0], num_cells + 2);
                 species[s].eos->compute_auxillary(&species[s].prim[0], num_cells + 2);
                 species[s].eos->compute_conserved(&species[s].prim[0], &species[s].u[0], num_cells + 2);
             }
+            //cout<<endl;
         }
     //}
 //}

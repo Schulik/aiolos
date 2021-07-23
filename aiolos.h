@@ -349,6 +349,7 @@ public:
     Vector_t numdens_vector;
     Vector_t mass_vector;
     Vector_t temperature_vector;
+    Vector_t temperature_vector_augment;
 
     Matrix_t radiation_matrix_T;
     Matrix_t radiation_matrix_M;

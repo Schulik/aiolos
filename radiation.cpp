@@ -443,17 +443,37 @@ void c_Sim::update_temperatures_simple() {
     
     //Compute change in energy
     for (int j=0; j < num_cells+2; j++) {
-        for(int s=0; s<num_species; s++)
-            species[s].prim[j].temperature += (species[s].dS(j) + species[s].dG(j) ) * dt  / species[s].u[j].u1 / species[s].cv ;
+        for(int s=0; s<num_species; s++) {
+            species[s].prim[j].temperature      += (species[s].dS(j) + species[s].dG(j) ) * dt / species[s].u[j].u1 / species[s].cv ;
+            species[s].prim[j].internal_energy  += (species[s].dS(j) + species[s].dG(j) ) * dt / species[s].u[j].u1;
+            
+            if(steps > 605 && j == 25 && s == 2)
+                cout<<" In Updte_T_simple, T, j, steps, s =  "<<species[s].prim[j].temperature<<", "<<j<<", "<<steps<<", "<<s<<" dS, dG = "<<species[s].dS(j)<<", "<<species[s].dG(j)<<" dT = "<<(species[s].dS(j) + species[s].dG(j) ) * dt  / species[s].u[j].u1 / species[s].cv<<endl;
+                
+            if(species[s].prim[j].temperature < 0) {
+                
+                cout<<" In Updte_T_simple, T<0!!!, j, steps, s =  "<<j<<", "<<steps<<", "<<s<<" dS, dG = "<<species[s].dS(j)<<", "<<species[s].dG(j)<<" dT = "<<(species[s].dS(j) + species[s].dG(j) ) * dt  / species[s].u[j].u1 / species[s].cv<<endl;
+            }
+        }
+            
     }
-    
     
     // Update Temperatures
     for(int si=0; si<num_species; si++) {
             species[si].eos->update_eint_from_T(&(species[si].prim[0]), num_cells+2);
             species[si].eos->update_p_from_eint(&(species[si].prim[0]), num_cells+2);
-            species[si].eos->compute_conserved(&(species[si].prim[0]), &(species[si].u[0]), num_cells+2);        
+            species[si].eos->compute_conserved(&(species[si].prim[0]), &(species[si].u[0]), num_cells+2);       
+            
+            //For self-consistency
+            species[si].compute_pressure(species[si].u);
     }
     
+    //Debug
+    for (int j=0; j < num_cells+2; j++) {
+        for(int s=0; s<num_species; s++) {
+            if(steps > 605 && j == 25 && s == 2)
+                cout<<" AFTER Updte_T_simple, T =  "<<species[s].prim[j].temperature<<", "<<" p = "<<species[s].prim[j].pres<<" E = "<<species[s].u[j].u3<<" e = "<<species[2].prim[25].internal_energy<<endl;
+        }
+    }
     
 }
