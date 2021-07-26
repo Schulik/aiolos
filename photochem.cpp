@@ -43,7 +43,7 @@ double H_threebody_recombination(double T_e) {
     using std::pow;
 
     double x = 2 * 157807 / T_e;
-    return (1.005e-14 / (T_e * T_e * T_e)) * pow(x, -1.089) /
+    return 1.* (1.005e-14 / (T_e * T_e * T_e)) * pow(x, -1.089) /
            pow(1 + pow(x / 0.354, 0.874), 1.101);
 }
 double H_collisional_ionization(double T_e) {
@@ -369,8 +369,8 @@ void c_Sim::do_photochemistry() {
                 
                 double GammaH = 0.;
                 for (int b = 0; b < num_he_bands; b++) {
-                    GammaH += 0.25 * solar_heating(b) * (1 - 13.6 * ev_to_K * kb / photon_energies[b]) *
-                                std::exp(-radial_optical_depth_twotemp(j,b)) * (-std::expm1(-dtaus[b])) / dx[j];
+                    //GammaH += 0.25 * solar_heating(b)  * std::exp(-radial_optical_depth_twotemp(j,b)) * (-std::expm1(-dtaus[b])) / dx[j]; // 'fullionefficiency' runs
+                    GammaH += 0.25 * solar_heating(b)  * std::exp(-radial_optical_depth_twotemp(j,b)) * (-std::expm1(-dtaus[b])) * (1 - 13.6 * ev_to_K * kb / photon_energies[b]) / dx[j];
                 }
 
                 // Collisional heat exchange:

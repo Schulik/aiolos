@@ -266,7 +266,8 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
         }
         photon_energies = np_somevalue(num_he_bands, 20. * ev_to_K * kb);
         for(int b=0; b<num_he_bands; b++) {
-            photon_energies[b] = 1.24/( l_i[b + 1] ) * ev_to_K * kb ;
+            //photon_energies[b] = 1.24/( l_i[b + 1] ) * ev_to_K * kb ;
+            photon_energies[b] = 20. * ev_to_K * kb ;
             cout<<"Assigned to highenergy band b = "<<b<<" a photon energy of "<<photon_energies[b]/ev_to_K/kb<<" eV "<<endl;
             
         }

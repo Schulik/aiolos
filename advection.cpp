@@ -35,7 +35,7 @@ void c_Sim::execute() {
     int crashed_T = 0, crashed_J = 0;
     int crash_T_imin = num_cells+2, crash_T_imax = 0, crash_T_numcells = 0;
     int crash_J_imin = num_cells+2, crash_J_imax = 0, crash_J_numcells = 0;
-    double crashtime, crashed_temperature;
+    double crashtime, crashed_temperature, crashed_meanintensity;
     int crashtime_already_assigned = 0;
         
     cout<<endl<<"Beginning main loop with num_cells="<<num_cells<<" and timestep="<<dt<<" cflfactor="<<cflfactor<<" and num_species = "<<num_species<<endl;
@@ -312,7 +312,7 @@ void c_Sim::execute() {
             }
             
             if(crashed_T > 0) {
-                cout<<endl<<">>> CRASH <<< DUE TO NEGATIVE TEMPERATURES, crash_imin/imax = "<<crash_T_imin<<"/"<<crash_T_imax<<" sample T ="<<crashed_temperature<<" num of crashed cells/total cells = "<<crash_T_numcells<<"/"<<num_cells<<"  crashed species name = "<<species[crashed_T-1].speciesname<<endl; 
+                cout<<endl<<">>> CRASH <<< DUE TO NEGATIVE TEMPERATURES, crash_imin/imax = "<<crash_T_imin<<"/"<<crash_T_imax<<" sample T = "<<crashed_temperature<<" num of crashed cells/total cells = "<<crash_T_numcells<<"/"<<num_cells<<"  crashed species name = "<<species[crashed_T-1].speciesname<<endl; 
                 cout<<" @dt="<<dt<<" stepnum "<<steps<<" Crashtime "<<crashtime<<endl;
                 cout<<"Writing crash dump into last output and exiting program."<<endl;
             } 
@@ -322,24 +322,32 @@ void c_Sim::execute() {
             for(int i=num_cells; i>=0; i--)  {
                     if(Jrad_FLD(i,b) < 0) {
                         
-                        if(crashtime_already_assigned == 0) {
-                            crashtime = globalTime;
-                            crashtime_already_assigned = 1;
+                        if(Jrad_FLD(i,b) > -1e-10) {
+                           Jrad_FLD(i,b) *= -1.; 
                         }
-                        
-                        crashed_J = b+1;
-                        crash_J_imin = (i<crash_J_imin)? i : crash_J_imin;
-                        crash_J_imax = (i>crash_J_imax)? i : crash_J_imax;
-                        crash_J_numcells++;
-                        
-                        //cout<<" NEGATIVE RAD DENSITY at b/i = "<<b<<"/"<<i<<"  at timestep "<<dt<<" stepnum "<<steps<<" totaltime "<<globalTime<<endl;
-                        //cout<<" Writing crash dump into last output and exiting program."<<endl;
-                        globalTime = 1.1*t_max;
+                        else {
+                            
+                            if(crashtime_already_assigned == 0) {
+                                crashtime = globalTime;
+                                crashtime_already_assigned = 1;
+                            }
+                            
+                            crashed_meanintensity = Jrad_FLD(i,b);
+                            crashed_J = b+1;
+                            crash_J_imin = (i<crash_J_imin)? i : crash_J_imin;
+                            crash_J_imax = (i>crash_J_imax)? i : crash_J_imax;
+                            crash_J_numcells++;
+                            
+                            //cout<<" NEGATIVE RAD DENSITY at b/i = "<<b<<"/"<<i<<"  at timestep "<<dt<<" stepnum "<<steps<<" totaltime "<<globalTime<<endl;
+                            //cout<<" Writing crash dump into last output and exiting program."<<endl;
+                            globalTime = 1.1*t_max;    
+                            
+                        }
                     }
             }
             
             if(crashed_J > 0) {
-                cout<<endl<<">>> CRASH <<< DUE TO NEGATIVE J, crash_imin/imax = "<<crash_J_imin<<"/"<<crash_J_imax<<" num of crashed cells/total cells = "<<crash_J_numcells<<"/"<<num_cells<<"  crashed band number = "<<crashed_J-1<<endl; 
+                cout<<endl<<">>> CRASH <<< DUE TO NEGATIVE J, crash_imin/imax = "<<crash_J_imin<<"/"<<crash_J_imax<<" sample J = "<<crashed_meanintensity<<" num of crashed cells/total cells = "<<crash_J_numcells<<"/"<<num_cells<<"  crashed band number = "<<crashed_J-1<<endl; 
                 cout<<" @dt="<<dt<<" stepnum "<<steps<<" Crashtime "<<crashtime<<endl;
                 cout<<"Writing crash dump into last output and exiting program."<<endl;
             }
