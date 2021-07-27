@@ -65,11 +65,21 @@ double logint(double xa, int N, double* X, double* RI) {
 //
 //
 //
-// update_opacities(): The central source for all opacity information
-//
+// update_opacities(): The central source for all opacity information, for all in/out and high-energy bands
+//                     Values for opacity_avg_solar, opacity_avg_planck, opacity_avg_rosseland are read from file and initialized in io.cpp, c_Species::read_species_data(..    )
+//                     Values for optical depths are computed in update_dS(), after photochemistry, as this potentially changes densities
 //
 //
 ///////////////////////////////////////////////////////////
+void c_Sim::update_opacities() {
+ 
+    //
+    // Compute kappa based on a species individual density, temperature, irradiation temperature.
+    // Initial values are valid no matter whether we use the photochemistry module or not.
+    //
+    for(int s=0; s<num_species; s++)
+        species[s].update_opacities(); //now to be found in opacities.cpp
+}
 
 void c_Species::update_opacities() {
 
@@ -83,22 +93,26 @@ void c_Species::update_opacities() {
             
             //is_gas_like: Either constant or read-in opacities, with additional pressure broadening as suggested by Robinson & Catling 2013 Nat.Geo
             for(int j=0; j< num_cells+2; j++) {
-                for(int b=0; b<num_bands; b++) {
-                    
-                    opacity(j,b)         = opacity_avg(b) * (1. + pressure_broadening_factor * pow(prim[j].pres/1e5, pressure_broadening_exponent)); 
-                    opacity_planck(j,b)  = opacity_avg(b) * (1. + pressure_broadening_factor * pow(prim[j].pres/1e5, pressure_broadening_exponent)); 
-                    opacity_twotemp(j,b) = base->const_opacity_solar_factor * opacity_avg(b) * (1. + pressure_broadening_factor * pow(prim[j].pres/1e5, pressure_broadening_exponent)); 
+                
+                for(int b=0; b<num_bands_in; b++) {
+                    opacity_twotemp(j,b) = base->const_opacity_solar_factor * opacity_avg_solar(b) * (1. + pressure_broadening_factor * pow(prim[j].pres/1e5, pressure_broadening_exponent)); 
+                }
+                for(int b=0; b<num_bands_out; b++) {
+                    opacity(j,b)         = opacity_avg_rosseland(b) * (1. + pressure_broadening_factor * pow(prim[j].pres/1e5, pressure_broadening_exponent)); 
+                    opacity_planck(j,b)  = opacity_avg_planck(b) * (1. + pressure_broadening_factor * pow(prim[j].pres/1e5, pressure_broadening_exponent)); 
                 }
             }
         }
         else { //is_dust_like
             
             for(int j=0; j< num_cells+2; j++) {
-                for(int b=0; b<num_bands; b++) {
-                    
-                    opacity(j,b)        = opacity_avg(b);  
-                    opacity_planck(j,b) = opacity_avg(b); 
-                    opacity_twotemp(j,b)= opacity_avg(b); 
+                
+                for(int b=0; b<num_bands_in; b++) {
+                    opacity_twotemp(j,b)= opacity_avg_solar(b); 
+                }
+                for(int b=0; b<num_bands_out; b++) {
+                    opacity(j,b)        = opacity_avg_rosseland(b);  
+                    opacity_planck(j,b) = opacity_avg_planck(b); 
                 }
             }
         }
@@ -114,20 +128,28 @@ void c_Species::update_opacities() {
             
             //is_gas_like: Either constant or read-in opacities, with additional pressure broadening as suggested by Robinson & Catling 2013 Nat.Geo
             for(int j=0; j< num_cells+2; j++) {
-                for(int b=0; b<num_bands; b++) {
-                    opacity(j,b)        = base->freedman_opacity(prim[j].pres/1e6, prim[j].temperature, 0.); 
-                    opacity_planck(j,b) = base->freedman_opacity(prim[j].pres/1e6, prim[j].temperature, 0.);
+                
+                for(int b=0; b<num_bands_in; b++) {
                     opacity_twotemp(j,b)= base->const_opacity_solar_factor * base->freedman_opacity(prim[j].pres/1e6, prim[j].temperature, 0.);
                 }
+                for(int b=0; b<num_bands_out; b++) {
+                    opacity(j,b)        = base->freedman_opacity(prim[j].pres/1e6, prim[j].temperature, 0.); 
+                    opacity_planck(j,b) = base->freedman_opacity(prim[j].pres/1e6, prim[j].temperature, 0.);
+                }
+                
             }
         }
         else { //is_dust_like
             for(int j=0; j< num_cells+2; j++) {
-                for(int b=0; b<num_bands; b++) {
-                    opacity(j,b)        = opacity_avg(b);  
-                    opacity_planck(j,b) = opacity_avg(b); 
-                    opacity_twotemp(j,b)= opacity_avg(b); 
+                
+                for(int b=0; b<num_bands_in; b++) {
+                    opacity_twotemp(j,b)= opacity_avg_solar(b); 
                 }
+                for(int b=0; b<num_bands_out; b++) {
+                    opacity(j,b)        = opacity_avg_rosseland(b);  
+                    opacity_planck(j,b) = opacity_avg_planck(b);
+                }
+                
             }
         }
         
@@ -139,17 +161,17 @@ void c_Species::update_opacities() {
     else if (base->opacity_model == 'M') {
         
         for(int j=0; j< num_cells+2; j++) {
-            for(int b=0; b<num_bands; b++) {
+            
+            for(int b=0; b<num_bands_out; b++) {
                 opacity(j,b)        = base->const_opacity_rosseland_factor * base->opacity_semenov_malygin(1, prim[j].temperature, prim[j].density, prim[j].pres); 
                 opacity_planck(j,b) = base->const_opacity_planck_factor * base->opacity_semenov_malygin(0, prim[j].temperature, prim[j].density, prim[j].pres);
-                
-                if(b == num_bands-1)
-                    opacity_twotemp(j,b) = base->const_opacity_planck_factor * opacity_avg(b); 
+            }
+            
+            for(int b=0; b<num_bands_in; b++) {
+                if(b == num_bands_in-1)
+                    opacity_twotemp(j,b) = base->const_opacity_planck_factor * opacity_avg_solar(b); 
                 else
-                    opacity_twotemp(j,b) = opacity_avg(b); 
-                
-                //base->opacity_semenov_malygin(0, base->T_star, prim[j].density, prim[j].density * prim[j].temperature * kb/(mass_amu*amu));
-                //opacity_twotemp(j,b)= base->opacity_semenov_malygin(1, prim[j].temperature, prim[j].density, prim[j].pres); 
+                    opacity_twotemp(j,b) = opacity_avg_solar(b); 
             }
         }
         
@@ -180,21 +202,28 @@ void c_Species::update_opacities() {
                 else
                     k = k0 / (1 + std::pow(T/T0, -BETA)) ;
 
-                for(int b=0; b<num_bands; b++) {
-                    opacity(j,b)         = k ;
-                    opacity_planck(j,b)  = k ; 
+                for(int b=0; b<num_bands_in; b++) {
                     opacity_twotemp(j,b) = ks ;
+                }
+                for(int b=0; b<num_bands_out; b++) {
+                    opacity(j,b)         = k ;
+                    opacity_planck(j,b)  = k ;
                 }
             }
             
         } else {
-            // Choose some low value for a gas species
-            for(int j=0; j< num_cells+2; j++)
-                for(int b=0; b<num_bands; b++) {
-                    opacity(j,b)         = 1e-20 ;
-                    opacity_planck(j,b)  = 1e-20 ;
-                    opacity_twotemp(j,b) = 1e-20 ;
+            // Choose some default low value for a gas species
+            for(int j=0; j< num_cells+2; j++) {
+                
+                for(int b=0; b<num_bands_in; b++) {
+                    opacity_twotemp(j,b) = 1e-4 ;
                 }
+                for(int b=0; b<num_bands_out; b++) {
+                    opacity(j,b)         = 1e-4 ;
+                    opacity_planck(j,b)  = 1e-4 ;
+                }
+                
+            }   
         }
         
         if(debug > 3) {
@@ -204,10 +233,13 @@ void c_Species::update_opacities() {
     else { //opacity_model == 'C', the default
         
         for(int j=0; j< num_cells+2; j++) {
-            for(int b=0; b<num_bands; b++) {
+            
+            for(int b=0; b<num_bands_in; b++) {
+                opacity_twotemp(j,b)= base->const_opacity_solar_factor * opacity_avg_solar(b) * (1. + pressure_broadening_factor * pow(prim[j].pres/1e5, pressure_broadening_exponent)); 
+            }
+            for(int b=0; b<num_bands_out; b++) {
                 opacity(j,b)        = const_opacity * (1. + pressure_broadening_factor * pow(prim[j].pres/1e5, pressure_broadening_exponent)); 
                 opacity_planck(j,b) = const_opacity * (1. + pressure_broadening_factor * pow(prim[j].pres/1e5, pressure_broadening_exponent)); 
-                opacity_twotemp(j,b)= base->const_opacity_solar_factor * opacity_avg(b) * (1. + pressure_broadening_factor * pow(prim[j].pres/1e5, pressure_broadening_exponent)); 
             }
         }
         
@@ -670,20 +702,3 @@ void c_Sim::kappa_landscape()
   		fflush (stdout);
 	}
 }
-
-
-/*
-double c_Sim::planck_opacity_in_band(double T, int b) {
-    
-    double tempopa = 0.;
-    double 
-    
-    for(int p = 0; p < num_plancks; p++) {
-        tempopa += compute_planck_function_integral3(l_i[b],l_i[b+1],T) * sigma_rad / pi * pow(T,4.) * opac
-        
-        
-    }
-    
-    
-    return tempopa;
-}*/

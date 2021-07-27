@@ -38,9 +38,15 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
         geometry         = read_parameter_from_file<Geometry>(filename, "PARI_GEOMETRY", debug, Geometry::cartesian).value;
         order            = read_parameter_from_file<IntegrationType>(filename, "PARI_ORDER", debug, IntegrationType::second_order).value;
         
-        lambda_min       = read_parameter_from_file<double>(filename,"PARI_LAM_MIN", debug, 1e-1).value;
-        lambda_max       = read_parameter_from_file<double>(filename,"PARI_LAM_MAX", debug, 10.).value;
-        lambda_per_decade= read_parameter_from_file<double>(filename,"PARI_LAM_PER_DECADE", debug, 10.).value;
+        num_bands_in     = read_parameter_from_file<int>(filename,"PARI_NUM_BANDS", debug, 1).value;
+        num_bands_out    = read_parameter_from_file<int>(filename,"NUM_BANDS_OUT", debug, num_bands_in).value;
+        lambda_min_in       = read_parameter_from_file<double>(filename,"PARI_LAM_MIN", debug, 1e-1).value;
+        lambda_max_in       = read_parameter_from_file<double>(filename,"PARI_LAM_MAX", debug, 10.).value;
+        lambda_per_decade_in= read_parameter_from_file<double>(filename,"PARI_LAM_PER_DECADE", debug, 10.).value;
+        lambda_min_out       = read_parameter_from_file<double>(filename,"PARI_LAM_MIN_OUT", debug, lambda_min_in).value;
+        lambda_max_out       = read_parameter_from_file<double>(filename,"PARI_LAM_MAX_OUT", debug, lambda_max_in).value;
+        lambda_per_decade_out= read_parameter_from_file<double>(filename,"PARI_LAM_PER_DECADE_OUT", debug, lambda_per_decade_in).value;
+        
         star_mass        =  read_parameter_from_file<double>(filename,"PARI_MSTAR", debug, 1.).value;
         star_mass        *= msolar;
         T_star           = read_parameter_from_file<double>(filename,"PARI_TSTAR", debug, 5777.).value;
@@ -48,7 +54,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
         UV_star          = read_parameter_from_file<double>(filename,"PARI_UVSTAR", debug, 0.).value;
         X_star           = read_parameter_from_file<double>(filename,"PARI_XSTAR", debug, 0.).value;
         Lyalpha_star     = read_parameter_from_file<double>(filename,"PARI_LYASTAR", debug, 0.).value;
-        num_bands        = read_parameter_from_file<int>(filename,"PARI_NUM_BANDS", debug, 1).value;
+        
         T_core           = read_parameter_from_file<double>(filename,"PARI_TPLANET", debug, 200.).value;
         use_planetary_temperature = read_parameter_from_file<int>(filename,"USE_PLANET_TEMPERATURE", debug, 0).value;
         core_cv           = read_parameter_from_file<double>(filename,"PARI_CORE_CV", debug, 1.e9).value;
@@ -212,40 +218,72 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
         phi               = np_zeros(num_cells+2);
         total_pressure    = np_zeros(num_cells+2);
         
-        if(num_bands < 1) {
-            cout<<" In INIT RADIATION, invalid num_bands = "<<num_bands<<" changing to num_bands = 1."<<endl;
-            
-            num_bands = 1;
+        if(num_bands_in < 1) {
+            cout<<" In INIT RADIATION, invalid num_bands_in = "<<num_bands_in<<" changing to num_bands_in = 1."<<endl;
+            num_bands_in = 1;
+        }
+        if(num_bands_out < 1) {
+            cout<<" In INIT RADIATION, invalid num_bands_out = "<<num_bands_out<<" changing to num_bands_out = 1."<<endl;
+            num_bands_out = 1;
         }
         
-        l_i       = np_zeros(num_bands+1);    // Wavelenght bin boundaries
-        l_i12     = np_zeros(num_bands);      // Wavelength bin midpoints or averages
-        BAND_IS_HIGHENERGY = inp_zeros(num_bands); //We save wether a band is a highenergy band. This is important for which solver is activated.
+        l_i_in        = np_zeros(num_bands_in+1);    // Wavelenght bin boundaries
+        l_i12_in      = np_zeros(num_bands_in);      // Wavelength bin midpoints or averages
+        l_i_out       = np_zeros(num_bands_out+1);    // Wavelenght bin boundaries
+        l_i12_out     = np_zeros(num_bands_out);      // Wavelength bin midpoints or averages
+        BAND_IS_HIGHENERGY = inp_zeros(num_bands_in); //We save wether a band is a highenergy band. This is important for which solver is activated.
         
-        l_i[0]         = lminglobal/100.;     //Transform wavelengths into microns
-        l_i[num_bands] = lmaxglobal/100.;
+        l_i_in[0]              = lminglobal/100.;     //Transform wavelengths into microns
+        l_i_in[num_bands_in]   = lmaxglobal/100.;
+        l_i_out[0]             = lminglobal/100.;     //Transform wavelengths into microns
+        l_i_out[num_bands_out] = lmaxglobal/100.;
         
-        if(num_bands == 2) {
-            l_i[1]   = 0.5*(lambda_max + lambda_min);
-            l_i12[0] = lambda_min;
-            l_i12[1] = lambda_max;
+        /////////////////////////////////////////////////////////
+        ////////////////////////////////Bands in
+        /////////////////////////////////////////////////////////
+        if(num_bands_in == 2) {
+            l_i_in[1]   = 0.5*(lambda_max_in + lambda_min_in);
+            l_i12_in[0] = lambda_min_in;
+            l_i12_in[1] = lambda_max_in;
         }
-        else if(num_bands > 2)
+        else if(num_bands_in > 2)
         {
-            //double dlogl = pow(10., 1./lambda_per_decade);
-            //double dlogl2 = pow(lambda_max/lambda_min, 1./(num_bands-2));
-            l_i[1]             = lambda_min;
-            l_i[num_bands-1]   = lambda_max;
-            double dlogl2      = pow(lambda_max/lambda_min, 1./(num_bands-2));
-            //l_i[0] = lambda_min;
+            l_i_in[1]                = lambda_min_in;
+            l_i_in[num_bands_in-1]   = lambda_max_in;
+            double dlogl2      = pow(lambda_max_in/lambda_min_in, 1./(num_bands_in-2));
             
-            for(int b=2; b<num_bands-1; b++) {
-                l_i[b]      = l_i[b-1] * dlogl2;
-                cout<<" in NUM_BANDS>2, b = "<<b<<" l_i[b] = "<<l_i[b]<<endl;
+            for(int b=2; b<num_bands_in-1; b++) {
+                l_i_in[b]      = l_i_in[b-1] * dlogl2;
+                cout<<" in NUM_BANDS>2, b = "<<b<<" l_i_in[b] = "<<l_i_in[b]<<endl;
             }
             
-            for(int b=0; b<num_bands; b++) {
-                l_i12[b]  = pow( 10., 0.5 * (std::log10(l_i[b]) + std::log10(l_i[b+1])));   
+            for(int b=0; b<num_bands_in; b++) {
+                l_i12_in[b]  = pow( 10., 0.5 * (std::log10(l_i_in[b]) + std::log10(l_i_in[b+1])));   
+                
+            }
+        }
+        /////////////////////////////////////////////////////////
+        ////////////////////////////////Bands out
+        /////////////////////////////////////////////////////////
+        if(num_bands_out == 2) {
+            l_i_out[1]   = 0.5*(lambda_max_out + lambda_min_out);
+            l_i12_out[0] = lambda_min_out;
+            l_i12_out[1] = lambda_max_out;
+        }
+        else if(num_bands_out > 2)
+        {
+            l_i_out[1]             = lambda_min_out;
+            l_i_out[num_bands_out-1]   = lambda_max_out;
+            double dlogl2      = pow(lambda_max_out/lambda_min_out, 1./(num_bands_out-2));
+            //l_i[0] = lambda_min;
+            
+            for(int b=2; b<num_bands_out-1; b++) {
+                l_i_out[b]      = l_i_out[b-1] * dlogl2;
+                cout<<" in NUM_BANDS>2, b = "<<b<<" l_i_out[b] = "<<l_i_out[b]<<endl;
+            }
+            
+            for(int b=0; b<num_bands_out; b++) {
+                l_i12_out[b]  = pow( 10., 0.5 * (std::log10(l_i_out[b]) + std::log10(l_i_out[b+1])));   
                 
             }
         }
@@ -255,23 +293,23 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
         // Low-energy bands directly input solar radiation into the thermal energy. High-energy bands ionize and are therefore more complicated to treat.
         //
         num_he_bands = 0;
-        for(int b=0; b<num_bands; b++) {
+        for(int b=0; b<num_bands_in; b++) {
             BAND_IS_HIGHENERGY[b] = 0;
             
             if(photochemistry_level > 0)
-                if (l_i[b + 1] < 0.09116) {
+                if (l_i_in[b + 1] < 0.09116) {
                     BAND_IS_HIGHENERGY[b] = 1;
                     num_he_bands++;
                 }
         }
         photon_energies = np_somevalue(num_he_bands, 20. * ev_to_K * kb);
         for(int b=0; b<num_he_bands; b++) {
-            //photon_energies[b] = 1.24/( l_i[b + 1] ) * ev_to_K * kb ;
-            photon_energies[b] = 20. * ev_to_K * kb ;
+            photon_energies[b] = 1.24/( l_i_in[b + 1] ) * ev_to_K * kb ;
+            //photon_energies[b] = 20. * ev_to_K * kb ;
             cout<<"Assigned to highenergy band b = "<<b<<" a photon energy of "<<photon_energies[b]/ev_to_K/kb<<" eV "<<endl;
-            
         }
 
+        cout<<" WAVELENGTH GRID FINISHED. num_bands_in / num_he_bands / num_bands_out = "<<num_bands_in<<" / "<<num_he_bands<<" / "<<num_bands_out<<endl;
 
         /*
         cout<<"   ATTENTION: Bands go from "<<l_i[0]<<" till "<<l_i[num_bands]<<", while lmin/lmax was given as "<<lambda_min<<"/"<<lambda_max<<endl;
@@ -422,6 +460,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
             err<<" FIRST AND LAST DX = "<<dx[0]<<" / "<<dx[num_cells+1]<<endl;
             throw std::runtime_error(err.str()) ;
         }
+        cout<<endl;
         
         //
         //Computing the metric factors for 2nd order non-uniform differentials
@@ -489,7 +528,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
         for(int s = 0; s < num_species; s++) {
             species.push_back(c_Species(this, filename, speciesfile, s, debug)); // Here we call the c_Species constructor
         }
-        
+        cout<<endl;
         //
         //
         // After successful init, compute all primitive quantities and determine first timestep
@@ -551,13 +590,13 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
     radiation_cv_vector  = Vector_t(num_species);
     radiation_T3_vector  = Vector_t(num_species);
     
-    previous_monitor_J = std::vector<double>(num_bands) ;
+    previous_monitor_J = std::vector<double>(num_bands_out) ;
     previous_monitor_T = std::vector<double>(num_species) ;
     
-    solar_heating = Eigen::VectorXd::Zero(num_bands,  1);
-    S_band        = Eigen::MatrixXd::Zero(num_cells+2, num_bands);
-    dS_band       = Eigen::MatrixXd::Zero(num_cells+2, num_bands);
-    dS_band_zero  = Eigen::MatrixXd::Zero(num_cells+2, num_bands);
+    solar_heating = Eigen::VectorXd::Zero(num_bands_in,  1);
+    S_band        = Eigen::MatrixXd::Zero(num_cells+2, num_bands_in);
+    dS_band       = Eigen::MatrixXd::Zero(num_cells+2, num_bands_in);
+    dS_band_zero  = Eigen::MatrixXd::Zero(num_cells+2, num_bands_in);
     planck_matrix = Eigen::MatrixXd::Zero(num_plancks, 2);
     
     //
@@ -610,10 +649,10 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
     if(debug > 0) cout<<"Init: Assigning stellar luminosities 2."<<endl;
     
     double templumi = 0;
-    for(int b=0; b<num_bands; b++) {
+    for(int b=0; b<num_bands_in; b++) {
         if(debug > 0) cout<<"Init: Assigning stellar luminosities. b ="<<b<<endl;
         
-        if(num_bands == 1) {
+        if(num_bands_in == 1) {
             solar_heating(b)  = sigma_rad * pow(T_star,4.) * pow(R_star*rsolar,2.)/pow(planet_semimajor*au,2.) + UV_star * 1.;
             templumi += solar_heating(b);
             
@@ -621,24 +660,23 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
         }
         else{
             cout<<"SOLAR HEATING in bin "<<b;
-            cout<<" from/to lmin/lmax"<<l_i[b];
-            cout<<"/"<<l_i[b+1]<<" with T_star = "<<T_star;
+            cout<<" from/to lmin/lmax"<<l_i_in[b];
+            cout<<"/"<<l_i_in[b+1]<<" with T_star = "<<T_star;
             
-            solar_heating(b)  = sigma_rad * pow(T_star,4.) * pow(R_star*rsolar,2.)/pow(planet_semimajor*au,2.) * compute_planck_function_integral3(l_i[b], l_i[b+1], T_star);
+            solar_heating(b)  = sigma_rad * pow(T_star,4.) * pow(R_star*rsolar,2.)/pow(planet_semimajor*au,2.) * compute_planck_function_integral3(l_i_in[b], l_i_in[b+1], T_star);
             templumi += solar_heating(b);
             
-            if(l_i[b+1] < 1e-1 && l_i[b+1] > 1e-2) { //Detect the EUV band 
+            if(l_i_in[b+1] < 1e-1 && l_i_in[b+1] > 0.0961) { //Detect the EUV band 
                 solar_heating(b) += UV_star/(4.*pi*pow(planet_semimajor*au,2.));
                 cout<<endl<<" band "<<b<<" detected as UV band. Assigning UV flux "<<UV_star/(4.*pi*pow(planet_semimajor*au,2.))<<" based on UV lumi "<<UV_star<<endl;
             }
                 
             
-            if(l_i[b+1] <= 1e-2 ) { //Detect the X ray band
+            if(l_i_in[b+1] <= 0.0961 ) { //Detect the X ray band
                 solar_heating(b) += X_star/(4.*pi*pow(planet_semimajor*au,2.));
                 cout<<endl<<" band "<<b<<" detected as X band. Assigning X flux "<<X_star/(4.*pi*pow(planet_semimajor*au,2.))<<" based on X lumi "<<X_star<<endl;
             } 
                 
-            
             cout<<" is "<<solar_heating(b)<<endl;
             
         }
@@ -647,35 +685,27 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
     
     double totallumi = 0;
     double totallumiincr = 0;
-    for(int b=0; b < num_bands; b++) {
+    for(int b=0; b < num_bands_in; b++) {
         
-        totallumiincr = compute_planck_function_integral3(l_i[b], l_i[b+1], T_star);
+        totallumiincr = compute_planck_function_integral3(l_i_in[b], l_i_in[b+1], T_star);
         totallumi     += totallumiincr;
-        cout<<" INIT BANDS, b = "<<b<<" l_i[b] = "<<l_i[b]<<" l_i[b+1] = "<<l_i[b+1]<<" l_i12[b] = "<<l_i12[b]<<" fraction = "<<totallumiincr<<" fraction for T=1430 K = "<<compute_planck_function_integral3(l_i[b], l_i[b+1], 1430.)<<endl;
+        cout<<" INIT BANDS, b = "<<b<<" l_i_in[b] = "<<l_i_in[b]<<" l_i[b+1] = "<<l_i_in[b+1]<<" l_i12[b] = "<<l_i12_in[b]<<" fraction = "<<totallumiincr<<" fraction for T=1430 K = "<<compute_planck_function_integral3(l_i_in[b], l_i_in[b+1], 1430.)<<endl;
     }
     cout<<" Total lumi / sigma T^4/pi is = "<<totallumi<<endl;
     
-    total_opacity        = Eigen::MatrixXd::Zero(num_cells+2, num_bands);
-    cell_optical_depth   = Eigen::MatrixXd::Zero(num_cells+2, num_bands);
-    radial_optical_depth = Eigen::MatrixXd::Zero(num_cells+2, num_bands);
+    total_opacity        = Eigen::MatrixXd::Zero(num_cells+2, num_bands_out);
+    cell_optical_depth   = Eigen::MatrixXd::Zero(num_cells+2, num_bands_out);
+    radial_optical_depth = Eigen::MatrixXd::Zero(num_cells+2, num_bands_out);
 
-    total_opacity_twotemp        = Eigen::MatrixXd::Zero(num_cells+2, num_bands);
-    cell_optical_depth_twotemp   = Eigen::MatrixXd::Zero(num_cells+2, num_bands);
-    radial_optical_depth_twotemp = Eigen::MatrixXd::Zero(num_cells+2, num_bands);
-    
-    T_FLD          = Eigen::MatrixXd::Zero(num_cells+2, num_species);
-    T_FLD2         = Eigen::MatrixXd::Zero(num_cells+2, num_species);
-    T_FLD3         = Eigen::MatrixXd::Zero(num_cells+2, num_species);
+    total_opacity_twotemp        = Eigen::MatrixXd::Zero(num_cells+2, num_bands_in);
+    cell_optical_depth_twotemp   = Eigen::MatrixXd::Zero(num_cells+2, num_bands_in);
+    radial_optical_depth_twotemp = Eigen::MatrixXd::Zero(num_cells+2, num_bands_in);
     
     Etot_corrected = Eigen::MatrixXd::Zero(num_cells+2, 1);
     
-    Jrad_FLD       = Eigen::MatrixXd::Zero(num_cells+2, num_bands);
-    Jrad_FLD2      = Eigen::MatrixXd::Zero(num_cells+2, num_bands);
-    Jrad_FLD3      = Eigen::MatrixXd::Zero(num_cells+2, num_bands);
-    Jrad_init      = Eigen::MatrixXd::Zero(num_cells+2, num_bands);
-    Jrad_FLD_total = Eigen::VectorXd::Zero(num_cells+2,  1);
-    Jrad_FLD_total2= Eigen::VectorXd::Zero(num_cells+2,  1);
-    tridiag        = BlockTriDiagSolver<Eigen::Dynamic>(num_cells+2, num_bands + num_species) ;
+    Jrad_FLD       = Eigen::MatrixXd::Zero(num_cells+2, num_bands_out);
+    Jrad_init      = Eigen::MatrixXd::Zero(num_cells+2, num_bands_out);
+    tridiag        = BlockTriDiagSolver<Eigen::Dynamic>(num_cells+2, num_bands_out + num_species) ;
     
     double rade_l = read_parameter_from_file<double>(filename,"PARI_RADSHOCK_ERL", debug, 1.).value;
     double rade_r = read_parameter_from_file<double>(filename,"PARI_RADSHOCK_ERR", debug, 1.).value;
@@ -684,7 +714,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
     
     for(int j = 0; j < num_cells+1; j++) {
         
-        if(num_bands == 1)  {
+        if(num_bands_out == 1)  {
             for(int s = 0; s< num_species; s++){
                 
                 //Jrad_FLD(j,0) += rad_energy_multipier * sigma_rad*pow(species[s].prim[j].temperature,4) / pi;
@@ -722,34 +752,29 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
                 
                 if(debug > 1) {
                 //if(debug > 1 && j==5) {
-                    cout<<" Jrad("<<j<<","<<0<<") = "<<Jrad_FLD(j,0)<<" dJrad_species["<<s<<"] = "<<rad_energy_multiplier * compute_planck_function_integral3(l_i[0], l_i[1], species[s].prim[j].temperature)<<" T_rad = "<<pow(pi*Jrad_FLD(j,0)/sigma_rad,0.25)<<" at Tgas = "<<species[s].prim[j].temperature<<endl;
+                    cout<<" Jrad("<<j<<","<<0<<") = "<<Jrad_FLD(j,0)<<" dJrad_species["<<s<<"] = "<<rad_energy_multiplier * compute_planck_function_integral3(l_i_out[0], l_i_out[1], species[s].prim[j].temperature)<<" T_rad = "<<pow(pi*Jrad_FLD(j,0)/sigma_rad,0.25)<<" at Tgas = "<<species[s].prim[j].temperature<<endl;
                 }
                     
             }
         } else {
             
-            for(int b = 0; b < num_bands; b++) {
+            for(int b = 0; b < num_bands_out; b++) {
                 for(int s = 0; s< num_species; s++){
-                    Jrad_FLD(j,b)  = rad_energy_multiplier * compute_planck_function_integral3(l_i[b], l_i[b+1], species[s].prim[j].temperature) * sigma_rad*pow(species[s].prim[j].temperature,4) / pi;
+                    Jrad_FLD(j,b)  = rad_energy_multiplier * compute_planck_function_integral3(l_i_out[b], l_i_out[b+1], species[s].prim[j].temperature) * sigma_rad*pow(species[s].prim[j].temperature,4) / pi;
                     if(Jrad_FLD(j,b) < 1e-50)
                         Jrad_FLD(j,b) = 1e-50;
                     
                     Jrad_init(j,b) = Jrad_FLD(j,b);
                     if(debug > 1 && j==5) {
-                        cout<<" Jrad("<<j<<","<<b<<") = "<<Jrad_FLD(j,b)<<" dJrad_species["<<s<<"] = "<<rad_energy_multiplier * compute_planck_function_integral3(l_i[b], l_i[b+1], species[s].prim[j].temperature)<<" at T ="<<species[s].prim[j].temperature<<endl; 
+                        cout<<" Jrad("<<j<<","<<b<<") = "<<Jrad_FLD(j,b)<<" dJrad_species["<<s<<"] = "<<rad_energy_multiplier * compute_planck_function_integral3(l_i_out[b], l_i_out[b+1], species[s].prim[j].temperature)<<" at T ="<<species[s].prim[j].temperature<<endl; 
                      }
                 }
             }
         }
         
     }
-        
-        
-        
-        
-        
     
-    cout<<" IN INIT: FINISHED INIT. RETURNING TO MAIN NOW."<<endl;
+    cout<<" IN INIT: FINISHED INIT. RETURNING TO MAIN NOW."<<endl<<endl;
 }
 
 
@@ -768,7 +793,8 @@ c_Species::c_Species(c_Sim *base_simulation, string filename, string species_fil
         base               = base_simulation;
         this_species_index = species_index;
         num_cells          = base->num_cells;
-        num_bands          = base->num_bands;
+        num_bands_in       = base->num_bands_in;
+        num_bands_out      = base->num_bands_out;
         this->workingdir   = base->workingdir;
         this->debug        = debug;
         
@@ -787,7 +813,6 @@ c_Species::c_Species(c_Sim *base_simulation, string filename, string species_fil
         TEMPERATURE_BUMP_STRENGTH    = read_parameter_from_file<double>(filename,"TEMPERATURE_BUMP_STRENGTH", debug, 0.).value; 
         pressure_broadening_factor   = read_parameter_from_file<double>(filename,"PRESSURE_BROADENING", debug, 0.).value; 
         pressure_broadening_exponent = read_parameter_from_file<double>(filename,"BROADENING_EXP", debug, 1.).value; 
-        
         
         if(debug > 0) cout<<"        Species["<<species_index<<"] Init: Finished reading boundaries."<<endl;
         if(debug > 0) cout<<"         Boundaries used in species["<<speciesname<<"]: "<<boundary_left<<" / "<<boundary_right<<endl;
@@ -957,10 +982,12 @@ c_Species::c_Species(c_Sim *base_simulation, string filename, string species_fil
         
         if(debug > 0) cout<<"        Species["<<species_index<<"]: Init done."<<endl;
         
-        opacity                = Eigen::MatrixXd::Zero(num_cells+2, num_bands); //num_cells * num_bands
-        opacity_planck         = Eigen::MatrixXd::Zero(num_cells+2, num_bands); //num_cells * num_bands
-        opacity_twotemp        = Eigen::MatrixXd::Zero(num_cells+2, num_bands); //num_cells * num_bands
-        fraction_total_opacity = Eigen::MatrixXd::Zero(num_cells+2, num_bands); //num_cells * num_bands
+        opacity                = Eigen::MatrixXd::Zero(num_cells+2, num_bands_out); //num_cells * num_bands_out
+        opacity_planck         = Eigen::MatrixXd::Zero(num_cells+2, num_bands_out); //num_cells * num_bands_out
+        opacity_twotemp        = Eigen::MatrixXd::Zero(num_cells+2, num_bands_in); //num_cells * num_bands_in
+        fraction_total_solar_opacity = Eigen::MatrixXd::Zero(num_cells+2, num_bands_in); //num_cells * num_bands_in
+        
+        //NOTE: If the chosen opacity model is such that a *.opa file is read-in, then this initialization can be found in io.cpp, in void c_Species::read_species_data(string filename, int species_index)
     
 }
 
@@ -1077,7 +1104,9 @@ void c_Species::initialize_hydrostatic_atmosphere(string filename) {
     
     //makeshift density fix
     base->density_floor = read_parameter_from_file<double>(filename,"DENSITY_FLOOR", debug, 1.e-20).value;
-    cout<<"FIXING SMALL DENSITIES to density floor ="<<base->density_floor<<endl;
+    if(this_species_index == 0)
+        cout<<"FIXING SMALL DENSITIES to density floor ="<<base->density_floor<<endl;
+    
     for(int i = 0; i<num_cells+1; i++) {
             double floor = base->density_floor * mass_amu ;
             if(u[i].u1 < floor) {
@@ -1087,8 +1116,10 @@ void c_Species::initialize_hydrostatic_atmosphere(string filename) {
     }
     
     if(base->init_T_temp > 2.7) {
-            cout<<" In INIT: Overwriting T with user-defined temperature:"<<base->init_T_temp;
-            
+        
+            if(this_species_index == 0)
+                cout<<" In INIT: Overwriting T with user-defined temperature:"<<base->init_T_temp;
+                
             for(int i=num_cells; i>=0; i--)  {
                 
                 //if(x_i12[i]<2.e10) {
@@ -1141,10 +1172,10 @@ void c_Species::initialize_hydrostatic_atmosphere(string filename) {
                 cout<<"In initwind: First smoothed factor = "<<smoothed_factor<<endl;
         }
         
-        cout<<"            Ended hydrostatic construction for species "<<speciesname<<", last smoothed factor was "<<smoothed_factor<<" while  density_excess="<<density_excess<<" r_b="<<bondi_radius<<endl;
+        cout<<"@@@ Ended hydrostatic construction for species "<<speciesname<<", last smoothed factor was "<<smoothed_factor<<" while  density_excess="<<density_excess<<" r_b="<<bondi_radius<<endl<<endl;
     }
     else
-        cout<<"            Ended hydrostatic construction for species "<<speciesname<<endl;
+        cout<<"@@@ Ended hydrostatic construction for species "<<speciesname<<endl<<endl;
     
     //TODO:Give some measure if hydrostatic construction was also successful, and give warning if not.
 

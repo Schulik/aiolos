@@ -302,7 +302,7 @@ void c_Sim::do_photochemistry() {
                 
                 for (int b = 0; b < num_he_bands; b++) {
                     Gamma0[b] = 0.25 * solar_heating(b) / photon_energies[b] * std::exp(-radial_optical_depth_twotemp(j+1,b)) / dx[j];
-                    dtaus[b]  = species[0].opacity_twotemp(j, b) * (nX[0] + nX[1]) * mX[0] * dx[j];
+                    dtaus[b]  = species[0].opacity_twotemp(j, b) * (nX[0] + nX[1]) * mX[0] * dx[j]; //TODO: Replace this approx with the actual HE optd values, but get everything else to run properly first
                 }
                 
                 // Update the ionization fractions
@@ -426,31 +426,38 @@ void c_Sim::do_photochemistry() {
                 if(steps > 605e6 && j == 25)
                     cout<<" steps, j, GH, dt= "<<steps<<", "<<j<<", "<<GammaH<<", "<<dt<<";; opdt, dtau, dS[2], dG[2], Te, Tx[2] = "<<radial_optical_depth_twotemp(j+1,0)<<", "<<dtaus[0]<<", "<<heating[2]<<", "<<cooling[2]<<", "<<Te<<", "<<species[2].prim[j].temperature<<endl;
 
-                //TODO: This might need to be called for all bands. When H, p+ and e- densities changes, so do their opacities across all bands, including low-energy bands.
-                //TODO: This needs to be ~k_rosseland, not k_Planck,solar. However k_rosseland in the UV is needed for this.
                 
+                //
+                // The following loop only documents quantities consistent with the ionization found. 
+                //
                 for (int b = 0; b < num_he_bands; b++) {   
-                    total_opacity(j,b)                = species[0].opacity(j,b)          * (nX[0] + nX[1]) * mX[0]; //TODO: Assign sensible opacities to electrons and protons
-                    total_opacity_twotemp(j,b)        = species[0].opacity_twotemp(j, b) * (nX[0] + nX[1]) * mX[0] ;
+                    
                     cell_optical_depth_twotemp(j,b)   = dtaus[b];
+                    total_opacity_twotemp(j,b)        = dtaus[b]/dx[j];
+                    for(int s=0; s<num_species; s++) 
+                        species[s].fraction_total_solar_opacity(j,b) = species[s].opacity_twotemp(j,b) * species[s].u[j].u1 * dx[j] / cell_optical_depth_twotemp(j,b);
                 
                     S_band(j,b) = solar_heating(b) * std::exp(-radial_optical_depth_twotemp(j,b)); //No factor 0.25 here, as we want to see the unaveraged radiation we put in, consistent with low-energy bands
                     dS_band(j,b) = 0.25 * solar_heating(b) * (1 - 13.6 * ev_to_K * kb / photon_energies[b]) *
                                 std::exp(-radial_optical_depth_twotemp(j,b)) * (-std::expm1(-dtaus[b])) / dx[j];
                 }
                 
+                //NOTE: All this implies no direct highenergy heating for species that are not involved in the highenergy process
+                
+                //
+                // If this temperature solver is used, we already found the new temperatures. NOT consistent with more than 3 species, which are HI, HII, and e-.
+                //
                 if(use_rad_fluxes==0) {
                     Eigen::Matrix<double, 3, 1> newT = heat._compute_T(Te);
                     for (int s = 0; s < 3; s++)
                         species[s].prim[j].temperature = newT(s);
                 }
-                    //Assign temperatures here directly, done
                 else {}
                     //Don't assign, but keep dS and temperature exchange terms for later.
                         
                     //In case of more species than 3, also keep dS and temperature exchange for later
-                        
                     //In case you dont use neither photochemistry nor radtrans, you shouoldn't be here, and instead just do a heat exchange solution
+                    //NOTE: Simple recommendation: In case of more than 3 species AND photochemistry, just use the full rad solver, it's faster anyway
                 
                 for (int s = 0; s < 3; s++) {
                     //Even in cases when radiative transport is not used, we want to document those quanitites in the output

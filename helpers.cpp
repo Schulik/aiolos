@@ -131,7 +131,6 @@ vector<string> stringsplit(const string& str, const string& delim)
     while (pos < str.length() && prev < str.length());
     return tokens;
 }
-
     
 //
 //
@@ -202,7 +201,7 @@ double c_Sim::compute_planck_function_integral3(double lmin, double lmax, double
     double lT_min;
     double lT_max;
 
-    if (num_bands == 1)
+    if (num_bands_out == 1)
         return 1 ;
     
     if(temperature < 2.71) {

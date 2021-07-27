@@ -318,7 +318,7 @@ void c_Sim::execute() {
             } 
                     
         }
-        for(int b = 0; b < num_bands; b++) {
+        for(int b = 0; b < num_bands_out; b++) {
             for(int i=num_cells; i>=0; i--)  {
                     if(Jrad_FLD(i,b) < 0) {
                         

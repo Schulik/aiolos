@@ -229,9 +229,9 @@ public:
     int num_species;
     std::vector<c_Species> species;
     
-    int num_bands;
+    int num_bands_in;
+    int num_bands_out;
     int num_he_bands;
-    int num_solarbands;
     int num_plancks = 512;
     int i_wien;
     int i_rayleighjeans;
@@ -260,9 +260,12 @@ public:
     std::vector<double> source_pressure_prefactor_right;
 
     double lminglobal = 1e-6, lmaxglobal = 1e14; //in mum; corresponds to Wien-temperature maxima from 3e9 to 1e-7 K
-    double lambda_min, lambda_max, lambda_per_decade;
-    std::vector<double> l_i;
-    std::vector<double> l_i12;
+    double lambda_min_in, lambda_max_in, lambda_per_decade_in;
+    double lambda_min_out, lambda_max_out, lambda_per_decade_out;
+    std::vector<double> l_i_in;
+    std::vector<double> l_i_out;
+    std::vector<double> l_i12_in;
+    std::vector<double> l_i12_out;
     
     int init_geometry;
     char collision_model;
@@ -398,11 +401,11 @@ public:
     const int HIGHENERGY_BAND_TRUE = 1;
     const int HIGHENERGY_BAND_FALSE= 0;
     
-    Eigen::MatrixXd total_opacity;
+    Eigen::MatrixXd total_opacity;           //num_bands_out
     Eigen::MatrixXd cell_optical_depth;
     Eigen::MatrixXd radial_optical_depth;
     
-    Eigen::MatrixXd total_opacity_twotemp;
+    Eigen::MatrixXd total_opacity_twotemp;   //num_bands_in
     Eigen::MatrixXd cell_optical_depth_twotemp;
     Eigen::MatrixXd radial_optical_depth_twotemp;
     
@@ -414,20 +417,12 @@ public:
     double init_J_factor;
     double init_T_temp;
     
-    Eigen::MatrixXd T_FLD ;
-    Eigen::MatrixXd T_FLD2 ;
-    Eigen::MatrixXd T_FLD3 ;
-    
     Eigen::MatrixXd planck_matrix;
-    Eigen::MatrixXd Etot_corrected ;
-    Eigen::MatrixXd Jrad_FLD ;
+    Eigen::MatrixXd Etot_corrected;
+    Eigen::MatrixXd Jrad_FLD;
 
-    BlockTriDiagSolver<Eigen::Dynamic> tridiag ;
-    Eigen::MatrixXd Jrad_FLD2 ;
-    Eigen::MatrixXd Jrad_FLD3 ;
+    BlockTriDiagSolver<Eigen::Dynamic> tridiag;
     Eigen::MatrixXd Jrad_init;
-    Eigen::MatrixXd Jrad_FLD_total ;
-    Eigen::MatrixXd Jrad_FLD_total2 ;
     
     int rad_solver_max_iter = 1;
     double epsilon_rad_min = 1e-1;  // Some convergence measure for the radiation solver, if needed
@@ -572,7 +567,8 @@ public:
     BoundaryType boundary_left;
     BoundaryType boundary_right;
     int num_cells;
-    int num_bands;
+    int num_bands_in;
+    int num_bands_out;
     int debug;
     
     string opacity_data_string;
@@ -596,15 +592,17 @@ public:
     std::vector<double> u_analytic;
     
     Eigen::MatrixXd opacity_data;  //superhigh-res lamdba grid, resolution dependent on minimum wl-distance in opacity data
-    Eigen::VectorXd opacity_avg;   //num_bands, this is the non-weighted average of opacity_data over the bands.
+    Eigen::VectorXd opacity_avg_solar;   //num_bands_in, this is the non-weighted average of opacity_data over the bands.
+    Eigen::VectorXd opacity_avg_planck;   //num_bands_in, this is the non-weighted average of opacity_data over the bands.
+    Eigen::VectorXd opacity_avg_rosseland;   //num_bands_in, this is the non-weighted average of opacity_data over the bands.
     
-    Eigen::MatrixXd opacity;        //num_cells * num_bands, stands in for the Rosseland mean
-    Eigen::MatrixXd opacity_planck; //num_cells * num_bands
-    Eigen::MatrixXd opacity_twotemp;//num_cells * num_bands
+    Eigen::MatrixXd opacity;        //num_cells * num_bands_out, stands in for the Rosseland mean
+    Eigen::MatrixXd opacity_planck; //num_cells * num_bands_out
+    Eigen::MatrixXd opacity_twotemp;//num_cells * num_bands_in
     
-    Eigen::MatrixXd fraction_total_opacity; //num_cells * num_bands, what fraction of the total opacity is represented by this species in this cell. gives heating of the species
-    Eigen::MatrixXd dS; //Heating, low-energy and high-energy
-    Eigen::MatrixXd dG; //Cooling, high-energy
+    Eigen::MatrixXd fraction_total_solar_opacity; //num_cells * num_bands_in, what fraction of the total opacity is represented by this species in this cell. gives heating of the species
+    Eigen::MatrixXd dS; //num_cells * num_bands_out, Heating, low-energy and high-energy
+    Eigen::MatrixXd dG; //num_cells * num_bands_out, Cooling, high-energy
     double dlogOpa;
     
     //std::vector<double> opticaldepth;
