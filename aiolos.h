@@ -520,6 +520,7 @@ public:
     void update_fluxes_FLD2(double, Eigen::MatrixXd &,Eigen::MatrixXd &,Eigen::MatrixXd &);           //  Called from transport_radiation#
     void update_temperatures(double, Eigen::MatrixXd &,Eigen::MatrixXd &,Eigen::MatrixXd &);
     double compute_planck_function_integral3(double lmin, double lmax, double temperature);
+    double compute_planck_function_integral4(double lmin, double lmax, double temperature);
     
     
 public:

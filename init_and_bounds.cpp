@@ -653,7 +653,9 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
         if(debug > 0) cout<<"Init: Assigning stellar luminosities. b ="<<b<<endl;
         
         if(num_bands_in == 1) {
-            solar_heating(b)  = sigma_rad * pow(T_star,4.) * pow(R_star*rsolar,2.)/pow(planet_semimajor*au,2.) + UV_star * 1.;
+            solar_heating(b)  = sigma_rad * pow(T_star,4.) * pow(R_star*rsolar,2.)/pow(planet_semimajor*au,2.);
+            solar_heating(b) += UV_star/(4.*pi*pow(planet_semimajor*au,2.));
+            solar_heating(b) += X_star/(4.*pi*pow(planet_semimajor*au,2.));
             templumi += solar_heating(b);
             
             cout<<" Solar heating is "<<solar_heating(b)<<" T_star = "<<T_star<<" pow(R_star*rsolar,2.) "<<pow(R_star*rsolar,2.)<<" pow(planet_semimajor*au,2.) "<<planet_semimajor<<endl;
@@ -663,24 +665,27 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
             cout<<" from/to lmin/lmax"<<l_i_in[b];
             cout<<"/"<<l_i_in[b+1]<<" with T_star = "<<T_star;
             
-            solar_heating(b)  = sigma_rad * pow(T_star,4.) * pow(R_star*rsolar,2.)/pow(planet_semimajor*au,2.) * compute_planck_function_integral3(l_i_in[b], l_i_in[b+1], T_star);
-            templumi += solar_heating(b);
+            solar_heating(b)  = sigma_rad * pow(T_star,4.) * pow(R_star*rsolar,2.)/pow(planet_semimajor*au,2.) * compute_planck_function_integral4(l_i_in[b], l_i_in[b+1], T_star);
+            templumi         += solar_heating(b);
             
-            if(l_i_in[b+1] < 1e-1 && l_i_in[b+1] > 0.0961) { //Detect the EUV band 
-                solar_heating(b) += UV_star/(4.*pi*pow(planet_semimajor*au,2.));
-                cout<<endl<<" band "<<b<<" detected as UV band. Assigning UV flux "<<UV_star/(4.*pi*pow(planet_semimajor*au,2.))<<" based on UV lumi "<<UV_star<<endl;
+            //if (BAND_IS_HIGHENERGY[b] == 1) {
+            if(l_i_in[b+1] <= 0.09161) { //Detect the EUV band 
+                    
+                if(l_i_in[b+1] <= 0.0161 ) { //Detect the X ray band
+                    solar_heating(b) += X_star/(4.*pi*pow(planet_semimajor*au,2.));
+                    cout<<endl<<" band "<<b<<" detected as X band. Assigning X flux "<<X_star/(4.*pi*pow(planet_semimajor*au,2.))<<" based on X lumi "<<X_star<<endl;
+                }
+                else {
+                    solar_heating(b) += UV_star/(4.*pi*pow(planet_semimajor*au,2.));
+                    cout<<endl<<" band "<<b<<" detected as UV band. Assigning UV flux "<<UV_star/(4.*pi*pow(planet_semimajor*au,2.))<<" based on UV lumi "<<UV_star<<endl;
+                }
             }
-                
-            
-            if(l_i_in[b+1] <= 0.0961 ) { //Detect the X ray band
-                solar_heating(b) += X_star/(4.*pi*pow(planet_semimajor*au,2.));
-                cout<<endl<<" band "<<b<<" detected as X band. Assigning X flux "<<X_star/(4.*pi*pow(planet_semimajor*au,2.))<<" based on X lumi "<<X_star<<endl;
-            } 
-                
-            cout<<" is "<<solar_heating(b)<<endl;
-            
         }
+        
+        cout<<" is F = "<<solar_heating(b)<<endl;
+            
     }
+    
     cout<<"TOTAL SOLAR HEATING / Lumi = "<<templumi<<" lumi = "<<(templumi*4.*pi*rsolar*rsolar*pi)<<endl;
     
     double totallumi = 0;

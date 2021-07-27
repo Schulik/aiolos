@@ -268,6 +268,80 @@ double c_Sim::compute_planck_function_integral3(double lmin, double lmax, double
     
 }
 
+double c_Sim::compute_planck_function_integral4(double lmin, double lmax, double temperature) {
+    
+    double power_min;
+    double power_max;
+    double lT_min;
+    double lT_max;
+
+    if (num_bands_in == 1)
+        return 1 ;
+    
+    if(temperature < 2.71) {
+        lT_min = lmin * 2.71;
+        lT_max = lmax * 2.71;
+        
+    } else {
+        lT_min = lmin * temperature;
+        lT_max = lmax * temperature;
+    }
+    
+    double m;
+    int imin = 0;
+    int imax = num_plancks;
+    
+    //if();
+    //if(debug > 1)
+    //int temp_imin = std::log(lT_min/planck_matrix(0,0)) / std::log(lT_spacing);
+    //if( steps >= 3927 && temp_imin < 0 )
+    //    cout<<"Planck Integral3, lmin/lmax/t = "<<lmin<<"/"<<lmax<<"/"<<temperature<<" lT_min / P00 = "<<lT_min<<" / "<<planck_matrix(0,0)<<" imin = "<<temp_imin<<endl;
+    
+    //
+    // Lower power
+    //
+    if(lT_min < planck_matrix(0,0)) {
+        m    = planck_matrix(0,1) / planck_matrix(0,0);
+        
+        power_min = planck_matrix(0,1) + m * lT_min;
+        
+        if(lT_max < planck_matrix(0,0)) //Do this only in the lowermost band
+            return 1.;
+    }
+    else {
+        imin = std::log(lT_min/planck_matrix(0,0)) / std::log(lT_spacing);
+        m    = (planck_matrix(imin+1,1) - planck_matrix(imin,1)) / (planck_matrix(imin+1,0)-planck_matrix(imin,0)); //valgrind marks memory leak here
+        
+        power_min = planck_matrix(imin,1) + m * (lT_min - planck_matrix(imin,0));
+    }
+    
+    if(debug > 1)
+        cout<<" imin/imax = "<<imin;
+    
+    //
+    // Upper power
+    //
+    if(lmax * temperature > planck_matrix(num_plancks-1,0)) {
+        power_max = 1.;
+        
+        if(lT_min > planck_matrix(num_plancks-1,0)) //Do this only in the uppermost band
+            return 1;
+    }
+    else {
+        
+        imax = std::log(lT_max/planck_matrix(0,0)) / std::log(lT_spacing);
+        m    = (planck_matrix(imax+1,1) - planck_matrix(imax,1)) / (planck_matrix(imax+1,0)-planck_matrix(imax,0));
+        
+        power_max = planck_matrix(imax,1) + m * (lT_max - planck_matrix(imax,0));
+    }
+    
+    if(debug > 1)
+        cout<<" / "<<" P(imin="<<imin<<")/P(imax="<<imax<<") = "<<power_min<<"/"<<power_max<<" = "<<power_max-power_min<<endl; 
+    
+    return power_max - power_min;
+    
+}
+
    
 
 

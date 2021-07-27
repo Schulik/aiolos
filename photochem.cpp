@@ -104,7 +104,7 @@ double HOnly_cooling(const std::array<double, 3> nX, double Te) {
  *
  * Note that this method can be extended to support multiple species by adding
  * their contribution to <x_e>.
- */
+ */ 
 class C2Ray_HOnly_ionization {
    public:
     C2Ray_HOnly_ionization(double* Gamma0_,double* tau0_, double dt_,
@@ -374,9 +374,11 @@ void c_Sim::do_photochemistry() {
                 }
 
                 // Collisional heat exchange:
-                fill_alpha_basis_arrays(j);
-                compute_collisional_heat_exchange_matrix(j);
-
+                if(!use_rad_fluxes) {
+                    fill_alpha_basis_arrays(j);
+                    compute_collisional_heat_exchange_matrix(j);
+                }
+                
                 // Solve for radiative cooling implicitly
                 C2Ray_HOnly_heating heat(GammaH, dt, nX_bar, TX,
                                          friction_coefficients);
