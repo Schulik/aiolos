@@ -52,7 +52,7 @@
         
         enclosed_mass[0] = planet_mass;
         
-        for(int i = 1; i <= num_cells+1; i++) {
+        for(int i = 1; i <= num_cells; i++) {
             
             if(debug >= 4) {
                 if(i==0)
@@ -66,8 +66,6 @@
             for(int s = 0; s < num_species; s++)
                 species_dens_sum += species[s].u[i].u1;
         
-            
-            
             enclosed_mass[i] = enclosed_mass[i-1] +  4. * 3.141592 * (pow(x_i[i],3.)-pow(x_i[i-1],3.) )/3. * species_dens_sum; //Straightfoward integration of the poisson eqn
             
             if (use_self_gravity == 1) 
@@ -492,12 +490,11 @@ void c_Sim::compute_alpha_matrix(int j) { //Called in compute_friction() and com
                             fi   = numdens_vector(si) / ntot;
                             fj   = numdens_vector(sj) / ntot;
                             
-                            coll_b      = 5.0e17 * std::pow(meanT, 0.75) ;     // from Zahnle & Kasting 1986 Tab. 1
+                            coll_b      = 5.0e17 * std::sqrt(std::sqrt(meanT*meanT*meanT)) ;     //std::pow(meanT, 0.75) // from Zahnle & Kasting 1986 Tab. 1
                             
                             alpha_local = kb * meanT * numdens_vector(sj) / (mass_vector(si) * coll_b) ; // From Burgers book, or Schunk & Nagy.
-                            //alpha_local = kb * meanT /(mumass * coll_b); 
                             
-                            //alpha_local *= (fi + fj)/(fi * muj + fj * mui);
+                            if(photochemistry_level == 1 && (si + sj) == 3)
                             alpha_local *= alpha_collision;
                         }
                     }
@@ -505,7 +502,7 @@ void c_Sim::compute_alpha_matrix(int j) { //Called in compute_friction() and com
                     if(si==0 && sj == 1) {
                         alphas_sample(j) = alpha_local;
                         //cout<<"    spec "<<species[si].name<<" j = "<<j<<" alpha_local = "<<alpha_local<<endl;
-                        if(steps == 1 && ((j==2) || (j==num_cells-2) || (j==num_cells/2)) )
+                        if(debug > 0 && steps == 1 && ((j==2) || (j==num_cells-2) || (j==num_cells/2)) )
                             cout<<"    spec "<<species[si].speciesname<<" j = "<<j<<" alpha_local = "<<alpha_local<<endl;
                     }
                     

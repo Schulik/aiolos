@@ -16,6 +16,7 @@ class Brent {
 
     template <class System>
     double solve(double a, double b, System& sys) {
+        //cout<<"starting brent with tol/maxint = "<<_tol<<"/"<<_max_iter<<endl;
         using std::abs;
         using std::min;
         double fa = sys(a);

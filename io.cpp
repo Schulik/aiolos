@@ -40,6 +40,7 @@ void c_Species::read_species_data(string filename, int species_index) {
     }
     //simulation_parameter tmp_parameter = {"NaN",0,0.,0,"NaN"};
     int found = 0;
+    double temp_static_charge;
     this->num_opacity_datas = -1;
     
     if(debug > 0) cout<<"          In read species Pos1"<<endl;
@@ -58,7 +59,7 @@ void c_Species::read_species_data(string filename, int species_index) {
                 this->speciesname             = stringlist[2];
                 this->mass_amu         = std::stod(stringlist[3]);
                 this->degrees_of_freedom = std::stod(stringlist[4]);
-                this->gamma_adiabat    = std::stod(stringlist[5]);
+                temp_static_charge       = std::stod(stringlist[5]);
                 this->initial_fraction = std::stod(stringlist[6]);
                 this->density_excess   = std::stod(stringlist[7]);
                 this->is_dust_like     = std::stod(stringlist[8]);
@@ -74,6 +75,14 @@ void c_Species::read_species_data(string filename, int species_index) {
 
         }
     
+    }
+    
+    if(std::abs(temp_static_charge) > 1.1 || std::abs(temp_static_charge) < 0.1) {
+        this->static_charge = 0;
+    }
+    else {
+        
+        this->static_charge = std::floor(temp_static_charge);
     }
     
     //cout<<"    In read_parameter Pos2"<<endl;
@@ -146,10 +155,25 @@ void c_Species::read_species_data(string filename, int species_index) {
             if(num_readin_columns >= 2) file_opacity_data(data_count, 2) = std::stod(stringlist[2]); // Opacity planck
             if(num_readin_columns >= 3) file_opacity_data(data_count, 3) = std::stod(stringlist[3]); // Opacity planck
             
+            if(debug > 1) {
+                //cout<<"stringlist "<<stringlist<<" ";
+                cout<< "file_opacity_data = "<<file_opacity_data(data_count, 0)<<" "<<file_opacity_data(data_count, 1);
+                
+                if(num_readin_columns >= 2) cout<<" "<<file_opacity_data(data_count, 2);
+                if(num_readin_columns >= 3) cout<<" "<<file_opacity_data(data_count, 3);
+                cout<<endl;
+                
+            }
             data_count++;
         }
         
+         if(debug > 1)
+            cout<<"Before fileclose"<<endl;
+        
         file2.close();
+        
+        if(debug > 1)
+            cout<<"After fileclose"<<endl;
         //
         // Interpolate the possibly non-uniformely binned opacity data on a uniform grid for fast interpolation later
         //
@@ -159,7 +183,9 @@ void c_Species::read_species_data(string filename, int species_index) {
         for(int j = 0; j < num_opacity_datas-1; j++) {
             deltaL    = file_opacity_data(j+1, 0) - file_opacity_data(j, 0); // Wavelength
             minDeltaL = (deltaL < minDeltaL)?deltaL:minDeltaL;
-            //cout<<" found deltaL = "<<deltaL<<" at j = "<<j<<endl;
+            
+            if(debug > 1)
+                cout<<" found deltaL = "<<deltaL<<" at j = "<<j<<endl;
         }
         
         // Create grid with resolution as smallest distance (artificial high-res grid, that is later used for averaging)
@@ -168,6 +194,9 @@ void c_Species::read_species_data(string filename, int species_index) {
     
         // Find high-res opacity in read-in opacity 
         for (int col = 1; col < num_readin_columns+1; col++) {
+            
+            if(debug > 1)
+                cout<<" Doing column "<<col<<endl;
             
             int j = 0;
             for(int i = 0; i< num_tmp_lambdas; i++) {
@@ -184,15 +213,21 @@ void c_Species::read_species_data(string filename, int species_index) {
                     lmax = file_opacity_data(j+1, 0);
                 }
                 
-                //Interpolation on highres grid
-                double m  =  std::log10(file_opacity_data(j+1,col) / file_opacity_data(j,col) ) / std::log10(lmax/lmin);
-                opacity_data(i,col) = pow(10., std::log10(file_opacity_data(j,col)) + m * std::log10(wl/lmin) );
-                
                 //Boundaries of wl grid
                 if(i==0)
                     opacity_data(i,col) = file_opacity_data(0,col);
-                if(i==num_tmp_lambdas-1)
+                else if(i==num_tmp_lambdas-1)
                     opacity_data(i,col) = file_opacity_data(num_opacity_datas-1,col);
+                else {
+                    
+                    
+                    //Interpolation on highres grid
+                    double m  =  std::log10(file_opacity_data(j+1,col) / file_opacity_data(j,col) ) / std::log10(lmax/lmin);
+                    opacity_data(i,col) = pow(10., std::log10(file_opacity_data(j,col)) + m * std::log10(wl/lmin) );
+                    
+                        
+                    
+                }
                 
                     //else if (wl < file_opacity_data(0, 0))
                     //    opacity_data(i,1) = file_opacity_data(0,1);
@@ -242,21 +277,26 @@ void c_Species::read_species_data(string filename, int species_index) {
                 
                 //cout<<" DEBUG band b = "<<b<<" lmin/lmax = "<<lmin<<"/"<<lmax<<endl;
                 
+                double wl;
                 for(int i = 0; i < num_tmp_lambdas; i++) {
                     double wl = opacity_data(i,0);
+                    
                     //cout<<" i = "<<i<<" wl = "<<wl<<" opa = "<<opacity_data(i,1)<<endl;
                     
                     if( wl < lmax && wl > lmin) {
+                        
+                        (*opacity_avg)[b]+= opacity_data(i,col); 
+                            //opacity_avg(b) += opacity_data(i,col); 
+                        wlcount++;
+                        /*
                         if(opacity_data(i,col) > 1e10 || opacity_data(i,col) < 1.1e-20) {
                             //cout<<"Band opacity_data("<<i<<",1) = "<<opacity_data(i,1)<<"is faulty! wlcount ="<<wlcount<<endl;
                             //cout<<" Band b, lmax "<<lmax<<" opa_data(0,0) = "<<opacity_data(0,0)<<endl;
                             //cout<<" Band b, lmin "<<lmin<<" opa_data(-1,0) = "<<opacity_data(num_tmp_lambdas,0)<<endl;
                             
                         } else {
-                            (*opacity_avg)[b]+= opacity_data(i,col); 
-                            //opacity_avg(b) += opacity_data(i,col); 
-                            wlcount++;
-                        }
+                            
+                        }*/
                     }
                     if(i==0) {
                         
@@ -267,12 +307,14 @@ void c_Species::read_species_data(string filename, int species_index) {
                     }
                 }
                 
-                if(wlcount > 0) {
+                if(wlcount > 1) {
                     (*opacity_avg)[b] /= (double)wlcount;
                 }
                 else 
-                    cout<<" Band "<<b<<" has wlcount==0!"<<endl;
-                    
+                    cout<<" Band "<<b<<" has wlcount==0! lmin/wl/lmax//opacity_data(0,0/1); = "<<lmin<<"/"<<wl<<"/"<<lmax<<"//"<<opacity_data(0,0)<<"/"<<opacity_data(0,1)<<" wlcount = "<<wlcount<<endl;
+                
+                if(debug > 1)
+                    cout<<" DEBUG. Band "<<b<<" has wlcount=="<<wlcount<<". lmin/wl/lmax//opacity_data(0,0/1); = "<<lmin<<"/"<<wl<<"/"<<lmax<<"//"<<opacity_data(0,0)<<"/"<<opacity_data(0,1)<<" opa_found = "<<(*opacity_avg)[b]<<endl;
                 //
                 // For bands which have no opacity data given / first and last band, we assume the nearest datapoint
                 //
@@ -284,19 +326,49 @@ void c_Species::read_species_data(string filename, int species_index) {
                     (*opacity_avg)[b] = opacity_data(num_tmp_lambdas-1,col);
                     cout<<" Band b, lmin "<<lmin<<"< opa_data(-1,0)"<<opacity_data(num_tmp_lambdas,0)<<endl;
                 }
-                if((*opacity_avg)[b] > 1e10 || (*opacity_avg)[b] < 0.) {
+                if((*opacity_avg)[b] < 0.) {
                     
                     cout<<"Band b = "<<b<<"is faulty! opacity = "<<(*opacity_avg)[b]<<" wlcount ="<<wlcount<<endl;
-                    cout<<" Band b, lmax "<<lmax<<" opa_data(0,0) = "<<opacity_data(0,0)<<endl;
                     cout<<" Band b, lmin "<<lmin<<" opa_data(-1,0) = "<<opacity_data(num_tmp_lambdas,0)<<endl;
+                    cout<<" Band b, lmax "<<lmax<<" opa_data(0,0) = "<<opacity_data(0,0)<<endl;
                 }
             }
         }
         
-        if(num_readin_columns < 3)
-            for(int b = 0; b < num_bands_out; b++) opacity_avg_rosseland(b) = const_opacity;
+        if(num_readin_columns < 3) 
+            for(int b = 0; b < num_bands_out; b++)  {
+                
+                opacity_avg_rosseland(b) = const_opacity;
+                if(debug> 1)
+                    cout<<" DEBUG b_out = "<<b<<" avg_rosseland = "<<opacity_avg_rosseland(b)<<" const_opa = "<<const_opacity<<endl;
+                
+            }
+                
+        
         if(num_readin_columns < 2)
-            for(int b = 0; b < num_bands_out; b++) opacity_avg_planck(b) = const_opacity;
+            for(int b = 0; b < num_bands_out; b++)  {
+                opacity_avg_planck(b) = const_opacity;
+                if(debug> 1)
+                    cout<<" DEBUG b_out = "<<b<<" avg_planck = "<<opacity_avg_rosseland(b)<<" const_opa = "<<const_opacity<<endl;
+                
+            }
+                
+        
+            
+        //
+        // ONLY FOR METALS COOLING SCENARIO!
+        //
+        /*if(base->num_species == 4 && num_bands_in == 3) {
+            cout<<" INFORMATION: Metal cooling scenario started. Setting all solar XRay opacities except metals to low value."<<endl;
+            
+            if(species_index < 3) 
+                opacity_avg_solar(0) = 1e-10;
+            //else 
+            //    //opacity_avg_solar(0) = 1e28;
+            //}
+            
+        }*/
+            
             
         //cout<<"pos4"<<endl;
         //Done! Now debug plot stuff
@@ -304,17 +376,17 @@ void c_Species::read_species_data(string filename, int species_index) {
         for(int b = 0; b <= num_bands_in; b++) cout<<base->l_i_in[b]<<"/";
         cout<<" ||| ";
         for(int b = 0; b <= num_bands_out; b++) cout<<base->l_i_out[b]<<"/";
-        cout<<endl;
+        cout<<endl<<endl;
         
-        cout<<"avg opacities solar = ";
+        cout<<"        avg opacities solar = ";
         for(int b = 0; b < num_bands_in; b++) cout<<opacity_avg_solar(b)<<"/";
         cout<<endl;
         
-        cout<<"avg opacities plnck = ";
+        cout<<"        avg opacities plnck = ";
         for(int b = 0; b < num_bands_out; b++) cout<<opacity_avg_planck(b)<<"/";
         cout<<endl;
         
-        cout<<"avg opacities rossl = ";
+        cout<<"        avg opacities rossl = ";
         for(int b = 0; b < num_bands_out; b++) cout<<opacity_avg_rosseland(b)<<"/";
         cout<<endl;
         
@@ -445,7 +517,11 @@ template simulation_parameter<BoundaryType> read_parameter_from_file(string, str
 template simulation_parameter<IntegrationType> read_parameter_from_file(string, string, int, IntegrationType);
 template simulation_parameter<IntegrationType> read_parameter_from_file(string, string, int);
 
-
+//
+//
+// Main output file
+//
+// 
 void c_Species::print_AOS_component_tofile(int timestepnumber) {
                            
     //
@@ -484,7 +560,7 @@ void c_Species::print_AOS_component_tofile(int timestepnumber) {
         
         //Print the domain
         base->enclosed_mass_tmp[0] = 0.;
-        for(int i = 1; i <= num_cells+1; i++) {
+        for(int i = 1; i <= num_cells; i++) {
             base->enclosed_mass_tmp[i] = base->enclosed_mass_tmp[i-1] +  4. * 3.141592 * (pow(base->x_i[i],3.)-pow(base->x_i[i-1],3.) )/3. * u[i].u1;
         }
         
@@ -507,8 +583,10 @@ void c_Species::print_AOS_component_tofile(int timestepnumber) {
                 Jtot += base->Jrad_FLD(i,b)/c_light*4.*pi;
             }
             
-            outfile<<base->x_i12[i]<<'\t'<<u[i].u1<<'\t'<<u[i].u2<<'\t'<<u[i].u3<<'\t'<<flux[i].u1<<'\t'<<flux[i].u2<<'\t'<<flux[i].u3<<'\t'<<balance1<<'\t'<<balance2<<'\t'<<balance3<<'\t'<<prim[i].pres<<'\t'<<u[i].u2/u[i].u1<<'\t'<<prim[i].temperature <<'\t'<<timesteps_cs[i]<<'\t'<<base->cflfactor/timesteps[i]<<'\t'<<prim[i].sound_speed<<'\t'<<timesteps_de[i]<<'\t'<<u_analytic[i]<<'\t'<<base->alphas_sample(i)<<'\t'<<base->phi[i]<<'\t'<<base->enclosed_mass_tmp[i]<<'\t'<<Jtot<<'\t'<<Stot<<'\t'<<base->friction_sample(i)<<endl;
-        } //prim[i].sound_speed
+            //outfile<<base->x_i12[i]<<'\t'<<u[i].u1<<'\t'<<u[i].u2<<'\t'<<u[i].u3<<'\t'<<flux[i].u1<<'\t'<<flux[i].u2<<'\t'<<flux[i].u3<<'\t'<<balance1<<'\t'<<balance2<<'\t'<<balance3<<'\t'<<prim[i].pres<<'\t'<<u[i].u2/u[i].u1<<'\t'<<prim[i].temperature <<'\t'<<timesteps_cs[i]<<'\t'<<base->cflfactor/timesteps[i]<<'\t'<<prim[i].sound_speed<<'\t'<<timesteps_de[i]<<'\t'<<u_analytic[i]<<'\t'<<base->alphas_sample(i)<<'\t'<<base->phi[i]<<'\t'<<base->enclosed_mass_tmp[i]<<'\t'<<Jtot<<'\t'<<Stot<<'\t'<<base->friction_sample(i)<<endl;
+            
+            outfile<<base->x_i12[i]<<'\t'<<u[i].u1<<'\t'<<u[i].u2<<'\t'<<u[i].u3<<'\t'<<flux[i].u1<<'\t'<<flux[i].u2<<'\t'<<flux[i].u3<<'\t'<<balance1<<'\t'<<balance2<<'\t'<<balance3<<'\t'<<prim[i].pres<<'\t'<<u[i].u2/u[i].u1<<'\t'<<prim[i].temperature <<'\t'<<timesteps_cs[i]<<'\t'<<base->cflfactor/timesteps[i]<<'\t'<<prim[i].sound_speed<<'\t'<<timesteps_de[i]<<'\t'<<u_analytic[i]<<'\t'<<base->alphas_sample(i)<<'\t'<<base->phi[i]<<'\t'<<base->enclosed_mass_tmp[i]<<'\t'<<dG(i)<<'\t'<<dS(i)<<'\t'<<base->friction_sample(i)<<endl;
+        } 
         
         //Print right ghost stuff
         outfile<<base->x_i12[num_cells+1]<<'\t'<<u[num_cells+1].u1<<'\t'<<u[num_cells+1].u2<<'\t'<<u[num_cells+1].u3<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<prim[num_cells+1].pres<<'\t'<<u[num_cells+1].u2/u[num_cells+1].u1<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<base->phi[num_cells+1]<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<endl;
@@ -604,13 +682,15 @@ void c_Sim::print_diagnostic_file(int outputnumber) {
                 //
                 for(int b=0; b<num_bands_in; b++) {
                     for(int s=0; s<num_species; s++) {
-                        outfileDiagnostic<<'\t'<<const_opacity_solar_factor*species[s].opacity_twotemp(i,b);
+                        outfileDiagnostic<<'\t'<<species[s].opacity_twotemp(i,b);
                     }
                 }
                 
                 for(int b=0; b<num_bands_out; b++) {
                     for(int s=0; s<num_species; s++) {
                         outfileDiagnostic<<'\t'<<species[s].opacity(i,b);
+                    }
+                    for(int s=0; s<num_species; s++) {
                         outfileDiagnostic<<'\t'<<species[s].opacity_planck(i,b);
                     }
                 }

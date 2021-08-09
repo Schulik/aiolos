@@ -247,6 +247,7 @@ public:
     double grid2_cells_per_decade;
     double grid2_transition;
     int grid2_transition_i;
+    int reverse_hydrostat_constrution;
     
     int type_of_grid;       //0 = cartesian, 1 = log
     std::vector<double> x_i;    		//The cell boundaries
@@ -270,6 +271,11 @@ public:
     int init_geometry;
     char collision_model;
     char opacity_model;
+    double ion_precision;
+    double ion_heating_precision;
+    int ion_maxiter;
+    int ion_heating_maxiter;
+    
     
     Geometry geometry ;
     
@@ -583,6 +589,7 @@ public:
 
     
     double mass_amu;
+    int static_charge;
     double initial_fraction;
     
     std::vector<AOS> u, u0;          // Conserved hyperbolic variables: density, mass flux, energy density
