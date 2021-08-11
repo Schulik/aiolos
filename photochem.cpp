@@ -136,9 +136,8 @@ class C2Ray_HOnly_ionization {
         double ne = ne0 + (x - x0) * nH;
 
         // Compute equilibrium
-        double ion = 0;
-        for(int b=0; b < num_he_bands; b++)
-            ion += Gamma0[b]/nH * -std::expm1(-tau0[b] * (1 - x));
+        double ion = photoionization_rate(x) ;
+
         double x_eq = (ion + ne * C) / (ion + ne * (C + R + ne * B));
         double t_rat = dt * (ion + ne * (C + R + ne * B));
 
@@ -162,10 +161,7 @@ class C2Ray_HOnly_ionization {
         double ne = ne0 + (x_bar - x0) * nH;
 
         // Compute equilibrium
-        double ion = 0.;
-        
-        for(int b=0; b < num_he_bands; b++)
-            ion += Gamma0[b]/nH * -std::expm1(-tau0[b] * (1 - x_bar));
+        double ion = photoionization_rate(x_bar) ;
         
         double x_eq = (ion + ne * C) / (ion + ne * (C + R + ne * B));
         double t_rat = dt * (ion + ne * (C + R + ne * B));
@@ -176,6 +172,13 @@ class C2Ray_HOnly_ionization {
         //cout<<" dt = "<<dt<<" ion = "<<ion<<"  ne * (C + R + ne * B) = "<< ne * (C + R + ne * B)<<" ne = "<<ne<<endl;
         
         return {nH * (1 - x_new), nH * x_new, nH * (x_new - x0) + ne0};
+    }
+
+    double photoionization_rate(double x_bar) const {
+        double ion = 0;
+        for(int b=0; b < num_he_bands; b++)
+            ion += Gamma0[b]/nH * -std::expm1(-tau0[b] * (1 - x_bar));
+        return ion ;
     }
 
     double *Gamma0, *tau0, dt, nH, ne0, x0, R, C, B, num_he_bands;
@@ -200,33 +203,49 @@ class C2Ray_HOnly_heating {
         Eigen::Matrix<double, NUM_SPECIES, NUM_SPECIES, Eigen::RowMajor>;
 
     C2Ray_HOnly_heating(double GammaH_, double dt_,
-                        const std::array<double, 3>& nX_average,
+                        const std::array<double, 3>& nX,
                         const std::array<double, 3>& TX,
+                        double ion_rate, double recomb_rate,
                         const Matrix_t& collisions)
      : GammaH(GammaH_),
        dt(dt_),
-       nX(nX_average),
+       ion(ion_rate), recomb(recomb_rate),
+       nX(nX),
        T(TX),
-       coll_mat(Mat3::Identity() - collisions * dt){};
+       coll_mat(Mat3::Identity() - collisions * dt)
+       {
+           // Add in heat exchange due to ionization / recombination
+           //   Here I've assumed m_e / m_p ~ 0
+           coll_mat(0,0) += ion*dt/nX[0] ;
+           coll_mat(1,0) -= ion*dt/nX[1] ;
+           
+           coll_mat(1,1) += recomb*dt/nX[1] ;
+           coll_mat(0,1) -= recomb*dt/nX[0] ;           
+       }; 
 
     // Compute the temperature residual.
-    double operator()(double Te) const { return _compute_T(Te)(2) - Te; }
+    double operator()(double Te) const { return compute_T(Te)(2) - Te; }
 
     // Compute the cooling rate give the electron temperature.
     std::array<double, 3> net_heating_rate(double Te) const {
-        //return heating_rate(Te) - cooling_rate(Te);
-        return {0.0, 0.0, GammaH - nX[2]*HOnly_cooling(nX, Te)};
+        Vec3 Tx = compute_T(Te) ;
+        double heat_exch = 1.5*kb * (recomb*Tx(1) - ion*Tx(0)) ;
+
+        return {heat_exch, -heat_exch, GammaH - nX[2]*HOnly_cooling(nX, Tx(2))};
     }
     
-    std::array<double, 3> heating_rate(double) const {
+    std::array<double, 3> heating_rate(double /*Te*/) const {
         return {0.0, 0.0, GammaH};
     }
     
     std::array<double, 3> cooling_rate(double Te) const {
-        return {0.0, 0.0, - nX[2]*HOnly_cooling(nX, Te)};
+        Vec3 Tx = compute_T(Te) ;
+        double heat_exch = 1.5*kb * (recomb*Tx(1) - ion*Tx(0)) ;
+
+        return {heat_exch, -heat_exch, - nX[2]*HOnly_cooling(nX, Tx(2))};
     }
     
-    Vec3 _compute_T(double Te) const {
+    Vec3 compute_T(double Te) const {
         // Setup RHS
         Vec3 RHS(T.data());
         RHS(2) += (GammaH/nX[2] - HOnly_cooling(nX, Te)) * dt / (1.5 * kb);
@@ -239,7 +258,7 @@ class C2Ray_HOnly_heating {
     
 
    public:
-    double GammaH, dt;
+    double GammaH, dt, ion, recomb ;
 
     std::array<double, 3> nX, T;
     Mat3 coll_mat;
@@ -334,29 +353,39 @@ void c_Sim::do_photochemistry() {
                 }
                 //tau0 += dtau;
 
-                // Next update the primitive quantities (conserved are done at
-                // the end) as response of the changing density due to ionization
+                // Next update the primitive quantities to ensure momentum / energy
+                // conservation 
 
-                if (nX_new[0] > nX[0]) {
-                    // Net recombination - add the energy / momentum to the H atoms
-                    double f1 = species[0].cv / species[1].cv;
-                    double f2 = species[0].cv / species[2].cv;
-                    uX[0] += (1 - nX[0] / nX_new[0]) * (f1*uX[1] + f2*uX[2] - uX[0]);
-                    TX[0] += (1 - nX[0] / nX_new[0]) * (   TX[1] +    TX[2] - TX[0]);
-                    f1 = mX[1]/mX[0] ; f2 = mX[2]/mX[0] ;
-                    vX[0] += (1 - nX[0] / nX_new[0]) * (f1*vX[1] + f2*vX[2] - vX[0]);
-                } else {
-                    // Net ionization - add the energy / momentum to the p+/e-
-                    double f1 = species[1].cv / species[0].cv;
-                    uX[1] += (1 - nX[1] / nX_new[1]) * (f1*uX[0] - uX[1]);
-                    uX[2] += (1 - nX[2] / nX_new[2]) * ( 0*uX[0] - uX[2]);
-                    TX[1] += (1 - nX[1] / nX_new[1]) * (   TX[0] - TX[1]);
-                    TX[2] += (1 - nX[2] / nX_new[2]) * (      0  - TX[2]);
+                // Momentum conservation:
+                double ne = nX_bar[2], nH = nX_bar[0] + nX_bar[1]  ;
+                double dn_R = (ion.R + ion.B*ne)*ne*nH*dt ;
+                double dn_I = (ion.C*ne + ion.photoionization_rate(x_bar))*nH*dt ;
 
-                    f1 = mX[0]/(mX[1]+mX[2]);
-                    vX[1] += (1 - nX[1] / nX_new[1]) * (f1*vX[0] - vX[1]);
-                    vX[2] += (1 - nX[2] / nX_new[2]) * (f1*vX[0] - vX[2]);
-                }
+                std::array<double, 3> mom = { 
+                    nX[0]*mX[0]*vX[0], nX[1]*mX[1]*vX[1], nX[2]*mX[2]*vX[2] } ;
+
+                double fe = 1/(1 + mX[2]/mX[1]), fp = 1/(1 + mX[1]/mX[2]) ;
+                double f = nX_new[0] + dn_I - dn_I*dn_R*(fp/(nX_new[1]+dn_R) + fe/(nX_new[2] + dn_R)) ;
+                mom[0] = (mom[0] + dn_R*(mom[1]/(nX_new[1]+dn_R) + mom[2]/(nX_new[2]+dn_R))) / f ;
+                mom[1] = (mom[1] + dn_I*mom[0]*fp)/(nX_new[1]+dn_R) ;
+                mom[2] = (mom[2] + dn_I*mom[0]*fe)/(nX_new[2]+dn_R) ;
+
+                // Compute the change in kinetic energy:
+                double dEk = 0.5*(mom[0]*mom[0]*nX_new[0] / mX[0] - mX[0]*nX[0]*vX[0]*vX[0] +
+                                  mom[1]*mom[1]*nX_new[1] / mX[1] - mX[1]*nX[1]*vX[1]*vX[1] +
+                                  mom[2]*mom[2]*nX_new[2] / mX[2] - mX[2]*nX[2]*vX[2]*vX[2]) ;
+                
+                // Update the velocity
+                vX[0] = mom[0] / mX[0] ;
+                vX[1] = mom[1] / mX[1] ;
+                vX[2] = mom[2] / mX[2] ;
+
+                // Next, compute the heating and cooling
+                //    It is useful to re-scale the temperatures first to conserve the
+                //    internal energy.
+                TX[0] *= nX[0] / nX_new[0] ;
+                TX[1] *= nX[1] / nX_new[1] ;
+                TX[2] *= nX[2] / nX_new[2] ;
 
                 for (int s = 0; s < 3; s++) {
                     species[s].prim[j].number_density = nX_new[s];
@@ -438,7 +467,9 @@ void c_Sim::do_photochemistry() {
                     //}
                     
                     // Solve for radiative cooling implicitly
-                    C2Ray_HOnly_heating heat(GammaH, dt, nX_bar, TX, friction_coefficients);
+                    C2Ray_HOnly_heating heat(GammaH + dEk/(dt+1e-300), dt, nX_new, TX,
+                           (ion.R + ion.B*ne)*ne*nH, (ion.C*ne + ion.photoionization_rate(x_bar))*nH,
+                           friction_coefficients);
 
                     // Bracket the temperature:
                     double Te1 = TX[2], Te2;
@@ -476,7 +507,7 @@ void c_Sim::do_photochemistry() {
                     heating = heat.heating_rate(Te);
                     cooling = heat.cooling_rate(Te);
                     
-                    Eigen::Matrix<double, 3, 1> newT = heat._compute_T(Te);
+                    Eigen::Matrix<double, 3, 1> newT = heat.compute_T(Te);
                     for (int s = 0; s < 3; s++)
                         species[s].prim[j].temperature = newT(s);   
                     
