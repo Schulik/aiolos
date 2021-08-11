@@ -257,9 +257,22 @@ void c_Sim::execute() {
                 //    compute_collisional_heat_exchange();
             }
         }
+
         
-        for(int s = 0; s < num_species; s++)
+        for(int s = 0; s < num_species; s++) {
             species[s].user_species_loop_function() ;
+            
+            
+            for(int i=num_cells+1; i>=0; i--)  {
+                AOS TMP = species[s].u[i];
+                double temp_temp = species[s].prim[i].temperature;
+                
+                if(temp_temp < init_T_temp)
+                    temp_temp = init_T_temp;
+                species[s].u[i] = AOS(TMP.u1, TMP.u2, species[s].cv * TMP.u1 * temp_temp + 0.5 * TMP.u2*TMP.u2/TMP.u1) ;
+            }
+        }
+            
             
         steps++;
         
