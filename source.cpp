@@ -413,7 +413,7 @@ void c_Sim::compute_friction_numerical() {
                 double v_end = friction_vec_output(si) - friction_vec_output(sj) ;
                 double v_half = 0.5*(v_end + friction_vec_input(si) - friction_vec_input(sj)) ; 
                                                
-                temp += dt * friction_coefficients(si,sj) * (species[sj].mass_amu/(species[sj].mass_amu+species[si].mass_amu)) * v_half * v_end ;
+                temp +=  dt * friction_coefficients(si,sj) * (species[sj].mass_amu/(species[sj].mass_amu+species[si].mass_amu)) * v_half * v_end ;
                 
                 if(si==0 && sj == 1) {
                     friction_sample(j) = alphas_sample(j) * (friction_vec_input(si) - friction_vec_input(sj));

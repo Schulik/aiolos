@@ -44,7 +44,7 @@ double H_threebody_recombination(double T_e) {
     using std::pow;
 
     double x = 2 * 157807 / T_e;
-    return 1.* (1.005e-14 / (T_e * T_e * T_e)) * pow(x, -1.089) /
+    return 1. * (1.005e-14 / (T_e * T_e * T_e)) * pow(x, -1.089) /
            pow(1 + pow(x / 0.354, 0.874), 1.101);
 }
 double H_collisional_ionization(double T_e) {
@@ -84,7 +84,8 @@ double HOnly_cooling(const std::array<double, 3> nX, double Te) {
     cooling += nX[0] * term;
 
     // HI Line cooling (Lyman alpha):
-    term = 7.5e-19 * exp(-0.75 * T_HI / Te) / (1 + sqrt(Te / 1e5));
+    //term = 7.5e-19 * exp(-0.75 * T_HI / Te) / (1 + sqrt(Te / 1e5));
+    term = 7.5e-19 * exp(-0.75 * T_HI / Te); //MC2009
     cooling += nX[0] * term;
 
     // Free-Free:
@@ -409,7 +410,17 @@ void c_Sim::do_photochemistry() {
                     GammaH += 0.25 * solar_heating(b)  * std::exp(-radial_optical_depth_twotemp(j,b)) * (-std::expm1(-dtaus[b])) * (1 - 13.6 * ev_to_K * kb / photon_energies[b]) / dx[j];
                 }
                 
-                if(false && use_rad_fluxes) {
+                if(debug >= 0 && j == num_cells-3 && steps == 2) {
+                    
+                    double dtaufinal = dtaus[1];
+                    double ipp = Gamma0[1]/(nX[0]+nX[1]) * -std::expm1(-dtaufinal); 
+                    double hpp = GammaH/(nX[0]+nX[1]);
+                    
+                    cout<<" j= "<<num_cells-3<<" steps == "<<steps<<" ion per particle = "<<ipp<<" heating per particle = "<<hpp<<endl;
+                    
+                }
+                
+                if(use_rad_fluxes) {
                         
                     Te = TX[2];
                     
@@ -516,7 +527,6 @@ void c_Sim::do_photochemistry() {
                     
                     
                 }
-                
                 
                 //
                 // The following loop only documents quantities consistent with the ionization found. 
