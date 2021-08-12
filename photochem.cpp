@@ -456,7 +456,7 @@ void c_Sim::do_photochemistry() {
                     //}
                     
                     // Solve for radiative cooling implicitly
-                    C2Ray_HOnly_heating heat(GammaH + dEk/(dt+1e-300), dt, nX_new, TX,
+                    C2Ray_HOnly_heating heat(GammaH - dEk/(dt+1e-300), dt, nX_new, TX,
                            (ion.R + ion.B*ne)*ne*nH, (ion.C*ne + ion.photoionization_rate(x_bar))*nH,
                            friction_coefficients);
 
