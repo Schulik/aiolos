@@ -185,44 +185,6 @@ class SingleGrainCondensation {
         _Ctot = {_C_v, _C_l} ;
     }
 
-    /* Based on fractional change in dust density/temperature in an explicit update */
-    double check_explicit() const {
-
-        double Pgas = _rho0[0] * ((Rgas/_mu_gas) * _T0[0]) ;
-        double Pv = _cond.P_vap(_T0[1]) ;
-
-        double rate = _cond.P_stick * _area *
-            std::max(Pgas / std::sqrt(2*pi*Rgas*_T0[0]), Pv   / std::sqrt(2*pi*Rgas*_T0[1])) ;
-
-        // Add a safety factor due to high Lsub.
-        double fac = std::max(_cond.Lsub / (_C_l*_T0[1]), 1.0) ;
-
-        return fac * rate * _dt ;
-    }
-
-
-    std::tuple<arr_t, arr_t, arr_t> update_explicit() const {
-
-        double Pgas = _rho0[0] * ((Rgas/_mu_gas) * _T0[0]) ;
-        double Pv = _cond.P_vap(_T0[1]) ;
-
-        double cond = _cond.P_stick * _area * _rho0[1] * Pgas / std::sqrt(2*pi*Rgas*_T0[0]) ;
-        double evap = _cond.P_stick * _area * _rho0[1] * Pv   / std::sqrt(2*pi*Rgas*_T0[1]) ;
-
-        arr_t rho = {
-            _rho0[0] - (cond - evap)*_dt,
-            _rho0[1] + (cond - evap)*_dt
-        } ;
-
-        arr_t v = {
-            (_rho0[0]*_v0[0] - (cond*_v0[0] - evap*_v0[1])*_dt) / rho[0],
-            (_rho0[1]*_v0[1] + (cond*_v0[0] - evap*_v0[1])*_dt) / rho[1]
-        } ;
-
-        return std::make_tuple(rho, _T0, v) ;
-        //return update_T_rho_v(_rho0[1] + (cond - evap)*_dt) ;
-    }
-    
     arr_t net_heating_rate(arr_t rho, arr_t T, arr_t v) {
 
         // Compute the condensation rate
