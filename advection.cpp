@@ -247,6 +247,9 @@ void c_Sim::execute() {
                 do_photochemistry();
             
             update_dS();               //Compute low-energy dS
+
+            // Apply any additional heating / cooling
+            user_heating_function() ;
             
             if(use_rad_fluxes==1) {
                 update_fluxes_FLD();   //FLD Radiation transport, updating Temperatures and photon band energies

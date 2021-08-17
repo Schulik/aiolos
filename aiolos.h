@@ -77,20 +77,30 @@ const int debug2 = 0;
 ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-double delta_ij(int i, int j);
+inline constexpr double delta_ij(int i, int j) {
+    return (i == j) ;
+}
+
 double lint(double xa, int N, double* X, double* RI);
 double logint(double xa, int N, double* X, double* RI);
 
 //
 // Functions mimicking certain numpy functionalities
 //
-std::vector<double> np_zeros(int);
-std::vector<double> np_ones(int);
-std::vector<double> np_somevalue(int, double);
 
-std::vector<int> inp_zeros(int);
-std::vector<int> inp_ones(int);
-std::vector<int> inp_somevalue(int, int);
+inline std::vector<double> np_somevalue(int size, double value) {
+    return std::vector<double>(size, value) ; 
+}
+inline std::vector<double> np_zeros(int size) { return np_somevalue(size, 0) ; }
+inline std::vector<double> np_ones(int size) { return np_somevalue(size, 1) ; }
+
+
+inline std::vector<int> inp_somevalue(int size, int value) { 
+    return std::vector<int>(size, value) ; 
+}
+inline std::vector<int> inp_zeros(int size) { return inp_somevalue(size, 0) ; }
+inline std::vector<int> inp_ones(int size) { return inp_somevalue(size, 1) ; }
+
 
 
 //double compute_planck_function_integral(double lmin, double lmax, double temperature);
@@ -171,7 +181,8 @@ struct Monitored_Quantities {
     double u1_tot, u2_tot, u3_tot;
 } ;
 
-std::vector<AOS> init_AOS(int num);
+inline std::vector<AOS> init_AOS(int num) { return std::vector<AOS>(num); }
+
 vector<string> stringsplit(const string& str, const string& delim);
 
 template<typename T>
@@ -519,6 +530,7 @@ public:
     void update_opacities();
     
     void do_photochemistry();
+    void user_heating_function(); 
     
     void update_fluxes(double timestep);           //  Called from transport_radiation#   
     void update_fluxes_FLD();           //  Called from transport_radiation#

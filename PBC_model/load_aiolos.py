@@ -8,8 +8,10 @@ def load_aiolos_snap(filename):
              ('pressure',   'f8'),
              ('velocity',    'f8'),
              ('temperature', 'f8'),
-             ('soundspeed', 'f8'),]
-    cols=[0,1,2,3,10,11,12,15]
+             ('soundspeed',  'f8'),
+             ('cooling',     'f8'),
+             ('heating',     'f8')]
+    cols=[0,1,2,3,10,11,12,15,21,22]
     
     data = np.genfromtxt(filename, dtype=dtype, usecols=cols)
     return data
@@ -119,7 +121,7 @@ if __name__ == "__main__":
     import sys
     import matplotlib.pyplot as plt
 
-    f, ax = plt.subplots(3,1)
+    f, ax = plt.subplots(3,1, sharex=True)
 
     for snap in sys.argv[1:]:
         if snap.startswith('output'): 

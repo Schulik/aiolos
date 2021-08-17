@@ -181,7 +181,7 @@ void c_Species::update_opacities() {
 
         // Toy model due to single grain size.
         if (is_dust_like) {
-            const double RHO = 1, BETA=1;
+            const double RHO = 3, BETA=1;
             double size = std::pow(3/(4*M_PI)*mass_amu*amu/RHO,1/3.) ;
             
             double k0 = 3/(4*RHO*size) ;
@@ -219,8 +219,8 @@ void c_Species::update_opacities() {
                     opacity_twotemp(j,b) = 1e-4 ;
                 }
                 for(int b=0; b<num_bands_out; b++) {
-                    opacity(j,b)         = 1e-4 ;
-                    opacity_planck(j,b)  = 1e-4 ;
+                    opacity(j,b)         = 1e-8 ;
+                    opacity_planck(j,b)  = 1e-8 ;
                 }
                 
             }   

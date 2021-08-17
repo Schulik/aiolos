@@ -80,35 +80,6 @@ double c_Sim::get_cfl_timestep() {
         return min(timestep_rad2, dt*max_timestep_change);
 }
 
-//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-//
-// Helper functions
-//
-//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-
-std::vector<AOS> init_AOS(int num) {   
-    return std::vector<AOS>(num);
-}
-
-///////////////////////////////////////////////////////////////////////
-///////////////////////////////////////////////////////////////////// Helper functions with numpy functionality
-///////////////////////////////////////////////////////////////////////
-
-std::vector<double> np_zeros(int size) { return std::vector<double>(size, 0.0) ;}
-std::vector<double> np_ones(int size) { return std::vector<double>(size, 1.0) ;}
-std::vector<double> np_somevalue(int size, double set_value) { return std::vector<double>(size, set_value) ; }
-
-std::vector<int> inp_zeros(int size) { return std::vector<int>(size, 0.0) ;}
-std::vector<int> inp_ones(int size) { return std::vector<int>(size, 1.0) ;}
-std::vector<int> inp_somevalue(int size, int set_value) { return std::vector<int>(size, set_value) ; }
-
-double delta_ij(int i, int j) {
-    if(i==j)
-        return 1.;
-    else 
-        return 0.;
-}
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 //
