@@ -31,7 +31,7 @@ INIT_T_TEMP             0
 FRICTION_SOLVER         1
 PARI_COLL_MODEL         P
 PARI_ALPHA_COLL         1.
-PARI_USE_COLL_HEAT      0
+PARI_USE_COLL_HEAT      1
 PARI_ORDER              2
 PARI_USE_RADIATION      1
 PARI_OPACITY_MODEL      D
@@ -69,10 +69,11 @@ PARI_BOUND_TYPE_RIGHT   0
 PARI_DOMAIN_DX          1e-3
 PARI_GRID_TYPE          1
 PARI_GEOMETRY           2
-PARI_CELLS_PER_DECADE   250
+PARI_CELLS_PER_DECADE   500
+
 #Domain min/max are 8 me core radius for earth density, and 100*hill radius
 PARI_DOMAIN_MIN         2.5e8
-PARI_DOMAIN_MAX         2.5e10
+PARI_DOMAIN_MAX         2.5e9
 
 #Scenarios
 PARI_INIT_WIND          1

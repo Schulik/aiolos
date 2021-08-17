@@ -54,11 +54,16 @@ void c_Species::user_initial_conditions(){
     } ;
 
     T_eq = base->T_star ;
-    double S = pow(T_eq,4.) * std::pow(base->R_star*rsolar,2.)/std::pow(base->planet_semimajor*au,2.) ;
+    double S = 0.25 * pow(T_eq,4.) * std::pow(base->R_star*rsolar,2.)/std::pow(base->planet_semimajor*au,2.) ;
     double ks = kappa(T_eq) ;
+    double tau0 = 1e300 ;
     for (int i=0; i < 100; i++) {
         double k = kappa(T_eq) ;
-        T_eq = 0.9*std::pow(S*ks/k/16, 0.25) + 0.1*T_eq ;
+        double g = ks/k ;
+
+        double T4 = 0.25*S*g ;//(1 + 3/g + (g - 3/g)*std::exp(-tau0));
+
+        T_eq = 0.9*std::pow(T4, 0.25) + 0.1*T_eq ;
     }
 
     std::cout << "Dusty wind setup: T_eq=" << T_eq << "K\n";
@@ -113,7 +118,6 @@ void c_Sim::user_heating_function() {
 
     RadiationProperties rad(num_bands_in, num_bands_out) ;
 
-    Brent brent ;
 
     for (int j = num_cells + 1; j > 0; j--) {
 
@@ -164,6 +168,7 @@ void c_Sim::user_heating_function() {
         double d0, d1 ; 
         std::tie(d0,d1) = cond.bracket_solution() ;
         
+        Brent brent(1e-6*rho[1]) ;
         d0 = brent.solve(d0, d1, cond) ;
 
         std::tie(rho, T, v) = cond.update_T_rho_v(d0) ;

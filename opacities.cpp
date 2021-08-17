@@ -216,7 +216,7 @@ void c_Species::update_opacities() {
             for(int j=0; j< num_cells+2; j++) {
                 
                 for(int b=0; b<num_bands_in; b++) {
-                    opacity_twotemp(j,b) = 1e-4 ;
+                    opacity_twotemp(j,b) = 1e-8 ;
                 }
                 for(int b=0; b<num_bands_out; b++) {
                     opacity(j,b)         = 1e-8 ;
