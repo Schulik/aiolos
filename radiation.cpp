@@ -31,8 +31,11 @@
 //////////////////////////////////////////////////////////////////
 void c_Sim::reset_dS() {
     for(int j = num_cells + 1; j>0; j--)
-        for(int s=0; s<num_species; s++)
-                species[s].dS(j)  = 0.;
+        for(int s=0; s<num_species; s++) {
+            species[s].dS(j)  = 0.;
+            species[s].dG(j)  = 0.;
+        }
+                
 }
 
 void c_Sim::update_dS() {
@@ -130,7 +133,7 @@ void c_Sim::update_dS() {
     }
     
     //Initialize optically thin regions with low energy density
-    if((steps==0) && (init_J_factor > 0.)) {
+    if((steps==0) && (init_J_factor > 1e10)) {
         
         cout<<" Setting J to custom values. init_J_factor = "<<init_J_factor<<" and init_T_temp ="<<init_T_temp<<" const_opacity_solar_factor = "<<const_opacity_solar_factor<<endl;
         
@@ -138,7 +141,7 @@ void c_Sim::update_dS() {
             for(int b=0; b<num_bands_out; b++) {
                 
                 if(radial_optical_depth(j,b) < 1.) 
-                    Jrad_FLD(j,b) *= init_J_factor/pow(x_i[j]/x_i[34] ,2.);
+                    Jrad_FLD(j,b) *= init_J_factor; //*std::pow(x_i[j]/x_i[34] , -2.);
                 
                 for(int s=0; s<num_species; s++)
                     species[s].prim[j].temperature = init_T_temp;
@@ -170,7 +173,6 @@ void c_Sim::update_dS() {
     
     //Set planetary temperature (computed in update_opacities)
     if(use_planetary_temperature == 1) {
-        
         for(int s=0; s<num_species; s++) {
             species[s].prim[1].temperature = T_surface;
             species[s].prim[0].temperature = T_surface;
@@ -236,6 +238,11 @@ void c_Sim::update_fluxes_FLD() {
 
     std::vector<double> 
         l(size_M, 0.), d(size_M, 0.), u(size_M, 0.), r(size_r, 0.) ;
+    //
+    // Making space for the convective energy transport, following Tajima & Nakagawa 1997
+    // Lconv = 2pir^2 c_p dT**3/2 std::sqrt(rho g Lmabda \partial rho/\partial T_P=const )
+    //         dT     = Lambda (dT'-dT)/2
+    //         Lambda = P/dP
     
     // Step 1: setup transport terms (J)
     for(int b=0; b<num_bands_out; b++) {
@@ -278,6 +285,8 @@ void c_Sim::update_fluxes_FLD() {
                 
                 l[idx] = 0 ;
                 u[idx] = -d[idx] ;
+                //u[idx] = 0. ;
+                //d[idx] =  ;
                 r[idx_r] = 0 ; 
             }
         //}
@@ -362,7 +371,6 @@ void c_Sim::update_fluxes_FLD() {
                 
                 int idx_s  = j*stride + (s + num_bands_out) * (num_vars+1) ;
                 int idx_rs = j*num_vars + (s + num_bands_out) ;
-                
                 
                 double Ts = species[s].prim[j].temperature ;
                 double rhos = species[s].prim[j].density ;

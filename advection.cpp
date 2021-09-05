@@ -229,6 +229,20 @@ void c_Sim::execute() {
             }
         }
         
+        /*for(int s = 0; s < num_species; s++) {
+            
+            //temporary fix for the boundary conditions
+            for(int i=0; i<=3; i++)  {
+                AOS TMP = species[s].u[i];
+                double temp_temp = species[s].prim[4].temperature;
+                
+                species[s].u[i] = AOS(TMP.u1, TMP.u2, species[s].cv * TMP.u1 * temp_temp + 0.5 * TMP.u2*TMP.u2/TMP.u1);
+                
+                //species[s].compute_pressure(species[s].u);
+            }
+            
+        }*/
+        
         for(int s = 0; s < num_species; s++) 
             species[s].compute_pressure(species[s].u);
             
@@ -258,8 +272,11 @@ void c_Sim::execute() {
             }
         }
 
+        //
+        // Fix temperature to a minimum
+        //
         
-        for(int s = 0; s < num_species; s++) {
+        /*for(int s = 0; s < num_species; s++) {
             species[s].user_species_loop_function() ;
             
             
@@ -271,7 +288,21 @@ void c_Sim::execute() {
                     temp_temp = init_T_temp;
                 species[s].u[i] = AOS(TMP.u1, TMP.u2, species[s].cv * TMP.u1 * temp_temp + 0.5 * TMP.u2*TMP.u2/TMP.u1) ;
             }
-        }
+            
+            //temporary fix for the boundary conditions
+            for(int i=0; i<=3; i++)  {
+                AOS TMP = species[s].u[i];
+                double temp_temp = species[s].prim[4].temperature;
+                
+                //if(temp_temp < init_T_temp)
+                //temp_temp = init_T_temp;
+                //cout<<" fixing boundary temperayres to "<<temp_temp<<"whie having started with T = "<<species[s].prim[i].temperature<<endl;
+                species[s].u[i] = AOS(TMP.u1, TMP.u2, species[s].cv * TMP.u1 * temp_temp + 0.5 * TMP.u2*TMP.u2/TMP.u1);
+                
+                species[s].compute_pressure(species[s].u);
+            }
+            
+        }*/
             
             
         steps++;
@@ -301,13 +332,13 @@ void c_Sim::execute() {
                         crash_T_numcells++;
                         
                         //cout<<" NEGATIVE TEMPERATURE at s/i = "<<s<<"/"<<i<<" in timestep="<<dt<<" stepnum "<<steps<<" totaltime "<<globalTime<<endl;
-                        globalTime = 1.1*t_max; //This secures that the program exits smoothly after the crash
+                        globalTime = 1.1*t_max; //This secures that the program exits smoothly after the crash and produces a -1 output file of the crashed state
                     }
             }
             
             if(crashed_T > 0) {
                 cout<<endl<<">>> CRASH <<< DUE TO NEGATIVE TEMPERATURES, crash_imin/imax = "<<crash_T_imin<<"/"<<crash_T_imax<<" sample T = "<<crashed_temperature<<" num of crashed cells/total cells = "<<crash_T_numcells<<"/"<<num_cells<<"  crashed species name = "<<species[crashed_T-1].speciesname<<endl; 
-                cout<<" @dt="<<dt<<" stepnum "<<steps<<" Crashtime "<<crashtime<<endl;
+                cout<<" @t/dt = "<<crashtime<<"/"<<dt<<" stepnum "<<steps<<endl;
                 cout<<"Writing crash dump into last output and exiting program."<<endl;
             } 
                     
@@ -334,15 +365,15 @@ void c_Sim::execute() {
                             
                             //cout<<" NEGATIVE RAD DENSITY at b/i = "<<b<<"/"<<i<<"  at timestep "<<dt<<" stepnum "<<steps<<" totaltime "<<globalTime<<endl;
                             //cout<<" Writing crash dump into last output and exiting program."<<endl;
-                            globalTime = 1.1*t_max;    
                             
+                            globalTime = 1.1*t_max;    
                         }
                     }
             }
             
             if(crashed_J > 0) {
                 cout<<endl<<">>> CRASH <<< DUE TO NEGATIVE J, crash_imin/imax = "<<crash_J_imin<<"/"<<crash_J_imax<<" sample J = "<<crashed_meanintensity<<" num of crashed cells/total cells = "<<crash_J_numcells<<"/"<<num_cells<<"  crashed band number = "<<crashed_J-1<<endl; 
-                cout<<" @dt="<<dt<<" stepnum "<<steps<<" Crashtime "<<crashtime<<endl;
+                cout<<" @t/dt = "<<crashtime<<"/"<<dt<<" stepnum "<<steps<<endl;
                 cout<<"Writing crash dump into last output and exiting program."<<endl;
             }
         }

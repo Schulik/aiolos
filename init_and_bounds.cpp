@@ -12,12 +12,14 @@
 ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, int debug) {
+c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, int debug, int debug_cell, int debug_steps) {
 
         if(debug > 0) cout<<"Init position 0."<<endl;
         
         steps = -1;
         this->debug      = debug ;
+        this->debug_cell = debug_cell;
+        this->debug_steps= debug_steps;
         simname          = filename_solo;
         this->workingdir = workingdir;
         
@@ -159,6 +161,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
         friction_solver   = read_parameter_from_file<int>(filename,"FRICTION_SOLVER", debug, 0).value;
         do_hydrodynamics  = read_parameter_from_file<int>(filename,"DO_HYDRO", debug, 1).value;
         photochemistry_level = read_parameter_from_file<int>(filename,"PHOTOCHEM_LEVEL", debug, 0).value;
+        dust_to_gas_ratio = read_parameter_from_file<double>(filename,"DUST_TO_GAS", debug, 0.).value;
         
         ion_precision         = read_parameter_from_file<double>(filename,"ION_PRECISION", debug, 1e-12).value;
         ion_heating_precision = read_parameter_from_file<double>(filename,"ION_HEATING_PRECISION", debug, 1e-12).value;
@@ -595,8 +598,8 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
                 }
                 if(std::abs(species[si].static_charge) > 0 && std::abs(species[sj].static_charge) > 0 && (si != sj)) {
                     cout<<" Setting friction mask to ionic value for species si/sj = "<<si<<"/"<<sj<<endl;
-                    friction_coeff_mask(si,sj) = 100.;
-                    friction_coeff_mask(sj,si) = 100.;
+                    friction_coeff_mask(si,sj) = 10000.;
+                    friction_coeff_mask(sj,si) = 10000.;
                 }
                 
             }
@@ -1030,7 +1033,11 @@ void c_Species::initialize_hydrostatic_atmosphere(string filename) {
     double metric_outer;
     
     double dphi_factor = read_parameter_from_file<double>(filename,"PARI_DPHI_FACTOR", debug, 1.).value;
-    base->density_floor = read_parameter_from_file<double>(filename,"DENSITY_FLOOR", debug, 1.e-20).value;
+        
+    if(base->photochemistry_level > 0 && std::abs(static_charge) > 0 )
+        base->density_floor = read_parameter_from_file<double>(filename,"ION_FLOOR", debug, 1.e-20).value;
+    else
+        base->density_floor = read_parameter_from_file<double>(filename,"DENSITY_FLOOR", debug, 1.e-20).value;
     //
     // Start with the outermost cell and build up a hydrostatic atmosphere
     // Fulfilling KKM16, Eqn. 17
@@ -1140,6 +1147,10 @@ void c_Species::initialize_hydrostatic_atmosphere(string filename) {
             }
             //////////////////////////////////////////////////////////////////////////////////////
             
+            //if(this_species_index == 2) {
+            //    cout<<" electrons, i/rho = "<<i<<"/"<<temp_rhofinal<<endl;
+            //}
+            
             u[i+1] = AOS(temp_rhofinal, 0., cv * temp_rhofinal * T_inner);
             
             if(negdens == 2) {
@@ -1183,13 +1194,13 @@ void c_Species::initialize_hydrostatic_atmosphere(string filename) {
     
     
     //makeshift density fix
-    if(this_species_index == 0)
-        cout<<"FIXING SMALL DENSITIES to density floor ="<<base->density_floor<<endl;
+    //if(this_species_index == 0)
+        cout<<"FIXING SMALL DENSITIES to density floor ="<<base->density_floor*mass_amu<<endl;
     
     for(int i = 0; i<num_cells+1; i++) {
             double floor = base->density_floor * mass_amu ;
             if(u[i].u1 < floor) {
-                //cout<<"FIXING SMALL DENSITIES in i ="<<i<<endl;
+                cout<<"FIXING SMALL DENSITIES in i ="<<i<<" for species = "<<this_species_index<<endl;
                 u[i] = AOS(floor, 0., cv * floor * prim[i].temperature) ;
             }
     }
@@ -1414,14 +1425,24 @@ void c_Species::apply_boundary_right(std::vector<AOS>& u) {
             user_boundary_right(u);
             break;
         case BoundaryType::open:
+            
             for (int i=Ncell+num_ghosts; i < Ncell+2*num_ghosts; i++) {
                 AOS_prim prim ;
                 eos->compute_primitive(&u[i-1],&prim, 1) ;
                 double dphi = (base->phi[i] - base->phi[i-1]) / (base->dx[i-1] + base->dx[i]) ;
                 dphi *= (base->omegaplus[i]*base->dx[i] + base->omegaminus[i-1]*base->dx[i-1]) ;
-                prim.pres = prim.pres -  prim.density * dphi ;
-                prim.pres = std::max( prim.pres, 0.0) ;
                 
+                double r =base->x_i12[i];
+                double mdot      = prim.density*prim.speed*r*r;
+                double freefallv = -std::sqrt(2.*G*base->planet_mass/r);
+                if(mdot < -1e18)
+                    prim.density = -1e18/freefallv/r/r;
+                    
+                prim.pres = prim.pres;// -  prim.density * dphi ;
+                prim.pres = std::max( prim.pres, 0.0) ;
+                //prim.temperature = base->init_T_temp;
+                
+                //eos->compute_eint_from_T
                 eos->compute_conserved(&prim, &u[i], 1) ;
             }
             break ;

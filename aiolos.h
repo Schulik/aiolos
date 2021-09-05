@@ -211,6 +211,8 @@ public:
     
     int problem_number;
     int debug;
+    int debug_cell = 40;
+    int debug_steps = 8965;
     int use_self_gravity;
     int use_linear_gravity;
     int use_rad_fluxes;
@@ -273,6 +275,7 @@ public:
     char opacity_model;
     double ion_precision;
     double ion_heating_precision;
+    double ion_floor;
     int ion_maxiter;
     int ion_heating_maxiter;
     
@@ -445,6 +448,7 @@ public:
     double init_sonic_radius;
     double T_increment;
     double alpha_collision;
+    double dust_to_gas_ratio;
     
     ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     //
@@ -532,7 +536,7 @@ public:
 public:
     
     c_Sim() {};
-    c_Sim(string parameter_filename, string species_filename, string workingdir, int debug=0);
+    c_Sim(string parameter_filename, string species_filename, string workingdir, int debug=0, int debug_cell=1, int debug_steps=99999999);
     ~c_Sim();
     
     void execute(); //Main loop

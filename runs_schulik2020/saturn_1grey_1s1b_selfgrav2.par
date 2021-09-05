@@ -1,0 +1,77 @@
+#
+# Parameterfile for atmosphere simulations
+# Do not use tabs, only white spaces as value separators
+#
+#TIME_TMAX          6.7801e8
+PARI_TIME_TMAX          1.01e8
+CFL_BREAK_TIME          1e3
+PARI_TIME_OUTPUT        1.1e6
+PARI_CFLFACTOR          0.9
+PARI_TIME_DT            1e10
+PARI_DPHI_FACTOR        1.0
+# Control parameters
+#
+# Problem numbers explained: shock_tube, no grav == 1, planet with grav == 2#
+# Friction solver: analytic == 0, numerical == 1
+# Collision model: constant == C, physical == P
+PARI_PROBLEM_NUMBER     2
+PARI_NUM_SPECIES        1
+PARI_NUM_BANDS          1
+DO_HYDRO                1
+#CONST_TEMP         180.
+PARI_CONST_TEMP         2.7
+INIT_TEMPERATURE_MODEL  P
+INIT_J_FACTOR           1e0
+# Solar radiation temps at 0.1 AU: 645K for bond albedo=0.75, 913K for bond albedo = 0
+# print 5777*(1./20./2.)**0.5*(1-0.75)**0.25
+
+FRICTION_SOLVER         1
+PARI_COLL_MODEL         P
+PARI_ALPHA_COLL         1.
+PARI_ORDER              2
+PARI_USE_RADIATION      1
+PARI_OPACITY_MODEL      C
+PARI_CONST_OPAC         1e0
+PRESSURE_BROADENING     0.
+NO_RAD_TRANS            1e0
+
+PARI_SELF_GRAV_SWITCH   1
+PARI_LINEAR_GRAV        0
+PARI_SMOOTHING_LENGTH   0.1
+PARI_DEBUGLEVEL         1
+PARI_INIT_STATIC        1
+USE_TIDES               0.
+
+
+#Physical parameters
+
+PARI_PLANET_MASS        90.
+PARI_INIT_DATA_SWITCH   1
+PARI_INIT_DATA_U1      1e-12
+PARI_INIT_DATA_U2      1.0
+PARI_INIT_DATA_U3      1e-12
+
+#Radiation parameters
+PARI_LAM_MIN            0.8e0
+PARI_LAM_MAX            0.8e0
+PARI_LAM_PER_DECADE     0.1
+PARI_TSTAR              6070.
+PARI_RSTAR              0.
+PARI_UVSTAR             0.
+PARI_PLANET_DIST        5.2
+
+#Numerical parameters
+PARI_BOUND_TYPE         2
+PARI_BOUND_TYPE_LEFT    3
+PARI_BOUND_TYPE_RIGHT   1
+PARI_DOMAIN_DX          1e-3
+PARI_GEOMETRY           2
+PARI_CELLS_PER_DECADE   1000
+
+PARI_GRID_TYPE          1
+#Domain min/max are 8 me core radius for earth density, and 100*hill radius
+PARI_DOMAIN_MIN         3.495e10
+PARI_DOMAIN_MAX         3.495e12
+
+#Scenarios
+PARI_INIT_WIND          1

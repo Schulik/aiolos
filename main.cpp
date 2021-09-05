@@ -24,6 +24,8 @@ int main(int argc, char** argv)
     string speciesfile;
     string workingdir = "./";
     int debug;
+    int debug_cell = 40;
+    int debug_steps = 8965;
     int suppress_warnings_global = 0;
     cout<<endl<<"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"<<endl;
           cout<<"~~~ Welcome to AIOLOS! May a gentle breeze lead your way through the bugs."<<endl;
@@ -75,7 +77,18 @@ int main(int argc, char** argv)
             cout<<"Suppressing warnings yes/no = 1/0 : "<<suppress_warnings_global<<endl;
             i++;
         }
-        
+        if(tmpstring.compare("-dcell") == 0) {
+            string yet_another_string = argv[i+1];
+            debug_cell    = std::stoi(yet_another_string);
+            cout<<"Debugging cell "<<debug<<endl;
+            i++;
+        }
+        if(tmpstring.compare("-dsteps") == 0) {
+            string yet_another_string = argv[i+1];
+            debug_steps    = std::stoi(yet_another_string);
+            cout<<"Debugging info output after steps number "<<debug<<endl;
+            i++;
+        }
     }
     
     if(!parameterfile_found) {
@@ -93,7 +106,7 @@ int main(int argc, char** argv)
         cout<<endl<<"In main, construction of simulation is about to start."<<endl;
        
         //Main simulation class object, is initialized with the simulation parameters from a file
-        c_Sim simulation1(simulationname, speciesfile, workingdir, debug);
+        c_Sim simulation1(simulationname, speciesfile, workingdir, debug, debug_cell, debug_steps);
         
         simulation1.set_suppress_warnings(suppress_warnings_global);
 
