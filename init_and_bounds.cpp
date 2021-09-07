@@ -55,7 +55,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
         X_star           = read_parameter_from_file<double>(filename,"PARI_XSTAR", debug, 0.).value;
         Lyalpha_star     = read_parameter_from_file<double>(filename,"PARI_LYASTAR", debug, 0.).value;
         
-        T_core           = read_parameter_from_file<double>(filename,"PARI_TPLANET", debug, 200.).value;
+        L_core           = read_parameter_from_file<double>(filename,"PARI_LPLANET", debug, 0.).value;
         use_planetary_temperature = read_parameter_from_file<int>(filename,"USE_PLANET_TEMPERATURE", debug, 0).value;
         core_cv           = read_parameter_from_file<double>(filename,"PARI_CORE_CV", debug, 1.e9).value;
         
@@ -129,7 +129,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
         //    Control parameters for users
         //
         ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        
+        int use_volume_centre ;
         problem_number    = read_parameter_from_file<int>(filename,"PARI_PROBLEM_NUMBER", debug).value;
         use_self_gravity  = read_parameter_from_file<int>(filename,"PARI_SELF_GRAV_SWITCH", debug, 0).value;
         use_tides         = read_parameter_from_file<int>(filename,"USE_TIDES", debug, 0).value;
@@ -137,6 +137,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
         use_rad_fluxes    = read_parameter_from_file<int>(filename,"PARI_USE_RADIATION", debug, 0).value;
         use_collisional_heating = read_parameter_from_file<int>(filename,"PARI_USE_COLL_HEAT", debug, 1).value;
         use_drag_predictor_step = read_parameter_from_file<int>(filename, "PARI_SECONDORDER_DRAG", debug, 0).value;
+        use_volume_centre = read_parameter_from_file<int>(filename, "PARI_USE_VOLUME_CENTRE", debug, 1).value;
         init_wind         = read_parameter_from_file<int>(filename,"PARI_INIT_WIND", debug, 0).value;
         alpha_collision   = read_parameter_from_file<double>(filename,"PARI_ALPHA_COLL", debug, 0).value;
         //init_mdot              = read_parameter_from_file<double>(filename,"PARI_MDOT", debug, -1.).value;
@@ -386,7 +387,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
         dx[0] = dx[1]*dx[1]/dx[2] ;
         dx[num_cells+1] = dx[num_cells]*dx[num_cells]/dx[num_cells-1];
 
-        R_core = x_i[1];
+        R_core = x_i[num_ghosts-1];
         
         // Surface areas
         switch (geometry) {
@@ -437,6 +438,11 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
                 x_iVC[i] = (4*M_PI) * (xr*xr*xr*xr - xl*xl*xl*xl) / (4*vol[i]) ;
                 break;
             }
+            // Use Arithmetic centre 
+            //    (useful for perfectly reflecting boundaries in non-cartesian geometry)
+            if (not use_volume_centre)
+                x_iVC[i] = 0.5*(xr+xl);
+
         }
         
         //Compute cell mid positions. Ghost cells also have mid positions in order to balance their pressure gradients

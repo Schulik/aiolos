@@ -139,6 +139,8 @@ void c_Sim::execute() {
             //if(steps==1 || steps==2)
             print_diagnostic_file((int)output_counter);
             
+            user_output_function(output_counter) ;
+
             monitor_counter+=1.;
             output_counter +=1.;
          }
@@ -150,6 +152,7 @@ void c_Sim::execute() {
              for(int s=0; s<num_species; s++)
                 species[s].print_AOS_component_tofile((int)output_counter); 
              
+             user_output_function(output_counter) ;
              
              output_counter+=1.; 
          }
@@ -316,7 +319,7 @@ void c_Sim::execute() {
                     
         }
         for(int b = 0; b < num_bands_out; b++) {
-            for(int i=num_cells; i>=0; i--)  {
+            for(int i=num_cells+2-num_ghosts; i>=num_ghosts; i--)  {
                     if(Jrad_FLD(i,b) < 0) {
                         
                         if(Jrad_FLD(i,b) > -1e-10) {
@@ -517,6 +520,7 @@ AOS c_Species::hllc_flux(int j)
     
     //Intermediate values in the star region, equations 10.30 -10.39 in Toro
     double SS     = ( pr-pl+mom_l*(SL - ul)-mom_r*(SR-ur) )/(dl*(SL - ul)-dr*(SR-ur) );
+    //double pS     = (pr*dl*(SL-ul) - pl*dr*(SR-ur) - dl*dr*(SL-ul)*(SR-ur)*(ur-ul)) / (dl*(SL - ul)-dr*(SR-ur)) ;
     
     if ((SL <= 0) &&  (SS >= 0)) {
         AOS FL         = AOS (mom_l, mom_l * ul + pl, ul * (El + pl) );

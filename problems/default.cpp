@@ -30,3 +30,4 @@ void c_Species::user_opacity() {
 
 void c_Species::user_species_loop_function() {} ;
 void c_Sim::user_heating_function() {} ;
+void c_Sim::user_output_function(int) {} ;

@@ -71,3 +71,5 @@ void c_Species::user_species_loop_function() {
     eos->compute_conserved(&prim[0], &u[0], num_cells+2);   
     compute_pressure(u);
 }
+
+void c_Sim::user_output_function(int) {} ;

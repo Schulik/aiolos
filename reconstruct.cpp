@@ -101,7 +101,7 @@ void c_Species::reconstruct_edge_states() {
 
             prim_l[i].speed += slope * (x_i[i-1] - x_iVC[i]) ; 
             prim_r[i].speed += slope * (x_i[ i ] - x_iVC[i]) ;
-            
+
             if ((prim_l[i].pres < 0) || (prim_r[i].pres < 0) || 
                 (prim_l[i].density < 0) || (prim_r[i].density < 0))
                 prim_l[i] = prim_r[i] = prim[i] ;

@@ -148,13 +148,11 @@ void c_Sim::update_dS() {
     }
     
     //Compute surface temperature from remaining solar flux and core flux
-    double cooling_time  = 1e9 / core_cv;
     double J_remnant = 0;
-    double T_rad_remnant;
     double T_target;
     
     for(int b = 0; b < num_bands_in; b++) {
-        J_remnant += S_band(1,b);
+        J_remnant += 0.25 * S_band(num_ghosts-1,b);
     }
     
     for(int s=0; s<num_species; s++) 
@@ -163,24 +161,28 @@ void c_Sim::update_dS() {
             species[s].prim[num_cells+1].temperature = species[s].const_T_space;
         }
     
-    T_rad_remnant = pow(pi * J_remnant / sigma_rad, 0.25);
-    
-    T_target      = pow(pow(T_core,4.) + pow(T_rad_remnant,4.), 0.25);
-    T_surface     = T_target; //+ (T_surface - T_target)*std::exp(-dt/cooling_time);
+    J_remnant += L_core/(4*pi*R_core*R_core) ;
+
+    T_target  = pow(std::abs(J_remnant) / sigma_rad, 0.25);
+    if (J_remnant < 0) 
+       T_target *= -1 ; // Use T < 0 to represent negative flux
+
+    T_surface = T_target;
     
     //Set planetary temperature (computed in update_opacities)
-    if(use_planetary_temperature == 1) {
+    if(false && use_planetary_temperature == 1) {
         
         for(int s=0; s<num_species; s++) {
             species[s].prim[1].temperature = T_surface;
             species[s].prim[0].temperature = T_surface;
         }
         for(int b=0; b<num_bands_out; b++) {
-            Jrad_FLD(1, b)            = sigma_rad * pow(T_surface,4.) * pow(R_core,2.) * compute_planck_function_integral3(l_i_out[b], l_i_out[b+1], T_surface) ;
-            Jrad_FLD(0, b)            = sigma_rad * pow(T_surface,4.) * pow(R_core,2.) * compute_planck_function_integral3(l_i_out[b], l_i_out[b+1], T_surface) ;
+            Jrad_FLD(1, b) = sigma_rad * pow(T_surface,4.) * compute_planck_function_integral3(l_i_out[b], l_i_out[b+1], std::abs(T_surface)) ;
+            Jrad_FLD(0, b) = sigma_rad * pow(T_surface,4.) * compute_planck_function_integral3(l_i_out[b], l_i_out[b+1], std::abs(T_surface)) ;
         }
         //cout<<"t ="<<globalTime<<" Jrad(0,b) = "<<Jrad_FLD(0, 0)<<" Tsurface = "<<T_surface<<" Tcore = "<<T_core<<" T_rad_remnant = "<<T_rad_remnant<<endl;
     }
+
     
     if(debug >= 1) {
         
@@ -222,12 +224,6 @@ void c_Sim::update_fluxes_FLD() {
         }
     }
     
-    auto flux_limiter = [](double R) {
-        if (R <= 2)
-            return 2 / (3 + std::sqrt(9 + 10*R*R)) ;
-        else 
-            return 10 / (10*R + 9 + std::sqrt(81 + 180*R)) ;
-    } ;
 
     int num_vars = num_bands_out + num_species;
     int stride = num_vars * num_vars ;
@@ -252,7 +248,7 @@ void c_Sim::update_fluxes_FLD() {
                 double dx      = (x_i12[j+1]-x_i12[j]) ;
                 double rhokr   = max(2.*(total_opacity(j,b)*total_opacity(j+1,b))/(total_opacity(j,b) + total_opacity(j+1,b)), 4./3./dx );
                        rhokr   = min( 0.5*( total_opacity(j,b) + total_opacity(j+1,b)) , rhokr);
-                double tau_inv = 0.5 / (dx * rhokr) ;
+                double tau_inv = 1 / (dx * rhokr) ;
                 //double tau_inv = 0.5 / (dx * (total_opacity(j,b) + total_opacity(j+1,b))) ;
                 double R       = 2 * tau_inv * std::abs(Jrad_FLD(j+1,b) - Jrad_FLD(j,b)) / (Jrad_FLD(j+1,b) + Jrad_FLD(j, b) + 1e-300) ;
                 double D       = no_rad_trans * surf[j] * flux_limiter(R) * tau_inv;
@@ -271,16 +267,23 @@ void c_Sim::update_fluxes_FLD() {
         // Boundaries:
         // Left boundary:
         //    Reflecting / no flux or planetary temperature
-        //if(use_planetary_temperature == 0) {
-            for (int j=0; j < num_ghosts; j++) {
-                int idx = j*stride + b*(num_vars + 1) ;
-                int idx_r = j*num_vars + b ;
+        for (int j=0; j < num_ghosts; j++) {
+            int idx = j*stride + b*(num_vars + 1) ;
+            int idx_r = j*num_vars + b ;
+
+            // Compute heating due to radiation reaching surface
+            double S = 0 ;
+            if (j == num_ghosts-1 && use_planetary_temperature) {
+                S = sigma_rad * pow(T_surface,4.) * compute_planck_function_integral3(l_i_out[b], l_i_out[b+1], std::abs(T_surface)) ;  
+                if (T_surface < 0) 
+                    S *= -1 ; 
                 
-                l[idx] = 0 ;
-                u[idx] = -d[idx] ;
-                r[idx_r] = 0 ; 
+                S *= -surf[j]/(4*pi*u[idx]) ;
             }
-        //}
+            l[idx] = 0 ;
+            u[idx] = -d[idx] ;
+            r[idx_r] = S*d[idx] ;
+        }
         
         //   Right boundary: reflective?
         //if(geometry == Geometry::cartesian) {

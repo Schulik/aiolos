@@ -11,7 +11,6 @@
 class Brent {
    public:
     Brent(){};
-    Brent(double tol) : _tol(tol){};
     Brent(double tol, int max_iter=128) : _tol(tol), _max_iter(max_iter){};
 
     template <class System>
@@ -22,8 +21,11 @@ class Brent {
         double fa = sys(a);
         double fb = sys(b);
 
-        if (not(fa * fb <= 0))
+        if (not(fa * fb <= 0)) {
+            std::cout << "Brent: (a,b)=(" << a << ", " << b << "), "
+                      <<"(f(a), f(b))=("<< fa << ", " << fb << ")\n" ;
             throw std::invalid_argument("Root must be bracketed");
+        }
 
         double EPS = std::numeric_limits<double>::epsilon();
         double c = b, fc = fb;

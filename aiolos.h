@@ -106,6 +106,23 @@ inline std::vector<int> inp_ones(int size) { return inp_somevalue(size, 1) ; }
 //double compute_planck_function_integral(double lmin, double lmax, double temperature);
 double compute_planck_function_integral2(double lmin, double lmax, double temperature);
 
+
+inline double flux_limiter(double R) {
+    if (R <= 2)
+        return 2 / (3 + std::sqrt(9 + 10*R*R)) ;
+    else 
+        return 10 / (10*R + 9 + std::sqrt(81 + 180*R)) ;
+}
+inline double eddington_coeff(double R) {
+    if (R <= 2) {
+        double l = 2 / (3 + std::sqrt(9 + 10*R*R)) ;
+        return l + l*l*R*R ;
+    } else {
+        double lR = 10 / (10 + 9/R + std::sqrt(81/(R*R) + 180/R)) ;
+        return lR/R + lR*lR ;
+    }
+}
+
 //
 // Everything to define and read simulation parameters
 //
@@ -390,7 +407,7 @@ public:
     double Lyalpha_star;
     double R_star;
     
-    double T_core;  //Internal heat flux
+    double L_core;  // Internal heat flux
     double T_surface; //Radiation flux making it through the atmosphere
     double R_core;
     double core_cv; //Heat capacity of the surface layer
@@ -532,6 +549,7 @@ public:
     void do_photochemistry();
     void user_heating_function(); 
     
+    
     void update_fluxes(double timestep);           //  Called from transport_radiation#   
     void update_fluxes_FLD();           //  Called from transport_radiation#
     void update_temperatures_simple();           //  Called from transport_radiation#
@@ -540,7 +558,8 @@ public:
     double compute_planck_function_integral3(double lmin, double lmax, double temperature);
     double compute_planck_function_integral4(double lmin, double lmax, double temperature);
     
-    
+    void user_output_function(int) ;
+
 public:
     
     c_Sim() {};

@@ -13,35 +13,23 @@ Condensible silicate(169, 3.21e10, 6.72e14, 0.1) ;
 
 
 static double T_core ;
-static double f_dust = 0e-20;
-static double E_core = 0, t_core = 0.1 ;
-
-void c_Sim::user_output_function(int output_counter) {
-    std::ofstream file ;
-    std::string filename = workingdir+"user_output.dat" ;
-
-    if (output_counter == 0) {
-        file.open(filename) ;
-        file << "# snap time[s] T_surf[K] L_surf[K]\n" ;
-    } else {
-        file.open(filename, std::ios::app) ;
-    }
-    file << output_counter << " " << globalTime << " " << T_core << " " << L_core << "\n" ;
-    cout << "T_core, T_surf: " << T_core << ", " << T_surface << "K\n";
-}
 
 void c_Species::user_boundary_left(std::vector<AOS>& u) {
     
+    AOS_prim p ;
+    p.pres = initial_fraction * silicate.P_vap(T_core) ;
+    p.density = p.pres * mass_amu / (Rgas * T_core) ;
+    p.speed = std::abs(u[base->num_ghosts].u2/u[base->num_ghosts].u1) ; 
+    
     for (int j=0; j < base->num_ghosts; j++) {
-        u[j] = u[2*base->num_ghosts-(j+1)] ;
-        u[j].u2 *= -1 ;
+        eos->compute_conserved(&p, &u[j], 1) ;
         base->phi[j] = base->phi[base->num_ghosts] ;
     }
 
 }
 
 
-void c_Species::user_boundary_right(std::vector<AOS>& u) {
+void c_Species::user_boundary_right(std::vector<AOS>&) {
 
     int N = num_cells + 2 - base->num_ghosts ;
     for (int j=0; j < base->num_ghosts; j++) {
@@ -49,6 +37,7 @@ void c_Species::user_boundary_right(std::vector<AOS>& u) {
         base->phi[N+j] = base->phi[N-1] ;
     }
 }
+void c_Sim::user_output_function(int) {} ;
 
 void c_Species::user_initial_conditions(){
     
@@ -71,27 +60,28 @@ void c_Species::user_initial_conditions(){
     T_core = base->T_star ;
     double S = 0.25 * pow(T_core,4.) * std::pow(base->R_star*rsolar,2.)/std::pow(base->planet_semimajor*au,2.) ;
     double ks = kappa(T_core) ;
-    double tau0 = 0e300 ;
+    //double tau0 = 0e300 ;
     for (int i=0; i < 100; i++) {
         double k = kappa(T_core) ;
         double g = ks/k ;
 
-        double T4 = 0.25*S*g * (1 + 3/g + (g - 3/g)*std::exp(-tau0));
+        double T4 = 0.25*S*g ;//* (1 + 3/g + (g - 3/g)*std::exp(-tau0));
 
         T_core = 0.9*std::pow(T4, 0.25) + 0.1*T_core ;
     }
-    //T_core = pow(S, 0.25) ;
+
     // Set the planet temperature
     base->L_core = 0 ;
     base->T_surface = T_core ;
-    base->use_planetary_temperature = 1 ;
+    base->use_planetary_temperature = 0 ;
+
 
     std::cout << "Dusty wind setup:\n\tT_eq=" << T_core << "K\n"
               << "\tGrain size=" << size << "cm\n" ;
     
     // First get the boundary condition
     AOS_prim p0 ;
-    p0.pres = initial_fraction *(30/mass_amu)* silicate.P_vap(T_core) ;
+    p0.pres = initial_fraction * silicate.P_vap(T_core) ;
     p0.density = p0.pres * mass_amu / (Rgas * T_core) ;
     p0.speed = 0 ;
     
@@ -127,8 +117,6 @@ void c_Sim::user_heating_function() {
         throw std::runtime_error("Condensation requires num_species=2") ;
 
     double RHO = 3 ;
-    double THICKNESS = 10; // Thickness of surface layer in cm.
-
     double a_grain = std::pow(3/(4*M_PI)*species[1].mass_amu*amu/RHO,1/3.) ;
     
     SingleGrainCondensation cond(
@@ -270,90 +258,6 @@ void c_Sim::user_heating_function() {
                 species[s].prim[j].temperature = T[s] ;
         }
     }
-
-    // Next compute evaporation and condensation from the surface
-    int j = num_ghosts ;
-    SurfaceCondensation2 planet_surf(silicate, species[0].mass_amu, 
-                                    species[0].cv, species[1].cv, RHO*THICKNESS,surf[j-1]/vol[j]);
-    if (use_rad_fluxes == 1) {
-        // Stellar radiation reaching the planet
-        for (int b=0; b < num_bands_in; b++) 
-            rad.flux_star[b] = 0.25 * solar_heating(b) * 
-                    std::exp(-radial_optical_depth_twotemp(j,b)) ;
-
-        // Thermal radiation reaching the planet
-        for (int b=0; b < num_bands_out; b++) {
-
-            double dx      = (x_i12[j]-x_i12[j-1]) ;
-            double rhokr   = max(2.*(total_opacity(j-1,b)*total_opacity(j,b))/(total_opacity(j-1,b) + total_opacity(j,b)), 4./3./dx );
-                   rhokr   = min( 0.5*( total_opacity(j-1,b) + total_opacity(j,b)) , rhokr);
-            double tau_inv = 1 / (dx * rhokr) ;
-            double R       = 2 * tau_inv * std::abs(Jrad_FLD(j,b) - Jrad_FLD(j-1,b)) / (Jrad_FLD(j,b) + Jrad_FLD(j-1, b) + 1e-300) ;
-            double lam     = flux_limiter(R) ;
-            double edd     = eddington_coeff(R) ;
-
-            rad.J_thermal[b] = Jrad_FLD(j-1, b) * (0.5 + 1.5*edd) + 2*lam*(Jrad_FLD(j,b) - Jrad_FLD(j-1,b)) * tau_inv ;
-            rad.J_thermal[b] = std::max(0., rad.J_thermal[b]) ;
-        }
-    } else {
-        throw std::runtime_error("Radiation must be turned on") ;
-    }
-
-    // Energy due to rain out
-    double L_rain = 0 ;
-    if (species[1].prim[j].speed < 0) {
-        AOS_prim& prim = species[1].prim[j] ;
-
-        double E_tot = prim.density*
-            (species[1].cv*prim.temperature + 0.5*prim.speed*prim.speed) ;
-
-        L_rain = - E_tot * prim.speed ;
-
-        prim.density += prim.density * prim.speed * dt * surf[j-1]/vol[j] ;
-    } 
-
-    // Get the surface temperature and mass-loss rate
-    planet_surf.set_state(T_core,
-                          species[0].prim[j].temperature, 
-                          species[0].prim[j].pres,
-                          rad, L_rain, dt) ;
-
-    double T0, T1 ; 
-    std::tie(T0,T1) = planet_surf.bracket_solution() ;
-    
-    Brent brent(1e-10*T_core) ;
-    //std::cout << T_core << " " << rad.flux_star[0] << " " << rad.J_thermal[0] << " " << rad.J_thermal[0]/Jrad_FLD(j-1, 0)<< "\n";
-    T_core = brent.solve(T0, T1, planet_surf) ;
-    double L = -planet_surf.surface_cooling_rate(T_core)*4*pi*R_core*R_core ;
-    E_core = (E_core + L*dt) / (1 + dt/t_core) ;
-    L_core = E_core / t_core ;
-
-    std::cout << "t, dt, T " << globalTime << " " << dt << " " 
-              << T_core << ", " << rad.flux_star[0]<< " " 
-              << L_core/(4*pi*R_core*R_core) << " " << L_rain << "\n" ;
-
-    double drho = dt*planet_surf.mass_flux(T_core)*surf[j-1]/vol[j] ;
-    double heat = dt*planet_surf.gas_heating_rate(T_core)*surf[j-1]/vol[j] ;
-
-    std::array<double, 2> frac = {1-f_dust, f_dust} ;
-
-    for (int s=0; s < 2; s++) {
-        // Update the mass, momentum and energy of the corresponding cell
-        AOS_prim& prim = species[s].prim[j] ;
-
-        double E_tot = prim.density*
-            (species[s].cv*prim.temperature + 0.5*prim.speed*prim.speed) ;
-
-        E_tot += frac[s]*heat;
-
-        prim.speed /= (1 + frac[s]*drho/prim.density) ;
-        prim.density += drho ;
-        
-        E_tot -= 0.5*prim.density*prim.speed*prim.speed ;
-
-        prim.temperature = E_tot / (prim.density*species[s].cv) ;
-    }
-
 
 
     // Finally, lets update the conserved quantities

@@ -28,6 +28,7 @@ double c_Sim::get_cfl_timestep() {
     // Compute heuristic radiative timestep
     //
     double maxde = 0;
+    int imax = -1 ;
     
     for(int s = 0; s < num_species; s++) {
         for(int i=num_cells-1; i>=0; i--)  {
@@ -35,10 +36,14 @@ double c_Sim::get_cfl_timestep() {
             
             species[s].timesteps_de[i] = dt / species[s].de_e[i] * energy_epsilon;
             
-            maxde = std::max(species[s].de_e[i], maxde) ;
-            if(debug > 2)
-                cout<<" steps "<<steps<<" species "<<s<<" i = "<<i<<" de/e = "<<species[s].de_e[i]<<" de/e/cflfactor = "<<species[s].de_e[i]/cflfactor<<endl;
+            if (species[s].de_e[i] > maxde) {
+                maxde = std::max(species[s].de_e[i], maxde) ;
+                imax = i ;
+            }
         }
+        if(debug > 2)
+            cout<<" steps "<<steps<<" species "<<s<<" imax = "<<imax<<" de/e = "<<species[s].de_e[imax]<<endl;
+        
     }
     
     timestep_rad2 = dt / maxde * energy_epsilon;
