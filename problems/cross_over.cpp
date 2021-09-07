@@ -64,12 +64,19 @@ void c_Species::user_opacity() {
         "method if you want to use user defined initial conditions.") ;
 }
 
-void c_Species::user_species_loop_function() {
-    for (int j=0; j <= num_cells+1; j++) {
-        prim[j].pres = prim[j].density * Rgas * T_eq / mass_amu ;
+void c_Sim::user_loop_function() {} ; {
+
+    for (int s = 0; s < num_species; s++) {
+        auto& prim = species[s].prim ;
+        auto& u = species[s].u ;
+    
+
+        for (int j=0; j <= num_cells+1; j++) {
+            prim[j].pres = prim[j].density * Rgas * T_eq / mass_amu ;
+        }
+        species[s].eos->compute_conserved(&prim[0], &u[0], num_cells+2);   
+        species[s].compute_pressure(u);
     }
-    eos->compute_conserved(&prim[0], &u[0], num_cells+2);   
-    compute_pressure(u);
 }
 
 void c_Sim::user_output_function(int) {} ;

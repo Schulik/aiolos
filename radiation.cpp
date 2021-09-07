@@ -147,19 +147,23 @@ void c_Sim::update_dS() {
         }
     }
     
-    //Compute surface temperature from remaining solar flux and core flux
-    double J_remnant = 0;
-    double T_target;
-    
-    for(int b = 0; b < num_bands_in; b++) {
-        J_remnant += 0.25 * S_band(num_ghosts-1,b);
-    }
     
     for(int s=0; s<num_species; s++) 
         if (species[s].const_T_space > 0) {
             species[s].prim[num_cells].temperature   = species[s].const_T_space;
             species[s].prim[num_cells+1].temperature = species[s].const_T_space;
         }
+
+
+    //Compute surface temperature from core flux
+    double J_remnant = 0;
+    double T_target;
+    
+    /*
+    for(int b = 0; b < num_bands_in; b++) {
+        J_remnant += 0.25 * S_band(num_ghosts-1,b);
+    }
+    */
     
     J_remnant += L_core/(4*pi*R_core*R_core) ;
 
@@ -224,6 +228,8 @@ void c_Sim::update_fluxes_FLD() {
         }
     }
     
+    // Diffusion coefficient for the core:
+    std::vector<double> D_core(num_bands_out, 0)  ;
 
     int num_vars = num_bands_out + num_species;
     int stride = num_vars * num_vars ;
@@ -272,17 +278,30 @@ void c_Sim::update_fluxes_FLD() {
             int idx_r = j*num_vars + b ;
 
             // Compute heating due to radiation reaching surface
-            double S = 0 ;
             if (j == num_ghosts-1 && use_planetary_temperature) {
+                double S ;
                 S = sigma_rad * pow(T_surface,4.) * compute_planck_function_integral3(l_i_out[b], l_i_out[b+1], std::abs(T_surface)) ;  
                 if (T_surface < 0) 
                     S *= -1 ; 
+
+                double dx      = (x_i12[j+1]-x_i12[j]) ;
+                double rhokr   = max(2.*(total_opacity(j,b)*total_opacity(j+1,b))/(total_opacity(j,b) + total_opacity(j+1,b)), 4./3./dx );
+                       rhokr   = min( 0.5*( total_opacity(j,b) + total_opacity(j+1,b)) , rhokr);
+                double tau_inv = 1 / (dx * rhokr) ;
+                double R       = 2 * tau_inv * std::abs(Jrad_FLD(j+1,b) - Jrad_FLD(j,b)) / (Jrad_FLD(j+1,b) + Jrad_FLD(j, b) + 1e-300) ;
+
+                D_core[b]    = no_rad_trans * flux_limiter(R) * tau_inv;
+                double Chi   = 0.25*(1 + 3*eddington_coeff(R)) ;
                 
-                S *= -surf[j]/(4*pi*u[idx]) ;
+                l[idx] = 0 ;
+                d[idx] = 0.5*(D_core[b] + Chi) * surf[j] ;
+                u[idx] = -0.5*D_core[b] * surf[j] ;
+                r[idx_r] = surf[j] * S / (4*pi) ;
+            } else {
+                l[idx] = 0 ;
+                u[idx] = -d[idx] ;
+                r[idx_r] = 0 ;
             }
-            l[idx] = 0 ;
-            u[idx] = -d[idx] ;
-            r[idx_r] = S*d[idx] ;
         }
         
         //   Right boundary: reflective?
@@ -435,6 +454,11 @@ void c_Sim::update_fluxes_FLD() {
         }
     }
     
+    if (use_planetary_temperature) {
+        F_core = 0 ;
+        for(int b=0; b<num_bands_out; b++) 
+            F_core -= 4*pi * D_core[b] * (Jrad_FLD(num_ghosts, b) - Jrad_FLD(num_ghosts-1, b)) ;
+    }
     
     // Update energies. 
     // TODO: We should add cv * (Tf - Ti) to u to conserve energy properly.

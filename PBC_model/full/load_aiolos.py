@@ -9,9 +9,10 @@ def load_aiolos_snap(filename):
              ('velocity',    'f8'),
              ('temperature', 'f8'),
              ('soundspeed',  'f8'),
+             ('potential',   'f8'),
              ('cooling',     'f8'),
              ('heating',     'f8')]
-    cols=[0,1,2,3,10,11,12,15,21,22]
+    cols=[0,1,2,3,10,11,12,15,19,21,22]
     
     data = np.genfromtxt(filename, dtype=dtype, usecols=cols)
     return data
@@ -71,9 +72,12 @@ def load_aiolos_diag(filename, bands=None, species=None):
         cols = []
         for i in range(bands):
             for j in range(species):
-                cols += [('kappa_R' + str(i) + '_' + str(j), 'f8')]
-                cols += [('kappa_P' + str(i) + '_' + str(j), 'f8')]
                 cols += [('kappa_P(Tsun)' + str(i) + '_' + str(j), 'f8')]
+        for i in range(bands):
+            for j in range(species):
+                cols += [('kappa_R' + str(i) + '_' + str(j), 'f8')]
+            for j in range(species):
+                cols += [('kappa_P' + str(i) + '_' + str(j), 'f8')]
         return cols
         
     dtype = [('x',    'f8'),
@@ -121,9 +125,11 @@ if __name__ == "__main__":
     import sys
     import matplotlib.pyplot as plt
 
-    f, ax = plt.subplots(3,1, sharex=True)
+    f, ax = plt.subplots(4,1, sharex=True)
 
-    for snap in sys.argv[1:]:
+    snaps = [s for s in sys.argv[1:] if s[0] == 'o'] + [s for s in sys.argv[1:] if s[0] != 'o']
+    
+    for snap in snaps:
         if snap.startswith('output'): 
             data = load_aiolos_snap(snap)
             if 'Gas' in snap:
@@ -137,20 +143,29 @@ if __name__ == "__main__":
 
             ax[1].semilogx(data['x'], data['temperature'], ls='',
                         marker=m, label=snap)
+            #ax[1].semilogx(data['x'], data['pressure']/data['density']**1.29, ls='',
+            #            marker=m, label=snap)
 
             ax[2].semilogx(data['x'], data['velocity'], ls='',
                 marker=m, label=snap)
+
+            l,= ax[3].loglog(data['x'], data['heating'], ls='-',
+                label=snap)
+            ax[3].semilogx(data['x'], np.abs(data['cooling']), ls='--',
+                c=l.get_color())
             #ax[2].semilogx(data['x'], data['soundspeed'], ls='--',
             #    marker=m)
         elif snap.startswith('diagnostic'):
             data = load_aiolos_diag(snap)
             ax[1].semilogx(data['x'], data['T_rad'], ls='',
                         marker='^', label=snap)
+            #ax[3].semilogx(data['x'], np.abs(data['dS0']), marker='^', ls='')
 
     ax[-1].set_xlabel('r')
     ax[0].set_ylabel('density')
     ax[1].set_ylabel('temperature')
     ax[2].set_ylabel('velocity')
+    ax[3].set_ylabel('heating / cooling')
 
 
     ax[1].legend(ncol=3)

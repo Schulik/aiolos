@@ -107,7 +107,7 @@ void c_Species::user_opacity() {
         "method if you want to use user defined initial conditions.") ;
 }
 
-void c_Species::user_species_loop_function() {} ;
+void c_Sim::user_loop_function() {} ;
 
 
 

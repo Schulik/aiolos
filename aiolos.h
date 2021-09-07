@@ -410,6 +410,7 @@ public:
     double L_core;  // Internal heat flux
     double T_surface; //Radiation flux making it through the atmosphere
     double R_core;
+    double F_core; // Net thermal radiative flux at the core.
     double core_cv; //Heat capacity of the surface layer
     double bond_albedo;
     
@@ -559,6 +560,7 @@ public:
     double compute_planck_function_integral4(double lmin, double lmax, double temperature);
     
     void user_output_function(int) ;
+    void user_loop_function() ;
 
 public:
     
@@ -776,7 +778,6 @@ public:
     void user_opacity() ;
 
     void user_initial_conditions();
-    void user_species_loop_function() ;
     
     ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     //

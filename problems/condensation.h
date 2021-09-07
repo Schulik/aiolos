@@ -348,121 +348,7 @@ class SingleGrainCondensation {
 };
 
 
-
 /* class SurfaceCondensation
- *
- * A model for dust condensation / evaporation from a planet's surface.
- * 
- * Notes:
- *   The layer_mass = density * thickness, controls the effective thermal
- *   inertia of the planet.
- */
-class SurfaceCondensation {
-  public:
-    typedef std::array<double,2> arr_t ;
-
-    SurfaceCondensation(Condensible cond, double mu_gas,
-                        double C_gas, double C_l, double layer_mass) 
-     : _cond(cond), _mu_gas(mu_gas), _C_v(C_gas), _C_l(C_l), _m_layer(layer_mass)
-    { } ;
-
-    void set_state(double T_surf, double T_gas, double P_gas, 
-                   RadiationProperties rad, double dt) {
-
-        _Pgas = P_gas ;
-        _Tgas = T_gas ;
-        _T0 = T_surf ;
-        _dt = dt ;
-
-        _rad = rad ;
-
-        // Compute the internal energy and heat capacity modified by radiation
-        double sT3 = sigma_rad*_T0*_T0*_T0 ;
-        
-        _u0 = _m_layer*_C_l*_T0 + dt*(_rad.surface_irradiation() + 3*sT3*_T0) ;
-
-        _Ctot = _m_layer*_C_l + _dt*4*sT3 ;
-    }
-
-    double mass_flux(double T_surf) const {
-
-        double Pv = _cond.P_vap(T_surf) ;
-
-        double cond = _cond.P_stick * _Pgas / std::sqrt(2*pi*Rgas/_mu_gas*_Tgas) ;
-        double evap = _cond.P_stick * Pv    / std::sqrt(2*pi*Rgas/_mu_gas*T_surf) ;
-
-        return evap - cond ;
-    }
-
-    double surface_cooling_rate(double T_surf) const {
-        double Pv = _cond.P_vap(T_surf) ;
-
-        double cond = _cond.P_stick * _Pgas / std::sqrt(2*pi*Rgas/_mu_gas*_Tgas) ;
-        double evap = _cond.P_stick * Pv    / std::sqrt(2*pi*Rgas/_mu_gas*T_surf) ;
-
-        double dTdt = (T_surf-_T0)/(_dt + 1e-300) ;
-
-        return (evap-cond)*(_cond.Lsub + (_C_v - _C_l)*T_surf) + _m_layer*_C_l*dTdt ;
-    }
-    double gas_heating_rate(double T_surf) const {
-        double Pv = _cond.P_vap(T_surf) ;
-
-        double cond = _cond.P_stick * _Pgas / std::sqrt(2*pi*Rgas/_mu_gas*_Tgas) ;
-        double evap = _cond.P_stick * Pv    / std::sqrt(2*pi*Rgas/_mu_gas*T_surf) ;
-
-        return (evap-cond)*_C_v*T_surf ;
-    }
-    
-    double operator()(double T_surf) const {
-
-        double Pv = _cond.P_vap(T_surf) ;
-
-        double cond = _cond.P_stick * _Pgas / std::sqrt(2*pi*Rgas/_mu_gas*_Tgas) ;
-        double evap = _cond.P_stick * Pv    / std::sqrt(2*pi*Rgas/_mu_gas*T_surf) ;
-
-        double Ctot = _Ctot + (_C_v - _C_l)*(evap-cond)*_dt ;
-
-        return T_surf - (_u0 - _cond.Lsub*(evap-cond)*_dt) / Ctot ;
-    }
-
-
-    std::tuple<double, double> bracket_solution() const {
-        double T_min, T_max ;
-
-        double fac = 2; 
-
-        T_min = _T0 ;
-        if (this->operator()(T_min) < 0) {
-            T_max = T_min*fac ;
-            while(this->operator()(T_max) < 0) {
-                T_min = T_max ;
-                T_max *= fac ;
-            }
-        }
-        else {
-            T_max = T_min ;
-            T_min /= fac ;
-            while(this->operator()(T_min) > 0) {
-                T_max = T_min ;
-                T_min /= fac ;
-            }
-        }
-
-        return std::make_tuple(T_min, T_max) ;
-    }
-
-  private:
-    Condensible _cond ;
-    double _mu_gas, _C_v, _C_l, _m_layer ;
-
-    double _T0, _Tgas, _Pgas, _u0, _Ctot, _dt ;
-
-    RadiationProperties _rad ;
-};
-
-
-
-/* class SurfaceCondensation2
  *
  * A model for dust condensation / evaporation from a planet's surface.
  * 
@@ -472,11 +358,11 @@ class SurfaceCondensation {
  * - Area_Vol is the (inner) surface area to volume ratio of the cell first
  *   active cell
  */
-class SurfaceCondensation2 {
+class SurfaceCondensation {
   public:
     typedef std::array<double,2> arr_t ;
 
-    SurfaceCondensation2(Condensible cond, double mu_gas,
+    SurfaceCondensation(Condensible cond, double mu_gas,
                         double C_gas, double C_l, double layer_mass, double Area_Vol)
      : _cond(cond), _mu_gas(mu_gas), _C_v(C_gas), _C_l(C_l),
        _m_layer(layer_mass), _A_V(Area_Vol)
@@ -495,12 +381,11 @@ class SurfaceCondensation2 {
         _rad = rad ;
         _Lrain = L_rain; 
 
-        // Compute the internal energy and heat capacity modified by radiation
-        double sT3 = sigma_rad*_T0*_T0*_T0 ;
+        // Compute the internal energy and total heat capacity
         
-        _u0 = _m_layer*_C_l*_T0 + dt*(_rad.surface_irradiation() + 3*sT3*_T0 + _Lrain) ;
+        _u0 = _m_layer*_C_l*_T0 + dt*(_rad.surface_irradiation() + _Lrain) ;
 
-        _Ctot = _m_layer*_C_l + _dt*4*sT3 ;
+        _Ctot = _m_layer*_C_l ;
     }
 
     double mass_flux(double T_surf) const {

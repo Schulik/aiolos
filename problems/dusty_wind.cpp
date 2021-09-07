@@ -11,10 +11,11 @@
 //    Perez-Becker & Chiang (2013)
 Condensible silicate(169, 3.21e10, 6.72e14, 0.1) ;
 
+static const double RHO = 3 ;
+static const double THICKNESS = 10 ;
 
 static double T_core ;
 static double f_dust = 0e-20;
-static double E_core = 0, t_core = 0.1 ;
 
 void c_Sim::user_output_function(int output_counter) {
     std::ofstream file ;
@@ -54,7 +55,7 @@ void c_Species::user_initial_conditions(){
     
 
     // Get the equilibrium temperature
-    const double RHO = 3, BETA=1;
+    const double BETA=1;
     
     double size = std::pow(3/(4*M_PI)*30*7.568e11/3*amu/RHO,1/3.) ;
     
@@ -82,8 +83,8 @@ void c_Species::user_initial_conditions(){
     }
     //T_core = pow(S, 0.25) ;
     // Set the planet temperature
-    base->L_core = 0 ;
     base->T_surface = T_core ;
+    base->L_core = 4*pi*base->R_core*base->R_core*sigma_rad*std::pow(T_core, 4) ;
     base->use_planetary_temperature = 1 ;
 
     std::cout << "Dusty wind setup:\n\tT_eq=" << T_core << "K\n"
@@ -117,17 +118,11 @@ void c_Species::user_opacity() {
         "method if you want to use user defined initial conditions.") ;
 }
 
-void c_Species::user_species_loop_function() {} ;
-
-
 
 void c_Sim::user_heating_function() {
 
     if (num_species != 2)
         throw std::runtime_error("Condensation requires num_species=2") ;
-
-    double RHO = 3 ;
-    double THICKNESS = 10; // Thickness of surface layer in cm.
 
     double a_grain = std::pow(3/(4*M_PI)*species[1].mass_amu*amu/RHO,1/3.) ;
     
@@ -271,30 +266,40 @@ void c_Sim::user_heating_function() {
         }
     }
 
-    // Next compute evaporation and condensation from the surface
+
+
+    // Finally, lets update the conserved quantities
+    for (int s = 0; s < num_species; s++) {
+        species[s].eos->update_eint_from_T(&species[s].prim[0], num_cells + 2);
+        species[s].eos->update_p_from_eint(&species[s].prim[0], num_cells + 2);
+        species[s].eos->compute_auxillary(&species[s].prim[0], num_cells + 2);
+        species[s].eos->compute_conserved(&species[s].prim[0], &species[s].u[0], num_cells + 2);
+    }
+
+    // Recompute radiative heating etc given new densities.
+    update_dS() ;
+}
+
+void c_Sim::user_loop_function() {
+
+    if (num_species != 2)
+        throw std::runtime_error("Condensation requires num_species=2") ;
+
+    // Compute evaporation and condensation from the surface
+
+    RadiationProperties rad(num_bands_in, 1) ;
+
     int j = num_ghosts ;
-    SurfaceCondensation2 planet_surf(silicate, species[0].mass_amu, 
-                                    species[0].cv, species[1].cv, RHO*THICKNESS,surf[j-1]/vol[j]);
+    SurfaceCondensation planet_surf(silicate, species[0].mass_amu, 
+                                   species[0].cv, species[1].cv, RHO*THICKNESS,surf[j-1]/vol[j]);
     if (use_rad_fluxes == 1) {
         // Stellar radiation reaching the planet
         for (int b=0; b < num_bands_in; b++) 
             rad.flux_star[b] = 0.25 * solar_heating(b) * 
                     std::exp(-radial_optical_depth_twotemp(j,b)) ;
 
-        // Thermal radiation reaching the planet
-        for (int b=0; b < num_bands_out; b++) {
-
-            double dx      = (x_i12[j]-x_i12[j-1]) ;
-            double rhokr   = max(2.*(total_opacity(j-1,b)*total_opacity(j,b))/(total_opacity(j-1,b) + total_opacity(j,b)), 4./3./dx );
-                   rhokr   = min( 0.5*( total_opacity(j-1,b) + total_opacity(j,b)) , rhokr);
-            double tau_inv = 1 / (dx * rhokr) ;
-            double R       = 2 * tau_inv * std::abs(Jrad_FLD(j,b) - Jrad_FLD(j-1,b)) / (Jrad_FLD(j,b) + Jrad_FLD(j-1, b) + 1e-300) ;
-            double lam     = flux_limiter(R) ;
-            double edd     = eddington_coeff(R) ;
-
-            rad.J_thermal[b] = Jrad_FLD(j-1, b) * (0.5 + 1.5*edd) + 2*lam*(Jrad_FLD(j,b) - Jrad_FLD(j-1,b)) * tau_inv ;
-            rad.J_thermal[b] = std::max(0., rad.J_thermal[b]) ;
-        }
+        // Thermal radiation reaching the planet (F_down = \pi J in diffusion limit)
+        rad.J_thermal[0] = - F_core / pi ;
     } else {
         throw std::runtime_error("Radiation must be turned on") ;
     }
@@ -322,15 +327,17 @@ void c_Sim::user_heating_function() {
     std::tie(T0,T1) = planet_surf.bracket_solution() ;
     
     Brent brent(1e-10*T_core) ;
-    //std::cout << T_core << " " << rad.flux_star[0] << " " << rad.J_thermal[0] << " " << rad.J_thermal[0]/Jrad_FLD(j-1, 0)<< "\n";
-    T_core = brent.solve(T0, T1, planet_surf) ;
-    double L = -planet_surf.surface_cooling_rate(T_core)*4*pi*R_core*R_core ;
-    E_core = (E_core + L*dt) / (1 + dt/t_core) ;
-    L_core = E_core / t_core ;
 
-    std::cout << "t, dt, T " << globalTime << " " << dt << " " 
-              << T_core << ", " << rad.flux_star[0]<< " " 
-              << L_core/(4*pi*R_core*R_core) << " " << L_rain << "\n" ;
+    T_core = brent.solve(T0, T1, planet_surf) ;
+    
+    L_core = 4*pi*R_core*R_core*sigma_rad*std::pow(T_core, 4) ;
+
+    /*
+    std::cout 
+        << "t, dt, T " << globalTime << " " << dt << " " << T_core << ", " 
+        << rad.flux_star[0]<< " " << pi*rad.J_thermal[0] << " "
+        << L_core/(4*pi*R_core*R_core) << " " << L_rain << "\n" ;
+    */
 
     double drho = dt*planet_surf.mass_flux(T_core)*surf[j-1]/vol[j] ;
     double heat = dt*planet_surf.gas_heating_rate(T_core)*surf[j-1]/vol[j] ;
@@ -354,17 +361,10 @@ void c_Sim::user_heating_function() {
         prim.temperature = E_tot / (prim.density*species[s].cv) ;
     }
 
-
-
-    // Finally, lets update the conserved quantities
     for (int s = 0; s < num_species; s++) {
-        species[s].eos->update_eint_from_T(&species[s].prim[0], num_cells + 2);
-        species[s].eos->update_p_from_eint(&species[s].prim[0], num_cells + 2);
-        species[s].eos->compute_auxillary(&species[s].prim[0], num_cells + 2);
-        species[s].eos->compute_conserved(&species[s].prim[0], &species[s].u[0], num_cells + 2);
+        species[s].eos->update_eint_from_T(&species[s].prim[j], 1);
+        species[s].eos->update_p_from_eint(&species[s].prim[j], 1);
+        species[s].eos->compute_auxillary(&species[s].prim[j], 1);
+        species[s].eos->compute_conserved(&species[s].prim[j], &species[s].u[j], 1);
     }
-
-    // Recompute radiative heating etc given new densities.
-    update_dS() ;
-}
-
+} ;

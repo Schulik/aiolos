@@ -264,10 +264,9 @@ void c_Sim::execute() {
             }
         }
 
+        user_loop_function() ;
         
         for(int s = 0; s < num_species; s++) {
-            species[s].user_species_loop_function() ;
-            
             
             for(int i=num_cells+1; i>=0; i--)  {
                 AOS TMP = species[s].u[i];
