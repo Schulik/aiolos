@@ -230,7 +230,45 @@ void c_Species::update_opacities() {
             cout<<" Simple dust model opacities used, and species["<<this_species_index<<"] is_dust_like ="<<is_dust_like<<endl;
         }
     }
-    else { //opacity_model == 'C', the default
+    else if (base->opacity_model == 'T'){ //Tabulated opacities, assuming data comes in cm^2/particle, hence divide by particle mass
+        
+        for(int j=0; j< num_cells+2; j++) {
+                
+                for(int b=0; b<num_bands_in; b++) {
+                    opacity_twotemp(j,b) = interpol_tabulated_opacity( opa_grid_solar , b, prim[j].temperature, prim[j].pres) * inv_mass;
+                    //cout<<" opa_s in j/b "<<j<<"/"<<b<<" = "<<opacity_twotemp(j,b)<<" ";
+                }
+                for(int b=0; b<num_bands_out; b++) {
+                    opacity_planck(j,b)  = interpol_tabulated_opacity( opa_grid_planck , b, prim[j].temperature, prim[j].pres) * inv_mass;
+                    opacity(j,b)         = interpol_tabulated_opacity( opa_grid_rosseland, b, prim[j].temperature, prim[j].pres) * inv_mass;
+                    //opacity(j,b)         = 1e-24 * inv_mass;
+                    //cout<<" opa_p  = "<<opacity_planck(j,b);
+                    //cout<<" opa_r  = "<<opacity(j,b)<<" had P/T = "<<prim[j].pres<<"/"<<prim[j].temperature<<endl;
+                }
+                
+            }
+        
+        /*
+        double pp[3] = {1e-40,1.5e4,1e40};
+        double tt[3] = {1e-40,510,1e40};
+        
+        for(int p=0; p<3; p++) {
+            for(int t=0; t<3; t++) {
+                
+                double opas = interpol_tabulated_opacity( opa_grid_solar    , 0, tt[t], pp[p]) * inv_mass;
+                double opap = interpol_tabulated_opacity( opa_grid_planck   , 0, tt[t], pp[p]) * inv_mass;
+                double opar = interpol_tabulated_opacity( opa_grid_rosseland, 0, tt[t], pp[p]) * inv_mass;
+                cout<<" p/t = "<<pp[p]<<"/"<<tt[t]<<" opas/opap/opar = "<<opas<<"/"<<opap<<"/"<<opar<<endl;
+            }
+            
+        }
+        
+        char a;
+        cin>>a; */
+        //double c_Species::interpol_tabulated_opacity(int whichone, int band, double rho, double T_gas, double pressure) {
+        
+        
+    } else { //opacity_model == 'C', the default
         
         for(int j=0; j< num_cells+2; j++) {
             
@@ -669,20 +707,21 @@ void c_Sim::kappa_landscape()
 {
   	int i,j;
 	const int arraysize = 500;
-  	double xxkappa,kappa, recentdens;
+  	double xxkappa,kappa, recentpress;
   	double opa_freedman[arraysize];
   	double opa_ross_semenov[arraysize];
     double opa_planck_semenov[arraysize];
     double opa_planck_twotemp[arraysize];
   	double temperature[arraysize];
 	double density[21]={1e-18,1e-17,1e-16,1e-15,1e-14,1e-13,1e-12,3e-12,6e-12,1e-11,1e-10,1e-9,1e-8,1e-7,1e-6,1e-5,1e-4,1e-3,1e-2};
+    double pressure[11]={0.1,1e0,1e1,1e2,1e3,1e4,1e5,1e6,1e7,1e8,1e9};
 	
 	printf("In kappa landscape.\n");
 	fflush (stdout);
 	
-	for(j = 0; j < 21; j++) {
-	   recentdens = density[j];
-	   printf("Doing density %e \n",density[j]);
+	for(j = 0; j < 11; j++) {
+	   recentpress = pressure[j];
+	   printf("Doing pressure %e \n",pressure[j]);
 		fflush (stdout);
   
   		for(i = 0; i < arraysize; i++) {
@@ -690,32 +729,190 @@ void c_Sim::kappa_landscape()
 			
 			//printf("Doing temperature %e and density %e \n",temperature[i],density[j]);
 			fflush (stdout);
-            double pressure = recentdens * temperature[i] * kb / (2.3 * amu);
             
-    		opa_freedman[i] = freedman_opacity(pressure , temperature[i], 0.);
-  			opa_ross_semenov[i]   = opacity_semenov_malygin(1, temperature[i],recentdens, pressure);
-			opa_planck_semenov[i] = opacity_semenov_malygin(0, temperature[i],recentdens, pressure);
-            opa_planck_twotemp[i] = opacity_semenov_malygin(0, T_star,recentdens, pressure);
+            double inv_mass = species[0].inv_mass;
+            //opa_freedman[i] = freedman_opacity(pressure , temperature[i], 0.);
+            opa_planck_twotemp[i] = species[0].interpol_tabulated_opacity( species[0].opa_grid_solar , 0, temperature[i], pressure[j]) * inv_mass;
+            opa_planck_semenov[i] = species[0].interpol_tabulated_opacity( species[0].opa_grid_planck , 0, temperature[i], pressure[j]) * inv_mass;
+            opa_ross_semenov[i]   = species[0].interpol_tabulated_opacity( species[0].opa_grid_rosseland, 0, temperature[i], pressure[j]) * inv_mass;
 			//printf("Semenov planck done \n");
 			//fflush (stdout);
   		}
   		
-  		printf("Done density %e \n",density[j]);
+  		printf("Done press %e \n",pressure[j]);
 		fflush (stdout);
   
   		FILE *output;
   		char name[256];
   
-  		printf ("Writing opacity landscape for density %e...\n", recentdens);
+  		printf ("Writing opacity landscape for press %e...\n", recentpress);
   		fflush (stdout);
-  		sprintf (name, "kappa_landscape2_%e.dat", recentdens);
+  		sprintf (name, "kappa_landscape2_%e.dat", recentpress);
   		//output = fopenp (name, "a");
         output = fopen (name, "a");
  		for(i = 0; i < arraysize; i++) {
-  				fprintf (output, "%e\t%e\t%e\t%e\t%e\n",\
-	   			temperature[i], opa_freedman[i], opa_ross_semenov[i], opa_planck_semenov[i], opa_planck_twotemp[i]);
+  				//fprintf (output, "%e\t%e\t%e\t%e\t%e\n",\
+            
+  				fprintf (output, "%e\t%e\t%e\t%e\n",\
+	   			temperature[i], opa_ross_semenov[i], opa_planck_semenov[i], opa_planck_twotemp[i]);
  		}
   		fclose (output);
   		fflush (stdout);
 	}
+}
+
+
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+//This function uses the data for *opa_gas_tscale, *opa_gas_pscale, *opa_gas_ross, *opa_gas_planck
+// similar to c_Sim::get_gas_malygin()
+// and interpolates them bilinearly on the given grid
+
+double c_Species::interpol_tabulated_opacity(const Eigen::VectorXd& array, int band, double T_gas, double pressure) {
+	
+  	double tP, tT, denom, kappa;	//tempPressure and denominator
+  	static double mul1, mul2, mul3, mul4; //temp doubles for the interpolation. static for faster speed
+  	static int Plow, Phigh;
+	int Tlow, Thigh;
+	int i;
+	//Eigen::VectorXd *array;
+    
+    /*
+     * 
+     * int opa_pgrid_size;
+    int opa_tgrid_size;
+    Eigen::VectorXd opa_pgrid;
+    Eigen::VectorXd opa_tgrid;
+    Eigen::VectorXd opa_grid_rosseland;
+    Eigen::VectorXd opa_grid_planck;
+    Eigen::VectorXd opa_grid_solar;
+    
+     * 
+     * */
+	/*
+	if(whichone == 0) {
+        array = &opa_grid_solar;
+    } 
+		  
+	else if(whichone == 1) {
+        array = &opa_grid_planck;
+    }
+    else {
+        array = &opa_grid_rosseland;
+        
+    }*/
+    
+	tP = pressure;
+	tT = T_gas;
+	/*
+	fprintf(stdout,"Input Dens = %e  temperture = %e    pressure = %e\n",rho, tT, tP);
+	fflush(stdout);
+	*/
+	//Search for value in T grid
+	if(tT < opa_tgrid[0])
+ 	  		tT = opa_tgrid[0];
+ 	  		//return 1e-20;				//T too low for gas to play a role
+	else if (tT > opa_tgrid[opa_tgrid_size-1])
+		  tT = opa_tgrid[opa_tgrid_size-1];
+
+	if(tP < opa_pgrid[0])
+	  		tP = opa_pgrid[0];
+	else if (tP > opa_pgrid[opa_pgrid_size-1])
+		  tP = opa_pgrid[opa_pgrid_size-1];
+
+	//for(i = 0; i < opa_tgrid_size; i++) {
+    for(i = opa_tgrid_size-2; i >= 0; i--) {
+			if(tT >= opa_tgrid[i]) {
+			 	Tlow  = i;
+			  	Thigh = i+1;
+                break;
+			}
+        }
+        
+    if(Thigh == opa_tgrid_size) {
+        Thigh = opa_tgrid_size-1;
+        Tlow  = opa_tgrid_size-2;
+        tT    = opa_tgrid(Thigh);
+    }
+        
+    
+    //for(i = 0; i < opa_pgrid_size; i++) {
+    for(i = opa_pgrid_size-2; i >= 0; i--) {
+        if(tP >= opa_pgrid[i]) {
+			 	Plow  = i;
+			  	Phigh = i+1;
+                break;
+			}
+        }
+    //
+    // Detection when we left the grid
+    //
+    if(Phigh == opa_pgrid_size) {
+        Phigh = opa_pgrid_size-1;
+        Plow  = opa_pgrid_size-2;
+        tP    = opa_pgrid(Phigh);
+    }
+    
+    //cout<<" in interpol, Plow/Phigh/Tlow/Thigh = "<<opa_pgrid[Plow]<<"/"<<opa_pgrid[Phigh]<<"/"<<opa_tgrid[Tlow]<<"/"<<opa_tgrid[Thigh]<<"  tT,tP = "<<tT<<"/"<<tP<<endl;
+	
+	
+	//Interpolate on pressure-temperature grid
+    /*
+	denom = 1.0/((opa_tgrid(Thigh) - opa_tgrid(Tlow)) * (opa_pgrid(Phigh) - opa_pgrid(Plow)));
+	mul1 = (opa_tgrid(Thigh) - tT) * (opa_pgrid(Phigh) - tP);
+	mul2 = (tT - opa_tgrid(Tlow))  * (opa_pgrid(Phigh) - tP);
+	mul3 = (opa_tgrid(Thigh) - tT) * (tP - opa_pgrid(Plow));
+	mul4 = (tT - opa_tgrid(Tlow))  * (tP - opa_pgrid(Plow));
+	kappa = denom *      (mul1 * array(Tlow + Plow * opa_tgrid_size + band * opa_tgrid_size * opa_pgrid_size)
+                        + mul2 * array(Thigh + Plow * opa_tgrid_size + band * opa_tgrid_size * opa_pgrid_size)
+						+ mul3 * array(Tlow + Phigh * opa_tgrid_size + band * opa_tgrid_size * opa_pgrid_size) 
+                        + mul4 * array(Thigh + Phigh * opa_tgrid_size + band * opa_tgrid_size * opa_pgrid_size));
+*/
+    
+    double pmax = std::log(opa_pgrid(Phigh));
+	double pmin = std::log(opa_pgrid(Plow));
+	double pval = std::log(tP);
+	
+	denom = 1.0/((opa_tgrid(Thigh) - opa_tgrid(Tlow)) * (pmax - pmin));
+	mul1 = (opa_tgrid(Thigh) - tT) * (pmax - pval);
+	mul2 = (tT - opa_tgrid(Tlow))  * (pmax - pval);
+	mul3 = (opa_tgrid(Thigh) - tT) * (pval - pmin);
+	mul4 = (tT - opa_tgrid(Tlow))  * (pval - pmin);
+    
+    kappa = denom *      (mul1 * std::log10(array(Tlow + Plow * opa_tgrid_size + band * opa_tgrid_size * opa_pgrid_size))
+                        + mul2 * std::log10(array(Thigh + Plow * opa_tgrid_size + band * opa_tgrid_size * opa_pgrid_size))
+						+ mul3 * std::log10(array(Tlow + Phigh * opa_tgrid_size + band * opa_tgrid_size * opa_pgrid_size)) 
+                        + mul4 * std::log10(array(Thigh + Phigh * opa_tgrid_size + band * opa_tgrid_size * opa_pgrid_size)) );
+    
+    pmax = std::log(opa_pgrid(Phigh));
+	pmin = std::log(opa_pgrid(Plow));
+	pval = std::log(tP*1.01);
+	
+	denom = 1.0/((opa_tgrid(Thigh) - opa_tgrid(Tlow)) * (pmax - pmin));
+	mul1 = (opa_tgrid(Thigh) - tT) * (pmax - pval);
+	mul2 = (tT - opa_tgrid(Tlow))  * (pmax - pval);
+	mul3 = (opa_tgrid(Thigh) - tT) * (pval - pmin);
+	mul4 = (tT - opa_tgrid(Tlow))  * (pval - pmin);
+    
+    double kappa2 = denom *      (mul1 * std::log10(array(Tlow + Plow * opa_tgrid_size + band * opa_tgrid_size * opa_pgrid_size))
+                        + mul2 * std::log10(array(Thigh + Plow * opa_tgrid_size + band * opa_tgrid_size * opa_pgrid_size))
+						+ mul3 * std::log10(array(Tlow + Phigh * opa_tgrid_size + band * opa_tgrid_size * opa_pgrid_size)) 
+                        + mul4 * std::log10(array(Thigh + Phigh * opa_tgrid_size + band * opa_tgrid_size * opa_pgrid_size)) );
+    
+    pmax = std::log(opa_pgrid(Phigh));
+	pmin = std::log(opa_pgrid(Plow));
+	pval = std::log(tP*0.99);
+	
+	denom = 1.0/((opa_tgrid(Thigh) - opa_tgrid(Tlow)) * (pmax - pmin));
+	mul1 = (opa_tgrid(Thigh) - tT) * (pmax - pval);
+	mul2 = (tT - opa_tgrid(Tlow))  * (pmax - pval);
+	mul3 = (opa_tgrid(Thigh) - tT) * (pval - pmin);
+	mul4 = (tT - opa_tgrid(Tlow))  * (pval - pmin);
+    
+    double kappa3 = denom *      (mul1 * std::log10(array(Tlow + Plow * opa_tgrid_size + band * opa_tgrid_size * opa_pgrid_size))
+                        + mul2 * std::log10(array(Thigh + Plow * opa_tgrid_size + band * opa_tgrid_size * opa_pgrid_size))
+						+ mul3 * std::log10(array(Tlow + Phigh * opa_tgrid_size + band * opa_tgrid_size * opa_pgrid_size)) 
+                        + mul4 * std::log10(array(Thigh + Phigh * opa_tgrid_size + band * opa_tgrid_size * opa_pgrid_size)) );
+	
+    
+  	return std::pow(10.,(kappa+kappa2+kappa3)*0.33333333333333333);
 }

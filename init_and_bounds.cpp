@@ -1195,12 +1195,12 @@ void c_Species::initialize_hydrostatic_atmosphere(string filename) {
     
     //makeshift density fix
     //if(this_species_index == 0)
-        cout<<"FIXING SMALL DENSITIES to density floor ="<<base->density_floor*mass_amu<<endl;
+        //cout<<"FIXING SMALL DENSITIES to density floor ="<<base->density_floor*mass_amu<<endl;
     
     for(int i = 0; i<num_cells+1; i++) {
             double floor = base->density_floor * mass_amu ;
             if(u[i].u1 < floor) {
-                cout<<"FIXING SMALL DENSITIES in i ="<<i<<" for species = "<<this_species_index<<endl;
+                //cout<<"FIXING SMALL DENSITIES in i ="<<i<<" for species = "<<this_species_index<<endl;
                 u[i] = AOS(floor, 0., cv * floor * prim[i].temperature) ;
             }
     }
@@ -1438,11 +1438,9 @@ void c_Species::apply_boundary_right(std::vector<AOS>& u) {
                 if(mdot < -1e18)
                     prim.density = -1e18/freefallv/r/r;
                     
-                prim.pres = prim.pres;// -  prim.density * dphi ;
+                //prim.pres = prim.pres;// -  prim.density * dphi ;
+                prim.pres = prim.pres -  prim.density * dphi ;
                 prim.pres = std::max( prim.pres, 0.0) ;
-                //prim.temperature = base->init_T_temp;
-                
-                //eos->compute_eint_from_T
                 eos->compute_conserved(&prim, &u[i], 1) ;
             }
             break ;
@@ -1469,6 +1467,7 @@ void c_Species::apply_boundary_right(std::vector<AOS>& u) {
             break;
     }
 }
+
 
 //
 // Creates a wave at the inner boundary supposedly propagating upwards in the gravity well

@@ -68,6 +68,8 @@ void c_Species::read_species_data(string filename, int species_index) {
                 this->opacity_data_string = stringlist[9];
                 //this->num_opacity_datas= std::stod(stringlist[10]);
                 
+                this->inv_mass = 1./(mass_amu*amu);
+                
                 if(debug > 0)
                     cout<<"Found species called "<<speciesname<<" with a mass of "<<mass_amu<<" dof "<<degrees_of_freedom<<" gamma "<<gamma_adiabat<<" and zeta_0 = "<<initial_fraction<<endl;
                 
@@ -343,7 +345,6 @@ void c_Species::read_species_data(string filename, int species_index) {
                     cout<<" DEBUG b_out = "<<b<<" avg_rosseland = "<<opacity_avg_rosseland(b)<<" const_opa = "<<const_opacity<<endl;
                 
             }
-                
         
         if(num_readin_columns < 2)
             for(int b = 0; b < num_bands_out; b++)  {
@@ -352,9 +353,7 @@ void c_Species::read_species_data(string filename, int species_index) {
                     cout<<" DEBUG b_out = "<<b<<" avg_planck = "<<opacity_avg_rosseland(b)<<" const_opa = "<<const_opacity<<endl;
                 
             }
-                
         
-            
         //
         // ONLY FOR METALS COOLING SCENARIO!
         //
@@ -391,6 +390,21 @@ void c_Species::read_species_data(string filename, int species_index) {
         cout<<endl;
         
     }
+    else if(base->opacity_model == 'T') {
+        //
+        // Tabulated data from opacit averages
+        //
+        string opacityinputfile = "inputdata/" + opacity_data_string;
+        std::vector<string> stringending = stringsplit(opacityinputfile,".");
+        
+        if(stringending[1].compare("aiopa") == 0) {
+            cout<<"Tabulated opacities chosen, reading file = "<<opacityinputfile<<endl;
+        }
+        else
+            cout<<"Invalid file = "<<opacityinputfile<<" should have format *.aitab ."<<endl;
+        
+        read_opacity_table(opacityinputfile);
+    }
     else {
         for(int b = 0; b < num_bands_in; b++) opacity_avg_solar(b)      = const_opacity;
         for(int b = 0; b < num_bands_out; b++) opacity_avg_planck(b)    = const_opacity;
@@ -405,6 +419,156 @@ void c_Species::read_species_data(string filename, int species_index) {
         cin>>stopchar;
     }
 }
+
+
+///////////////////////////////////////////////////////////////////////////////////////////////
+//
+//
+//
+//
+//
+//
+//
+///////////////////////////////////////////////////////////////////////////////////////////////
+
+
+
+void c_Species::read_opacity_table(string tablename) {
+    
+    int num_bands_out = base->num_bands_out;
+    int num_bands_in  = base->num_bands_in;
+    
+    cout<<"Attempting to open "<<tablename<<"!"<<endl;
+    
+    ifstream file(tablename);
+    string line;
+    if(!file) {
+        cout<<"Couldnt open opacity table "<<tablename<<"!"<<endl;
+    }
+    //simulation_parameter tmp_parameter = {"NaN",0,0.,0,"NaN"};
+    int found = 0;
+    this->num_opacity_datas = -1;
+    
+    if(debug >= 1) cout<<"          In read Opacities Pos1. Trying to 2*read num_bands_out + num_bands_in ="<<2*num_bands_out+num_bands_in<<" opacity blocks."<<endl;
+    if(num_bands_in == num_bands_out)
+        cout<<"WARNING: num_bands_in == num_bands_out, this is the default. Check if you really want this. Might break opacity reading."<<endl;
+    
+    //Get the size of the table first
+    //
+    std::getline( file, line );
+    //cout<<"Got the line!"<<endl;
+    std::vector<string> stringlist = stringsplit(line," ");
+    
+    //cout<<"String is split!"<<stringlist[0]<<endl;
+    opa_pgrid_size = std::stod(stringlist[0]);
+    opa_tgrid_size = std::stod(stringlist[1]);
+    
+    //cout<<" Identified grid size ="<<opa_pgrid_size<<" / "<<opa_tgrid_size<<endl;
+    
+    if(opa_pgrid_size <= 0 || opa_tgrid_size > 9999) {
+        cout<<" ERROR with pressure grid size = "<<opa_pgrid_size<<" in read_opacity_table!"<<endl;
+    }
+    if(opa_tgrid_size <= 0 || opa_tgrid_size > 9999) {
+        cout<<" ERROR with temperature grid size = "<<opa_tgrid_size<<" in read_opacity_table!"<<endl;
+    }
+    
+    //Now allocate memory and read data
+    //
+    opa_pgrid = Eigen::VectorXd::Zero(opa_pgrid_size);
+    opa_tgrid = Eigen::VectorXd::Zero(opa_tgrid_size);
+    
+    opa_grid_solar     = Eigen::VectorXd::Zero(opa_pgrid_size * opa_tgrid_size * num_bands_in);
+    opa_grid_rosseland = Eigen::VectorXd::Zero(opa_pgrid_size * opa_tgrid_size * num_bands_out);
+    opa_grid_planck    = Eigen::VectorXd::Zero(opa_pgrid_size * opa_tgrid_size * num_bands_out);
+    
+    //cout<<" After memory allocation. Sizes are "<<opa_pgrid_size * opa_tgrid_size * num_bands_in<<" and "<<opa_pgrid_size * opa_tgrid_size * num_bands_out<<endl;
+    
+    //One empty line
+    std::getline( file, line );
+    
+    //Read pgrid
+    //
+    std::getline( file, line );
+    stringlist = stringsplit(line," ");
+    for(int i=0; i<opa_pgrid_size; i++) {
+        opa_pgrid(i) = std::stod(stringlist[i]);
+        //cout<<" opa_pgrid = "<<opa_pgrid(i)<<endl;
+    }
+    
+    //Read tgrid
+    //
+    std::getline( file, line );
+    stringlist = stringsplit(line," ");
+    for(int i=0; i<opa_tgrid_size; i++) {
+        opa_tgrid(i) = std::stod(stringlist[i]);
+        //cout<<" opa_tgrid = "<<opa_tgrid(i)<<endl;
+    }
+    
+    // Planck two-temperature mean-opacity grid
+    //
+    std::getline( file, line );
+    for(int bi = 0; bi<num_bands_in; bi++) {
+        
+        //std::getline( file, line );
+        for(int i=0; i<opa_pgrid_size; i++) {
+            std::getline( file, line );
+            stringlist = stringsplit(line," ");
+            
+            for(int j=0; j<opa_tgrid_size; j++) {
+                //cout<<" opas_ = "<<std::stod(stringlist[j])<<" assigned to "<< j + i * opa_tgrid_size + bi * opa_pgrid_size * opa_tgrid_size<<" list pos "<<j<<endl;
+                opa_grid_solar( j + i * opa_tgrid_size + bi * opa_pgrid_size * opa_tgrid_size ) = std::stod(stringlist[j]);
+            }
+        }
+        
+    }
+    cout<<" finshed opas "<<endl;
+    
+    // Planck single-temperature mean-opacity grid
+    //
+    std::getline( file, line );
+    for(int bo = 0; bo<num_bands_out; bo++) {
+        
+        //std::getline( file, line );
+        for(int i=0; i<opa_pgrid_size; i++) {
+            std::getline( file, line );
+            stringlist = stringsplit(line," ");
+            
+            for(int j=0; j<opa_tgrid_size; j++) {
+                //cout<<" opap_ = "<<std::stod(stringlist[j])<<" assigned to "<< j + i * opa_tgrid_size + bo * opa_pgrid_size * opa_tgrid_size<<" list pos "<<j<<endl;
+                opa_grid_planck( j + i * opa_tgrid_size + bo * opa_pgrid_size * opa_tgrid_size ) = std::stod(stringlist[j]);
+            }
+        }
+    }
+    
+    cout<<" finshed opap "<<endl;
+    // Rosseland mean-opacity grid
+    //
+    std::getline( file, line );
+    for(int bo = 0; bo<num_bands_out; bo++) {
+        
+        //std::getline( file, line );
+        for(int i=0; i<opa_pgrid_size; i++) {
+            std::getline( file, line );
+            stringlist = stringsplit(line," ");
+            
+            for(int j=0; j<opa_tgrid_size; j++) {
+                //cout<<" opar_ = "<<std::stod(stringlist[j])<<" assigned to "<< j + i * opa_tgrid_size + bo * opa_pgrid_size * opa_tgrid_size<<endl;
+                opa_grid_rosseland( j + i * opa_tgrid_size + bo * opa_pgrid_size * opa_tgrid_size ) = std::stod(stringlist[j]);
+            }
+        }
+        
+    }
+    
+    cout<<" Successfully finished reading opacity table. "<<endl;
+    //cout<<"Showing read data: pgrid / tgrid = "<<endl<<opa_pgrid<<endl<<"///"<<endl<<opa_tgrid<<endl;
+    //cout<<"Showing read data: solar opas = "<<endl<<opa_grid_solar<<endl;
+    //cout<<"Showing read data: planck opas = "<<endl<<opa_grid_planck<<endl;
+    //cout<<"Showing read data: planck rosseland = "<<endl<<opa_grid_rosseland<<endl;
+    
+    //char a;
+    //cin>>a;
+}
+
 
 
 template<typename T> 
@@ -687,11 +851,12 @@ void c_Sim::print_diagnostic_file(int outputnumber) {
                 }
                 
                 for(int b=0; b<num_bands_out; b++) {
-                    for(int s=0; s<num_species; s++) {
-                        outfileDiagnostic<<'\t'<<species[s].opacity(i,b);
-                    }
+                    
                     for(int s=0; s<num_species; s++) {
                         outfileDiagnostic<<'\t'<<species[s].opacity_planck(i,b);
+                    }
+                    for(int s=0; s<num_species; s++) {
+                        outfileDiagnostic<<'\t'<<species[s].opacity(i,b);
                     }
                 }
                 

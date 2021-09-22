@@ -593,6 +593,7 @@ public:
 
     
     double mass_amu;
+    double inv_mass;
     int static_charge;
     double initial_fraction;
     
@@ -617,9 +618,16 @@ public:
     Eigen::MatrixXd dG; //num_cells * num_bands_out, Cooling, high-energy
     double dlogOpa;
     
-    //std::vector<double> opticaldepth;
-    //std::vector<double> opacity;
-    //std::vector<double> radiative_flux;
+    //////////////
+    //Custom opacity table stuff
+    //////////////
+    int opa_pgrid_size;
+    int opa_tgrid_size;
+    Eigen::VectorXd opa_pgrid;
+    Eigen::VectorXd opa_tgrid;
+    Eigen::VectorXd opa_grid_rosseland;
+    Eigen::VectorXd opa_grid_planck;
+    Eigen::VectorXd opa_grid_solar;
     
     double density_excess;
     double bondi_radius;
@@ -719,15 +727,7 @@ public:
     }
     
     void update_opacities();
-    double interpol_opacity(int j, int b) {
-        
-        cout<<" j/b="<<j<<"/"<<b<<endl;
-        //int index_l = base->l_i[b] ;
-        //int index_u = base->l_i[b+1];
-        
-        return 1.;
-    }
-    double planck_opacity_at_T(double T);
+    double interpol_tabulated_opacity(const Eigen::VectorXd& array, int band, double T_gas, double pressure);
     
     //
     // Equations of state
@@ -761,6 +761,7 @@ public:
     void print_AOS_component_tofile(int timestepnumber);
     
     void read_species_data(string filename, int species_index);
+    void read_opacity_table(string filename);
     void set_debug(int);
     void set_suppress_warnings(int j) {suppress_warnings = j;}    
     

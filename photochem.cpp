@@ -502,7 +502,7 @@ void c_Sim::do_photochemistry() {
                         double ne = nX[2];
                         cout<<" Cooling peak detected in photochem. DEBUG data:"<<endl;
                         cout<<" Te = "<<Te<<endl;
-                        cout<<GammaH<<" "<<Gamma0[0]<<" "<<Gamma0[1]<<" "<<Gamma0final<<endl;
+                        //cout<<GammaH<<" "<<Gamma0[0]<<" "<<Gamma0[1]<<" "<<Gamma0final<<endl;
                         cout<<R<<" "<<C<<" "<<B<<endl;
 
                         

@@ -377,7 +377,7 @@ void c_Sim::update_fluxes_FLD() {
 
                 d[idx_s ] = 1 / dt ;
                 r[idx_rs] = Ts / dt ;
-                r[idx_rs] += (species[s].dS(j) + species[s].dG(j)) / species[s].u[j].u1 / species[s].cv;
+                r[idx_rs] += (species[s].dS(j) + species[s].dG(j)) / species[s].u[j].u1 / species[s].cv; //Misc heating terms that are not directly related to self-consistent temperature are just added to the rhs
                 
                 for(int b=0; b<num_bands_out; b++) {
                     int idx_b  = j*stride + b * (num_vars+1) ;
