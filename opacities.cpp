@@ -470,19 +470,28 @@ double c_Sim::get_gas_malygin(int rosseland, double rho, double T_gas, double pr
 	getchar();
 	*/
 	//Interpolate on pressure-temperature grid
-	denom = 1.0/((opa_gas_tscale[Thigh] - opa_gas_tscale[Tlow]) * (opa_gas_pscale[Phigh] - opa_gas_pscale[Plow]));
-	mul1 = (opa_gas_tscale[Thigh] - tT) * (opa_gas_pscale[Phigh] - tP);
-	mul2 = (tT - opa_gas_tscale[Tlow])  * (opa_gas_pscale[Phigh] - tP);
-	mul3 = (opa_gas_tscale[Thigh] - tT) * (tP - opa_gas_pscale[Plow]);
-	mul4 = (tT - opa_gas_tscale[Tlow])  * (tP - opa_gas_pscale[Plow]);
-	tempKappa = denom * (mul1 * array[Tlow + Plow * opacity_gas_cols] + mul2 * array[Thigh + Plow * opacity_gas_cols] 
-						+ mul3 * array[Tlow + Phigh * opacity_gas_cols] + mul4 * array[Thigh + Phigh * opacity_gas_cols]);
-	/*
+	
+	double pmax = std::log(opa_gas_pscale[Phigh]);
+	double pmin = std::log(opa_gas_pscale[Plow]);
+	double pval = std::log(tP);
+	
+	denom = 1.0/((opa_gas_tscale[Thigh] - opa_gas_tscale[Tlow]) * (pmax - pmin));
+	
+    mul1 = (opa_gas_tscale[Thigh] - tT) * (pmax - pval);
+	mul2 = (tT - opa_gas_tscale[Tlow])  * (pmax - pval);
+	mul3 = (opa_gas_tscale[Thigh] - tT) * (pval - pmin);
+	mul4 = (tT - opa_gas_tscale[Tlow])  * (pval - pmin);
+	tempKappa = denom * ( mul1 * std::log10(array[Tlow + Plow * opacity_gas_cols]) + 
+	                      mul2 * std::log10(array[Thigh + Plow * opacity_gas_cols]) 
+						+ mul3 * std::log10(array[Tlow + Phigh * opacity_gas_cols]) + 
+                          mul4 * std::log10(array[Thigh + Phigh * opacity_gas_cols]) );
+	
+    /*
 // 	return wanted value
 	fprintf(stdout,"Interpolation kappas: %e %e %e %e \n",array[Tlow + Plow * opacity_gas_cols],array[Thigh + Plow * opacity_gas_cols],array[Tlow + Phigh * opacity_gas_cols],array[Thigh + Phigh * opacity_gas_cols]);
    fprintf(stdout,"Found kappa: %e\n",tempKappa);
   */
-  	return tempKappa;
+  	return std::pow(10.,tempKappa);
 }
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
