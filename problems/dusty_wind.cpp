@@ -27,8 +27,10 @@ void c_Sim::user_output_function(int output_counter) {
     } else {
         file.open(filename, std::ios::app) ;
     }
-    file << output_counter << " " << globalTime << " " << T_core << " " << L_core << "\n" ;
-    cout << "T_core, T_surf: " << T_core << ", " << T_surface << "K\n";
+    file << output_counter << " " << globalTime << " " << T_core << " " << 4*pi*R_core*R_core*F_core << "\n" ;
+    double T_F = std::pow(std::abs(F_core)/sigma_rad, 0.25) ;
+    if (F_core < 0) T_F *= -1 ;
+    cout << "T_core, Net thermal flux[K]: " << T_core << ", " << T_F << "K\n";
 }
 
 void c_Species::user_boundary_left(std::vector<AOS>& u) {

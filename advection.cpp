@@ -372,6 +372,8 @@ void c_Sim::execute() {
         species[s].print_AOS_component_tofile(-1);
     print_diagnostic_file(-1);
     print_monitor(-1);
+    user_output_function(-1) ;
+
         
 }
 
