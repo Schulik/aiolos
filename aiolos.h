@@ -221,7 +221,8 @@ public:
     int photochemistry_level;
     int use_collisional_heating;
     int use_drag_predictor_step;
-
+    int use_convective_fluxes;
+    
     ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     //
     //  Numerical
@@ -602,6 +603,7 @@ public:
     std::vector<AOS> source;         // Gravitational source term
     std::vector<AOS> source_pressure;// Geometric source term
     std::vector<AOS> flux;
+    std::vector<double> lconvect;
     std::vector<double> u_analytic;
     
     Eigen::MatrixXd opacity_data;  //superhigh-res lamdba grid, resolution dependent on minimum wl-distance in opacity data

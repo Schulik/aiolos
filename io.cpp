@@ -446,7 +446,6 @@ void c_Species::read_opacity_table(string tablename) {
         cout<<"Couldnt open opacity table "<<tablename<<"!"<<endl;
     }
     //simulation_parameter tmp_parameter = {"NaN",0,0.,0,"NaN"};
-    int found = 0;
     this->num_opacity_datas = -1;
     
     if(debug >= 1) cout<<"          In read Opacities Pos1. Trying to 2*read num_bands_out + num_bands_in ="<<2*num_bands_out+num_bands_in<<" opacity blocks."<<endl;
@@ -717,7 +716,7 @@ void c_Species::print_AOS_component_tofile(int timestepnumber) {
     {
         //outfile.precision(16);
         
-        double hydrostat2 = 0., hydrostat3 = 0.;
+        //double hydrostat2 = 0., hydrostat3 = 0.;
         
         //Print left ghost stuff
         outfile<<base->x_i12[0]<<'\t'<<u[0].u1<<'\t'<<u[0].u2<<'\t'<<u[0].u3<<'\t'<<flux[0].u1<<'\t'<<flux[0].u2<<'\t'<<flux[0].u3<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<prim[0].pres<<'\t'<<u[0].u2/u[0].u1<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<base->phi[0]<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<endl;
@@ -735,8 +734,8 @@ void c_Species::print_AOS_component_tofile(int timestepnumber) {
             double balance3 = ((flux[i-1].u3 * base->surf[i-1] - flux[i].u3 * base->surf[i]) / base->vol[i] + (source[i].u3 +source_pressure[i].u3));
             
             //hydrostat = flux[i-1].u2/base->dx[i] ; //hydrostat2 + hydrostat3 ; 
-            hydrostat2 = flux[i].u2/base->dx[i];//pressure[i+1] - pressure[i];
-            hydrostat3 = source[i].u2;//0.5 * (u[i].u1 + u[i+1].u1) * (phi[i+1] - phi[i]);
+            //hydrostat2 = flux[i].u2/base->dx[i];//pressure[i+1] - pressure[i];
+            //hydrostat3 = source[i].u2;//0.5 * (u[i].u1 + u[i+1].u1) * (phi[i+1] - phi[i]);
             
             double Jtot = 0.;
             double Stot = 0.;
@@ -753,7 +752,7 @@ void c_Species::print_AOS_component_tofile(int timestepnumber) {
         } 
         
         //Print right ghost stuff
-        outfile<<base->x_i12[num_cells+1]<<'\t'<<u[num_cells+1].u1<<'\t'<<u[num_cells+1].u2<<'\t'<<u[num_cells+1].u3<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<prim[num_cells+1].pres<<'\t'<<u[num_cells+1].u2/u[num_cells+1].u1<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<base->phi[num_cells+1]<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<endl;
+        //outfile<<base->x_i12[num_cells+1]<<'\t'<<u[num_cells+1].u1<<'\t'<<u[num_cells+1].u2<<'\t'<<u[num_cells+1].u3<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<prim[num_cells+1].pres<<'\t'<<u[num_cells+1].u2/u[num_cells+1].u1<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<base->phi[num_cells+1]<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<endl;
    
         cout<<"    Sucessfully written file "<<filename<<" for species = "<<speciesname<<" t = "<<base->globalTime<<" dt = "<<base->dt<<", cfl = "<<base->cflfactor<<" steps = "<<base->steps<<endl;
     }
@@ -894,6 +893,17 @@ void c_Sim::print_diagnostic_file(int outputnumber) {
 
                     outfileDiagnostic<<'\t'<<flux;
                 }
+                
+                //Convective fluxes
+                if(use_convective_fluxes) { 
+                    
+                    for (int s=0; s < num_species; s++) {
+                        outfileDiagnostic<<'\t'<<species[s].lconvect.at(i);
+                    }
+                        
+                        
+                }
+                
                 outfileDiagnostic<<endl;
             }
             

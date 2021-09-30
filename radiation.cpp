@@ -195,7 +195,7 @@ void c_Sim::update_dS() {
             for(int b=0; b<num_bands_in;b++) {
                 cout<<"    band ["<<b<<"][j="<<j<<"] = "<<S_band(j,b)<<" dS = "<<dS_band(j,b)<<" tau = "<<const_opacity_solar_factor*radial_optical_depth_twotemp(j,b);
                 for(int s=0; s<num_species; s++) {
-                     cout<<" dS_fract["<<species[s].speciesname<<"] = "<<(species[s].fraction_total_solar_opacity(j,b))<<" rho/T = "<<species[s].prim[j].density<<"/"<<species[s].prim[j].temperature<<" x = "<<x_i12[j];
+                     cout<<" dS_fract["<<species[s].speciesname<<"] = "<<(species[s].fraction_total_solar_opacity(j,b))<<" rho/T/Etot-Ekin = "<<species[s].prim[j].density<<"/"<<species[s].prim[j].temperature<<"/"<<(species[s].u[j].u3 - 0.5*std::pow(species[s].u[j].u2,2.)/species[s].u[j].u1)<<" x = "<<x_i12[j];
                     //" opa = "<<species[s].opacity(j,b)<<" total opa(j+1)"<<total_opacity(j+1,b)<<
                 }
                 //cout<<endl;
@@ -239,10 +239,6 @@ void c_Sim::update_fluxes_FLD() {
     std::vector<double> 
         l(size_M, 0.), d(size_M, 0.), u(size_M, 0.), r(size_r, 0.) ;
     //
-    // Making space for the convective energy transport, following Tajima & Nakagawa 1997
-    // Lconv = 2pir^2 c_p dT**3/2 std::sqrt(rho g Lmabda \partial rho/\partial T_P=const )
-    //         dT     = Lambda (dT'-dT)/2
-    //         Lambda = P/dP
     
     // Step 1: setup transport terms (J)
     for(int b=0; b<num_bands_out; b++) {
@@ -272,8 +268,20 @@ void c_Sim::update_fluxes_FLD() {
                 
                 if(debug > 1)
                     cout<<" radiation part 0. t,j,b="<<steps<<","<<j<<","<<b<<" tau_inv/R/D = "<<tau_inv<<"/"<<R<<"/"<<D<<" J/J/dJ = "<<Jrad_FLD(j+1,b)<<"/"<<Jrad_FLD(j,b)<<"/"<<(Jrad_FLD(j+1,b)-Jrad_FLD(j,b))<<" flux = "<<D*(Jrad_FLD(j+1,b)-Jrad_FLD(j,b))<<endl;
+                
+                /*if(j==20 || j==21 || j==22) {
+                    if( (base->steps == 3205600) || (base->steps == 3206000) || (base->steps == 3205700) || (base->steps == 3205625) || (base->steps == 3205650) || (base->steps == 3205675) || (base->steps == 3205605) || (base->steps == 3205610) || (base->steps == 3205615) || (base->steps == 3205620) ) {
+                    
+                    
+                    //cout<<"Radiation 1,  R  "<<   
+                    
+                    
+                    }
+                }*/
+                    
             }
         }
+        
         
         // Boundaries:
         // Left boundary:
@@ -388,7 +396,7 @@ void c_Sim::update_fluxes_FLD() {
                     double fac = no_rad_trans * species[s].opacity_planck(j, b) * sigma_rad*Ts*Ts*Ts / pi * compute_planck_function_integral3(l_i_out[b], l_i_out[b+1], species[s].prim[j].temperature);
                     
                     d[idx_s ] += 16 * pi * fac / species[s].cv ;
-                    d[idx_sb] = - 4 * pi * species[s].opacity_planck(j, b)  * no_rad_trans / species[s].cv ;
+                    d[idx_sb] = - 4 * pi * species[s].opacity_planck(j, b) * no_rad_trans / species[s].cv ;
                     r[idx_rs] += 12 * pi * fac * Ts / species[s].cv ;
                     
                     if (j < num_ghosts || j >= num_cells + 2-num_ghosts) continue ;
@@ -398,8 +406,8 @@ void c_Sim::update_fluxes_FLD() {
                     d[idx_bs] = - 4 * vol[j] * rhos * fac ;
                     r[idx_rb] -=  3 * vol[j] * rhos * fac * Ts ;
                     
-                    if(debug > 1)
-                        cout<<" radiation part2, t = "<<steps<<" b["<<b<<"] i["<<j<<"] s["<<s<<"] l/d/u/r_rs/rs_rb = "<<d[idx_s]<<"/"<<d[idx_sb]<<"/"<<d[idx_b]<<"/"<<d[idx_bs]<<"/"<<r[idx_rs]<<"/"<<r[idx_rb]<<" opac = "<<vol[j] * rhos * species[s].opacity(j, b)<<endl;
+                    if(debug >= 1)
+                        cout<<" radiation part2, t = "<<steps<<" b["<<b<<"] i["<<j<<"] s["<<s<<"] l/d/u/r_rs/rs_rb = "<<d[idx_s]<<"/"<<d[idx_sb]<<"/"<<d[idx_b]<<"/"<<d[idx_bs]<<"/"<<r[idx_rs]<<"/"<<r[idx_rb]<<" opac = "<<vol[j] * rhos * species[s].opacity(j, b)<<" fac = "<<fac<<endl;
                 }
             }
             if (use_collisional_heating && num_species > 1) {
@@ -415,10 +423,140 @@ void c_Sim::update_fluxes_FLD() {
             }
         }
     }
-    if(debug > 4) {
+    
+    
+        // Making space for the convective energy transport, following Tajima & Nakagawa 1997
+        // Lconv = 2pir^2 c_p dT**3/2 std::sqrt(rho g Lmabda \partial rho/\partial T_P=const )
+        //         dT     = Lambda (dT'-dT)/2
+        //         Lambda = P/dP
+        
+        //
+        // Step3: Transport terms for convective fluxes in the T-equation
+        //
+        if(use_convective_fluxes) {
+            
+
+           auto smooth = [](double dT, double dT_ad) {
+                
+                double dTrel = (dT - dT_ad)/dT_ad;
+               
+                if(dT - dT_ad > 0.)
+                   return (dT-dT_ad) *0.01 * (1.-std::exp(-dTrel*dTrel));
+                else
+                    return 0.;
+               
+            } ;
+        
+           for (int j=2; j < num_cells-1; j++) {
+                for (int s=0; s < num_species; s++) {
+                    
+                    int idx      = j*stride   + (s + num_bands_out) * (num_vars+1) ;
+                    int idx_r    = j*num_vars + (s + num_bands_out) ;
+                    
+                    double dx = (x_i12[j+1]-x_i12[j]) ;
+                    double rhoavg = (species[s].prim[j].density + species[s].prim[j+1].density) * 0.5;
+                    double Pavg   = (species[s].prim[j].pres + species[s].prim[j+1].pres) * 0.5;
+                    double Tavg   = (species[s].prim[j].temperature + species[s].prim[j+1].temperature) * 0.5;
+                    double dP     = (species[s].prim[j].pres - species[s].prim[j+1].pres)/Pavg;
+                    double dT     = (species[s].prim[j].temperature - species[s].prim[j+1].temperature)/Tavg / dP;
+                    double glocal = -get_phi_grav(x_i[j], enclosed_mass[j])/x_i[j];
+                    
+                    double nabla_ad = 1.-1./species[s].gamma_adiabat;
+                    double lam = Pavg / (species[s].prim[j].pres - species[s].prim[j+1].pres);  // The mixing length
+                    double DT =  (dT > nabla_ad ? dT - nabla_ad : 0.); //smooth(dT, nabla_ad); //   // Gradient comparison and switch for Lconv
+                           DT = (dx * total_opacity(j,0)) > 2./3. ? DT : 0.; //Guardian to not use convection in optically thin areas
+                    //double DT = dT - nabla_ad;    // Gradient comparison and switch for Lconv
+                    
+                    double alphaconv = 0.5 * species[s].cv * lam * lam * DT * rhoavg * std::sqrt(glocal/Tavg); //Prefactor
+                    double Lconv = alphaconv;
+                    double Lconvsymm = 0;
+                    
+                    u[idx] += -Lconv ;
+                    d[idx] += Lconv ;
+                    d[idx+stride] += Lconv ;
+                    l[idx+stride] += -Lconv ;
+                    //r[idx_r]      += Lconv * nabla_ad;
+                    
+                    species[s].lconvect[j] = Lconv * dT;
+                    
+                    if(false) {
+                    //if(dT > nabla_ad) {
+                        cout<<" step "<<steps<<" j = "<<j<<" DT = "<<DT<<" convective flux nonzero = "<<alphaconv<<endl;
+                        
+                        char a;
+                        cin>>a;
+                    }
+                        
+                    if(globalTime > 1e16) {
+                        
+                        cout<<j<<" nabla_ad = "<<nabla_ad<<" nabla_actual = "<<dT<<" DT = "<<DT<<" deltaT = "<<(species[s].prim[j].temperature - species[s].prim[j+1].temperature)<<" Lconv = "<<Lconv<<endl;
+                        
+                        
+                    }
+                        
+                }
+            }
+            
+            // Convective boundaries
+            //
+            for (int j=0; j < num_ghosts; j++) {
+                
+                for (int s=0; s < num_species; s++) {
+                    int idx      = j*stride   + (s + num_bands_out) * (num_vars+1) ;
+                    int idx_r    = j*num_vars + (s + num_bands_out) ;
+                    
+                    double Lconv = species[s].lconvect[2]*1.1;
+                    
+                    u[idx] += -Lconv ;
+                    d[idx] += Lconv ;
+                    d[idx+stride] += Lconv ;
+                    l[idx+stride] += -Lconv ;
+                }
+                
+            }
+            
+            if(globalTime > 1e16) {
+                
+                char a;
+                cin>>a;
+            }
+            
+        }
+        
+    
+    if(debug >= 3) {
+        
+        cout<<"L ="<<endl;
+        for(int i = 0; i < size_M; i++) {
+            
+            if(i%num_vars == 0)
+                cout<<endl;
+            if(i%stride == 0)
+                cout<<endl;
+            
+            cout<<l.at(i)<<" ";
+            
+        }
+        
+        cout<<"D ="<<endl;
+        for(int i = 0; i < size_M; i++) {
+            
+            if(i%num_vars == 0)
+                cout<<endl;
+            if(i%stride == 0)
+                cout<<endl;
+            
+            cout<<d.at(i)<<" ";
+            
+        }
+        //cout<<"L ="<<endl<<l<<endl;
+        //cout<<"D ="<<endl<<d<<endl;
+        //cout<<"U ="<<endl<<u<<endl;
+        
         char stepstop;
         cin>>stepstop;
     }
+    
 
     tridiag.factor_matrix(&l[0], &d[0], &u[0]) ;
     tridiag.solve(&r[0], &r[0]) ; // Solve in place (check it works)

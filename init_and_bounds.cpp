@@ -137,6 +137,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
         use_tides         = read_parameter_from_file<int>(filename,"USE_TIDES", debug, 0).value;
         use_linear_gravity= read_parameter_from_file<int>(filename,"PARI_LINEAR_GRAV", debug, 0).value;
         use_rad_fluxes    = read_parameter_from_file<int>(filename,"PARI_USE_RADIATION", debug, 0).value;
+        use_convective_fluxes = read_parameter_from_file<int>(filename,"USE_CONVECTION", debug, 0).value;
         use_collisional_heating = read_parameter_from_file<int>(filename,"PARI_USE_COLL_HEAT", debug, 1).value;
         use_drag_predictor_step = read_parameter_from_file<int>(filename, "PARI_SECONDORDER_DRAG", debug, 0).value;
         init_wind         = read_parameter_from_file<int>(filename,"PARI_INIT_WIND", debug, 0).value;
@@ -353,14 +354,33 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
             
             double dlogx  = pow(10.,1./cells_per_decade);
             double dlogx2 = pow(10.,1./grid2_cells_per_decade);
+            double templogx = dlogx;
+            //int grid2_transition_i = 0;
             
             x_i[0] = domain_min / std::pow(dlogx, (num_ghosts-1)) ;
+            /*for(int i=1; i<= num_cells; i++) {
+                
+                if(x_i[i] > grid2_transition) {
+                    grid2_transition_i = i;
+                    cout<<" found grid2_transition_i = "<<i<<endl;
+                    break;
+                }
+            }*/
+            cout<<" grid_transition_i = "<<grid2_transition_i<<endl;
+            
             for(int i=1; i<= num_cells; i++) {
                 
-                if(x_i[i-1] < grid2_transition)
-                    x_i[i]   =  x_i[i-1] * dlogx;
-                else
-                    x_i[i]   =  x_i[i-1] * dlogx2;
+                if(i <= grid2_transition_i) {
+                    
+                    templogx = dlogx;
+                } else if (i >= (grid2_transition_i + 5)) {
+                    templogx = dlogx2;
+                } else {
+                    templogx = dlogx + double(i-grid2_transition_i)/5. * (dlogx2 - dlogx);
+                    //cout<<" in grid2generation, i/dlogx = "<<i<<"/"<<templogx<<" dlogx/dlogx2 = "<<dlogx<<"/"<<dlogx2<<endl;
+                }
+                    
+                x_i[i]   =  x_i[i-1] * templogx;
             }
             
             //Assign the last boundary as domain maximum as long as nonuniform grid is in the test-phase
@@ -458,12 +478,16 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
         
         int all_grid_ok = 1, broken_index;
         double broken_value;
-        for(int i = 0; i <= num_cells+1; i++)
+        for(int i = 0; i <= num_cells+1; i++) {
             if( dx[i] < 0 ) {
                 all_grid_ok = 0;
                 broken_index = i;
                 broken_value = dx[i];
             }
+         
+            cout<<i<<" dx = "<<dx[i]/x_i12[i]<<endl;
+        }
+            
         
         if(debug > 0) cout<<"Init: Finished grid setup"<<endl;
         if(!all_grid_ok) {
@@ -863,6 +887,7 @@ c_Species::c_Species(c_Sim *base_simulation, string filename, string species_fil
         source          = init_AOS(num_cells+2);  
         source_pressure = init_AOS(num_cells+2);
         flux            = init_AOS(num_cells+1);
+        lconvect        =std::vector<double>(num_cells+1);
 
         //
         // Determine which equation of states we are using, and assign thermodynamic variables: heat capacity, adiabatic ratio, and equation of state
@@ -1438,8 +1463,8 @@ void c_Species::apply_boundary_right(std::vector<AOS>& u) {
                 if(mdot < -1e18)
                     prim.density = -1e18/freefallv/r/r;
                     
-                //prim.pres = prim.pres;// -  prim.density * dphi ;
-                prim.pres = prim.pres -  prim.density * dphi ;
+                prim.pres = prim.pres;// -  prim.density * dphi ;
+                //prim.pres = prim.pres -  prim.density * dphi ;
                 prim.pres = std::max( prim.pres, 0.0) ;
                 eos->compute_conserved(&prim, &u[i], 1) ;
             }

@@ -666,11 +666,8 @@ void c_Sim::do_photochemistry() {
                         double GammaHfinal = 0.;
                         double GammaHfinal2= 0;
                         double Gamma0final = 0.;
-                        double one = 0.;
-                        double one2 = 0.;
                         double nphot = 1.;
                         double npart = nX[0] + nX[1];
-                        char wait;
                         
                         for(int b=0; b < num_he_bands; b++) {
                             
@@ -712,8 +709,8 @@ void c_Sim::do_photochemistry() {
                         double C = H_collisional_ionization(Te);
                         double B = H_threebody_recombination(Te);
                         double ne = nX[2];
-                        double x_eq = (Gamma0final + ne * C) / (Gamma0final + ne * (C + R + ne * B));
-                        double t_rat = dt * (Gamma0final + ne * (C + R + ne * B));
+                        //double x_eq = (Gamma0final + ne * C) / (Gamma0final + ne * (C + R + ne * B));
+                        //double t_rat = dt * (Gamma0final + ne * (C + R + ne * B));
                         double x1 = species[1].u[j].u1 / (species[0].u[j+1].u1+species[1].u[j+1].u1);
                         double x2 = species[1].u[j+1].u1/(species[0].u[j+1].u1+species[1].u[j+1].u1);
                         double x_grad = std::abs( x1/x2 );

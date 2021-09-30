@@ -88,6 +88,8 @@ void c_Sim::execute() {
             compute_total_pressure();
         }
             
+        //if(steps==3209954)
+        //    debug = 1;
             
         dt = get_cfl_timestep();
         dt = std::min(dt, timestep_rad2) ;
@@ -174,7 +176,19 @@ void c_Sim::execute() {
         //
         // Step 0: If no gas movement is desired, set all velocity changes to 0
         //
+        /*
+        if( (species[0].u[21].u3 - 0.5*pow(species[0].u[21].u2,2.)/species[0].u[21].u1) < 0. ) {
+            
+            cout<<" p_nom<0 at steps ="<<steps<< " before update, T = "<<species[0].prim[21].temperature<<" p_nominal = "<<(species[0].u[21].u3 - 0.5*std::pow(species[0].u[21].u2,2.)/species[0].u[21].u1)<<endl;
+        }
         
+        if(species[0].prim[21].temperature < 0. ) {
+            
+            cout<<" T<0 at steps ="<<steps<< " before, T = "<<species[0].prim[21].temperature<<" p_nominal = "<<(species[0].u[21].u3 - 0.5*std::pow(species[0].u[21].u2,2.)/species[0].u[21].u1)<<endl;
+            
+            cout<<" T<0 at steps ="<<steps<< " before, T = "<<species[0].prim[21].temperature<<" p_nominal2 = "<<(species[0].u[21].u3 - 0.5*species[0].u[21].u2 * species[0].prim[21].speed)<<endl;
+        }
+        */
         if (do_hydrodynamics == 1) {
         
             for(int s = 0; s < num_species; s++)
@@ -186,6 +200,20 @@ void c_Sim::execute() {
                     species[s].u[j] = species[s].u[j] + species[s].dudt[0][j]*dt ;
             }
         }
+        /*
+        if( (species[0].u[21].u3 - 0.5*pow(species[0].u[21].u2,2.)/species[0].u[21].u1) < 0. ) {
+            
+            cout<<" p_nom<0 at steps ="<<steps<< " intermediate update, T = "<<species[0].prim[21].temperature<<" p_nominal = "<<(species[0].u[21].u3 - 0.5*std::pow(species[0].u[21].u2,2.)/species[0].u[21].u1)<<endl;
+        }
+        
+        if(species[0].prim[21].temperature < 0. ) {
+            
+            cout<<" T<0 at steps ="<<steps<< " intermediate, T = "<<species[0].prim[21].temperature<<" p_nominal = "<<(species[0].u[21].u3 - 0.5*std::pow(species[0].u[21].u2,2.)/species[0].u[21].u1)<<endl;
+            
+            cout<<" T<0 at steps ="<<steps<< " intermediate, T = "<<species[0].prim[21].temperature<<" p_nominal2 = "<<(species[0].u[21].u3 - 0.5*species[0].u[21].u2 * species[0].prim[21].speed)<<endl;
+        }
+        */
+        
         
         if (order == IntegrationType::first_order) {
             globalTime += dt;
@@ -209,6 +237,7 @@ void c_Sim::execute() {
                         compute_collisional_heat_exchange() ;
                 }
 
+                //debug = 2;
                 for(int s = 0; s < num_species; s++)
                     species[s].execute(species[s].u, species[s].dudt[1]);
 
@@ -228,6 +257,25 @@ void c_Sim::execute() {
                 }
             }
         }
+        /*
+        if( (species[0].u[21].u3 - 0.5*pow(species[0].u[21].u2,2.)/species[0].u[21].u1) < 0. ) {
+            
+            cout<<" p_nom1<0 at steps ="<<steps<< " after 2nd, before pressure, T = "<<species[0].prim[21].temperature<<" p_nominal = "<<(species[0].u[21].u3 - 0.5*std::pow(species[0].u[21].u2,2.)/species[0].u[21].u1)<<endl;
+            
+            cout<<" p_nom1<0 at steps ="<<steps<< " after 2nd, before pressure, T = "<<species[0].prim[21].temperature<<" p_nominal2 = "<<(species[0].u[21].u3 - 0.5*species[0].u[21].u2 * species[0].prim[21].speed)<<endl;
+        }
+        
+        if( (species[0].u[21].u3 - 0.5*species[0].u[21].u2 * species[0].prim[21].speed) < 0. ) {
+            
+            cout<<" p_nom2<0 at steps ="<<steps<< " after 2nd, before pressure, T = "<<species[0].prim[21].temperature<<" p_nominal = "<<(species[0].u[21].u3 - 0.5*std::pow(species[0].u[21].u2,2.)/species[0].u[21].u1)<<endl;
+            cout<<" p_nom2<0 at steps ="<<steps<< " after 2nd, before pressure, T = "<<species[0].prim[21].temperature<<" p_nominal2 = "<<(species[0].u[21].u3 - 0.5*species[0].u[21].u2 * species[0].prim[21].speed)<<endl;
+        }
+        
+        if(species[0].prim[21].temperature < 0. ) {
+            
+            cout<<" T<0 at steps ="<<steps<< " after 2nd, before pressure, T = "<<species[0].prim[21].temperature<<" p_nominal = "<<(species[0].u[21].u3 - 0.5*std::pow(species[0].u[21].u2,2.)/species[0].u[21].u1)<<endl;
+            cout<<" T<0 at steps ="<<steps<< " after 2nd, before pressure, T = "<<species[0].prim[21].temperature<<" p_nominal2 = "<<(species[0].u[21].u3 - 0.5*species[0].u[21].u2 * species[0].prim[21].speed)<<endl;
+        }*/
         
         /*for(int s = 0; s < num_species; s++) {
             
@@ -247,7 +295,28 @@ void c_Sim::execute() {
             species[s].compute_pressure(species[s].u);
             
         //compute_total_pressure();
+        /*
+        if(species[0].prim[21].temperature < 0. ) {
+            
+            cout<<" T<0 at steps ="<<steps<< " after 2nd, after pressure, T = "<<species[0].prim[21].temperature<<" p_nominal = "<<(species[0].u[21].u3 - 0.5*std::pow(species[0].u[21].u2,2.)/species[0].u[21].u1)<<endl;
+            
+            cout<<" T<0 at steps ="<<steps<< " after 2nd, after pressure, T = "<<species[0].prim[21].temperature<<" p_nominal2 = "<<(species[0].u[21].u3 - 0.5*species[0].u[21].u2 * species[0].prim[21].speed)<<endl;
+        }
+         
+        if( (species[0].u[21].u3 - 0.5*pow(species[0].u[21].u2,2.)/species[0].u[21].u1) < 0. ) {
+            
+            cout<<" p_nom1<0 at steps ="<<steps<< " after 2nd, after pressure, T = "<<species[0].prim[21].temperature<<" p_nominal = "<<(species[0].u[21].u3 - 0.5*std::pow(species[0].u[21].u2,2.)/species[0].u[21].u1)<<endl;
+            
+            cout<<" p_nom1<0 at steps ="<<steps<< " after 2nd, after pressure, T = "<<species[0].prim[21].temperature<<" p_nominal2 = "<<(species[0].u[21].u3 - 0.5*species[0].u[21].u2 * species[0].prim[21].speed)<<endl;
+        }
         
+        if( (species[0].u[21].u3 - 0.5*species[0].u[21].u2 * species[0].prim[21].speed) < 0. ) {
+            
+            cout<<" p_nom2<0 at steps ="<<steps<< " after 2nd, after pressure, T = "<<species[0].prim[21].temperature<<" p_nominal = "<<(species[0].u[21].u3 - 0.5*std::pow(species[0].u[21].u2,2.)/species[0].u[21].u1)<<endl;
+            cout<<" p_nom2<0 at steps ="<<steps<< " after 2nd, after pressure, T = "<<species[0].prim[21].temperature<<" p_nominal2 = "<<(species[0].u[21].u3 - 0.5*species[0].u[21].u2 * species[0].prim[21].speed)<<endl;
+        }
+        
+        */
         if (do_hydrodynamics == 1)
             compute_drag_update() ;
         
@@ -437,8 +506,71 @@ void c_Species::execute(std::vector<AOS>& u_in, std::vector<AOS>& dudt) {
         if(debug >= 2)
             cout<<"Done."<<endl<<" Before compute pressure in species "<<speciesname<<"... ";
         
-        compute_pressure(u_in);
+        if(base->debug > 0) {
+            
+            
+            if(prim[21].temperature < 0. ) {
+            
+            cout<<" T<0 in execute, steps ="<<base->steps<< " beforeP, T = "<<prim[20].temperature<<" "<<prim[21].temperature<<" "<<prim[22].temperature<<" p_nominal = "<<(u[21].u3 - 0.5*std::pow(u[21].u2,2.)/u[21].u1)<<endl;
+            cout<<" T<0 in execute, steps ="<<base->steps<< " beforeP, rho = "<<prim[20].density<<" "<<prim[21].density<<" "<<prim[22].density<<" p_nominal2 = "<<(u[21].u3 - 0.5*u[21].u2 * prim[21].speed)<<endl;
+            cout<<" opar = "<<opacity(20,0)<<" "<<opacity(21,0)<<" "<<opacity(22,0)<<" opas = "<<opacity(20,0)<<" "<<opacity_planck(21,0)<<" "<<opacity_planck(22,0)<<endl;
+            cout<<" t = "<<base->globalTime<<endl;
+        }
         
+        if( (base->steps == 3205600) || (base->steps == 3206000) || (base->steps == 3205700) || (base->steps == 3205625) || (base->steps == 3205650) || (base->steps == 3205675) || (base->steps == 3205605) || (base->steps == 3205610) || (base->steps == 3205615) || (base->steps == 3205620) || (base->steps == 3205595) || (base->steps == 3205500) ) {
+            
+            cout<<" steps ="<<base->steps<< " beforeP, T = "<<prim[20].temperature<<" "<<prim[21].temperature<<" "<<prim[22].temperature<<" p_nominal = "<<(u[21].u3 - 0.5*std::pow(u[21].u2,2.)/u[21].u1)<<" u1/u2/u3/v = "<<u[21].u1<<"/"<<u[21].u2<<"/"<<u[21].u3<<"/"<<prim[21].speed<<endl;
+            cout<<" steps ="<<base->steps<< " beforeP, rho = "<<prim[20].density<<" "<<prim[21].density<<" "<<prim[22].density<<" Js = "<<base->Jrad_FLD(20, 0)<<"/"<<base->Jrad_FLD(21, 0)<<"/"<<base->Jrad_FLD(22, 0) <<endl;
+            cout<<" opar = "<<opacity(20,0)<<" "<<opacity(21,0)<<" "<<opacity(22,0)<<" opas = "<<opacity(20,0)<<" "<<opacity_planck(21,0)<<" "<<opacity_planck(22,0)<<endl;
+            cout<<" t = "<<base->globalTime<<endl;
+            
+            for(int j=19; j<=22; j++) {
+                
+                double dx      = (base->x_i12[j+1]-base->x_i12[j]) ;
+                double rhokr   = max(2.*(base->total_opacity(j,0)*base->total_opacity(j+1,0))/(base->total_opacity(j,0) + base->total_opacity(j+1,0)), 4./3./dx );
+                        rhokr   = min( 0.5*( base->total_opacity(j,0) + base->total_opacity(j+1,0)) , rhokr);
+                double tau_inv = 0.5 / (dx * rhokr) ;
+                double R       = 2 * tau_inv * std::abs(base->Jrad_FLD(j+1,0) - base->Jrad_FLD(j,0)) / (base->Jrad_FLD(j+1,0) + base->Jrad_FLD(j, 0) + 1e-300) ;
+                double flux_limiter;
+                    if (R <= 2)
+                        flux_limiter = 2 / (3 + std::sqrt(9 + 10*R*R)) ;
+                    else 
+                        flux_limiter = 10 / (10*R + 9 + std::sqrt(81 + 180*R)) ;
+                
+                double D       = base->surf[j] * flux_limiter * tau_inv;
+                double flux    = - 4. * pi * D * (base->Jrad_FLD(j+1,0) - base->Jrad_FLD(j,0));
+            
+                cout<<" i/i+1= "<<j<<"/"<<j+1<<" F = "<<flux<<" D = "<<D<<" limiter = "<<flux_limiter<<" R = "<<R<<" rhokr = "<<rhokr<<" J-B = "<<prim[j].density*opacity_planck(j,0)*(base->Jrad_FLD(j,0)-sigma_rad*pow(prim[j].temperature,4.) / pi )<<endl;
+            }
+                
+                
+            
+        }
+        
+            if(base->steps >= 3209950 ) {
+                
+                cout<<" steps ="<<base->steps<< " beforeP, T = "<<prim[20].temperature<<" "<<prim[21].temperature<<" "<<prim[22].temperature<<" p_nominal = "<<(u[21].u3 - 0.5*std::pow(u[21].u2,2.)/u[21].u1)<<" u1/u2/u3/v = "<<u[21].u1<<"/"<<u[21].u2<<"/"<<u[21].u3<<"/"<<prim[21].speed<<endl;
+                cout<<" steps ="<<base->steps<< " beforeP,rho = "<<prim[20].density<<" "<<prim[21].density<<" "<<prim[22].density<<" p_nominal2 = "<<(u[21].u3 - 0.5*u[21].u2 * prim[21].speed)<<endl;
+                cout<<" opar = "<<opacity(20,0)<<" "<<opacity(21,0)<<" "<<opacity(22,0)<<" opas = "<<opacity(20,0)<<" "<<opacity_planck(21,0)<<" "<<opacity_planck(22,0)<<endl;
+                cout<<" t = "<<base->globalTime<<endl;
+            }
+            
+            
+            
+        }
+        
+        base->debug=0;
+        
+        compute_pressure(u_in);
+        /*
+        if(prim[21].temperature < 0. ) {
+            
+            cout<<" T<0 in execute, steps ="<<base->steps<< " afterP, T = "<<prim[20].temperature<<" "<<prim[21].temperature<<" "<<prim[22].temperature<<" p_nominal = "<<(u[21].u3 - 0.5*std::pow(u[21].u2,2.)/u[21].u1)<<" u1/u2/u3/v = "<<u[21].u1<<"/"<<u[21].u2<<"/"<<u[21].u3<<"/"<<prim[21].speed<<endl;
+            cout<<" T<0 in execute, steps ="<<base->steps<< " afterP, rho = "<<prim[20].density<<" "<<prim[21].density<<" "<<prim[22].density<<" p_nominal2 = "<<(u[21].u3 - 0.5*u[21].u2 * prim[21].speed)<<endl;
+            cout<<" opar = "<<opacity(20,0)<<" "<<opacity(21,0)<<" "<<opacity(22,0)<<" opas = "<<opacity(20,0)<<" "<<opacity_planck(21,0)<<" "<<opacity_planck(22,0)<<endl;
+            cout<<" t = "<<base->globalTime<<endl;
+        }
+        */
         
         if(debug >= 2)
             cout<<"Done. Starting edge-states."<<endl;
