@@ -138,6 +138,8 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
         use_linear_gravity= read_parameter_from_file<int>(filename,"PARI_LINEAR_GRAV", debug, 0).value;
         use_rad_fluxes    = read_parameter_from_file<int>(filename,"PARI_USE_RADIATION", debug, 0).value;
         use_convective_fluxes = read_parameter_from_file<int>(filename,"USE_CONVECTION", debug, 0).value;
+        convect_boundary_strength = read_parameter_from_file<double>(filename,"CONVECT_BOUNDARY_STRENGTH", debug, 1.1).value;
+        
         use_collisional_heating = read_parameter_from_file<int>(filename,"PARI_USE_COLL_HEAT", debug, 1).value;
         use_drag_predictor_step = read_parameter_from_file<int>(filename, "PARI_SECONDORDER_DRAG", debug, 0).value;
         init_wind         = read_parameter_from_file<int>(filename,"PARI_INIT_WIND", debug, 0).value;
@@ -485,7 +487,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
                 broken_value = dx[i];
             }
          
-            cout<<i<<" dx = "<<dx[i]/x_i12[i]<<endl;
+            //cout<<i<<" dx = "<<dx[i]/x_i12[i]<<endl;
         }
             
         

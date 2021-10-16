@@ -417,7 +417,7 @@ void c_Sim::execute() {
                     if(Jrad_FLD(i,b) < 0) {
                         
                         if(Jrad_FLD(i,b) > -1e-10) {
-                           Jrad_FLD(i,b) *= -1.; 
+                            Jrad_FLD(i,b) *= -1.; 
                         }
                         else {
                             
@@ -426,14 +426,12 @@ void c_Sim::execute() {
                                 crashtime_already_assigned = 1;
                             }
                             
+                            
                             crashed_meanintensity = Jrad_FLD(i,b);
                             crashed_J = b+1;
                             crash_J_imin = (i<crash_J_imin)? i : crash_J_imin;
                             crash_J_imax = (i>crash_J_imax)? i : crash_J_imax;
                             crash_J_numcells++;
-                            
-                            //cout<<" NEGATIVE RAD DENSITY at b/i = "<<b<<"/"<<i<<"  at timestep "<<dt<<" stepnum "<<steps<<" totaltime "<<globalTime<<endl;
-                            //cout<<" Writing crash dump into last output and exiting program."<<endl;
                             
                             globalTime = 1.1*t_max;    
                         }

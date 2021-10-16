@@ -860,7 +860,7 @@ void c_Sim::print_diagnostic_file(int outputnumber) {
                 }
                 
                 //Radiative and species temperatures
-                outfileDiagnostic<<'\t'<<pow(Jtot*pi/sigma_rad*c_light/4./3.141, 0.25);      //col 5: The radiative temperature 
+                outfileDiagnostic<<'\t'<<pow(Jtot/sigma_rad*c_light/4., 0.25);      //col 5: The radiative temperature 
                 
                 for(int s=0; s<num_species; s++)
                     outfileDiagnostic<<'\t'<<species[s].prim[i].temperature; //col 6-...: all species temperatures 

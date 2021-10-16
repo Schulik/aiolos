@@ -174,8 +174,6 @@ void c_Species::update_opacities() {
                     opacity_twotemp(j,b) = opacity_avg_solar(b); 
             }
         }
-        
-        
     }
     else if  (base->opacity_model == 'D') {
 
@@ -273,7 +271,7 @@ void c_Species::update_opacities() {
         for(int j=0; j< num_cells+2; j++) {
             
             for(int b=0; b<num_bands_in; b++) {
-                opacity_twotemp(j,b)= const_opacity * (1. + pressure_broadening_factor * pow(prim[j].pres/1e5, pressure_broadening_exponent)); 
+                opacity_twotemp(j,b)= opacity_avg_solar(b)  * (1. + pressure_broadening_factor * pow(prim[j].pres/1e5, pressure_broadening_exponent)); 
                 
             }
             for(int b=0; b<num_bands_out; b++) {

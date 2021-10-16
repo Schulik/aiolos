@@ -98,6 +98,16 @@ void c_Sim::update_dS() {
                     dS_band_zero(j,b) = dS_band(j,b);
                 
                     
+                    //
+                    // Planetary heating 2
+                    //
+                    if(use_planetary_temperature == 1){
+                        if(j==2) {
+                            
+                            dS_band(j,b) += pow(T_core,4.)*sigma_rad / (dx[j]); //std::sqrt(3.)*
+                        
+                        }
+                    }
                 }// Irregular dS computation, in case we want to fix the solar heating function to its initial value
                 else 
                     dS_band(j,b) = dS_band_zero(j,b);
@@ -132,6 +142,13 @@ void c_Sim::update_dS() {
         
     }
     
+    //
+    //  bad boundaries
+    //
+    //for(int s=0; s<num_species; s++) {
+    //    species[s].dS(num_cells+2)  = species[s].dS(num_cells+1);   
+   // }
+    
     //Initialize optically thin regions with low energy density
     if((steps==0) && (init_J_factor > 1e10)) {
         
@@ -160,14 +177,24 @@ void c_Sim::update_dS() {
         J_remnant += S_band(1,b);
     }
     
-    for(int s=0; s<num_species; s++) 
-        if (species[s].const_T_space > 0) {
-            species[s].prim[num_cells].temperature   = species[s].const_T_space;
-            species[s].prim[num_cells+1].temperature = species[s].const_T_space;
-        }
+    //
+    // To dampen oscillating outer temperature fluctuations
+    //
+    for(int s=0; s<num_species; s++)  {
+        //species[s].prim[num_cells].temperature   = species[s].prim[num_cells-1].temperature; // species[s].const_T_space;
+        //species[s].prim[num_cells+1].temperature = species[s].prim[num_cells-1].temperature; //species[s].const_T_space;
+    }
     
-    T_rad_remnant = pow(pi * J_remnant / sigma_rad, 0.25);
+    for(int b=0; b<num_bands_out; b++)  {
+        //Jrad_FLD(num_cells, b)   = 0.9*Jrad_FLD(num_cells-1, b);
+        //Jrad_FLD(num_cells+1,b)  = 0.8*Jrad_FLD(num_cells-1, b);
+    }
+        //if (species[s].const_T_space > 0) {
+            
+        //}
     
+    
+    /*T_rad_remnant = pow(pi * J_remnant / sigma_rad, 0.25);
     T_target      = pow(pow(T_core,4.) + pow(T_rad_remnant,4.), 0.25);
     T_surface     = T_target; //+ (T_surface - T_target)*std::exp(-dt/cooling_time);
     
@@ -182,7 +209,7 @@ void c_Sim::update_dS() {
             Jrad_FLD(0, b)            = sigma_rad * pow(T_surface,4.) * pow(R_core,2.) * compute_planck_function_integral3(l_i_out[b], l_i_out[b+1], T_surface) ;
         }
         //cout<<"t ="<<globalTime<<" Jrad(0,b) = "<<Jrad_FLD(0, 0)<<" Tsurface = "<<T_surface<<" Tcore = "<<T_core<<" T_rad_remnant = "<<T_rad_remnant<<endl;
-    }
+    }*/
     
     if(debug >= 1) {
         
@@ -223,14 +250,25 @@ void c_Sim::update_fluxes_FLD() {
             }
         }
     }
-    
+   
     auto flux_limiter = [](double R) {
         if (R <= 2)
             return 2 / (3 + std::sqrt(9 + 10*R*R)) ;
         else 
             return 10 / (10*R + 9 + std::sqrt(81 + 180*R)) ;
-    } ;
-
+    } ; 
+    /*
+     auto flux_limiter = [](double R) {
+         
+         return (2.+ R) / (6. + 3*R + R*R) ;
+     } ;
+    
+     /*
+     auto flux_limiter = [](double R) {
+         
+         return 1. / (3.+ R) ;
+     } ;*/
+     
     int num_vars = num_bands_out + num_species;
     int stride = num_vars * num_vars ;
     int size_r = (num_cells + 2) * num_vars ;
@@ -253,13 +291,23 @@ void c_Sim::update_fluxes_FLD() {
             // Flux across right boundary
             if (j > 0 && j < num_cells + 1) {
                 double dx      = (x_i12[j+1]-x_i12[j]) ;
-                double rhokr   = max(2.*(total_opacity(j,b)*total_opacity(j+1,b))/(total_opacity(j,b) + total_opacity(j+1,b)), 4./3./dx );
+                /*double rhokr   = max(2.*(total_opacity(j,b)*total_opacity(j+1,b))/(total_opacity(j,b) + total_opacity(j+1,b)), 4./3./dx );
                        rhokr   = min( 0.5*( total_opacity(j,b) + total_opacity(j+1,b)) , rhokr);
                 double tau_inv = 0.5 / (dx * rhokr) ;
-                //double tau_inv = 0.5 / (dx * (total_opacity(j,b) + total_opacity(j+1,b))) ;
                 double R       = 2 * tau_inv * std::abs(Jrad_FLD(j+1,b) - Jrad_FLD(j,b)) / (Jrad_FLD(j+1,b) + Jrad_FLD(j, b) + 1e-300) ;
-                double D       = no_rad_trans * surf[j] * flux_limiter(R) * tau_inv;
-
+                double D       = 1.0 * no_rad_trans * surf[j] * flux_limiter(R) * tau_inv;
+                */
+                
+                //double rhokr   = 0.5*( total_opacity(j,b) + total_opacity(j+1,b)); //min( 0.5*( total_opacity(j,b) + total_opacity(j+1,b)) , rhokr);
+                double rhokr   = max(2.*(total_opacity(j,b)*total_opacity(j+1,b))/(total_opacity(j,b) + total_opacity(j+1,b)), 4./3./dx );
+                       rhokr   = min( 0.5*( total_opacity(j,b) + total_opacity(j+1,b)) , rhokr);
+                       
+                       rhokr   = (2.*(total_opacity(j,b)*total_opacity(j+1,b))/(total_opacity(j,b) + total_opacity(j+1,b)));
+                double tau_inv = 1.0 / (dx * rhokr) ;
+                //double tau_inv = 0.5 / (dx * (total_opacity(j,b) + total_opacity(j+1,b))) ;
+                double R       = 8. * tau_inv * std::abs(Jrad_FLD(j+1,b) - Jrad_FLD(j,b)) / (Jrad_FLD(j+1,b) + Jrad_FLD(j, b) + 1e-300) ;
+                double D       = 3.141/1. * tau_inv * no_rad_trans * surf[j] * flux_limiter(R); // 
+                
                 // divergence terms
                 u[idx] = -D ;
                 d[idx] += D ;
@@ -505,7 +553,7 @@ void c_Sim::update_fluxes_FLD() {
                     int idx      = j*stride   + (s + num_bands_out) * (num_vars+1) ;
                     int idx_r    = j*num_vars + (s + num_bands_out) ;
                     
-                    double Lconv = species[s].lconvect[2]*1.1;
+                    double Lconv = species[s].lconvect[2]*1.5;
                     
                     u[idx] += -Lconv ;
                     d[idx] += Lconv ;
@@ -549,6 +597,18 @@ void c_Sim::update_fluxes_FLD() {
             cout<<d.at(i)<<" ";
             
         }
+        
+        cout<<"u ="<<endl;
+        for(int i = 0; i < size_M; i++) {
+            
+            if(i%num_vars == 0)
+                cout<<endl;
+            if(i%stride == 0)
+                cout<<endl;
+            
+            cout<<u.at(i)<<" ";
+            
+        }
         //cout<<"L ="<<endl<<l<<endl;
         //cout<<"D ="<<endl<<d<<endl;
         //cout<<"U ="<<endl<<u<<endl;
@@ -576,6 +636,21 @@ void c_Sim::update_fluxes_FLD() {
         for(int s=0; s<num_species; s++) {
             species[s].prim[j].temperature = r[j*num_vars + (s + num_bands_out)] ;
         }
+    }
+    
+    //
+    // Emergency BC
+    //
+    
+    for(int s=0; s<num_species; s++)  {
+        //species[s].prim[num_cells].temperature   = species[s].prim[num_cells-1].temperature; // species[s].const_T_space;
+        //species[s].prim[num_cells+1].temperature = species[s].prim[num_cells-1].temperature; //species[s].const_T_space;
+        //species[s].prim[num_cells+2].temperature = species[s].prim[num_cells-1].temperature; //species[s].const_T_space;
+    }
+    for(int b=0; b<num_bands_out; b++)  {
+        //Jrad_FLD(num_cells, b)   = 0.99*Jrad_FLD(num_cells-1, b);
+        //Jrad_FLD(num_cells+1,b)  = 0.98*Jrad_FLD(num_cells-1, b);
+        //Jrad_FLD(num_cells+2,b)  = 0.97*Jrad_FLD(num_cells-1, b);
     }
     
     

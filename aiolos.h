@@ -222,6 +222,7 @@ public:
     int use_collisional_heating;
     int use_drag_predictor_step;
     int use_convective_fluxes;
+    double convect_boundary_strength;
     
     ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     //
