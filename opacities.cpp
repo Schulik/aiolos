@@ -275,8 +275,8 @@ void c_Species::update_opacities() {
                 
             }
             for(int b=0; b<num_bands_out; b++) {
-                opacity(j,b)        = const_opacity * (1. + pressure_broadening_factor * pow(prim[j].pres/1e5, pressure_broadening_exponent)); 
-                opacity_planck(j,b) = const_opacity * (1. + pressure_broadening_factor * pow(prim[j].pres/1e5, pressure_broadening_exponent)); 
+                opacity(j,b)        = base->const_opacity_rosseland_factor * const_opacity * (1. + pressure_broadening_factor * pow(prim[j].pres/1e5, pressure_broadening_exponent)); 
+                opacity_planck(j,b) = base->const_opacity_planck_factor * const_opacity * (1. + pressure_broadening_factor * pow(prim[j].pres/1e5, pressure_broadening_exponent)); 
             }
         }
         

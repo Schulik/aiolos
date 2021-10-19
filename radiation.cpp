@@ -104,7 +104,7 @@ void c_Sim::update_dS() {
                     if(use_planetary_temperature == 1){
                         if(j==2) {
                             
-                            dS_band(j,b) += pow(T_core,4.)*sigma_rad / (dx[j]); //std::sqrt(3.)*
+                            dS_band(j,b) += 0.5* pow(T_core,4.)*sigma_rad / (dx[j]); 
                         
                         }
                     }
@@ -250,25 +250,33 @@ void c_Sim::update_fluxes_FLD() {
             }
         }
     }
-   
+    
     auto flux_limiter = [](double R) {
         if (R <= 2)
             return 2 / (3 + std::sqrt(9 + 10*R*R)) ;
         else 
             return 10 / (10*R + 9 + std::sqrt(81 + 180*R)) ;
+    } ;
+    
+    /*auto flux_limiter = [](double R) {
+        if (R <= 1.5)
+            return 2 / (3 + std::sqrt(9 + 12*R*R)) ;
+        else 
+            return 1. / (1. + R + std::sqrt(1. + 2.*R)) ;
     } ; 
-    /*
+    
+    *//*
      auto flux_limiter = [](double R) {
          
          return (2.+ R) / (6. + 3*R + R*R) ;
      } ;
-    
+    */
      /*
      auto flux_limiter = [](double R) {
          
          return 1. / (3.+ R) ;
-     } ;*/
-     
+     } ;
+     */
     int num_vars = num_bands_out + num_species;
     int stride = num_vars * num_vars ;
     int size_r = (num_cells + 2) * num_vars ;
@@ -290,23 +298,15 @@ void c_Sim::update_fluxes_FLD() {
 
             // Flux across right boundary
             if (j > 0 && j < num_cells + 1) {
-                double dx      = (x_i12[j+1]-x_i12[j]) ;
-                /*double rhokr   = max(2.*(total_opacity(j,b)*total_opacity(j+1,b))/(total_opacity(j,b) + total_opacity(j+1,b)), 4./3./dx );
-                       rhokr   = min( 0.5*( total_opacity(j,b) + total_opacity(j+1,b)) , rhokr);
-                double tau_inv = 0.5 / (dx * rhokr) ;
-                double R       = 2 * tau_inv * std::abs(Jrad_FLD(j+1,b) - Jrad_FLD(j,b)) / (Jrad_FLD(j+1,b) + Jrad_FLD(j, b) + 1e-300) ;
-                double D       = 1.0 * no_rad_trans * surf[j] * flux_limiter(R) * tau_inv;
-                */
-                
-                //double rhokr   = 0.5*( total_opacity(j,b) + total_opacity(j+1,b)); //min( 0.5*( total_opacity(j,b) + total_opacity(j+1,b)) , rhokr);
+                double dx      = (x_i12[j+1]-x_i12[j]) ;                
                 double rhokr   = max(2.*(total_opacity(j,b)*total_opacity(j+1,b))/(total_opacity(j,b) + total_opacity(j+1,b)), 4./3./dx );
                        rhokr   = min( 0.5*( total_opacity(j,b) + total_opacity(j+1,b)) , rhokr);
-                       
-                       rhokr   = (2.*(total_opacity(j,b)*total_opacity(j+1,b))/(total_opacity(j,b) + total_opacity(j+1,b)));
-                double tau_inv = 1.0 / (dx * rhokr) ;
-                //double tau_inv = 0.5 / (dx * (total_opacity(j,b) + total_opacity(j+1,b))) ;
-                double R       = 8. * tau_inv * std::abs(Jrad_FLD(j+1,b) - Jrad_FLD(j,b)) / (Jrad_FLD(j+1,b) + Jrad_FLD(j, b) + 1e-300) ;
-                double D       = 3.141/1. * tau_inv * no_rad_trans * surf[j] * flux_limiter(R); // 
+                double tau_inv = 4. / (dx * rhokr) ;
+                double R       = 1. * tau_inv * std::abs(Jrad_FLD(j+1,b) - Jrad_FLD(j,b)) / (Jrad_FLD(j+1,b) + Jrad_FLD(j, b) + 1e-300) ; // Put in 0.5 as prefactor to get correct rad shock
+                double D       = 0.25 * tau_inv * no_rad_trans * surf[j] * flux_limiter(R);
+                
+                //correct static G10 model prefactors: 4/2/ 3.141/4.
+                //fake-correct supercritical shock prefactors: 4/4/ 3.141/8  or 16/2/ pi/16
                 
                 // divergence terms
                 u[idx] = -D ;
@@ -350,6 +350,7 @@ void c_Sim::update_fluxes_FLD() {
         //   Right boundary: reflective?
         //if(geometry == Geometry::cartesian) {
         if(closed_radiative_boundaries) {
+        //if(true) {
 
             int Ncell = num_cells - 2*(num_ghosts - 1);
             for (int j=0; j < num_ghosts; j++) {
@@ -372,12 +373,15 @@ void c_Sim::update_fluxes_FLD() {
                 int idx = i*stride + b*(num_vars + 1) ;
                 int idx_r = i*num_vars + b ;  
 
-                if (j == 0) // FLD flux at the edge of the last cell
+                /*if (j == 0) // FLD flux at the edge of the last cell
                     l[idx] = u[i-1] ;
                 else // Free-stream 
-                    l[i] = -surf[i-1] / (x_i12[i]-x_i12[i-1]) ;
-
-                d[idx] = -l[idx] + surf[ i ] / (x_i12[i+1]-x_i12[i]) ;
+                    l[i] = -surf[i-1] / (x_i12[i]-x_i12[i-1]) ;*/
+                
+                l[idx] = -surf[i-1] / (x_i12[i]-x_i12[i-1]) ;
+                
+                
+                d[idx] = + surf[ i ] / (x_i12[i+1]-x_i12[i]) ;// -l[idx];// 
                 u[idx] = 0 ;
                 r[idx_r] = 0 ;
             }
@@ -433,7 +437,7 @@ void c_Sim::update_fluxes_FLD() {
 
                 d[idx_s ] = 1 / dt ;
                 r[idx_rs] = Ts / dt ;
-                r[idx_rs] += (species[s].dS(j) + species[s].dG(j)) / species[s].u[j].u1 / species[s].cv; //Misc heating terms that are not directly related to self-consistent temperature are just added to the rhs
+                r[idx_rs] +=  (species[s].dS(j) + species[s].dG(j)) / species[s].u[j].u1 / species[s].cv; //Misc heating terms that are not directly related to self-consistent temperature are just added to the rhs
                 
                 for(int b=0; b<num_bands_out; b++) {
                     int idx_b  = j*stride + b * (num_vars+1) ;
@@ -617,7 +621,9 @@ void c_Sim::update_fluxes_FLD() {
         cin>>stepstop;
     }
     
-
+    //
+    // Solve!
+    //
     tridiag.factor_matrix(&l[0], &d[0], &u[0]) ;
     tridiag.solve(&r[0], &r[0]) ; // Solve in place (check it works)
 

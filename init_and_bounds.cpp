@@ -1144,7 +1144,7 @@ void c_Species::initialize_hydrostatic_atmosphere(string filename) {
             }
         }
         
-    } else {
+    } else {//REVERSE_HYDROSTAT_CONSTRUCTION
             int negdens = 0; 
             
             for(int i=1; i<=iter_start; i++)  {
@@ -1164,7 +1164,7 @@ void c_Species::initialize_hydrostatic_atmosphere(string filename) {
             temp_rhofinal = u[i].u1 *  (factor_inner - metric_inner)/(factor_outer + metric_outer);
             
             //////////////////////////////////////////////////////////////////////////////////////
-            double floor = base->density_floor * mass_amu ;
+            double floor = base->density_floor * mass_amu * std::pow(base->x_i12[i]/base->x_i12[1], -4.);
             if(temp_rhofinal < floor) {
                 
                 if(temp_rhofinal < 0.)
@@ -1225,7 +1225,7 @@ void c_Species::initialize_hydrostatic_atmosphere(string filename) {
         //cout<<"FIXING SMALL DENSITIES to density floor ="<<base->density_floor*mass_amu<<endl;
     
     for(int i = 0; i<num_cells+1; i++) {
-            double floor = base->density_floor * mass_amu ;
+            double floor = base->density_floor * mass_amu * std::pow(base->x_i12[i]/base->x_i12[1], -4.);
             if(u[i].u1 < floor) {
                 //cout<<"FIXING SMALL DENSITIES in i ="<<i<<" for species = "<<this_species_index<<endl;
                 u[i] = AOS(floor, 0., cv * floor * prim[i].temperature) ;
