@@ -24,7 +24,8 @@
 ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 void c_Sim::execute() { 
-     
+    
+    debug = 2;
     steps = 0;
     double output_counter = 0;
     double monitor_counter= 0;
@@ -321,6 +322,8 @@ void c_Sim::execute() {
             compute_drag_update() ;
         
         if( (photochemistry_level + use_rad_fluxes ) > 0 ) {
+            //cout<<"JUST BEFORE STARTING PHOTOCHEMISTRY!!!"<<endl;
+            //debug = 2;
             
             update_opacities();
             reset_dS();
@@ -372,12 +375,11 @@ void c_Sim::execute() {
             }
             
         }*/
-            
+        
+        if(steps==0)
+            cout<<"Initial sound crossing time = "<<max_snd_crs_time<<", debug = "<<debug<<endl;
             
         steps++;
-        
-        if(steps==1)
-            cout<<"Initial sound crossing time = "<<max_snd_crs_time<<endl;
         
         if(debug > 1)
             cout<<"timestep in execute()="<<dt<<" stepnum "<<steps<<" totaltime"<<globalTime<<endl;
@@ -415,6 +417,10 @@ void c_Sim::execute() {
         for(int b = 0; b < num_bands_out; b++) {
             for(int i=num_cells; i>=0; i--)  {
                     if(Jrad_FLD(i,b) < 0) {
+                        
+//                         if(i>=num_cells-1) {
+//                             Jrad_FLD(i,b) *= -1.;
+//                         }
                         
                         if(Jrad_FLD(i,b) > -1e-10) {
                             Jrad_FLD(i,b) *= -1.; 
@@ -611,7 +617,8 @@ void c_Species::execute(std::vector<AOS>& u_in, std::vector<AOS>& dudt) {
             dudt[j] = (flux[j-1] * base->surf[j-1] - flux[j] * base->surf[j]) / base->vol[j] + (source[j] + source_pressure[j]) ;
             
             //if( (debug > 1) && ( j==1 || j==num_cells || j==(num_cells/2) )) {
-            if( (debug > 3) && ( j==5 || j==1 || j==2 || j==3 || j==4 || j==6 || j==7 || j==8 || j==9 ) && (base->steps==1 || base->steps==0)) {
+            //if( (debug > 3) && ( j==5 || j==1 || j==2 || j==3 || j==4 || j==6 || j==7 || j==8 || j==9 ) && (base->steps==1 || base->steps==0)) {
+            if( ( j==2 ) && (base->steps==1 || base->steps==0)) {
                 char alpha;
                 cout<<"Debuggin fluxes in cell i= "<<j<<" for species "<<speciesname<<" at time "<<base->steps<<endl; 
                 cout<<"     fl.u1 = "<<flux[j-1].u1<<": fr.u1 = "<<flux[j].u1<<endl;
@@ -633,13 +640,14 @@ void c_Species::execute(std::vector<AOS>& u_in, std::vector<AOS>& dudt) {
                 cout<<"     u1 : Al*Fl - Ar*Fr + s + sP = "<<((flux[j-1].u1 * base->surf[j-1] - flux[j].u1 * base->surf[j]) / base->vol[j] + (source[j].u1 +source_pressure[j].u1))<<endl;
                 cout<<"     u2 : Al*Fl - Ar*Fr + s + sP = "<<((flux[j-1].u2 * base->surf[j-1] - flux[j].u2 * base->surf[j]) / base->vol[j] + (source[j].u2 +source_pressure[j].u2))<<endl;
                 cout<<"     u3 : Al*Fl - Ar*Fr + s + sP = "<<((flux[j-1].u3 * base->surf[j-1] - flux[j].u3 * base->surf[j]) / base->vol[j] + (source[j].u3 +source_pressure[j].u3))<<endl;
+                cout<<" "<<endl;
+                cout<<"     u1 : dudt[1] = "<<(dudt[j].u1)<<endl;
+                cout<<"     u2 : dudt[2] = "<<(dudt[j].u2)<<endl;
+                cout<<"     u3 : dudt[3] = "<<(dudt[j].u3)<<endl;
+                
                 cin>>alpha;
             }
         }
-        
-        
-        if(debug >= 2)
-            cout<<" Before updating rad fluxes... ";
     
 } 
 

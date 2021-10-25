@@ -3,7 +3,7 @@
 # Do not use tabs, only white spaces as value separators
 #
 #TIME_TMAX          6.7801e8
-PARI_TIME_TMAX          3.05e9
+PARI_TIME_TMAX          3.05e10
 CFL_BREAK_TIME          1e3
 PARI_TIME_OUTPUT        3.01e8
 PARI_CFLFACTOR          0.9

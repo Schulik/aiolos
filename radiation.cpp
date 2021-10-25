@@ -40,6 +40,9 @@ void c_Sim::reset_dS() {
 
 void c_Sim::update_dS() {
     
+    if(debug > 1)
+        cout<<"Updating dS..."<<endl;
+    
     //
     // Compute optical depths, solar radiation attenuation and heating function for low-energy bands
     //
@@ -217,15 +220,29 @@ void c_Sim::update_dS() {
            cout<<" in band_in ["<<b<<"] top-of-the-atmosphere heating = "<<solar_heating(b)<<endl;
         }
         cout<<"    in update opa "<<endl;
-        for(int j=num_cells; j>0; j--) {
+        for(int j=num_cells+1; j>=0; j--) {
             
-            for(int b=0; b<num_bands_in;b++) {
-                cout<<"    band ["<<b<<"][j="<<j<<"] = "<<S_band(j,b)<<" dS = "<<dS_band(j,b)<<" tau = "<<const_opacity_solar_factor*radial_optical_depth_twotemp(j,b);
+            for(int b=0; b<num_bands_in; b++) {
+                cout<<"    band ["<<b<<"][j="<<j<<"] = "<<S_band(j,b)<<" dS = "<<dS_band(j,b)<<" tau_s = "<<radial_optical_depth_twotemp(j,b);
                 for(int s=0; s<num_species; s++) {
-                     cout<<" dS_fract["<<species[s].speciesname<<"] = "<<(species[s].fraction_total_solar_opacity(j,b))<<" rho/T/Etot-Ekin = "<<species[s].prim[j].density<<"/"<<species[s].prim[j].temperature<<"/"<<(species[s].u[j].u3 - 0.5*std::pow(species[s].u[j].u2,2.)/species[s].u[j].u1)<<" x = "<<x_i12[j];
+                     cout<<" dS_fract["<<species[s].speciesname<<"] = "<<(species[s].fraction_total_solar_opacity(j,b))<<" opas = "<<species[s].opacity_twotemp(j,b)<<" rho = "<<species[s].prim[j].density;
+                     
+                     //cout<<" dS_fract["<<species[s].speciesname<<"] = "<<(species[s].fraction_total_solar_opacity(j,b))<<" rho/T/Etot-Ekin = "<<species[s].prim[j].density<<"/"<<species[s].prim[j].temperature<<"/"<<(species[s].u[j].u3 - 0.5*std::pow(species[s].u[j].u2,2.)/species[s].u[j].u1)<<" x = "<<x_i12[j];
                     //" opa = "<<species[s].opacity(j,b)<<" total opa(j+1)"<<total_opacity(j+1,b)<<
                 }
                 //cout<<endl;
+            }
+            cout<<endl;
+        }
+        
+        for(int j=num_cells+1; j>=0; j--) {
+            
+            for(int b=0; b<num_bands_out; b++) {
+                cout<<"    band ["<<b<<"][j="<<j<<"] = "<<S_band(j,b)<<" dS = "<<dS_band(j,b)<<" tau_s = "<<radial_optical_depth_twotemp(j,b);
+                for(int s=0; s<num_species; s++) {
+                     cout<<" opap["<<species[s].speciesname<<"] = "<<(species[s].opacity_planck(j,b))<<" opa = "<<species[s].opacity(j,b);
+                     
+                }
             }
             cout<<endl;
         }
@@ -240,6 +257,9 @@ void c_Sim::update_dS() {
 
 
 void c_Sim::update_fluxes_FLD() {
+    
+    if(debug > 1)
+        cout<<"Starting update_fluxes_FLD.."<<endl;
     
     // If test, then set J to initial values before computing on
     if(radiation_matter_equilibrium_test == 1) {
@@ -301,8 +321,9 @@ void c_Sim::update_fluxes_FLD() {
                 double dx      = (x_i12[j+1]-x_i12[j]) ;                
                 double rhokr   = max(2.*(total_opacity(j,b)*total_opacity(j+1,b))/(total_opacity(j,b) + total_opacity(j+1,b)), 4./3./dx );
                        rhokr   = min( 0.5*( total_opacity(j,b) + total_opacity(j+1,b)) , rhokr);
+
                 double tau_inv = 4. / (dx * rhokr) ;
-                double R       = 1. * tau_inv * std::abs(Jrad_FLD(j+1,b) - Jrad_FLD(j,b)) / (Jrad_FLD(j+1,b) + Jrad_FLD(j, b) + 1e-300) ; // Put in 0.5 as prefactor to get correct rad shock
+                double R       = 1. * tau_inv * std::abs(Jrad_FLD(j+1,b) - Jrad_FLD(j,b)) / (Jrad_FLD(j+1,b) + Jrad_FLD(j, b) + 1e-300) ; // Put in 1.0 as prefactor to get correct rad shock
                 double D       = 0.25 * tau_inv * no_rad_trans * surf[j] * flux_limiter(R);
                 
                 //correct static G10 model prefactors: 4/2/ 3.141/4.
@@ -368,20 +389,21 @@ void c_Sim::update_fluxes_FLD() {
             
             int Ncell   = num_cells - 2*(num_ghosts - 1) ;
             for (int j=0; j < num_ghosts-1; j++) {
-                int i       = Ncell + num_ghosts ;
+                int i       = Ncell + num_ghosts;
 
                 int idx = i*stride + b*(num_vars + 1) ;
+                int idxim1 = (i-1)*stride + b*(num_vars + 1) ;
                 int idx_r = i*num_vars + b ;  
 
-                /*if (j == 0) // FLD flux at the edge of the last cell
-                    l[idx] = u[i-1] ;
+                if (j == 0) // FLD flux at the edge of the last cell
+                    l[idx] = -surf[i-1] / (x_i12[i]-x_i12[i-1]) ; //u[i-1] ;
                 else // Free-stream 
-                    l[i] = -surf[i-1] / (x_i12[i]-x_i12[i-1]) ;*/
+                    l[idx] = -surf[i-1] / (x_i12[i]-x_i12[i-1]) ;
                 
-                l[idx] = -surf[i-1] / (x_i12[i]-x_i12[i-1]) ;
+                //l[idx] = -surf[i-1] / (x_i12[i]-x_i12[i-1]);// (x_i12[i]-x_i12[i-1]) ;
                 
                 
-                d[idx] = + surf[ i ] / (x_i12[i+1]-x_i12[i]) ;// -l[idx];// 
+                d[idx] = -0.*l[idx] + surf[ i ] / (x_i12[i+1]-x_i12[i]); // (x_i12[i+1]-x_i12[i]) ;//;// 
                 u[idx] = 0 ;
                 r[idx_r] = 0 ;
             }
@@ -423,10 +445,10 @@ void c_Sim::update_fluxes_FLD() {
             for (int s=0; s < num_species; s++) {
                 
                 if(debug > 1) {
-                        cout<<" Going into radpart 2. ";
-                        cout<<" opa    = "<<species[s].opacity_planck(j, 0);
+                        cout<<" Going into radpart 2. i["<<j<<"]";
+                        cout<<" opas/p/r    = "<<species[s].opacity_twotemp(j, 0)<<"/"<<species[s].opacity_planck(j, 0)<<"/"<<species[s].opacity(j, 0);
                         cout<<" temper = "<<species[s].prim[j].temperature;
-                        cout<<" dens   = "<<species[s].prim[j].density<<endl;
+                        cout<<" dens   = "<<species[s].prim[j].density<<" dS = "<<species[s].dS(j)<<endl;
                 }
                 
                 int idx_s  = j*stride + (s + num_bands_out) * (num_vars+1) ;
@@ -640,7 +662,12 @@ void c_Sim::update_fluxes_FLD() {
         }
 
         for(int s=0; s<num_species; s++) {
-            species[s].prim[j].temperature = r[j*num_vars + (s + num_bands_out)] ;
+            double tt = r[j*num_vars + (s + num_bands_out)];
+            
+            if(tt<temperature_floor)
+                tt=temperature_floor;
+            
+            species[s].prim[j].temperature = tt ;
         }
     }
     

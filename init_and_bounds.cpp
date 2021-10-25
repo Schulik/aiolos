@@ -165,6 +165,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
         do_hydrodynamics  = read_parameter_from_file<int>(filename,"DO_HYDRO", debug, 1).value;
         photochemistry_level = read_parameter_from_file<int>(filename,"PHOTOCHEM_LEVEL", debug, 0).value;
         dust_to_gas_ratio = read_parameter_from_file<double>(filename,"DUST_TO_GAS", debug, 0.).value;
+        temperature_floor = read_parameter_from_file<double>(filename,"TEMPERATURE_FLOOR", debug, 0.).value;  
         
         ion_precision         = read_parameter_from_file<double>(filename,"ION_PRECISION", debug, 1e-12).value;
         ion_heating_precision = read_parameter_from_file<double>(filename,"ION_HEATING_PRECISION", debug, 1e-12).value;
@@ -579,6 +580,9 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
         dt = t_max ; // Old value needed by get_cfl_timestep()
         dt = get_cfl_timestep();
         
+        for(int j=15;j<18;j++)
+        cout<<" POS4.1 dens["<<j<<"] = "<<species[0].u[j].u1<<" temp = "<<species[0].prim[j].temperature<<endl;
+        
         if(debug > 0) cout<<"Init: Finished Init. Got initial dt = "<<dt<<" This is only temporary dt_init, not used for the first timestep."<<endl;
         //
         // Matrix init via Eigen
@@ -688,6 +692,9 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
     //cin>>inpit;
     
     
+    //for(int j=15;j<18;j++)
+     //   cout<<" POS4.2 dens["<<j<<"] = "<<species[0].u[j].u1<<" temp = "<<species[0].prim[j].temperature<<endl;
+    
     if(debug > 0) cout<<"Init: Assigning stellar luminosities 1."<<endl;
     for(int s=0; s<num_species; s++) {
         species[s].dS = Eigen::VectorXd::Zero(num_cells+2,  1);
@@ -737,6 +744,9 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
     
     cout<<"TOTAL SOLAR HEATING / Lumi = "<<templumi<<" lumi = "<<(templumi*4.*pi*rsolar*rsolar*pi)<<endl;
     
+    //for(int j=15;j<18;j++)
+    //    cout<<" POS4.3 dens["<<j<<"] = "<<species[0].u[j].u1<<" temp = "<<species[0].prim[j].temperature<<endl;
+    
     double totallumi = 0;
     double totallumiincr = 0;
     for(int b=0; b < num_bands_in; b++) {
@@ -766,7 +776,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
     init_J_factor = read_parameter_from_file<double>(filename,"INIT_J_FACTOR", debug, -1.).value;
     
     
-    for(int j = 0; j < num_cells+1; j++) {
+    for(int j = 0; j <= num_cells+2; j++) {
         
         if(num_bands_out == 1)  {
             for(int s = 0; s< num_species; s++){
@@ -804,7 +814,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
                 }
                  
                 
-                if(debug > 1) {
+                if(debug > 3) {
                 //if(debug > 1 && j==5) {
                     cout<<" Jrad("<<j<<","<<0<<") = "<<Jrad_FLD(j,0)<<" dJrad_species["<<s<<"] = "<<rad_energy_multiplier * compute_planck_function_integral3(l_i_out[0], l_i_out[1], species[s].prim[j].temperature)<<" T_rad = "<<pow(pi*Jrad_FLD(j,0)/sigma_rad,0.25)<<" at Tgas = "<<species[s].prim[j].temperature<<endl;
                 }
@@ -827,6 +837,9 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
         }
         
     }
+    
+    //for(int j=15;j<18;j++)
+    //    cout<<" POS5 dens["<<j<<"] = "<<species[0].u[j].u1<<" temp = "<<species[0].prim[j].temperature<<endl;
     
     cout<<" Finished init. Returning to main now."<<endl<<endl;
 }
@@ -1030,9 +1043,15 @@ c_Species::c_Species(c_Sim *base_simulation, string filename, string species_fil
             WAVE_PERIOD    = read_parameter_from_file<double>(filename,"WAVE_PERIOD", debug).value; 
         }
         
+        for(int j=15;j<18;j++)
+            cout<<" POS3.5 dens["<<j<<"] = "<<u[j].u1<<" temp = "<<prim[j].temperature<<" E/e/p = "<<u[j].u3<<"/"<<prim[j].internal_energy<<"/"<<prim[j].pres<<" rho*cv*T = "<<cv*u[j].u1*prim[j].temperature<<endl;
+        
         // Apply boundary conditions
         apply_boundary_left(u) ;
         apply_boundary_right(u) ;
+        
+        for(int j=15;j<18;j++)
+            cout<<" POS4 dens["<<j<<"] = "<<u[j].u1<<" temp = "<<prim[j].temperature<<" E/e/p = "<<u[j].u3<<"/"<<prim[j].internal_energy<<"/"<<prim[j].pres<<" rho*cv*T = "<<cv*u[j].u1*prim[j].temperature<<endl;
         
         if(debug > 0) cout<<"        Species["<<species_index<<"]: Init done."<<endl;
         
@@ -1074,17 +1093,22 @@ void c_Species::initialize_hydrostatic_atmosphere(string filename) {
     //
     // First, initialize (adiabatic) temperature
     //
-    for(int i=num_cells+1; i>=0; i--) {
+    for(int i=num_cells+2; i>=0; i--) {
             
         if(base->temperature_model == 'P')
             prim[i].temperature = - dphi_factor * base->phi[i] / (cv * gamma_adiabat) + const_T_space;
         else
-            prim[i].temperature = const_T_space;
+            prim[i].temperature = const_T_space + 0.e-3*std::pow(base->x_i12[i]/base->x_i12[0],-1);
+        
+        if(debug>=2) {
+            cout<<"Just assigned T ="<<prim[i].temperature<<" to i = "<<i<<" with phi_grav = "<<base->phi[i]<<endl;
+            char a;
+            cin>>a;
             
-            //Add temperature bumps and troughs
-            //prim[i].temperature += TEMPERATURE_BUMP_STRENGTH * 4.  * exp( - pow(base->x_i12[i] - 1.e-1 ,2.) / (0.1) );
-            //prim[i].temperature -= TEMPERATURE_BUMP_STRENGTH * 15. * exp( - pow(base->x_i12[i] - 7.e-3 ,2.) / (1.5e-3) );
+        }
     }
+    
+    cout<<" POS1 dens[2] = "<<u[2].u1<<" temp[2] = "<<prim[2].temperature<<" num_cells+2 = "<<num_cells+2<<endl;
     
     //At this point, the right ghost cell is already initialized, so we can just build up a hydrostatic state from there
     int iter_start;
@@ -1178,9 +1202,9 @@ void c_Species::initialize_hydrostatic_atmosphere(string filename) {
             //    cout<<" electrons, i/rho = "<<i<<"/"<<temp_rhofinal<<endl;
             //}
             
-            u[i+1] = AOS(temp_rhofinal, 0., cv * temp_rhofinal * T_inner);
+            u[i+1] = AOS(temp_rhofinal, 0., cv * temp_rhofinal * T_outer);
             
-            if(negdens == 2) {
+            if(debug > 2) {
                 
                 char a;
                 cout.precision(16);
@@ -1203,13 +1227,19 @@ void c_Species::initialize_hydrostatic_atmosphere(string filename) {
                 cout<<"     Ratio of temperatures inner/outer = "<<T_inner/T_outer<<" t_inner ="<<T_inner<<" t_outer ="<<T_outer<<endl;
                 cout<<"     Ratio of pressures inner/outer = "<<cv * temp_rhofinal * T_inner /u[i+1].u3<<endl;
                 cout<<"     Resulting density == "<<temp_rhofinal<<endl;
+                cout<<"     floor ="<<floor<<endl;
                 cout<<"     density before "<<u[i+1].u1<<endl;
                 cin>>a;
             }
         }
         
-        
+        //u[1] = AOS(u[2].u1 , 0., u[2].u3);
+        //u[0] = AOS(u[3].u1 , 0., u[3].u3);
+        //prim[1] = prim[2];
+        //prim[0] = prim[3];
     }
+    
+    cout<<" POS2 dens[2] = "<<u[2].u1<<" temp[2] = "<<prim[2].temperature<<" rhoe1, rhoe2 = "<<u[1].u3<<"/"<<u[2].u3<<" cv ="<<cv<<endl;
     
     if(base->type_of_grid == -2) {
         
@@ -1218,11 +1248,6 @@ void c_Species::initialize_hydrostatic_atmosphere(string filename) {
             u[i] = AOS(u[iter_start].u1 / rr, 0., cv * u[iter_start].u1 / rr * prim[i].temperature) ;
         }
     }
-    
-    
-    //makeshift density fix
-    //if(this_species_index == 0)
-        //cout<<"FIXING SMALL DENSITIES to density floor ="<<base->density_floor*mass_amu<<endl;
     
     for(int i = 0; i<num_cells+1; i++) {
             double floor = base->density_floor * mass_amu * std::pow(base->x_i12[i]/base->x_i12[1], -4.);
@@ -1250,7 +1275,7 @@ void c_Species::initialize_hydrostatic_atmosphere(string filename) {
             }
         }
         else
-            cout<<" In INIT:NO TOverwriting T with user-defined temperature:"<<base->init_T_temp;
+            cout<<" In INIT: Did NOT overwrite T, because init_T_temp < 2.7= = "<<base->init_T_temp;
     
     
     if(u[2].u1 > 1e40) {
@@ -1261,7 +1286,23 @@ void c_Species::initialize_hydrostatic_atmosphere(string filename) {
         cout<<"    Be advised, your solution is probably about to unphysically explode."<<endl;
     }
     
+    cout<<endl;
+    
+    
+    
+    /*for(int si=0; si<num_species; si++) {
+        species[si].eos->update_eint_from_T(&(species[si].prim[0]), num_cells+2);
+        species[si].eos->update_p_from_eint(&(species[si].prim[0]), num_cells+2);
+        species[si].eos->compute_conserved(&(species[si].prim[0]), &(species[si].u[0]), num_cells+2);        
+    }
+    
+    eos->compute_primitive(&(u[0]), &(prim[0]), num_cells+2) ;    
+    eos->compute_auxillary(&(prim[0]), num_cells+2);
+    */
     compute_pressure(u);
+    //for(int j=15;j<18;j++)
+    //    cout<<" POS2.3 dens["<<j<<"] = "<<u[j].u1<<" temp = "<<prim[j].temperature<<" E/e/p = "<<u[j].u3<<"/"<<prim[j].internal_energy<<"/"<<prim[j].pres<<" rho*cv*T = "<<cv*u[j].u1*prim[j].temperature<<endl;
+    
     for(int i=num_cells; i>=0; i--)  {
         primlast[i].internal_energy = prim[i].internal_energy;
     }
@@ -1294,7 +1335,11 @@ void c_Species::initialize_hydrostatic_atmosphere(string filename) {
     else
         cout<<"@@@ Ended hydrostatic construction for species "<<speciesname<<endl<<endl;
     
+    //cout<<" POS3 dens[2] = "<<u[2].u1<<" temp[2] = "<<prim[2].temperature<<" mass = "<<mass_amu<<" dens flor = "<<base->density_floor<<endl;
     //TODO:Give some measure if hydrostatic construction was also successful, and give warning if not.
+    
+    //for(int j=15;j<18;j++)
+    //    cout<<" POS3 dens["<<j<<"] = "<<u[j].u1<<" temp = "<<prim[j].temperature<<" E/e/p = "<<u[j].u3<<"/"<<prim[j].internal_energy<<"/"<<prim[j].pres<<" rho*cv*T = "<<cv*u[j].u1*prim[j].temperature<<endl;
 
 }
 
@@ -1414,7 +1459,8 @@ void c_Species::apply_boundary_left(std::vector<AOS>& u) {
                 int iact = num_ghosts   +i;
                 u[igh]     = u[iact]; 
                 u[igh].u2 *= -1;
-                base->phi[igh]   = base->phi[iact] ;
+                //if(base->steps>=0) //Avoid adjusting the potential in the multi-species hydrostatic construction phase
+                    base->phi[igh]   = base->phi[iact] ;
             }
             break;
         case BoundaryType::fixed:
@@ -1465,7 +1511,7 @@ void c_Species::apply_boundary_right(std::vector<AOS>& u) {
                 if(mdot < -1e18)
                     prim.density = -1e18/freefallv/r/r;
                     
-                prim.pres = prim.pres;// -  prim.density * dphi ;
+                prim.pres = prim.pres -  prim.density * dphi ;
                 //prim.pres = prim.pres -  prim.density * dphi ;
                 prim.pres = std::max( prim.pres, 0.0) ;
                 eos->compute_conserved(&prim, &u[i], 1) ;

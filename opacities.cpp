@@ -73,6 +73,8 @@ double logint(double xa, int N, double* X, double* RI) {
 ///////////////////////////////////////////////////////////
 void c_Sim::update_opacities() {
  
+    if(debug > 1)
+        cout<<" Starting update_opacities()..."<<endl;
     //
     // Compute kappa based on a species individual density, temperature, irradiation temperature.
     // Initial values are valid no matter whether we use the photochemistry module or not.
@@ -171,7 +173,7 @@ void c_Species::update_opacities() {
                 if(b == num_bands_in-1)
                     opacity_twotemp(j,b) = base->const_opacity_planck_factor * opacity_avg_solar(b); 
                 else
-                    opacity_twotemp(j,b) = opacity_avg_solar(b); 
+                    opacity_twotemp(j,b) = base->const_opacity_planck_factor * opacity_avg_solar(b); 
             }
         }
     }
@@ -233,12 +235,12 @@ void c_Species::update_opacities() {
         for(int j=0; j< num_cells+2; j++) {
                 
                 for(int b=0; b<num_bands_in; b++) {
-                    opacity_twotemp(j,b) = interpol_tabulated_opacity( opa_grid_solar , b, prim[j].temperature, prim[j].pres) * inv_mass;
+                    opacity_twotemp(j,b) = base->const_opacity_solar_factor * interpol_tabulated_opacity( opa_grid_solar , b, prim[j].temperature, prim[j].pres) * inv_mass;
                     //cout<<" opa_s in j/b "<<j<<"/"<<b<<" = "<<opacity_twotemp(j,b)<<" ";
                 }
                 for(int b=0; b<num_bands_out; b++) {
-                    opacity_planck(j,b)  = interpol_tabulated_opacity( opa_grid_planck , b, prim[j].temperature, prim[j].pres) * inv_mass;
-                    opacity(j,b)         = interpol_tabulated_opacity( opa_grid_rosseland, b, prim[j].temperature, prim[j].pres) * inv_mass;
+                    opacity_planck(j,b)  = base->const_opacity_planck_factor * interpol_tabulated_opacity( opa_grid_planck , b, prim[j].temperature, prim[j].pres) * inv_mass;
+                    opacity(j,b)         = base->const_opacity_rosseland_factor * interpol_tabulated_opacity( opa_grid_rosseland, b, prim[j].temperature, prim[j].pres) * inv_mass;
                     //opacity(j,b)         = 1e-24 * inv_mass;
                     //cout<<" opa_p  = "<<opacity_planck(j,b);
                     //cout<<" opa_r  = "<<opacity(j,b)<<" had P/T = "<<prim[j].pres<<"/"<<prim[j].temperature<<endl;
@@ -271,12 +273,22 @@ void c_Species::update_opacities() {
         for(int j=0; j< num_cells+2; j++) {
             
             for(int b=0; b<num_bands_in; b++) {
-                opacity_twotemp(j,b)= opacity_avg_solar(b)  * (1. + pressure_broadening_factor * pow(prim[j].pres/1e5, pressure_broadening_exponent)); 
+
+                opacity_twotemp(j,b)= opacity_avg_solar(b); //* (1. + pressure_broadening_factor * pow(prim[j].pres/1e5, pressure_broadening_exponent)); 
                 
             }
             for(int b=0; b<num_bands_out; b++) {
-                opacity(j,b)        = base->const_opacity_rosseland_factor * const_opacity * (1. + pressure_broadening_factor * pow(prim[j].pres/1e5, pressure_broadening_exponent)); 
-                opacity_planck(j,b) = base->const_opacity_planck_factor * const_opacity * (1. + pressure_broadening_factor * pow(prim[j].pres/1e5, pressure_broadening_exponent)); 
+                opacity(j,b)        = base->const_opacity_rosseland_factor * const_opacity;// * (1. + pressure_broadening_factor * pow(prim[j].pres/1e5, pressure_broadening_exponent)); 
+                opacity_planck(j,b) = base->const_opacity_planck_factor * const_opacity;// * (1. + pressure_broadening_factor * pow(prim[j].pres/1e5, pressure_broadening_exponent)); 
+            }
+            
+            if(j==num_cells+1) {
+                
+                cout<<" opar = "<<opacity(j,0)<<" factor = "<<(1. + pressure_broadening_factor * pow(prim[j].pres/1e5, pressure_broadening_exponent))<<endl;
+                
+                cout<<"Stopping to inspect assigned opas in const model, j = "<<j<<endl;
+                //char a;
+                //cin>>a;
             }
         }
         
@@ -289,13 +301,26 @@ void c_Species::update_opacities() {
         
         for(int j=0; j< num_cells+2; j++) {
             
-            for(int b=0; b<num_bands_in; b++) {
+            if(j==num_cells+1) {
                 
-                if(j >= 100000053){
-                    cout<<"steps "<<base->steps<<" j/b/s = "<<j<<b<<this_species_index<<" opa = "<<opacity_twotemp(j,b)<<" solar_fac = "<<base->const_opacity_solar_factor<<" temper = "<< prim[j].temperature<<" p ="<<prim[j].pres<<endl;
+                for(int b=0; b<num_bands_in; b++) {
+                    
+                    cout<<"steps "<<base->steps<<" j/b/s = "<<j<<"/"<<b<<"/"<<this_species_index<<" opas = "<<opacity_twotemp(j,b)<<" solar_fac = "<<base->const_opacity_solar_factor<<" temper = "<< prim[j].temperature<<" p ="<<prim[j].pres<<endl;
                     
                 }
+                
+                for(int b=0; b<num_bands_out; b++) {
+                    
+                    cout<<"steps "<<base->steps<<" j/b/s = "<<j<<"/"<<b<<"/"<<this_species_index<<" opap = "<<opacity_planck(j,b)<<" opar = "<<opacity(j,b)<<endl;
+                    
+                }
+                
+                cout<<"Stopping to inspect last opas in j =="<<j<<endl;
+                //char a;
+                //cin>>a;
             }
+            
+            
         }
     }
                     

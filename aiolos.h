@@ -280,7 +280,7 @@ public:
     double ion_floor;
     int ion_maxiter;
     int ion_heating_maxiter;
-    
+    double temperature_floor;
     
     Geometry geometry ;
     

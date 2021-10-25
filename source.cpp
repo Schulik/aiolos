@@ -36,6 +36,7 @@
             
         }
         phi[0]           = get_phi_grav(x_i12[1],         planet_mass);
+        //phi[1]           = get_phi_grav(x_i12[2],         planet_mass);
     }
 
     //
@@ -51,8 +52,9 @@
             cout<<"In update mass. "<<endl;
         
         enclosed_mass[0] = planet_mass;
+        enclosed_mass[1] = planet_mass;
         
-        for(int i = 1; i <= num_cells; i++) {
+        for(int i = 2; i <= num_cells; i++) {
             
             if(debug >= 4) {
                 if(i==0)
