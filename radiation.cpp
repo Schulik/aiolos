@@ -105,11 +105,12 @@ void c_Sim::update_dS() {
                     // Planetary heating 2
                     //
                     if(use_planetary_temperature == 1){
-                        if(j==2) {
-                            
-                            dS_band(j,b) += 0.5* pow(T_core,4.)*sigma_rad / (dx[j]); 
                         
-                        }
+                        //Spread the luminosity for fewer crashes
+                        dS_band(2,b) += 3./6. *0.5* pow(T_core,4.)*sigma_rad / (dx[2]); 
+                        dS_band(3,b) += 2./6. *0.5* pow(T_core,4.)*sigma_rad / (dx[3]); 
+                        dS_band(4,b) += 1./6. *0.5* pow(T_core,4.)*sigma_rad / (dx[4]); 
+                        
                     }
                 }// Irregular dS computation, in case we want to fix the solar heating function to its initial value
                 else 
@@ -271,21 +272,21 @@ void c_Sim::update_fluxes_FLD() {
         }
     }
     
-    auto flux_limiter = [](double R) {
+    /*auto flux_limiter = [](double R) {
         if (R <= 2)
             return 2 / (3 + std::sqrt(9 + 10*R*R)) ;
         else 
             return 10 / (10*R + 9 + std::sqrt(81 + 180*R)) ;
-    } ;
+    } ;*/
     
-    /*auto flux_limiter = [](double R) {
+    auto flux_limiter = [](double R) {
         if (R <= 1.5)
             return 2 / (3 + std::sqrt(9 + 12*R*R)) ;
         else 
             return 1. / (1. + R + std::sqrt(1. + 2.*R)) ;
     } ; 
     
-    *//*
+    /*
      auto flux_limiter = [](double R) {
          
          return (2.+ R) / (6. + 3*R + R*R) ;
@@ -308,7 +309,7 @@ void c_Sim::update_fluxes_FLD() {
     
     // Step 1: setup transport terms (J)
     for(int b=0; b<num_bands_out; b++) {
-        for (int j=0; j < num_cells+2; j++) {
+        for (int j=0; j < num_cells+1; j++) {
             int idx = j*stride + b*(num_vars + 1) ;
             int idx_r = j*num_vars + b ;
 
@@ -322,12 +323,16 @@ void c_Sim::update_fluxes_FLD() {
                 double rhokr   = max(2.*(total_opacity(j,b)*total_opacity(j+1,b))/(total_opacity(j,b) + total_opacity(j+1,b)), 4./3./dx );
                        rhokr   = min( 0.5*( total_opacity(j,b) + total_opacity(j+1,b)) , rhokr);
 
-                double tau_inv = 4. / (dx * rhokr) ;
-                double R       = 1. * tau_inv * std::abs(Jrad_FLD(j+1,b) - Jrad_FLD(j,b)) / (Jrad_FLD(j+1,b) + Jrad_FLD(j, b) + 1e-300) ; // Put in 1.0 as prefactor to get correct rad shock
-                double D       = 0.25 * tau_inv * no_rad_trans * surf[j] * flux_limiter(R);
+                double tau_inv = 1. / (dx * rhokr) ;
+                double R       = 4. * tau_inv * std::abs(Jrad_FLD(j+1,b) - Jrad_FLD(j,b)) / (Jrad_FLD(j+1,b) + Jrad_FLD(j, b) + 1e-300) ; // Put in 1.0 as prefactor to get correct rad shock
+                double D       = 1. * tau_inv * no_rad_trans * surf[j] * flux_limiter(R);
                 
-                //correct static G10 model prefactors: 4/2/ 3.141/4.
+                // restarting iteration with 4 0.25 0.25 (everything was working)
+                //titan single species tables works with 4 0.5 0.25
+                
+                //correct static G10 model prefactors: 4/2/ 0.25.
                 //fake-correct supercritical shock prefactors: 4/4/ 3.141/8  or 16/2/ pi/16
+                //correct supercrit shock prefactors: 2 0.5 0.5
                 
                 // divergence terms
                 u[idx] = -D ;
@@ -389,14 +394,14 @@ void c_Sim::update_fluxes_FLD() {
             
             int Ncell   = num_cells - 2*(num_ghosts - 1) ;
             for (int j=0; j < num_ghosts-1; j++) {
-                int i       = Ncell + num_ghosts;
+                int i       = Ncell + num_ghosts + j;
 
                 int idx = i*stride + b*(num_vars + 1) ;
                 int idxim1 = (i-1)*stride + b*(num_vars + 1) ;
                 int idx_r = i*num_vars + b ;  
 
                 if (j == 0) // FLD flux at the edge of the last cell
-                    l[idx] = -surf[i-1] / (x_i12[i]-x_i12[i-1]) ; //u[i-1] ;
+                    l[idx] = -surf[i-1] / (x_i12[i]-x_i12[i-1]) ; //u[i-1] ;u[idxim1];//;
                 else // Free-stream 
                     l[idx] = -surf[i-1] / (x_i12[i]-x_i12[i-1]) ;
                 
@@ -426,7 +431,7 @@ void c_Sim::update_fluxes_FLD() {
                 for(int si = 0; si<num_species; si++) {
                         cout<<species[si].prim[2].temperature<<" ";
                 }
-                cout<<endl;
+                //cout<<endl;
             }
             
             if(debug > 3) {
@@ -441,7 +446,7 @@ void c_Sim::update_fluxes_FLD() {
     
     if(radiation_matter_equilibrium_test <= 2) { //radtests 3 and 4 are delta-radiation peaks without energy-matter coupling
         
-        for (int j=0; j < num_cells+2; j++) {
+        for (int j=0; j < num_cells+1; j++) {
             for (int s=0; s < num_species; s++) {
                 
                 if(debug > 1) {
@@ -492,8 +497,12 @@ void c_Sim::update_fluxes_FLD() {
                     int idx  = j*stride + (si + num_bands_out) * num_vars + num_bands_out;
                     for (int sj=0; sj < num_species; sj++) {
                         d[idx+sj] -= friction_coefficients(si,sj) ;
+                        //cout<<" si/sj = "<<si<<"/"<<sj<<" coeff = "<<friction_coefficients(si,sj);
                     }
                 }
+                
+                //char a;
+                //cin>>a;
             }
         }
     }
@@ -668,6 +677,8 @@ void c_Sim::update_fluxes_FLD() {
                 tt=temperature_floor;
             
             species[s].prim[j].temperature = tt ;
+            //if(j==num_cells)
+            //    cout<<" num_cells = "<<num_cells<<" temp = "<<species[s].prim[j].temperature<<endl;
         }
     }
     

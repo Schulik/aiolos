@@ -153,14 +153,23 @@
     //
     ///////////////////////////////////////////////////////////
     
+void c_Sim::compute_drag_update() {
+        if(alpha_collision > 0 && num_species > 1) {
+            if(friction_solver == 0)
+                compute_friction_analytical();
+            else
+                compute_friction_numerical();
+        }
+    }
+    
     //
     // Friction solver 0
     //
     
-    void c_Sim::compute_friction_analytical() {
+void c_Sim::compute_friction_analytical() {
 
         if(debug > 0) cout<<"in analytic friction, num_species = "<<num_species<<endl;
-
+        
         if(num_species == 2) {
         
             //Apply analytic solutions ...
@@ -229,14 +238,15 @@
                 species[0].prim[j].speed = v1a;
                 species[1].prim[j].speed = v2a;
                 
-                if(debug >= 1 && j==1200 && steps == 10) {
-                    cout<<" v1b, v2b = "<<v1b<<" "<<v2b<<endl<<" v1a, v2a = "<<v1a<<" "<<v2a<<endl;
-                    cout<<" dv1, dv2 = "<<v1a-v1b<<" "<<v2a-v2b<<endl;
-                    cout<<" dp1, dp2 = "<<(v1a-v1b)*species[0].u[j].u1 + (v2a-v2b)*species[1].u[j].u1<<endl;
-                    cout<<"    dt*alpha = "<<dt*alpha<<" alpha = "<<alpha<<" eps = "<<species[1].u[j].u1/species[0].u[j].u1<<endl;
+                //if(debug >= 1 && j==1200 && steps == 10) {
+                if(debug >= 1) {
+                    //cout<<" v1b, v2b = "<<v1b<<" "<<v2b<<endl<<" v1a, v2a = "<<v1a<<" "<<v2a<<endl;
+                    //cout<<" dv1, dv2 = "<<v1a-v1b<<" "<<v2a-v2b<<endl;
+                    //cout<<" dp1, dp2 = "<<(v1a-v1b)*species[0].u[j].u1 + (v2a-v2b)*species[1].u[j].u1<<endl;
+                    cout<<"    dt*alpha = "<<dt*alpha<<" alpha = "<<alpha<<" eps = "<<species[1].u[j].u1/species[0].u[j].u1<<" dp/|p| = "<<((v1a-v1b)*species[0].u[j].u1 + (v2a-v2b)*species[1].u[j].u1)/(std::sqrt(species[0].u[j].u2*species[0].u[j].u2) + std::sqrt(species[1].u[j].u2*species[1].u[j].u2) )<<" meanT = "<<meanT<<" coll_b = "<<coll_b<<" cell = "<<j<<endl;
                     
-                    char a;
-                    cin>>a;
+                    //char a;
+                    //cin>>a;
                 }
                 
                 double v_half = 0.5*(v1a + v1b) - 0.5*(v2a + v2b) ;
@@ -347,7 +357,11 @@
             
     }
     
-    if(debug > 0) cout<<"in friction, pos2"<<endl;
+    if(debug > 0) {
+        cout<<"in friction, pos2 num_cells = "<<num_cells<<endl;  
+        char a;
+        cin>>a;
+    } 
             
     for(int s=0; s<num_species; s++){
             species[s].eos->update_p_from_eint(&(species[s].prim[0]), num_cells+2);
@@ -554,7 +568,7 @@ void c_Sim::compute_collisional_heat_exchange() {
         cout << "in compute_collisional_heat_exchange, num_species = "
              << num_species << endl;
     
-    for(int j=0; j <= num_cells+1; j++){
+    for(int j=0; j <= num_cells+0; j++){
 
         fill_alpha_basis_arrays(j);
         compute_collisional_heat_exchange_matrix(j);

@@ -489,15 +489,7 @@ public:
     //
     void compute_friction_analytical(); 
     void compute_friction_numerical(); 
-
-    void compute_drag_update() {
-        if(alpha_collision > 0 && num_species > 1) {
-            if(friction_solver == 0)
-                compute_friction_analytical();
-            else
-                compute_friction_numerical();
-        }
-    } ;
+    void compute_drag_update();
     
     void fill_alpha_basis_arrays(int j);
     void fill_rad_basis_arrays(int, double, Eigen::MatrixXd &, Eigen::MatrixXd &);

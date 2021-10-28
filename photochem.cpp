@@ -40,7 +40,7 @@ double H_radiative_recombination(double T_e) {
     // Case B
     //return 2.753e-14 * pow(x, 1.500) / pow(1 + pow(x / 2.740, 0.407), 2.242);
     ////       2.753e-14 * pow(2 * 157807 / x, 1.500) / pow(1 + pow(2 * 157807 / x / 2.740, 0.407), 2.242)
-    return 2.7e-13 * pow(T_e/1e4, -0.9); //MC2009 value
+    return 1.0 * 2.7e-13 * pow(T_e/1e4, -0.9); //MC2009 value
 }
 double H_threebody_recombination(double T_e) {
     using std::pow;

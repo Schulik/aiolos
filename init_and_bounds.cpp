@@ -580,8 +580,8 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
         dt = t_max ; // Old value needed by get_cfl_timestep()
         dt = get_cfl_timestep();
         
-        for(int j=15;j<18;j++)
-        cout<<" POS4.1 dens["<<j<<"] = "<<species[0].u[j].u1<<" temp = "<<species[0].prim[j].temperature<<endl;
+        //for(int j=num_cells-1;j<num_cells+1;j++)
+        //cout<<" POS4.1 dens["<<j<<"] = "<<species[0].u[j].u1<<" temp = "<<species[0].prim[j].temperature<<endl;
         
         if(debug > 0) cout<<"Init: Finished Init. Got initial dt = "<<dt<<" This is only temporary dt_init, not used for the first timestep."<<endl;
         //
@@ -1043,15 +1043,15 @@ c_Species::c_Species(c_Sim *base_simulation, string filename, string species_fil
             WAVE_PERIOD    = read_parameter_from_file<double>(filename,"WAVE_PERIOD", debug).value; 
         }
         
-        for(int j=15;j<18;j++)
-            cout<<" POS3.5 dens["<<j<<"] = "<<u[j].u1<<" temp = "<<prim[j].temperature<<" E/e/p = "<<u[j].u3<<"/"<<prim[j].internal_energy<<"/"<<prim[j].pres<<" rho*cv*T = "<<cv*u[j].u1*prim[j].temperature<<endl;
+        //for(int j=num_cells-1;j<num_cells+1;j++)
+        //    cout<<" POS3.5 dens["<<j<<"] = "<<u[j].u1<<" temp = "<<prim[j].temperature<<" E/e/p = "<<u[j].u3<<"/"<<prim[j].internal_energy<<"/"<<prim[j].pres<<" rho*cv*T = "<<cv*u[j].u1*prim[j].temperature<<endl;
         
         // Apply boundary conditions
         apply_boundary_left(u) ;
         apply_boundary_right(u) ;
         
-        for(int j=15;j<18;j++)
-            cout<<" POS4 dens["<<j<<"] = "<<u[j].u1<<" temp = "<<prim[j].temperature<<" E/e/p = "<<u[j].u3<<"/"<<prim[j].internal_energy<<"/"<<prim[j].pres<<" rho*cv*T = "<<cv*u[j].u1*prim[j].temperature<<endl;
+        //for(int j=num_cells=1;j<num_cells+1;j++)
+        //    cout<<" POS4 dens["<<j<<"] = "<<u[j].u1<<" temp = "<<prim[j].temperature<<" E/e/p = "<<u[j].u3<<"/"<<prim[j].internal_energy<<"/"<<prim[j].pres<<" rho*cv*T = "<<cv*u[j].u1*prim[j].temperature<<endl;
         
         if(debug > 0) cout<<"        Species["<<species_index<<"]: Init done."<<endl;
         
@@ -1130,7 +1130,7 @@ void c_Species::initialize_hydrostatic_atmosphere(string filename) {
             //factor_outer = (gamma_adiabat-1.) * cv * T_outer; 
             //factor_inner = (gamma_adiabat-1.) * cv * T_inner; 
             
-            eos->get_p_over_rho_analytic(&T_outer, &factor_outer);
+            eos->get_p_over_rho_analytic(&T_outer, &factor_outer); //sets factor = k*T/mu in the case of an ideal gas EOS
             eos->get_p_over_rho_analytic(&T_inner, &factor_inner);
             
             metric_outer = (base->phi[i+1] - base->phi[i]) * base->omegaplus[i+1] * base->dx[i+1] / (base->dx[i+1] + base->dx[i]);
@@ -1240,6 +1240,9 @@ void c_Species::initialize_hydrostatic_atmosphere(string filename) {
     }
     
     cout<<" POS2 dens[2] = "<<u[2].u1<<" temp[2] = "<<prim[2].temperature<<" rhoe1, rhoe2 = "<<u[1].u3<<"/"<<u[2].u3<<" cv ="<<cv<<endl;
+    cout<<"Assigned densities in num_cell-1 = "<<u[num_cells-1].u1<<endl;
+    cout<<"Assigned densities in num_cell = "<<  u[num_cells].u1<<endl;
+    cout<<"Assigned densities in num_cell+1 = "<<u[num_cells+1].u1<<endl;
     
     if(base->type_of_grid == -2) {
         
@@ -1341,6 +1344,10 @@ void c_Species::initialize_hydrostatic_atmosphere(string filename) {
     //for(int j=15;j<18;j++)
     //    cout<<" POS3 dens["<<j<<"] = "<<u[j].u1<<" temp = "<<prim[j].temperature<<" E/e/p = "<<u[j].u3<<"/"<<prim[j].internal_energy<<"/"<<prim[j].pres<<" rho*cv*T = "<<cv*u[j].u1*prim[j].temperature<<endl;
 
+    cout<<"End of hydrostat"<<endl;
+    cout<<"Assigned densities in num_cell-1 = "<<u[num_cells-1].u1<<endl;
+    cout<<"Assigned densities in num_cell = "<<  u[num_cells].u1<<endl;
+    cout<<"Assigned densities in num_cell+1 = "<<u[num_cells+1].u1<<endl;
 }
 
 void c_Species::initialize_exponential_atmosphere() {
@@ -1503,17 +1510,28 @@ void c_Species::apply_boundary_right(std::vector<AOS>& u) {
                 AOS_prim prim ;
                 eos->compute_primitive(&u[i-1],&prim, 1) ;
                 double dphi = (base->phi[i] - base->phi[i-1]) / (base->dx[i-1] + base->dx[i]) ;
-                dphi *= (base->omegaplus[i]*base->dx[i] + base->omegaminus[i-1]*base->dx[i-1]) ;
+                //dphi *= (base->omegaplus[i]*base->dx[i] + base->omegaminus[i-1]*base->dx[i-1]) ;
+                //dphi *= (prim.density * base->omegaplus[i]*base->dx[i] + this->prim[i].density * base->omegaminus[i-1]*base->dx[i-1]) ;
+                dphi *= (this->prim[i].density* base->omegaplus[i]*base->dx[i] +  prim.density  * base->omegaminus[i-1]*base->dx[i-1]) ;
                 
+                //metric_outer = base->omegaplus[i+1] * base->dx[i+1] / (base->dx[i+1] + base->dx[i]);
+                //metric_inner = base->omegaminus[i]  * base->dx[i]   / (base->dx[i+1] + base->dx[i]);
+                //temp_rhofinal = u[i].u1 *  (factor_inner - metric_inner)/(factor_outer + metric_outer);
+            
                 double r =base->x_i12[i];
                 double mdot      = prim.density*prim.speed*r*r;
                 double freefallv = -std::sqrt(2.*G*base->planet_mass/r);
                 if(mdot < -1e18)
                     prim.density = -1e18/freefallv/r/r;
-                    
-                prim.pres = prim.pres -  prim.density * dphi ;
+                
+                //cout<<" in boundaries, rhoi rho+1 = "<<prim.density<<"/"<<this->prim[i].density<<" p,p2 = "<<prim.pres;
+                prim.pres = prim.pres - dphi ;
+                //cout<<"/"<<prim.pres<<" i = "<<i<<endl;
+                
                 //prim.pres = prim.pres -  prim.density * dphi ;
-                prim.pres = std::max( prim.pres, 0.0) ;
+                
+                //prim.pres = std::max( prim.pres, 0.0) ;          //27.10.2021: Not in use anymore, due to this causing problems with negative temperatures. p=0 -> E = 0 -> T = 0  and negative after a bit of hydro
+                prim.pres = std::max( prim.pres, 1e-3*prim.pres) ; //TODO: Replace 1e-3 with an estimate for the max pressure jump in a adiabatic shock
                 eos->compute_conserved(&prim, &u[i], 1) ;
             }
             break ;

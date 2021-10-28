@@ -274,7 +274,7 @@ void c_Species::update_opacities() {
             
             for(int b=0; b<num_bands_in; b++) {
 
-                opacity_twotemp(j,b)= opacity_avg_solar(b); //* (1. + pressure_broadening_factor * pow(prim[j].pres/1e5, pressure_broadening_exponent)); 
+                opacity_twotemp(j,b)= base->const_opacity_solar_factor * opacity_avg_solar(b); //* (1. + pressure_broadening_factor * pow(prim[j].pres/1e5, pressure_broadening_exponent)); 
                 
             }
             for(int b=0; b<num_bands_out; b++) {
@@ -284,9 +284,9 @@ void c_Species::update_opacities() {
             
             if(j==num_cells+1) {
                 
-                cout<<" opar = "<<opacity(j,0)<<" factor = "<<(1. + pressure_broadening_factor * pow(prim[j].pres/1e5, pressure_broadening_exponent))<<endl;
+                //cout<<" opar = "<<opacity(j,0)<<" factor = "<<(1. + pressure_broadening_factor * pow(prim[j].pres/1e5, pressure_broadening_exponent))<<endl;
                 
-                cout<<"Stopping to inspect assigned opas in const model, j = "<<j<<endl;
+                //cout<<"Stopping to inspect assigned opas in const model, j = "<<j<<endl;
                 //char a;
                 //cin>>a;
             }
@@ -297,7 +297,7 @@ void c_Species::update_opacities() {
         }
     }
     
-    if(debug >= 0 && base->steps <= 2) {
+    if(debug >= 1 && base->steps <= 2) {
         
         for(int j=0; j< num_cells+2; j++) {
             
