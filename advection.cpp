@@ -575,7 +575,7 @@ void c_Species::execute(std::vector<AOS>& u_in, std::vector<AOS>& dudt) {
             
         }
         
-        base->debug=0;
+        //base->debug=0;
         
         compute_pressure(u_in);
         /*

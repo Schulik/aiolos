@@ -171,9 +171,9 @@ void c_Species::update_opacities() {
             
             for(int b=0; b<num_bands_in; b++) {
                 if(b == num_bands_in-1)
-                    opacity_twotemp(j,b) = base->const_opacity_planck_factor * opacity_avg_solar(b); 
+                    opacity_twotemp(j,b) = base->const_opacity_solar_factor * opacity_avg_solar(b); 
                 else
-                    opacity_twotemp(j,b) = base->const_opacity_planck_factor * opacity_avg_solar(b); 
+                    opacity_twotemp(j,b) = base->const_opacity_solar_factor * opacity_avg_solar(b); 
             }
         }
     }
@@ -278,17 +278,14 @@ void c_Species::update_opacities() {
                 
             }
             for(int b=0; b<num_bands_out; b++) {
-                opacity(j,b)        = base->const_opacity_rosseland_factor * const_opacity;// * (1. + pressure_broadening_factor * pow(prim[j].pres/1e5, pressure_broadening_exponent)); 
-                opacity_planck(j,b) = base->const_opacity_planck_factor * const_opacity;// * (1. + pressure_broadening_factor * pow(prim[j].pres/1e5, pressure_broadening_exponent)); 
-            }
-            
-            if(j==num_cells+1) {
+                opacity(j,b)        = base->const_opacity_rosseland_factor * const_opacity;
                 
-                //cout<<" opar = "<<opacity(j,0)<<" factor = "<<(1. + pressure_broadening_factor * pow(prim[j].pres/1e5, pressure_broadening_exponent))<<endl;
+                if(prim[j].temperature < 5.e2) {
+                    opacity_planck(j,b) = base->const_opacity_planck_factor * const_opacity;
+                } else {
+                    opacity_planck(j,b) = base->const_opacity_planck_factor * const_opacity;// * pow((prim[j].temperature/5.e2),4.);
+                }
                 
-                //cout<<"Stopping to inspect assigned opas in const model, j = "<<j<<endl;
-                //char a;
-                //cin>>a;
             }
         }
         

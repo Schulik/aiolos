@@ -30,11 +30,25 @@
 //
 //////////////////////////////////////////////////////////////////
 void c_Sim::reset_dS() {
-    for(int j = num_cells + 1; j>0; j--)
+    for(int j = num_cells + 1; j>0; j--) {
         for(int s=0; s<num_species; s++) {
             species[s].dS(j)  = 0.;
             species[s].dG(j)  = 0.;
         }
+    }
+        
+    if(globalTime < radiation_rampup_time) {
+        for(int b=0; b<num_bands_in; b++) {
+        
+            solar_heating(b) = solar_heating_final(b) * ( init_radiation_factor + (1.-init_radiation_factor) * globalTime/radiation_rampup_time );
+        }
+    } else {
+        for(int b=0; b<num_bands_in; b++) {
+            solar_heating(b) = solar_heating_final(b);
+        }        
+    }
+    
+        
                 
 }
 

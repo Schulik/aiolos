@@ -40,7 +40,10 @@ double H_radiative_recombination(double T_e) {
     // Case B
     //return 2.753e-14 * pow(x, 1.500) / pow(1 + pow(x / 2.740, 0.407), 2.242);
     ////       2.753e-14 * pow(2 * 157807 / x, 1.500) / pow(1 + pow(2 * 157807 / x / 2.740, 0.407), 2.242)
-    return 1.0 * 2.7e-13 * pow(T_e/1e4, -0.9); //MC2009 value
+    return 1e-10 * 2.7e-13 * pow(T_e/1e4, -0.9); //MC2009 value
+    
+    //JOwens code:
+    //  rec_coeff =  8.7d-27*tgas**0.5 * t3**(-0.2)*(1+t6**0.7)**(-1)
 }
 double H_threebody_recombination(double T_e) {
     using std::pow;
@@ -60,7 +63,7 @@ double H_collisional_ionization(double T_e) {
     double x = 2 * 157807. / T_e;
     double term = 21.11 * pow(T_e, -1.5) * pow(x, -1.089) /
                   pow(1 + pow(x / 0.354, 0.874), 1.101);
-    return 1e-50* term * exp(-0.5 * x);
+    return 1e-0 * term * exp(-0.5 * x);
 }
 
 // Cooling rate per electron.

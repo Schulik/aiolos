@@ -390,6 +390,9 @@ public:
     double core_cv; //Heat capacity of the surface layer
     double bond_albedo;
     
+    double init_radiation_factor;
+    double radiation_rampup_time;
+    
     //int radiation_solver;
     int use_planetary_temperature;
     int closed_radiative_boundaries ;
@@ -407,6 +410,7 @@ public:
     Eigen::MatrixXd dS_band;
     Eigen::MatrixXd dS_band_zero;
     Eigen::MatrixXd solar_heating;
+    Eigen::MatrixXd solar_heating_final;
     std::vector<int> BAND_IS_HIGHENERGY;
     std::vector<double> photon_energies;
     const int HIGHENERGY_BAND_TRUE = 1;

@@ -155,6 +155,8 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
         
         no_rad_trans               = read_parameter_from_file<double>(filename,"NO_RAD_TRANS", debug, 1.).value;
         photocooling_multiplier    = read_parameter_from_file<double>(filename,"PHOTOCOOL_MULTIPLIER", debug, 1.).value;
+        radiation_rampup_time      = read_parameter_from_file<double>(filename,"RAD_RAMPUP_TIME", debug, 0.).value;
+        init_radiation_factor      = read_parameter_from_file<double>(filename,"INIT_RAD_FACTOR", debug, 0.).value;
         //radiation_solver           = read_parameter_from_file<int>(filename,"RADIATION_SOLVER", debug, 0).value;
         closed_radiative_boundaries = read_parameter_from_file<int>(filename,"PARI_CLOSED_RADIATIVE_BOUND", debug, 0).value;
         const_opacity_solar_factor = read_parameter_from_file<double>(filename,"CONSTOPA_SOLAR_FACTOR", debug, 1.).value;
@@ -646,6 +648,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
     previous_monitor_T = std::vector<double>(num_species) ;
     
     solar_heating = Eigen::VectorXd::Zero(num_bands_in,  1);
+    solar_heating_final = Eigen::VectorXd::Zero(num_bands_in,  1);
     S_band        = Eigen::MatrixXd::Zero(num_cells+2, num_bands_in);
     dS_band       = Eigen::MatrixXd::Zero(num_cells+2, num_bands_in);
     dS_band_zero  = Eigen::MatrixXd::Zero(num_cells+2, num_bands_in);
@@ -713,6 +716,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
             solar_heating(b) += X_star/(4.*pi*pow(planet_semimajor*au,2.));
             templumi += solar_heating(b);
             
+            solar_heating_final(b) = solar_heating(b);
             cout<<" Solar heating is "<<solar_heating(b)<<" T_star = "<<T_star<<" pow(R_star*rsolar,2.) "<<pow(R_star*rsolar,2.)<<" pow(planet_semimajor*au,2.) "<<planet_semimajor<<endl;
         }
         else{
@@ -736,6 +740,8 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
                     cout<<endl<<"        band "<<b<<" detected as UV band. Assigning UV flux "<<UV_star/(4.*pi*pow(planet_semimajor*au,2.))<<" based on UV lumi "<<UV_star;
                 }
             }
+            
+            solar_heating_final(b) = solar_heating(b);
         }
         
         cout<<" is F = "<<solar_heating(b)<<endl;

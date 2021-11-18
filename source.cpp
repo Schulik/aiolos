@@ -30,9 +30,12 @@
     //
     void c_Sim::init_grav_pot() {
         
-        for(int i = 1; i <= num_cells+1; i++) {
+        for(int i = 1; i <= num_cells+2; i++) {
             enclosed_mass[i] = planet_mass;      //No self-gravity
             phi[i]           = get_phi_grav(x_i12[i], enclosed_mass[i]);
+            
+            if(use_tides == 1)
+                phi[i] -= 3.*G*star_mass*x_i12[i]*x_i12[i]/pow(planet_semimajor*au,3.);
             
         }
         phi[0]           = get_phi_grav(x_i12[1],         planet_mass);
