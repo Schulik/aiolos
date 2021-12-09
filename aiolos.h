@@ -297,7 +297,7 @@ public:
     double monitor_time;
     double max_snd_crs_time;
     double rad_energy_multiplier;
-    int steps;
+    signed long long int steps;
     int timecount;
     int monitor_output_index;
 

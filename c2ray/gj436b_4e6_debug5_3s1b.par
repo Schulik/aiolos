@@ -1,0 +1,100 @@
+#
+# Parameterfile for atmosphere simulations
+# Do not use tabs, only white spaces as value separators
+#
+PARI_TIME_TMAX          4.05e6
+CFL_BREAK_TIME          1e20
+PARI_TIME_OUTPUT        1.0e5
+PARI_CFLFACTOR          0.9
+PARI_TIME_DT            1e10
+PARI_DPHI_FACTOR        1.0
+ENERGY_EPSILON          0.1
+DENSITY_FLOOR           1.0e-20
+ION_FLOOR               1.0e-25
+
+RAD_RAMPUP_TIME        1e6
+INIT_RAD_FACTOR        1e-3
+
+PARI_NUM_SPECIES        3
+PARI_NUM_BANDS          3
+NUM_BANDS_OUT           1
+
+#
+# Module control
+#
+DO_HYDRO                1
+PARI_ORDER              2
+PHOTOCHEM_LEVEL         1
+PARI_USE_RADIATION      1
+FRICTION_SOLVER         3
+PARI_SECONDORDER_DRAG   0
+PARI_USE_COLL_HEAT      1
+
+#
+# Physical parameter parameters
+#
+# Problem numbers explained: shock_tube, no grav == 1, planet with grav == 2#
+# Friction solver: analytic == 0, numerical == 1
+# Collision model: constant == C, physical == P
+# Opacity model:   constant == C, physical == P
+#
+
+PARI_COLL_MODEL         P
+PARI_ALPHA_COLL         1.e4
+NO_RAD_TRANS            1e-40
+PARI_OPACITY_MODEL      P
+PRESSURE_BROADENING     1.
+CONSTOPA_SOLAR_FACTOR   1e0
+
+PARI_SELF_GRAV_SWITCH   0
+PARI_LINEAR_GRAV        0
+USE_TIDES               0
+
+#
+# Initial Conditions
+#
+
+PARI_CONST_TEMP         712.
+INIT_TEMPERATURE_MODEL  C
+INIT_T_TEMP             712.
+TEMPERATURE_FLOOR       712.
+
+PARI_INIT_DATA_SWITCH   1
+REVERSE_HYDROSTAT_CONSTRUCTION 1
+PARI_INIT_DATA_U1      2.0e-12
+PARI_INIT_DATA_U2      1.0
+PARI_INIT_DATA_U3      1e-9
+
+#
+# Radiation parameters
+#
+PARI_LAM_MIN            0.01
+PARI_LAM_MAX            0.0620
+PARI_LAM_PER_DECADE     0.1
+PARI_TSTAR              6070.
+PARI_RSTAR              1e-10
+PARI_UVSTAR             8.8026e30
+PARI_XSTAR              1.e1
+PARI_PLANET_DIST        0.05
+
+#
+# Numerical parameters
+#
+PARI_PLANET_MASS        21.25
+PARI_BOUND_TYPE_LEFT    3
+PARI_BOUND_TYPE_RIGHT   1
+PARI_DOMAIN_DX          1e-3
+PARI_GEOMETRY           2
+PARI_CELLS_PER_DECADE   500
+PARI_DOMAIN_MIN         2.757317e9
+PARI_DOMAIN_MAX         1.09e11
+PARI_GRID_TYPE          2
+GRID2_TRANSITION        3.0e9
+GRID2_CELLS_PER_DECADE  100
+
+#
+# Scenarios
+#
+PARI_PROBLEM_NUMBER     2
+PARI_INIT_WIND          1
+PARI_INIT_STATIC        1

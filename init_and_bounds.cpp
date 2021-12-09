@@ -630,8 +630,8 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
                 }
                 if(std::abs(species[si].static_charge) > 0 && std::abs(species[sj].static_charge) > 0 && (si != sj)) {
                     cout<<" Setting friction mask to ionic value for species si/sj = "<<si<<"/"<<sj<<endl;
-                    friction_coeff_mask(si,sj) = 10000.;
-                    friction_coeff_mask(sj,si) = 10000.;
+                    friction_coeff_mask(si,sj) = 10.;
+                    friction_coeff_mask(sj,si) = 10.;
                 }
                 
             }
@@ -1515,29 +1515,36 @@ void c_Species::apply_boundary_right(std::vector<AOS>& u) {
             for (int i=Ncell+num_ghosts; i < Ncell+2*num_ghosts; i++) {
                 AOS_prim prim ;
                 eos->compute_primitive(&u[i-1],&prim, 1) ;
-                double dphi = (base->phi[i] - base->phi[i-1]) / (base->dx[i-1] + base->dx[i]) ;
-                //dphi *= (base->omegaplus[i]*base->dx[i] + base->omegaminus[i-1]*base->dx[i-1]) ;
-                //dphi *= (prim.density * base->omegaplus[i]*base->dx[i] + this->prim[i].density * base->omegaminus[i-1]*base->dx[i-1]) ;
-                dphi *= (this->prim[i].density* base->omegaplus[i]*base->dx[i] +  prim.density  * base->omegaminus[i-1]*base->dx[i-1]) ;
                 
-                //metric_outer = base->omegaplus[i+1] * base->dx[i+1] / (base->dx[i+1] + base->dx[i]);
-                //metric_inner = base->omegaminus[i]  * base->dx[i]   / (base->dx[i+1] + base->dx[i]);
-                //temp_rhofinal = u[i].u1 *  (factor_inner - metric_inner)/(factor_outer + metric_outer);
-            
-                double r =base->x_i12[i];
-                double mdot      = prim.density*prim.speed*r*r;
-                double freefallv = -std::sqrt(2.*G*base->planet_mass/r);
-                if(mdot < -1e18)
-                    prim.density = -1e18/freefallv/r/r;
+                if(false) {
+                    double dphi = (base->phi[i] - base->phi[i-1]) / (base->dx[i-1] + base->dx[i]) ;
+                    //dphi *= (base->omegaplus[i]*base->dx[i] + base->omegaminus[i-1]*base->dx[i-1]) ;
+                    //dphi *= (prim.density * base->omegaplus[i]*base->dx[i] + this->prim[i].density * base->omegaminus[i-1]*base->dx[i-1]) ;
+                    dphi *= (this->prim[i].density* base->omegaplus[i]*base->dx[i] +  prim.density  * base->omegaminus[i-1]*base->dx[i-1]) ;
+                    
+                    double r =base->x_i12[i];
+                    double mdot      = prim.density*prim.speed*r*r;
+                    double freefallv = -std::sqrt(2.*G*base->planet_mass/r);
+                    if(mdot < -1e18)
+                        prim.density = -1e18/freefallv/r/r;
+                    
+                    //cout<<" in boundaries, rhoi rho+1 = "<<prim.density<<"/"<<this->prim[i].density<<" p,p2 = "<<prim.pres;
+                    prim.pres = prim.pres - dphi ;
+                }
                 
-                //cout<<" in boundaries, rhoi rho+1 = "<<prim.density<<"/"<<this->prim[i].density<<" p,p2 = "<<prim.pres;
-                prim.pres = prim.pres - dphi ;
                 //cout<<"/"<<prim.pres<<" i = "<<i<<endl;
                 
-                //prim.pres = prim.pres -  prim.density * dphi ;
+                
+                
+                if(true) {
+                    double dphi = (base->phi[i] - base->phi[i-1]) / (base->dx[i-1] + base->dx[i]) ;
+                    prim.pres = prim.pres -  prim.density * dphi ;    
+                    
+                }
                 
                 //prim.pres = std::max( prim.pres, 0.0) ;          //27.10.2021: Not in use anymore, due to this causing problems with negative temperatures. p=0 -> E = 0 -> T = 0  and negative after a bit of hydro
-                prim.pres = std::max( prim.pres, 1e-3*prim.pres) ; //TODO: Replace 1e-3 with an estimate for the max pressure jump in a adiabatic shock
+                prim.pres = std::max( prim.pres, 1e-1*prim.pres) ; //TODO: Replace 1e-3 with an estimate for the max pressure jump in a adiabatic shock
+                //prim.pres = std::min( prim.pres, 2.*prim.pres) ; //TODO: Replace 1e-3 with an estimate for the max pressure jump in a adiabatic shock
                 eos->compute_conserved(&prim, &u[i], 1) ;
             }
             break ;

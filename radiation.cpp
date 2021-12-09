@@ -48,7 +48,12 @@ void c_Sim::reset_dS() {
         }        
     }
     
-        
+       
+        if(steps==1107) {
+            
+            cout<<" in reset_dS Steps == 1107, dS = "<<dS_band(60,0)<<" S = "<<S_band(60,0)<<" F = "<<solar_heating(0)<<" F0 = "<<solar_heating_final(0)<<endl;
+            
+        }   
                 
 }
 
@@ -126,16 +131,28 @@ void c_Sim::update_dS() {
                         dS_band(4,b) += 1./6. *0.5* pow(T_core,4.)*sigma_rad / (dx[4]); 
                         
                     }
+                    
                 }// Irregular dS computation, in case we want to fix the solar heating function to its initial value
-                else 
+                else {
                     dS_band(j,b) = dS_band_zero(j,b);
+                }
+                    
                 //
                 // In low-energy bands, individual species are heated according to their contribution to the total cell optical depth
                 //
                 for(int s=0; s<num_species; s++)
                     species[s].dS(j)  += dS_band(j,b) * species[s].fraction_total_solar_opacity(j,b);
+            
+                if(steps==1107 && j==60) {
+            
+                        cout<<" in compute dS, Steps == 1107, dS = "<<dS_band(60,0)<<" S = "<<S_band(60,0)<<" F = "<<solar_heating(0)<<" F0 = "<<solar_heating_final(0)<<endl;
+                        cout<<" nominal ds = "<<0.25 * solar_heating(b)*total_opacity_twotemp(j,b)*(1-bond_albedo)<<endl;
+                        
+                }
             }
         }
+        
+        
         
         //////////////////////////////////////////////////////////////////
         ///////////////////Thermal bands
@@ -268,6 +285,12 @@ void c_Sim::update_dS() {
         }
         
     }
+    
+    if(steps==1107) {
+            
+            cout<<" in update_dS Steps == 1107, dS = "<<dS_band(60,0)<<" S = "<<S_band(60,0)<<" F = "<<solar_heating(0)<<endl;
+            
+        }
 }
 
 

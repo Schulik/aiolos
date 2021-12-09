@@ -30,7 +30,7 @@ void c_Sim::execute() {
     double monitor_counter= 0;
     const double dt_initial = dt_min_init;
     double next_print_time  = dt_initial;
-    const int maxsteps = 1e9;
+    const signed long long int maxsteps = 1e12;
     
     int crashed_T = 0, crashed_J = 0;
     int crash_T_imin = num_cells+2, crash_T_imax = 0, crash_T_numcells = 0;
