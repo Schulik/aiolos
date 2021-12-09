@@ -46,6 +46,7 @@ int main()
     count += !run_test("shock_tube6.par") ;
     count += !run_test("shock_tube7.par") ;
 
+    count += !run_test("soundwave_16.par") ;
     count += !run_test("soundwave_32.par") ;
     count += !run_test("soundwave_64.par") ;
     count += !run_test("soundwave_128.par") ;

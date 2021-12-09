@@ -7,7 +7,7 @@ from load_aiolos import load_aiolos_snap, load_aiolos_params
 
 
 def get_data(DIR):
-    Ns = [32, 64, 128, 256, 512]
+    Ns = [16, 32, 64 128, 256, 512]
     L1s = []
     for N in Ns:
          IC_file = DIR + 'output_soundwave_{}_H2'.format(N) + '_t0.dat'

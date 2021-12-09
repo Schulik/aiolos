@@ -11,11 +11,13 @@
 //    Perez-Becker & Chiang (2013)
 Condensible silicate(169, 3.21e10, 6.72e14, 0.1) ;
 
-static const double RHO = 3 ;
+static const double RHO_DUST = 3 ;
 static const double THICKNESS = 10 ;
 
 static double T_core ;
-static double f_dust = 0e-20;
+static double f_dust = 1e-10;
+static double a_grain = -1 ;
+
 
 void c_Sim::user_output_function(int output_counter) {
     std::ofstream file ;
@@ -56,41 +58,25 @@ void c_Species::user_boundary_right(std::vector<AOS>& u) {
 void c_Species::user_initial_conditions(){
     
 
-    // Get the equilibrium temperature
-    const double BETA=1;
-    
-    double size = std::pow(3/(4*M_PI)*30*7.568e11/3*amu/RHO,1/3.) ;
-    
-    double k0 = 3/(4*RHO*size) ;
-    double T0 = 1/(2*M_PI * 3.475 * size) ;
-    
-    auto kappa = [BETA, k0, T0](double T) {
-        if (BETA == 1) 
-            return k0 * T / (T0 + T) ;
-        else
-            return k0 / (1 + std::pow(T/T0, -BETA)) ;
-    } ;
+    if (is_dust_like && a_grain < 0) {
+        a_grain = std::pow(3/(4*M_PI)*mass_amu*amu/RHO_DUST,1/3.) ;
+        f_dust = initial_fraction ;
+    }
 
+    // Get the equilibrium temperature
+    // Set the starting temperature a little below the equilibrium temperature
     T_core = base->T_star ;
     double S = 0.25 * pow(T_core,4.) * std::pow(base->R_star*rsolar,2.)/std::pow(base->planet_semimajor*au,2.) ;
-    double ks = kappa(T_core) ;
-    double tau0 = 0e300 ;
-    for (int i=0; i < 100; i++) {
-        double k = kappa(T_core) ;
-        double g = ks/k ;
+    T_core = pow(S/2, 0.25) ;
 
-        double T4 = 0.25*S*g * (1 + 3/g + (g - 3/g)*std::exp(-tau0));
-
-        T_core = 0.9*std::pow(T4, 0.25) + 0.1*T_core ;
-    }
-    //T_core = pow(S, 0.25) ;
     // Set the planet temperature
     base->T_surface = T_core ;
     base->L_core = 4*pi*base->R_core*base->R_core*sigma_rad*std::pow(T_core, 4) ;
     base->use_planetary_temperature = 1 ;
 
-    std::cout << "Dusty wind setup:\n\tT_eq=" << T_core << "K\n"
-              << "\tGrain size=" << size << "cm\n" ;
+    if (is_dust_like)
+        std::cout << "Dusty wind setup:\n\tT_eq=" << T_core << "K\n"
+                  << "\tGrain size=" << a_grain * 1e4 << "micron\n" ;
     
     // First get the boundary condition
     AOS_prim p0 ;
@@ -126,10 +112,10 @@ void c_Sim::user_heating_function() {
     if (num_species != 2)
         throw std::runtime_error("Condensation requires num_species=2") ;
 
-    double a_grain = std::pow(3/(4*M_PI)*species[1].mass_amu*amu/RHO,1/3.) ;
-    
+    assert(a_grain > 0) ;
+
     SingleGrainCondensation cond(
-        silicate, species[0].mass_amu, a_grain, RHO, 
+        silicate, species[0].mass_amu, a_grain, RHO_DUST, 
         species[0].cv, species[1].cv) ;
         
     for (int b = 0; b < num_bands_in; b++) {
@@ -293,7 +279,7 @@ void c_Sim::user_loop_function() {
 
     int j = num_ghosts ;
     SurfaceCondensation planet_surf(silicate, species[0].mass_amu, 
-                                   species[0].cv, species[1].cv, RHO*THICKNESS,surf[j-1]/vol[j]);
+                                   species[0].cv, species[1].cv, RHO_DUST*THICKNESS,surf[j-1]/vol[j]);
     if (use_rad_fluxes == 1) {
         // Stellar radiation reaching the planet
         for (int b=0; b < num_bands_in; b++) 
@@ -356,7 +342,7 @@ void c_Sim::user_loop_function() {
         E_tot += frac[s]*heat;
 
         prim.speed /= (1 + frac[s]*drho/prim.density) ;
-        prim.density += drho ;
+        prim.density += frac[s]*drho ;
         
         E_tot -= 0.5*prim.density*prim.speed*prim.speed ;
 
