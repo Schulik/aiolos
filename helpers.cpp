@@ -29,7 +29,13 @@ double c_Sim::get_cfl_timestep() {
     //
     double maxde = 0;
     int imax = -1 ;
-    
+
+    static double dt_prev = 0 ;
+    static double f_prev = 1. ;
+    auto switch_fun = [](double x) {
+        return 1 + 2*std::atan(0.5*(x-1)) ;
+    } ;
+
     for(int s = 0; s < num_species; s++) {
         for(int i=num_cells-1; i>=0; i--)  {
             species[s].de_e[i] = std::abs(species[s].primlast[i].internal_energy - species[s].prim[i].internal_energy)/species[s].prim[i].internal_energy;
@@ -46,7 +52,11 @@ double c_Sim::get_cfl_timestep() {
         
     }
     
-    timestep_rad2 = dt / maxde * energy_epsilon;
+    double f = switch_fun(energy_epsilon/maxde) ;
+    timestep_rad2 = dt * std::pow(switch_fun(f*f_prev/switch_fun(dt/dt_prev)), 0.25);
+    f_prev = f;
+    dt_prev = dt ;
+    //timestep_rad2 = dt / maxde * energy_epsilon;
 
     //
     // Compute individual max wave crossing timesteps per cell
@@ -80,7 +90,7 @@ double c_Sim::get_cfl_timestep() {
     cfl_step = cflfactor / minstep;
     
     if(do_hydrodynamics)
-        return min(cfl_step, dt*max_timestep_change);
+        return min(cfl_step, min(timestep_rad2, dt*max_timestep_change));
     else
         return min(timestep_rad2, dt*max_timestep_change);
 }
@@ -179,69 +189,8 @@ double c_Sim::compute_planck_function_integral3(double lmin, double lmax, double
 
     if (num_bands_out == 1)
         return 1 ;
-    
-    if(temperature < 2.71) {
-        lT_min = lmin * 2.71;
-        lT_max = lmax * 2.71;
-        
-    } else {
-        lT_min = lmin * temperature;
-        lT_max = lmax * temperature;
-    }
-    
-    double m;
-    int imin = 0;
-    int imax = num_plancks;
-    
-    //if();
-    //if(debug > 1)
-    //int temp_imin = std::log(lT_min/planck_matrix(0,0)) / std::log(lT_spacing);
-    //if( steps >= 3927 && temp_imin < 0 )
-    //    cout<<"Planck Integral3, lmin/lmax/t = "<<lmin<<"/"<<lmax<<"/"<<temperature<<" lT_min / P00 = "<<lT_min<<" / "<<planck_matrix(0,0)<<" imin = "<<temp_imin<<endl;
-    
-    //
-    // Lower power
-    //
-    if(lT_min < planck_matrix(0,0)) {
-        m    = planck_matrix(0,1) / planck_matrix(0,0);
-        
-        power_min = planck_matrix(0,1) + m * lT_min;
-        
-        if(lT_max < planck_matrix(0,0)) //Do this only in the lowermost band
-            return 1.;
-    }
-    else {
-        imin = std::log(lT_min/planck_matrix(0,0)) / std::log(lT_spacing);
-        m    = (planck_matrix(imin+1,1) - planck_matrix(imin,1)) / (planck_matrix(imin+1,0)-planck_matrix(imin,0)); //valgrind marks memory leak here
-        
-        power_min = planck_matrix(imin,1) + m * (lT_min - planck_matrix(imin,0));
-    }
-    
-    if(debug > 1)
-        cout<<" imin/imax = "<<imin;
-    
-    //
-    // Upper power
-    //
-    if(lmax * temperature > planck_matrix(num_plancks-1,0)) {
-        power_max = 1.;
-        
-        if(lT_min > planck_matrix(num_plancks-1,0)) //Do this only in the uppermost band
-            return 1;
-    }
-    else {
-        
-        imax = std::log(lT_max/planck_matrix(0,0)) / std::log(lT_spacing);
-        m    = (planck_matrix(imax+1,1) - planck_matrix(imax,1)) / (planck_matrix(imax+1,0)-planck_matrix(imax,0));
-        
-        power_max = planck_matrix(imax,1) + m * (lT_max - planck_matrix(imax,0));
-    }
-    
-    if(debug > 1)
-        cout<<" / "<<" P(imin="<<imin<<")/P(imax="<<imax<<") = "<<power_min<<"/"<<power_max<<" = "<<power_max-power_min<<endl; 
-    
-    return power_max - power_min;
-    
+
+    return compute_planck_function_integral4(lmin, lmax, temperature) ;
 }
 
 double c_Sim::compute_planck_function_integral4(double lmin, double lmax, double temperature) {

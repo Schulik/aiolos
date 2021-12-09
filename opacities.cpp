@@ -186,21 +186,19 @@ void c_Species::update_opacities() {
             
             double k0 = 3/(4*RHO*size) ;
             double T0 = 1/(2*M_PI * 3.475 * size) ;
+
             
-            double ks ;
-            if (BETA == 1) 
-                ks = k0 * base->T_star / (T0 + base->T_star) ;
-            else
-                ks = k0 / (1 + std::pow(base->T_star/T0, -BETA)) ;
+            auto kappa_dust = [k0,T0,BETA](double T) {
+                if (BETA == 1)
+                    return k0 * T / std::sqrt(T0*T0 + T*T);
+                else
+                    return k0 / std::pow(1 + T0*T0/(T*T), 0.5*BETA);
+            } ;
+            
+            double ks = kappa_dust(base->T_star) ;
 
             for(int j=0; j< num_cells+2; j++) {
-                double k ;
-                double T = prim[j].temperature ;
-
-                if (BETA == 1) 
-                    k = k0 * T / (T0 + T) ;
-                else
-                    k = k0 / (1 + std::pow(T/T0, -BETA)) ;
+                double k = kappa_dust(prim[j].temperature) ;
 
                 for(int b=0; b<num_bands_in; b++) {
                     opacity_twotemp(j,b) = ks ;

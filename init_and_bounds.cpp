@@ -718,12 +718,13 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
     double totallumiincr = 0;
     for(int b=0; b < num_bands_in; b++) {
         
-        totallumiincr = compute_planck_function_integral3(l_i_in[b], l_i_in[b+1], T_star);
+        totallumiincr = compute_planck_function_integral4(l_i_in[b], l_i_in[b+1], T_star);
         totallumi     += totallumiincr;
+
         if(debug > 0 ) cout<<" INIT BANDS, b = "<<b<<" l_i_in[b] = "<<l_i_in[b]<<" l_i[b+1] = "<<l_i_in[b+1]<<" l_i12[b] = "<<l_i12_in[b]<<" fraction = "<<totallumiincr<<" fraction for T=1430 K = "<<compute_planck_function_integral3(l_i_in[b], l_i_in[b+1], 1430.)<<endl;
     }
     cout<<" Total lumi / sigma T^4/pi is = "<<totallumi<<endl;
-    
+
     total_opacity        = Eigen::MatrixXd::Zero(num_cells+2, num_bands_out);
     cell_optical_depth   = Eigen::MatrixXd::Zero(num_cells+2, num_bands_out);
     radial_optical_depth = Eigen::MatrixXd::Zero(num_cells+2, num_bands_out);

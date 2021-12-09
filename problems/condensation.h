@@ -398,21 +398,7 @@ class SurfaceCondensation {
 
         return evap - cond ;
     }
-
-    double surface_cooling_rate(double T_surf) const {
-        
-        double Pv = _cond.P_vap(T_surf) ;
-        double evap = _cond.P_stick * Pv / std::sqrt(2*pi*Rgas/_mu_gas*T_surf) ;
-
-        double T_gas, cond ;
-        std::tie(T_gas, cond) = compute_gas_T_and_cond_rate(T_surf, evap) ;
-
-        double dTdt = (T_surf-_T0)/(_dt + 1e-300) ;
-
-        return _m_layer*_C_l*dTdt - _Lrain + (evap-cond)*(_cond.Lsub - _C_l*T_surf)
-            + evap*_C_v*T_surf - cond*_C_v*T_gas ;
-    }
-    
+ 
     double gas_heating_rate(double T_surf) const {
         
         double Pv = _cond.P_vap(T_surf) ;

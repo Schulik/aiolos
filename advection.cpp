@@ -90,7 +90,6 @@ void c_Sim::execute() {
             
             
         dt = get_cfl_timestep();
-        dt = std::min(dt, timestep_rad2) ;
         dt = std::min(dt, t_max - globalTime) ;
         if(steps == 0)
             dt = std::min(dt, dt_initial);
@@ -266,19 +265,6 @@ void c_Sim::execute() {
 
         user_loop_function() ;
         
-        for(int s = 0; s < num_species; s++) {
-            
-            for(int i=num_cells+1; i>=0; i--)  {
-                AOS TMP = species[s].u[i];
-                double temp_temp = species[s].prim[i].temperature;
-                
-                if(temp_temp < init_T_temp)
-                    temp_temp = init_T_temp;
-                species[s].u[i] = AOS(TMP.u1, TMP.u2, species[s].cv * TMP.u1 * temp_temp + 0.5 * TMP.u2*TMP.u2/TMP.u1) ;
-            }
-        }
-            
-            
         steps++;
         
         if(steps==1)
@@ -450,8 +436,7 @@ void c_Species::execute(std::vector<AOS>& u_in, std::vector<AOS>& dudt) {
         //
         // Step 3: Add it all up to update the conserved variables
         //
-        //flux[0] = AOS(0,0,0);
-        //flux[1] = AOS(0,0,0);
+
         
         for(int j=1; j<=num_cells; j++) {
             dudt[j] = (flux[j-1] * base->surf[j-1] - flux[j] * base->surf[j]) / base->vol[j] + (source[j] + source_pressure[j]) ;

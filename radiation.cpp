@@ -87,10 +87,10 @@ void c_Sim::update_dS() {
                 if(steps > -1) {
                             
                     if(j<num_cells+1)
-                        dS_band(j,b) = 0.25 * solar_heating(b) * (-exp(-radial_optical_depth_twotemp(j+1,b)) * expm1( const_opacity_solar_factor* ( radial_optical_depth_twotemp(j+1,b) - radial_optical_depth_twotemp(j,b))) ) /dx[j] * (1.-bond_albedo);
+                        dS_band(j,b) = 0.25 * solar_heating(b) * (-exp(-radial_optical_depth_twotemp(j+1,b)) * expm1(-cell_optical_depth_twotemp(j,b)) )/dx[j] ;
                     else
                         // Use optically thin limit  
-                        dS_band(j,b) = 0.25 * solar_heating(b)*total_opacity_twotemp(j,b)*(1-bond_albedo);
+                        dS_band(j,b) = 0.25 * solar_heating(b)*total_opacity_twotemp(j,b);
                     
                     dS_band_zero(j,b) = dS_band(j,b);
                 
@@ -321,28 +321,26 @@ void c_Sim::update_fluxes_FLD() {
             }
         }
         else {//   Right boundary: free stream, no emission / absorbtion.
-            
-            int Ncell   = num_cells - 2*(num_ghosts - 1) ;
-            for (int j=0; j < num_ghosts-1; j++) {
-                int i       = Ncell + num_ghosts ;
 
-                int idx = i*stride + b*(num_vars + 1) ;
-                int idx_r = i*num_vars + b ;  
-
-                if (j == 0) // FLD flux at the edge of the last cell
-                    l[idx] = u[i-1] ;
-                else // Free-stream 
-                    l[i] = -surf[i-1] / (x_i12[i]-x_i12[i-1]) ;
-
-                d[idx] = -l[idx] + surf[ i ] / (x_i12[i+1]-x_i12[i]) ;
-                u[idx] = 0 ;
-                r[idx_r] = 0 ;
-            }
+            // Only need to set the very last cell.
+            //  Assume F = J and \div(F) = const
 
             int idx = (num_cells+1)*stride + b*(num_vars + 1) ;
             int idx_r = (num_cells+1)*num_vars + b ;  
-            l[idx] = -1;
-            d[idx] = 1;
+            
+            double f = x_i12[num_cells]/x_i12[num_cells+1] ;
+            switch (geometry) {
+                case Geometry::cartesian:
+                    f = 1 ;
+                    break;
+                case Geometry::cylindrical:
+                    break;
+                case Geometry::spherical:
+                    f *= f;
+                    break;
+            }
+            
+            l[idx] = -f*d[idx] ;
             u[idx] = 0;
             r[idx_r] = 0 ;
         }
