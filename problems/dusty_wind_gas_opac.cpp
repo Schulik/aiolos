@@ -161,11 +161,6 @@ void c_Species::user_initial_conditions() {
         f_dust = initial_fraction;
     }
 
-    // Get the equilibrium temperature
-    double size =
-        std::pow(3 / (4 * M_PI) * 30 * 7.568e11 / 3 * amu / RHO_DUST, 1 / 3.);
-    kappa_dust = DustOpacity(size);
-
     // Set the starting temperature a little below the equilibrium temperature
     T_core = base->T_star;
     double S = 0.25 * pow(T_core, 4.) * std::pow(base->R_star * rsolar, 2.) /
