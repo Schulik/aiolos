@@ -333,7 +333,7 @@ void c_Sim::user_loop_function() {
         E_tot += frac_e[s] * heat;
 
         prim.speed /= (1 + frac_d[s] * drho / prim.density);
-        prim.density += frac[s] * drho;
+        prim.density += frac_d[s] * drho;
 
         E_tot -= 0.5 * prim.density * prim.speed * prim.speed;
 
