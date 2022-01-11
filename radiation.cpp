@@ -57,23 +57,8 @@ void c_Sim::reset_dS() {
                 
 }
 
-void c_Sim::update_dS() {
+void c_Sim::update_dS_jb(int j, int b) {
     
-    if(debug > 1)
-        cout<<"Updating dS..."<<endl;
-    
-    //
-    // Compute optical depths, solar radiation attenuation and heating function for low-energy bands
-    //
-    for(int j = num_cells + 1; j>0; j--) {
-        
-        //////////////////////////////////////////////////////////////////
-        //////////////Solar bands
-        //////////////////////////////////////////////////////////////////
-        for(int b=0; b<num_bands_in; b++) {
-            
-            if(!BAND_IS_HIGHENERGY[b]) {
-            
                 total_opacity_twotemp(j,b)        = 0 ;
                 radial_optical_depth_twotemp(j,b) = 0.;
                 
@@ -102,9 +87,6 @@ void c_Sim::update_dS() {
                 
                 S_band(j,b) = solar_heating(b) * std::exp(-radial_optical_depth_twotemp(j,b));
                 
-                //if(steps == 0)
-                //    cout<<"IN SOLAR HEATING, const_opacity_solar_factor = "<<const_opacity_solar_factor<<endl;
-                
                 if(debug >= 1)
                     cout<<" in cell ["<<j<<"] band ["<<b<<"] top-of-the-atmosphere heating = "<<solar_heating(b)<<" tau_rad(j,b) = "<<radial_optical_depth(j,b)<<" exp(tau) = "<<std::exp(-radial_optical_depth(j,b))<<endl;
                 
@@ -119,7 +101,6 @@ void c_Sim::update_dS() {
                     
                     dS_band_zero(j,b) = dS_band(j,b);
                 
-                    
                     //
                     // Planetary heating 2
                     //
@@ -129,7 +110,6 @@ void c_Sim::update_dS() {
                         dS_band(2,b) += 3./6. *0.5* pow(T_core,4.)*sigma_rad / (dx[2]); 
                         dS_band(3,b) += 2./6. *0.5* pow(T_core,4.)*sigma_rad / (dx[3]); 
                         dS_band(4,b) += 1./6. *0.5* pow(T_core,4.)*sigma_rad / (dx[4]); 
-                        
                     }
                     
                 }// Irregular dS computation, in case we want to fix the solar heating function to its initial value
@@ -140,17 +120,82 @@ void c_Sim::update_dS() {
                 //
                 // In low-energy bands, individual species are heated according to their contribution to the total cell optical depth
                 //
-                for(int s=0; s<num_species; s++)
-                    species[s].dS(j)  += dS_band(j,b) * species[s].fraction_total_solar_opacity(j,b);
-            
-                if(steps==1107 && j==60) {
-            
-                        cout<<" in compute dS, Steps == 1107, dS = "<<dS_band(60,0)<<" S = "<<S_band(60,0)<<" F = "<<solar_heating(0)<<" F0 = "<<solar_heating_final(0)<<endl;
-                        cout<<" nominal ds = "<<0.25 * solar_heating(b)*total_opacity_twotemp(j,b)*(1-bond_albedo)<<endl;
+                for(int s=0; s<num_species; s++) {
+                    //if lowenergy or photochem < 2
+                    
+                    if(photochem < 2)
+                        species[s].dS(j)  += dS_band(j,b) * species[s].fraction_total_solar_opacity(j,b);
+                    else {
                         
+                        //if(species.s participates in photoreaction)
+                                    //take educt.dS(j,b) and assign it to products, weighed with (1-E_lim/hv) and mass ratios
+                        
+                        //for all reacs:
+                            //for educt:
+                        //         Equant = dS_band(j,b) * species[s].fraction_total_solar_opacity(j,b);
+                        //    for products:
+                        //         dS += Equant * mass_weight;
+                        
+                    }
+                    
+                    
+                    /*
+                    else {
+                        
+                        //Assuming one photoreaction only acts on one reactant and photon band
+                        for(c_photochem_reaction& reaction : photoreactions) {
+                            threshold_energy = 13.6; //TODO: replace with reaction-specific number
+                            heating_mask_educ  = {0.};
+                            heating_mask_prod  = {0.,1.};
+                            
+                            double energy_available = dS_band(j,b) * (1 - threshold_energy * ev_to_K * kb / photon_energies[b]);
+                            double cooling = nX[2]*HOnly_cooling(nX, Tx(2));
+                            
+                            for(int& ej : reaction.educts ) {
+                                
+                                species[ej].dS(j)  += heating_mask[ej] * species[ej].fraction_total_solar_opacity(j,b) * energy_available;
+                                species[ej].dG(j)  += heating_mask[ej]
+                            }
+                            for(int& pj : reaction.products ) {
+                                
+                                species[pj].dS(j)  += heating_mask[pj] * species[pj].fraction_total_solar_opacity(j,b) * energy_available;
+                            }                            
+                        
+                        }
+                    
+                    }
+                    */
                 }
+                    
+    
+    
+    
+    
+}
+
+void c_Sim::update_dS() {
+    
+    if(debug > 1)
+        cout<<"Updating dS..."<<endl;
+    
+    //
+    // Compute optical depths, solar radiation attenuation and heating function for low-energy bands
+    //
+    for(int j = num_cells + 1; j>0; j--) {
+        
+        //////////////////////////////////////////////////////////////////
+        //////////////Solar bands
+        //////////////////////////////////////////////////////////////////
+        for(int b=0; b<num_bands_in; b++) {
+            
+            if(!BAND_IS_HIGHENERGY[b]) {
+            
+                update_dS_jb(int j, int b);
+            
             }
         }
+        
+        //TODO: Add chemical energy to dS
         
         
         

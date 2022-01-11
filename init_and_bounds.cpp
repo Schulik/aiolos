@@ -168,14 +168,15 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
         photochemistry_level = read_parameter_from_file<int>(filename,"PHOTOCHEM_LEVEL", debug, 0).value;
         dust_to_gas_ratio = read_parameter_from_file<double>(filename,"DUST_TO_GAS", debug, 0.).value;
         temperature_floor = read_parameter_from_file<double>(filename,"TEMPERATURE_FLOOR", debug, 0.).value;  
+        use_chemistry      = read_parameter_from_file<int>(filename,"DO_CHEM", debug, 0).value;
         
         ion_precision         = read_parameter_from_file<double>(filename,"ION_PRECISION", debug, 1e-12).value;
         ion_heating_precision = read_parameter_from_file<double>(filename,"ION_HEATING_PRECISION", debug, 1e-12).value;
         ion_maxiter                  = read_parameter_from_file<int>(filename,"ION_MAXITER", debug, 128).value;
         ion_heating_maxiter          = read_parameter_from_file<int>(filename,"ION_HEATING_MAXITER", debug, 128).value;
         
-        cout<<" ION_HEATING_PRECISION set to "<<ion_heating_precision<<" heating+maxiters = "<<ion_heating_maxiter<<endl;
-        cout<<" ION_PRECISION set to "<<ion_precision<<" ion_maxiter = "<<ion_maxiter<<endl;
+        //cout<<" ION_HEATING_PRECISION set to "<<ion_heating_precision<<" heating+maxiters = "<<ion_heating_maxiter<<endl;
+        //cout<<" ION_PRECISION set to "<<ion_precision<<" ion_maxiter = "<<ion_maxiter<<endl;
         
         rad_solver_max_iter = read_parameter_from_file<int>(filename,"MAX_RAD_ITER", debug, 1).value;
         bond_albedo       = read_parameter_from_file<double>(filename,"BOND_ALBEDO", debug, 0.).value; 
@@ -320,8 +321,9 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
                     num_he_bands++;
                 }
         }
-        photon_energies = np_somevalue(num_he_bands, 20. * ev_to_K * kb);
-        for(int b=0; b<num_he_bands; b++) {
+        photon_energies = np_somevalue(num_bands_in, 20. * ev_to_K * kb);
+        //for(int b=0; b<num_he_bands; b++) {
+        for(int b=0; b<num_bands_in; b++) {
             photon_energies[b] = 1.24/( l_i_in[b + 1] ) * ev_to_K * kb ;
             //photon_energies[b] = 20. * ev_to_K * kb ;
             cout<<"Assigned to highenergy band b = "<<b<<" a photon energy of "<<photon_energies[b]/ev_to_K/kb<<" eV "<<endl;
@@ -782,7 +784,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
     init_J_factor = read_parameter_from_file<double>(filename,"INIT_J_FACTOR", debug, -1.).value;
     
     
-    for(int j = 0; j <= num_cells+2; j++) {
+    for(int j = 0; j <= num_cells+1; j++) {
         
         if(num_bands_out == 1)  {
             for(int s = 0; s< num_species; s++){
@@ -843,6 +845,40 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
         }
         
     }
+    cout<<"photochem level = "<<photochemistry_level<<endl;
+    if(photochemistry_level == 2) {
+        cout<<" Init chemistry."<<endl<<endl;
+    
+        try {
+            
+                init_reactions(1);
+        }
+        catch(int i ) {
+            
+            if(i==0)
+                cout<<" FATAL ERROR caught in init_chemistry: Reagular reaction educt index exceeds num_species! "<<endl;
+            else if(i==1)
+                cout<<" FATAL ERROR caught in init_chemistry: Reagular reaction product index exceeds num_species! "<<endl;
+            else if(i==2)
+                cout<<" FATAL ERROR caught in init_chemistry: Photochem reaction educt index exceeds num_species! "<<endl;
+            else if(i==3)
+                cout<<" FATAL ERROR caught in init_chemistry: Photochem reaction product index exceeds num_species! "<<endl;
+            else if(i==4)
+                cout<<" FATAL ERROR caught in init_chemistry: Photochem reaction band index exceeds num_bands! "<<endl;
+            
+        } 
+        catch(...) {
+            
+            cout<<"Misc error caught in init_chemistry."<<endl;
+        }
+        
+        
+        
+        //Catch num_species < index error etc.
+        
+        
+    }
+    
     
     //for(int j=15;j<18;j++)
     //    cout<<" POS5 dens["<<j<<"] = "<<species[0].u[j].u1<<" temp = "<<species[0].prim[j].temperature<<endl;
@@ -1051,6 +1087,11 @@ c_Species::c_Species(c_Sim *base_simulation, string filename, string species_fil
         
         //for(int j=num_cells-1;j<num_cells+1;j++)
         //    cout<<" POS3.5 dens["<<j<<"] = "<<u[j].u1<<" temp = "<<prim[j].temperature<<" E/e/p = "<<u[j].u3<<"/"<<prim[j].internal_energy<<"/"<<prim[j].pres<<" rho*cv*T = "<<cv*u[j].u1*prim[j].temperature<<endl;
+        
+        mass_reservoir = 0.;
+        t_evap = 50.;
+        latent_heat = 3.34e5*1e7/1e3; //3.34e5 J/kg
+        p_sat = 1e6;
         
         // Apply boundary conditions
         apply_boundary_left(u) ;
@@ -1454,6 +1495,40 @@ void c_Species::apply_boundary_left(std::vector<AOS>& u) {
     switch(boundary_left) {
         case BoundaryType::user:
             user_boundary_left(u);
+            /*double dm = 0;
+            
+            mass_reservoir = 0.;
+            t_evap = 50.;
+            latent_heat = 3.34e5*1e7/1e3; //3.34e5 J/kg
+            p_sat = 1e-3 * std::exp(latent_heat/(Rgas*T*(1.-T_evap/prim[i].temperature)));
+            
+            for (int i=num_ghosts; i > 0; i--) {
+                
+                dp = prim[2].press - p_sat;
+                
+                if(dp < 0) { // Condensation
+                    dm = -1;
+                }
+                else{ //Evaporation
+                    
+                    if(mass_reservoir < 0.) {
+                        dp = 0.;
+                        dm = 0;
+                    }
+                        
+                    dm = 1;
+                }
+                
+                mass_reservoir += base->dt * dm;
+                
+                AOS_prim prim ;
+                eos->compute_primitive(&u[i],&prim, 1) ;
+                prim.pres   = prim[2] - dp;
+                prim.pres   = std::max( prim.pres, 0.0) ;
+                eos->compute_conserved(&prim, &u[i-1], 1) ;
+            }
+            
+            */
             break;
         case BoundaryType::open:
             for (int i=num_ghosts; i > 0; i--) {

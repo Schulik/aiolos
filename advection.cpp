@@ -90,7 +90,10 @@ void c_Sim::execute() {
                 species[s].compute_pressure(species[s].u);
             compute_total_pressure();
         }
-            
+        
+        //if(steps>1000)
+        //    cout<<"steps/dt/time = "<<steps<<"/"<<dt<<"/"<<globalTime<<endl;
+        
         //if(steps==3209954)
         //    debug = 1;
             
@@ -216,9 +219,6 @@ void c_Sim::execute() {
         //cout<<" POS0.5 num_cells+1 = "<<num_cells+1<<" T/p/rho/e = "<<species[1].prim[num_cells+1].temperature<<"/"<<species[1].prim[num_cells+1].pres<<"/"<<species[1].prim[num_cells+1].density<<"/"<<species[1].prim[num_cells+1].internal_energy<<" u1/u3 = "<<species[1].u[num_cells+1].u1<<"/"<<species[1].u[num_cells+1].u3<<endl;
         
         
-        
-        
-        
         if (order == IntegrationType::first_order) {
             globalTime += dt;
         }
@@ -339,8 +339,14 @@ void c_Sim::execute() {
             reset_dS();
             
             // Compute high-energy dS and ionization
-            if(photochemistry_level > 0)
+            if(photochemistry_level == 1) {
                 do_photochemistry();
+                
+            }
+            else if(photochemistry_level == 2) {
+                do_chemistry();
+            }
+                
             
             update_dS();               //Compute low-energy dS
             

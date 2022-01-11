@@ -25,8 +25,11 @@
 #define NUM_SPECIES Eigen::Dynamic
 #endif
 
-
 using namespace std;
+
+using Matrix_t = Eigen::Matrix<double, NUM_SPECIES,NUM_SPECIES, Eigen::RowMajor>;
+using Vector_t = Eigen::Matrix<double, NUM_SPECIES, 1>;
+
 
 //Basic physics quantities
 const double G        = 6.678e-8; //cgs units
@@ -184,6 +187,45 @@ void update_cons_prim_after_friction(AOS* cons, AOS_prim* prim, double dEkin, do
 
 
 class c_Species;
+//class c_reaction;
+//class c_photochem_reaction;
+
+class c_reaction
+{    
+public:
+    int reaction_number = -1;
+    std::vector<int> educts;   //A list of indices
+    std::vector<int> products; //A list of indices
+    std::vector<double> e_stoch;
+    std::vector<double> p_stoch;
+    double delta_stoch;
+    
+    int e_num = 0.;
+    int p_num = 0.;
+    
+    double r = 0.;       //Reaction coefficient (a constant for now)
+    
+public:
+    c_reaction(int reacnum, int num_species, std::vector<int> e_indices,std::vector<int> p_indices,std::vector<double> e_stoch, std::vector<double> p_stoch, double reaction_rate);
+};
+    
+class c_photochem_reaction 
+{
+public:
+    int reaction_number = -1;
+    std::vector<int> educts;   //A list of indices
+    std::vector<int> products; //A list of indices
+    std::vector<double> e_stoch;
+    std::vector<double> p_stoch;
+    
+    int e_num = 0.;
+    int p_num = 0.;
+    
+    //Photochem specific
+    int band;
+    
+    c_photochem_reaction(int reacnum, int num_species, int num_bands, std::vector<int> e_indices, std::vector<int> p_indices, std::vector<double> e_stoch, std::vector<double> p_stoch, int band);
+};
 
 ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -348,8 +390,8 @@ public:
     
     int friction_solver;
     
-    using Matrix_t = Eigen::Matrix<double, NUM_SPECIES,NUM_SPECIES, Eigen::RowMajor>;
-    using Vector_t = Eigen::Matrix<double, NUM_SPECIES, 1>;
+    //using Matrix_t = Eigen::Matrix<double, NUM_SPECIES,NUM_SPECIES, Eigen::RowMajor>;
+    //using Vector_t = Eigen::Matrix<double, NUM_SPECIES, 1>;
     Matrix_t friction_matrix_T;
     Matrix_t identity_matrix;
     Matrix_t friction_coefficients;
@@ -442,6 +484,30 @@ public:
     int rad_solver_max_iter = 1;
     double epsilon_rad_min = 1e-1;  // Some convergence measure for the radiation solver, if needed
     double density_floor;
+    
+    //
+    // (Photo)Chemistry
+    //
+    int use_chemistry;
+    std::vector<c_reaction> reactions;
+    std::vector<c_photochem_reaction> photoreactions;
+    
+    Vector_t reaction_b;
+    Vector_t n_olds;
+    Vector_t n_news;
+    Matrix_t reaction_matrix;
+    Eigen::PartialPivLU<Matrix_t> LUchem;
+    
+    
+    void init_reactions(int cdebug);
+    void do_chemistry();
+    
+    int solver_cchem_implicit_general(double dt, int num_spec, int cdebug);
+    int solver_cchem_implicit_specialized_cochem(double dt, int num_spec, int cdebug);
+    
+    std::vector<double> thermo_poly(double T,double a1,double a2,double a3,double a4,double a5,double a6,double a7,double a8,double a9);
+    std::vector<double> get_thermo_variables(double T,string species_string);
+    
     
     ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     //
@@ -638,6 +704,14 @@ public:
     double pressure_broadening_factor;
     double pressure_broadening_exponent;
     
+    //
+    // Boundary condensation mass reservoir variables
+    //
+    double mass_reservoir;
+    double p_sat;
+    double t_evap;
+    double latent_heat;
+    
     ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     //
     // Primitives and other helper quantities
@@ -759,7 +833,7 @@ public:
     int suppress_warnings;
     void print_AOS_component_tofile(int timestepnumber);
     
-    void read_species_data(string filename, int species_index);
+    int read_species_data(string filename, int species_index);
     void read_opacity_table(string filename);
     void set_debug(int);
     void set_suppress_warnings(int j) {suppress_warnings = j;}    

@@ -40,7 +40,7 @@ double H_radiative_recombination(double T_e) {
     // Case B
     //return 2.753e-14 * pow(x, 1.500) / pow(1 + pow(x / 2.740, 0.407), 2.242);
     ////       2.753e-14 * pow(2 * 157807 / x, 1.500) / pow(1 + pow(2 * 157807 / x / 2.740, 0.407), 2.242)
-    return 1e+0 * 2.7e-13; // * pow(T_e/1e4, -0.9); //MC2009 value
+    return 1e+0 * 2.7e-13 * pow(T_e/1e4, -0.9); //MC2009 value
     
     //JOwens code:
     //  rec_coeff =  8.7d-27*tgas**0.5 * t3**(-0.2)*(1+t6**0.7)**(-1)
@@ -51,7 +51,7 @@ double H_threebody_recombination(double T_e) {
     if (T_e < 220) T_e = 220.;
 
     double x = 2 * 157807 / T_e;
-    return 1.e-20 * (1.005e-14 / (T_e * T_e * T_e)) * pow(x, -1.089) /
+    return 1.e0 * (1.005e-14 / (T_e * T_e * T_e)) * pow(x, -1.089) /
            pow(1 + pow(x / 0.354, 0.874), 1.101);
 }
 double H_collisional_ionization(double T_e) {
@@ -63,7 +63,7 @@ double H_collisional_ionization(double T_e) {
     double x = 2 * 157807. / T_e;
     double term = 21.11 * pow(T_e, -1.5) * pow(x, -1.089) /
                   pow(1 + pow(x / 0.354, 0.874), 1.101);
-    return 1e-20 * term * exp(-0.5 * x);
+    return 1e0 * term * exp(-0.5 * x);
 }
 
 // Cooling rate per electron.
@@ -87,7 +87,6 @@ double HOnly_cooling(const std::array<double, 3> nX, double Te) {
         term = 7.562-27 * std::pow(Te, 0.42872) ;
     cooling += nX[1] * term;
     
-
     // Collisional ionization cooling:
     term = kb * T_HI * H_collisional_ionization(Te);
     cooling += nX[0] * term;
@@ -186,8 +185,14 @@ class C2Ray_HOnly_ionization {
 
     double photoionization_rate(double x_bar) const {
         double ion = 0;
-        for(int b=0; b < num_he_bands; b++)
-            ion += Gamma0[b]/(nH ) * -std::expm1(-tau0[b] * (1 - x_bar));
+            
+        for(int b=0; b < num_he_bands; b++) {
+            if( tau0[b] * (1 - x_bar) < 1e-10 )
+                ion += Gamma0[b]/(nH ) * tau0[b] * (1. - 0.5 * tau0[b] * (1 - x_bar));
+            else
+                ion += Gamma0[b]/(nH * (1-x_bar) ) * -std::expm1(-tau0[b] * (1 - x_bar));
+        }
+                
         return ion ;
     }
 
@@ -273,6 +278,113 @@ class C2Ray_HOnly_heating {
     std::array<double, 3> nX, T;
     Mat3 coll_mat;
 };
+
+double get_implicit_photochem() { //double dt, double n1_old, double n2_old, double F, double dx, double kappa, double alpha
+
+    
+    int cnt = 0;
+    long double dt = 1e-2;
+    long double tmax = 1e4;
+    long double globalT = 0.;
+    long double n1_old = 1.;
+    long double n2_old = 0.;
+    
+    long double F = 1e16;
+    long double dx = 1e7;
+    long double kappa = 2.2e-18;
+    long double alpha = 2.7e-13;
+     /*
+    long double F = 1e16;
+    long double dx = 1e-5;
+    long double kappa = 1e-5;
+    long double alpha = 1.; */
+    
+    cout << "Size of double : " << sizeof(double) << " bytes" << endl;
+    cout << "Size of long double : " << sizeof(long double) << " bytes" << endl;
+     
+    char a;
+    cout<<"Starting implicit photochem time evolution. Press any button to continue."<<endl;
+    cin>>a;
+    
+    while(globalT < tmax) {
+    
+        long double dtau = dx*kappa*n1_old;
+        
+        //long double b1 = n1_old - dt * ( n2_old*n2_old * alpha + F/dx*(1. - std::exp(-dtau)*(1+dtau)) );
+        //long double b2 = n2_old + dt * ( n2_old*n2_old * alpha + F/dx*(1. - std::exp(-dtau)*(1+dtau)) );
+        
+        long double b1 = n1_old - dt * ( n2_old*n2_old * alpha + F/dx*(- std::expm1(-dtau)-dtau*std::exp(-dtau) ) );
+        long double b2 = n2_old + dt * ( n2_old*n2_old * alpha + F/dx*(- std::expm1(-dtau)-dtau*std::exp(-dtau)) );
+        
+        long double dA00 = 1. + dt*F*kappa*std::exp(-dtau);
+        long double dA11 = 1. + dt*2.*n2_old*alpha;
+        
+        long double dA01 =    - dt*F*kappa*std::exp(-dtau);
+        long double dA10 =    - dt*2*n2_old*alpha;
+        
+        long double n2_new = (b2 * dA00 - b1 * dA01) / (dA00*dA11-dA01*dA10);
+        long double n1_new = (b1 - n2_new * dA10 )/dA00;
+        
+        n1_old=n1_new;
+        n2_old=n2_new;
+        
+        cnt++;
+        globalT += dt;
+    }
+    
+    cout<<"Done with photochem time evolution. Final nvalues = "<<n1_old<<"/"<<n2_old<<"."<<endl;
+    cout<<"1- Final nvalues = "<<1.-n1_old<<"/"<<1.-n2_old<<". Press any button to continue."<<endl;
+    cin>>a;
+    
+    return n2_old/(n1_old+n2_old);
+}
+
+//
+// Implicit solver for two variables, ne and np.
+//
+double get_implicit_photochem2(double dt, double n1_old, double n2_old, double F, double dx, double kappa, double alpha) {
+
+
+        long double dtau = dx*kappa*n1_old;
+        
+        long double b1 = n1_old - dt * ( n2_old*n2_old * alpha + F/dx*(- std::expm1(-dtau)-dtau*std::exp(-dtau) ) );
+        long double b2 = n2_old + dt * ( n2_old*n2_old * alpha + F/dx*(- std::expm1(-dtau)-dtau*std::exp(-dtau)) );
+        
+        long double dA00 = 1. + dt*F*kappa*std::exp(-dtau);
+        long double dA11 = 1. + dt*2.*n2_old*alpha;
+        
+        long double dA01 =    - dt*F*kappa*std::exp(-dtau);
+        long double dA10 =    - dt*2*n2_old*alpha;
+        
+        long double n2_new = (b2 * dA00 - b1 * dA01) / (dA00*dA11-dA01*dA10);
+        long double n1_new = (b1 - n2_new * dA10 )/dA00;
+        
+        n1_old=n1_new;
+        n2_old=n2_new;
+    
+    return n2_old/(n1_old+n2_old);
+}
+
+//
+// Reduced, single equation implicit solver for the ion fraction, using ne+np=const.
+//
+double get_implicit_photochem3(double dt, double n1_old, double n2_old, double F, double dx, double kappa, double alpha) {
+    
+    long double ntot = (n1_old + n2_old);
+    long double x    = n2_old/ntot;
+    long double dtau = dx*kappa*ntot*(1-x);
+    
+    long double nom   = 1 + dt*F*kappa*std::exp(-dtau) +   dt*ntot*alpha * x;
+    long double denom = 1 + dt*F*kappa*std::exp(-dtau) + 2*dt*ntot*alpha * x;
+    long double source= dt*F/(ntot*dx) * (-std::expm1(-dtau));
+    
+    long double xnew = (x*nom + source) / denom;
+    
+    long double n2_new = xnew * ntot;
+    long double n1_new = (1-xnew) * ntot;
+    
+    return n2_old/(n1_old+n2_old);
+}
 
 void c_Sim::do_photochemistry() {
     // cout<<" Doing photochemistry "<<endl;
@@ -364,21 +476,23 @@ void c_Sim::do_photochemistry() {
                 double xmin = std::max((nX[1] - nX[2]) / (nX[0] + nX[1]), 0.0);
                 double x_bar;
                 try {
-                        x_bar = root_solver_ion.solve(xmin, 1, ion);
+                        x_bar = get_implicit_photochem3(dt, nX[0], nX[1], Gamma0[1], dx[j], species[0].opacity_twotemp(j, 1) * mX[0], 2.7e-13);
+                        //x_bar = get_implicit_photochem(); //dt, n1_old, n2_old, F, dx, kappa, alpha
+                        double x_bar2 = root_solver_ion.solve(xmin, 1, ion);
                 }
                 catch(...) { }
                 
                 //if(j==num_cells-2 && steps==532928){
-                if(j==132 && steps==532928){
+                if(j==132 && ( steps==532928 || steps==866083 || steps==2021166 || steps == 3722009)) {
                 //if(j==244 && steps==532928){
-                    
+                
                         double Tn = species[0].prim[j].temperature;
                         double Tp = species[1].prim[j].temperature;
                         double Te = species[2].prim[j].temperature;
                         double Gamma0final = 0.;
         
                         for(int b=1; b < num_he_bands; b++)
-                            Gamma0final += Gamma0[b]/nX[0] * -std::expm1(-dtaus[b] * (1 - x_bar));
+                            Gamma0final += Gamma0[b]/(nX[0]) * -std::expm1(-dtaus[b] * (1 - x_bar));
                         
                         double R = H_radiative_recombination(Te);
                         double C = H_collisional_ionization(Te);
@@ -410,8 +524,8 @@ void c_Sim::do_photochemistry() {
                                 << "\t" << uX[0] << " " << uX[1] << " " << uX[2] << "\n" 
                                 << "\t" << nX[0] << " " << nX[1] << " " << nX[2] << "\n" 
                                 << "\t" << pX[0] << " " << pX[1] << " " << pX[2] << "\n" ;
-                                cout<<" r = "<<x_i12[j]<<endl;
-                                cout<<" G0 = "<<Gamma0[1]<<endl
+                                
+                                cout<<" "<<endl
                                 <<" recomb rate = "<<ne*R<<endl
                                 <<" Gamma_manual = "<<Gmanual<<endl
                                 <<" Gamma_manual/nx0 = "<<Gmanual/nX[0]<<endl

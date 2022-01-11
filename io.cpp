@@ -29,8 +29,30 @@
 //
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-void c_Species::read_species_data(string filename, int species_index) {
+int c_Species::read_species_data(string filename, int species_index) {
     
+    //////////////////////////////////////////////////////////
+    //////////////////////////////////////////////////////////
+    //
+    // Read and interpret *.spc first
+    //
+    //////////////////////////////////////////////////////////
+    //////////////////////////////////////////////////////////
+    
+    //
+    // If the opacity model is 'P', physical, then we read in opacity data from files
+    //
+    opacity_avg_solar            = Eigen::VectorXd::Zero(num_bands_in); //num_cells * num_bands
+    opacity_avg_planck           = Eigen::VectorXd::Zero(num_bands_out); //num_cells * num_bands
+    opacity_avg_rosseland        = Eigen::VectorXd::Zero(num_bands_out); //num_cells * num_bands
+    
+    /*if (base->opacity_model == 'C')  {
+        for(int b = 0; b < num_bands_in; b++) opacity_avg_solar(b)      = const_opacity;
+        for(int b = 0; b < num_bands_out; b++) opacity_avg_planck(b)    = const_opacity;
+        for(int b = 0; b < num_bands_out; b++) opacity_avg_rosseland(b) = const_opacity;
+        
+        return 0;
+    }*/
     
     ifstream file(filename);
     string line;
@@ -101,12 +123,13 @@ void c_Species::read_species_data(string filename, int species_index) {
     
     if(debug > 0) cout<<"         Leaving species readin now. Bye!"<<endl;
     
+    //////////////////////////////////////////////////////////
+    //////////////////////////////////////////////////////////
     //
-    // If the opacity model is 'P', physical, then we read in opacity data from files
+    // Read and interpret *.opa, *.op2, *.op3, and *.aiopa files
     //
-    opacity_avg_solar            = Eigen::VectorXd::Zero(num_bands_in); //num_cells * num_bands
-    opacity_avg_planck           = Eigen::VectorXd::Zero(num_bands_out); //num_cells * num_bands
-    opacity_avg_rosseland        = Eigen::VectorXd::Zero(num_bands_out); //num_cells * num_bands
+    //////////////////////////////////////////////////////////
+    //////////////////////////////////////////////////////////
     
     //if(num_opacity_datas > -1) 
     if(base->opacity_model == 'P' || base->opacity_model == 'M' || base->opacity_model == 'C') {
@@ -160,11 +183,9 @@ void c_Species::read_species_data(string filename, int species_index) {
             if(debug > 1) {
                 //cout<<"stringlist "<<stringlist<<" ";
                 cout<< "file_opacity_data = "<<file_opacity_data(data_count, 0)<<" "<<file_opacity_data(data_count, 1);
-                
                 if(num_readin_columns >= 2) cout<<" "<<file_opacity_data(data_count, 2);
                 if(num_readin_columns >= 3) cout<<" "<<file_opacity_data(data_count, 3);
                 cout<<endl;
-                
             }
             data_count++;
         }
@@ -370,6 +391,11 @@ void c_Species::read_species_data(string filename, int species_index) {
             
             
         //cout<<"pos4"<<endl;
+        
+        for(int b = 0; b < num_bands_in; b++) opacity_avg_solar(b)      *=  base->const_opacity_solar_factor;
+        for(int b = 0; b < num_bands_out; b++) opacity_avg_planck(b)    *=  base->const_opacity_planck_factor;
+        for(int b = 0; b < num_bands_out; b++) opacity_avg_rosseland(b) *=  base->const_opacity_rosseland_factor;
+        
         //Done! Now debug plot stuff
         cout<<"Done reading in data for species = "<<species_index<<". Wavelength grids in/out = ";
         for(int b = 0; b <= num_bands_in; b++) cout<<base->l_i_in[b]<<"/";
@@ -406,9 +432,9 @@ void c_Species::read_species_data(string filename, int species_index) {
         read_opacity_table(opacityinputfile);
     }
     else {
-        for(int b = 0; b < num_bands_in; b++) opacity_avg_solar(b)      = const_opacity;
-        for(int b = 0; b < num_bands_out; b++) opacity_avg_planck(b)    = const_opacity;
-        for(int b = 0; b < num_bands_out; b++) opacity_avg_rosseland(b) = const_opacity;
+        for(int b = 0; b < num_bands_in; b++) opacity_avg_solar(b)      =  base->const_opacity_solar_factor * const_opacity;
+        for(int b = 0; b < num_bands_out; b++) opacity_avg_planck(b)    =  base->const_opacity_planck_factor * const_opacity;
+        for(int b = 0; b < num_bands_out; b++) opacity_avg_rosseland(b) =  base->const_opacity_rosseland_factor * const_opacity;
     }
     
     
@@ -418,6 +444,8 @@ void c_Species::read_species_data(string filename, int species_index) {
         char stopchar;
         cin>>stopchar;
     }
+    
+    return 0;
 }
 
 
