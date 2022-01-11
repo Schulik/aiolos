@@ -112,7 +112,7 @@ vector<string> stringsplit(const string& str, const string& delim)
         if (pos == string::npos) pos = str.length();
         string token = str.substr(prev, pos-prev);
         if (!token.empty()) tokens.push_back(token);
-        prev = pos + delim.length();
+        prev = pos + 1 ; 
     }
     while (pos < str.length() && prev < str.length());
     return tokens;
