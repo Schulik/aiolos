@@ -23,6 +23,9 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
         
         string filename    = workingdir + filename_solo;
         string speciesfile = workingdir + speciesfile_solo;
+
+        // Get parameter info
+        parameters = Parameterfile(filename, debug) ;
         
         cout<<" Opening parameter file "<<filename<<endl;
         
@@ -32,36 +35,36 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
         //
         ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         double dx0;
-        type_of_grid     = read_parameter_from_file<int>(filename,"PARI_GRID_TYPE", debug, 0).value;
-        domain_min       = read_parameter_from_file<double>(filename,"PARI_DOMAIN_MIN", debug).value;
-        domain_max       = read_parameter_from_file<double>(filename,"PARI_DOMAIN_MAX", debug).value;
-        geometry         = read_parameter_from_file<Geometry>(filename, "PARI_GEOMETRY", debug, Geometry::cartesian).value;
-        order            = read_parameter_from_file<IntegrationType>(filename, "PARI_ORDER", debug, IntegrationType::second_order).value;
+        type_of_grid     = parameters.read<int>("PARI_GRID_TYPE", 0).value;
+        domain_min       = parameters.read<double>("PARI_DOMAIN_MIN").value;
+        domain_max       = parameters.read<double>("PARI_DOMAIN_MAX").value;
+        geometry         = parameters.read<Geometry>("PARI_GEOMETRY", Geometry::cartesian).value;
+        order            = parameters.read<IntegrationType>( "PARI_ORDER", IntegrationType::second_order).value;
         
-        num_bands_in     = read_parameter_from_file<int>(filename,"PARI_NUM_BANDS", debug, 1).value;
-        num_bands_out    = read_parameter_from_file<int>(filename,"NUM_BANDS_OUT", debug, num_bands_in).value;
-        lambda_min_in       = read_parameter_from_file<double>(filename,"PARI_LAM_MIN", debug, 1e-1).value;
-        lambda_max_in       = read_parameter_from_file<double>(filename,"PARI_LAM_MAX", debug, 10.).value;
-        lambda_per_decade_in= read_parameter_from_file<double>(filename,"PARI_LAM_PER_DECADE", debug, 10.).value;
-        lambda_min_out       = read_parameter_from_file<double>(filename,"PARI_LAM_MIN_OUT", debug, lambda_min_in).value;
-        lambda_max_out       = read_parameter_from_file<double>(filename,"PARI_LAM_MAX_OUT", debug, lambda_max_in).value;
-        lambda_per_decade_out= read_parameter_from_file<double>(filename,"PARI_LAM_PER_DECADE_OUT", debug, lambda_per_decade_in).value;
+        num_bands_in     = parameters.read<int>("PARI_NUM_BANDS", 1).value;
+        num_bands_out    = parameters.read<int>("NUM_BANDS_OUT", num_bands_in).value;
+        lambda_min_in       = parameters.read<double>("PARI_LAM_MIN", 1e-1).value;
+        lambda_max_in       = parameters.read<double>("PARI_LAM_MAX", 10.).value;
+        lambda_per_decade_in= parameters.read<double>("PARI_LAM_PER_DECADE", 10.).value;
+        lambda_min_out       = parameters.read<double>("PARI_LAM_MIN_OUT", lambda_min_in).value;
+        lambda_max_out       = parameters.read<double>("PARI_LAM_MAX_OUT", lambda_max_in).value;
+        lambda_per_decade_out= parameters.read<double>("PARI_LAM_PER_DECADE_OUT", lambda_per_decade_in).value;
         
-        star_mass        =  read_parameter_from_file<double>(filename,"PARI_MSTAR", debug, 1.).value;
+        star_mass        =  parameters.read<double>("PARI_MSTAR", 1.).value;
         star_mass        *= msolar;
-        T_star           = read_parameter_from_file<double>(filename,"PARI_TSTAR", debug, 5777.).value;
-        R_star           = read_parameter_from_file<double>(filename,"PARI_RSTAR", debug, 0.).value;
-        UV_star          = read_parameter_from_file<double>(filename,"PARI_UVSTAR", debug, 0.).value;
-        X_star           = read_parameter_from_file<double>(filename,"PARI_XSTAR", debug, 0.).value;
-        Lyalpha_star     = read_parameter_from_file<double>(filename,"PARI_LYASTAR", debug, 0.).value;
+        T_star           = parameters.read<double>("PARI_TSTAR", 5777.).value;
+        R_star           = parameters.read<double>("PARI_RSTAR", 0.).value;
+        UV_star          = parameters.read<double>("PARI_UVSTAR", 0.).value;
+        X_star           = parameters.read<double>("PARI_XSTAR", 0.).value;
+        Lyalpha_star     = parameters.read<double>("PARI_LYASTAR", 0.).value;
         
-        L_core           = read_parameter_from_file<double>(filename,"PARI_LPLANET", debug, 0.).value;
-        use_planetary_temperature = read_parameter_from_file<int>(filename,"USE_PLANET_TEMPERATURE", debug, 0).value;
-        core_cv           = read_parameter_from_file<double>(filename,"PARI_CORE_CV", debug, 1.e9).value;
+        L_core           = parameters.read<double>("PARI_LPLANET", 0.).value;
+        use_planetary_temperature = parameters.read<int>("USE_PLANET_TEMPERATURE", 0).value;
+        core_cv           = parameters.read<double>("PARI_CORE_CV", 1.e9).value;
         
-        radiation_matter_equilibrium_test = read_parameter_from_file<int>(filename,"RAD_MATTER_EQUI_TEST", debug, 0).value;
-        radiation_diffusion_test_linear   = read_parameter_from_file<int>(filename,"RAD_DIFF_TEST_LIN", debug, 0).value;
-        radiation_diffusion_test_nonlinear= read_parameter_from_file<int>(filename,"RAD_DIFF_TEST_NLIN", debug, 0).value;
+        radiation_matter_equilibrium_test = parameters.read<int>("RAD_MATTER_EQUI_TEST", 0).value;
+        radiation_diffusion_test_linear   = parameters.read<int>("RAD_DIFF_TEST_LIN", 0).value;
+        radiation_diffusion_test_nonlinear= parameters.read<int>("RAD_DIFF_TEST_NLIN", 0).value;
         
         if(debug > 0) cout<<"Using integration order "<<order<<" while second order would be "<<IntegrationType::second_order<<endl;
         
@@ -71,18 +74,18 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
             num_ghosts = 2 ;
 
         if(type_of_grid == 0) {
-            dx0              = read_parameter_from_file<double>(filename,"PARI_DOMAIN_DX", debug).value;
+            dx0              = parameters.read<double>("PARI_DOMAIN_DX").value;
             num_cells        = (int)((domain_max - domain_min)/dx0);
             cout<<"Domain specifics:  "<<domain_min<<" | . . . "<<num_cells<<" uniform cells . . . | "<<domain_max<<endl;
         }
         else {
-            cells_per_decade = read_parameter_from_file<double>(filename,"PARI_CELLS_PER_DECADE", debug).value;
+            cells_per_decade = parameters.read<double>("PARI_CELLS_PER_DECADE").value;
             num_cells        = (int) ( (log10f(domain_max) - log10f(domain_min)) * cells_per_decade );
             dx0              = domain_min;
             
             if(type_of_grid==2) {
-                    grid2_transition       = read_parameter_from_file<double>(filename,"GRID2_TRANSITION", debug, 99.e99).value;
-                    grid2_cells_per_decade = read_parameter_from_file<double>(filename,"GRID2_CELLS_PER_DECADE", debug, 10).value;
+                    grid2_transition       = parameters.read<double>("GRID2_TRANSITION", 99.e99).value;
+                    grid2_cells_per_decade = parameters.read<double>("GRID2_CELLS_PER_DECADE", 10).value;
                     
                     num_cells          = (int) ( (log10f(grid2_transition) - log10f(domain_min)) * cells_per_decade );
                     grid2_transition_i = num_cells + num_ghosts;
@@ -91,7 +94,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
             }
             cout<<"Domain specifics:  "<<domain_min<<" | . .  .  "<<num_cells<<" nonuniform cells .       .             .     | "<<domain_max<<endl;
         }
-        reverse_hydrostat_constrution = read_parameter_from_file<int>(filename,"REVERSE_HYDROSTAT_CONSTRUCTION", debug, 0).value;
+        reverse_hydrostat_constrution = parameters.read<int>("REVERSE_HYDROSTAT_CONSTRUCTION", 0).value;
         
         //
         // Check that cell number looks fine. Shoutout if its not.
@@ -104,14 +107,14 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
             
         if(debug > 0) cout<<"Init: Finished reading grid parameters."<<endl;
         
-        cflfactor   = read_parameter_from_file<double>(filename,"PARI_CFLFACTOR", debug, 1.).value;
-        t_max       = read_parameter_from_file<double>(filename,"PARI_TIME_TMAX", debug).value;
-        max_timestep_change = read_parameter_from_file<double>(filename,"MAX_TIMESTEP_CHANGE", debug, 1.1).value;
-        dt_min_init         = read_parameter_from_file<double>(filename,"DT_MIN_INIT", debug, 1e-20).value;
-        output_time = read_parameter_from_file<double>(filename,"PARI_TIME_OUTPUT", debug).value; 
-        monitor_time = read_parameter_from_file<double>(filename,"PARI_TIME_DT", debug).value;
-        CFL_break_time = read_parameter_from_file<double>(filename,"CFL_BREAK_TIME", debug, std::numeric_limits<double>::max()).value ;
-        energy_epsilon = read_parameter_from_file<double>(filename,"ENERGY_EPSILON", debug, 0.01).value;
+        cflfactor   = parameters.read<double>("PARI_CFLFACTOR", 1.).value;
+        t_max       = parameters.read<double>("PARI_TIME_TMAX").value;
+        max_timestep_change = parameters.read<double>("MAX_TIMESTEP_CHANGE", 1.1).value;
+        dt_min_init         = parameters.read<double>("DT_MIN_INIT", 1e-20).value;
+        output_time = parameters.read<double>("PARI_TIME_OUTPUT").value; 
+        monitor_time = parameters.read<double>("PARI_TIME_DT").value;
+        CFL_break_time = parameters.read<double>("CFL_BREAK_TIME", std::numeric_limits<double>::max()).value ;
+        energy_epsilon = parameters.read<double>("ENERGY_EPSILON", 0.01).value;
         
         globalTime = 0.0;    
         timecount = 0;
@@ -130,48 +133,48 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
         //
         ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         int use_volume_centre ;
-        problem_number    = read_parameter_from_file<int>(filename,"PARI_PROBLEM_NUMBER", debug).value;
-        use_self_gravity  = read_parameter_from_file<int>(filename,"PARI_SELF_GRAV_SWITCH", debug, 0).value;
-        use_tides         = read_parameter_from_file<int>(filename,"USE_TIDES", debug, 0).value;
-        use_linear_gravity= read_parameter_from_file<int>(filename,"PARI_LINEAR_GRAV", debug, 0).value;
-        use_rad_fluxes    = read_parameter_from_file<int>(filename,"PARI_USE_RADIATION", debug, 0).value;
-        use_collisional_heating = read_parameter_from_file<int>(filename,"PARI_USE_COLL_HEAT", debug, 1).value;
-        use_drag_predictor_step = read_parameter_from_file<int>(filename, "PARI_SECONDORDER_DRAG", debug, 0).value;
-        use_volume_centre = read_parameter_from_file<int>(filename, "PARI_USE_VOLUME_CENTRE", debug, 1).value;
-        init_wind         = read_parameter_from_file<int>(filename,"PARI_INIT_WIND", debug, 0).value;
-        alpha_collision   = read_parameter_from_file<double>(filename,"PARI_ALPHA_COLL", debug, 0).value;
-        //init_mdot              = read_parameter_from_file<double>(filename,"PARI_MDOT", debug, -1.).value;
-        init_sonic_radius = read_parameter_from_file<double>(filename,"INIT_SONIC_RADIUS", debug, -1e10).value;
-        rad_energy_multiplier=read_parameter_from_file<double>(filename,"PARI_RAD_MULTIPL", debug, 1.).value;
-        collision_model   = read_parameter_from_file<char>(filename,"PARI_COLL_MODEL", debug, 'C').value;
-        opacity_model     = read_parameter_from_file<char>(filename,"PARI_OPACITY_MODEL", debug, 'C').value;
+        problem_number    = parameters.read<int>("PARI_PROBLEM_NUMBER").value;
+        use_self_gravity  = parameters.read<int>("PARI_SELF_GRAV_SWITCH", 0).value;
+        use_tides         = parameters.read<int>("USE_TIDES", 0).value;
+        use_linear_gravity= parameters.read<int>("PARI_LINEAR_GRAV", 0).value;
+        use_rad_fluxes    = parameters.read<int>("PARI_USE_RADIATION", 0).value;
+        use_collisional_heating = parameters.read<int>("PARI_USE_COLL_HEAT", 1).value;
+        use_drag_predictor_step = parameters.read<int>("PARI_SECONDORDER_DRAG", 0).value;
+        use_volume_centre = parameters.read<int>("PARI_USE_VOLUME_CENTRE", 1).value;
+        init_wind         = parameters.read<int>("PARI_INIT_WIND", 0).value;
+        alpha_collision   = parameters.read<double>("PARI_ALPHA_COLL", 0).value;
+        //init_mdot              = parameters.read<double>("PARI_MDOT", -1.).value;
+        init_sonic_radius = parameters.read<double>("INIT_SONIC_RADIUS", -1e10).value;
+        rad_energy_multiplier=parameters.read<double>("PARI_RAD_MULTIPL", 1.).value;
+        collision_model   = parameters.read<char>("PARI_COLL_MODEL", 'C').value;
+        opacity_model     = parameters.read<char>("PARI_OPACITY_MODEL", 'C').value;
         if(opacity_model == 'M')
             init_malygin_opacities();
         cout<<" CHOSEN OPACITY MODEL = "<<opacity_model<<endl;
         
-        no_rad_trans               = read_parameter_from_file<double>(filename,"NO_RAD_TRANS", debug, 1.).value;
-        photocooling_multiplier    = read_parameter_from_file<double>(filename,"PHOTOCOOL_MULTIPLIER", debug, 1.).value;
-        //radiation_solver           = read_parameter_from_file<int>(filename,"RADIATION_SOLVER", debug, 0).value;
-        closed_radiative_boundaries = read_parameter_from_file<int>(filename,"PARI_CLOSED_RADIATIVE_BOUND", debug, 0).value;
-        const_opacity_solar_factor = read_parameter_from_file<double>(filename,"CONSTOPA_SOLAR_FACTOR", debug, 1.).value;
-        const_opacity_rosseland_factor = read_parameter_from_file<double>(filename,"CONSTOPA_ROSS_FACTOR", debug, 1.).value;
-        const_opacity_planck_factor = read_parameter_from_file<double>(filename,"CONSTOPA_PLANCK_FACTOR", debug, 1.).value;
-        temperature_model = read_parameter_from_file<char>(filename,"INIT_TEMPERATURE_MODEL", debug, 'P').value;
-        friction_solver   = read_parameter_from_file<int>(filename,"FRICTION_SOLVER", debug, 0).value;
-        do_hydrodynamics  = read_parameter_from_file<int>(filename,"DO_HYDRO", debug, 1).value;
-        photochemistry_level = read_parameter_from_file<int>(filename,"PHOTOCHEM_LEVEL", debug, 0).value;
+        no_rad_trans               = parameters.read<double>("NO_RAD_TRANS", 1.).value;
+        photocooling_multiplier    = parameters.read<double>("PHOTOCOOL_MULTIPLIER", 1.).value;
+        //radiation_solver           = parameters.read<int>("RADIATION_SOLVER", 0).value;
+        closed_radiative_boundaries = parameters.read<int>("PARI_CLOSED_RADIATIVE_BOUND", 0).value;
+        const_opacity_solar_factor = parameters.read<double>("CONSTOPA_SOLAR_FACTOR", 1.).value;
+        const_opacity_rosseland_factor = parameters.read<double>("CONSTOPA_ROSS_FACTOR", 1.).value;
+        const_opacity_planck_factor = parameters.read<double>("CONSTOPA_PLANCK_FACTOR", 1.).value;
+        temperature_model = parameters.read<char>("INIT_TEMPERATURE_MODEL", 'P').value;
+        friction_solver   = parameters.read<int>("FRICTION_SOLVER", 0).value;
+        do_hydrodynamics  = parameters.read<int>("DO_HYDRO", 1).value;
+        photochemistry_level = parameters.read<int>("PHOTOCHEM_LEVEL", 0).value;
         
-        ion_precision         = read_parameter_from_file<double>(filename,"ION_PRECISION", debug, 1e-12).value;
-        ion_heating_precision = read_parameter_from_file<double>(filename,"ION_HEATING_PRECISION", debug, 1e-12).value;
-        ion_maxiter                  = read_parameter_from_file<int>(filename,"ION_MAXITER", debug, 128).value;
-        ion_heating_maxiter          = read_parameter_from_file<int>(filename,"ION_HEATING_MAXITER", debug, 128).value;
+        ion_precision         = parameters.read<double>("ION_PRECISION", 1e-12).value;
+        ion_heating_precision = parameters.read<double>("ION_HEATING_PRECISION", 1e-12).value;
+        ion_maxiter                  = parameters.read<int>("ION_MAXITER", 128).value;
+        ion_heating_maxiter          = parameters.read<int>("ION_HEATING_MAXITER", 128).value;
         
         cout<<" ION_HEATING_PRECISION set to "<<ion_heating_precision<<" heating+maxiters = "<<ion_heating_maxiter<<endl;
         cout<<" ION_PRECISION set to "<<ion_precision<<" ion_maxiter = "<<ion_maxiter<<endl;
         
-        rad_solver_max_iter = read_parameter_from_file<int>(filename,"MAX_RAD_ITER", debug, 1).value;
-        bond_albedo       = read_parameter_from_file<double>(filename,"BOND_ALBEDO", debug, 0.).value; 
-        planet_semimajor= read_parameter_from_file<double>(filename,"PARI_PLANET_DIST", debug, 1.).value; //in AU
+        rad_solver_max_iter = parameters.read<int>("MAX_RAD_ITER", 1).value;
+        bond_albedo       = parameters.read<double>("BOND_ALBEDO", 0.).value; 
+        planet_semimajor= parameters.read<double>("PARI_PLANET_DIST", 1.).value; //in AU
         
         if(problem_number == 2)
             monitor_output_index = num_cells/2; //TODO: Replace with index of sonic radius for dominant species?
@@ -180,22 +183,22 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
         
         if(problem_number==2) {
             
-            planet_mass     = read_parameter_from_file<double>(filename,"PARI_PLANET_MASS", debug, 1).value; //in Earth masses
+            planet_mass     = parameters.read<double>("PARI_PLANET_MASS", 1).value; //in Earth masses
             planet_mass     *= mearth;
             
-            planet_position = read_parameter_from_file<double>(filename,"PARI_PLANET_POS", debug, 0.).value;  //inside the simulation domain
-            rs              = read_parameter_from_file<double>(filename,"PARI_SMOOTHING_LENGTH", debug, 0.).value; //Gravitational smoothing length in hill 
-            rs_time         = read_parameter_from_file<double>(filename,"PARI_SMOOTHING_TIME", debug, 0.).value; //Time until we reach rs starting at rs_at_moment
+            planet_position = parameters.read<double>("PARI_PLANET_POS", 0.).value;  //inside the simulation domain
+            rs              = parameters.read<double>("PARI_SMOOTHING_LENGTH", 0.).value; //Gravitational smoothing length in hill 
+            rs_time         = parameters.read<double>("PARI_SMOOTHING_TIME", 0.).value; //Time until we reach rs starting at rs_at_moment
             rs_at_moment    = 0.2;
             
         } else {
             
-            planet_mass     = read_parameter_from_file<double>(filename,"PARI_PLANET_MASS", debug, 0).value; //in Earth masses
+            planet_mass     = parameters.read<double>("PARI_PLANET_MASS", 0).value; //in Earth masses
             planet_mass     *= mearth;
             
-            planet_position = read_parameter_from_file<double>(filename,"PARI_PLANET_POS", debug, 0.).value;  //inside the simulation domain
-            rs              = read_parameter_from_file<double>(filename,"PARI_SMOOTHING_LENGTH", debug, 0.).value; //Gravitational smoothing length in hill 
-            rs_time         = read_parameter_from_file<double>(filename,"PARI_SMOOTHING_TIME", debug, 0.).value; //Time until we reach rs starting at rs_at_moment
+            planet_position = parameters.read<double>("PARI_PLANET_POS", 0.).value;  //inside the simulation domain
+            rs              = parameters.read<double>("PARI_SMOOTHING_LENGTH", 0.).value; //Gravitational smoothing length in hill 
+            rs_time         = parameters.read<double>("PARI_SMOOTHING_TIME", 0.).value; //Time until we reach rs starting at rs_at_moment
             rs_at_moment    = 0.2;
         }
         
@@ -524,7 +527,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
         // 
         // !!!!IMPORTANT CHANGE HERE TO NUM_SPECIES_ACT
         //
-        num_species = read_parameter_from_file<int>(filename,"PARI_NUM_SPECIES", debug, 1).value;
+        num_species = parameters.read<int>("PARI_NUM_SPECIES", 1).value;
 
         if (NUM_SPECIES != Eigen::Dynamic && num_species != NUM_SPECIES) {
             std::stringstream err ;
@@ -534,14 +537,14 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
             throw std::invalid_argument(err.str()) ;
         }
 
-        init_T_temp   = read_parameter_from_file<double>(filename,"INIT_T_TEMP", debug, 1.).value;
+        init_T_temp   = parameters.read<double>("INIT_T_TEMP", 1.).value;
 
         if(debug > 0) cout<<"Init: About to setup species with num_species = "<<num_species<<endl;
         
         species.reserve(num_species);
         
         for(int s = 0; s < num_species; s++) {
-            species.push_back(c_Species(this, filename, speciesfile, s, debug)); // Here we call the c_Species constructor
+            species.push_back(c_Species(this,  speciesfile, s, debug)); // Here we call the c_Species constructor
         }
         cout<<endl;
         //
@@ -739,9 +742,9 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
     Jrad_init      = Eigen::MatrixXd::Zero(num_cells+2, num_bands_out);
     tridiag        = BlockTriDiagSolver<Eigen::Dynamic>(num_cells+2, num_bands_out + num_species) ;
     
-    double rade_l = read_parameter_from_file<double>(filename,"PARI_RADSHOCK_ERL", debug, 1.).value;
-    double rade_r = read_parameter_from_file<double>(filename,"PARI_RADSHOCK_ERR", debug, 1.).value;
-    init_J_factor = read_parameter_from_file<double>(filename,"INIT_J_FACTOR", debug, -1.).value;
+    double rade_l = parameters.read<double>("PARI_RADSHOCK_ERL", 1.).value;
+    double rade_r = parameters.read<double>("PARI_RADSHOCK_ERR", 1.).value;
+    init_J_factor = parameters.read<double>("INIT_J_FACTOR", -1.).value;
     
     
     for(int j = 0; j < num_cells+1; j++) {
@@ -772,7 +775,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
                 
                 else if(radiation_matter_equilibrium_test >= 4) {//Nonlinear diffusion test, and proper RHD shock tests
                     
-                    double SHOCK_TUBE_MID = read_parameter_from_file<double>(filename,"PARI_INIT_SHOCK_MID", debug, 0.5).value;
+                    double SHOCK_TUBE_MID = parameters.read<double>("PARI_INIT_SHOCK_MID", 0.5).value;
                     
                     if(x_i12[j] < SHOCK_TUBE_MID) 
                         Jrad_FLD(j,0) = rade_l;
@@ -820,7 +823,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
 ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-c_Species::c_Species(c_Sim *base_simulation, string filename, string species_filename, int species_index, int debug) {
+c_Species::c_Species(c_Sim *base_simulation, string species_filename, int species_index, int debug) {
     
         base               = base_simulation;
         this_species_index = species_index;
@@ -838,18 +841,18 @@ c_Species::c_Species(c_Sim *base_simulation, string filename, string species_fil
         //
         ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         
-        boundary_left  = read_parameter_from_file<BoundaryType>(filename,"PARI_BOUND_TYPE_LEFT", debug, BoundaryType::fixed).value;
-        boundary_right = read_parameter_from_file<BoundaryType>(filename,"PARI_BOUND_TYPE_RIGHT", debug, BoundaryType::fixed).value;
+        boundary_left  = base->parameters.read<BoundaryType>("PARI_BOUND_TYPE_LEFT", BoundaryType::fixed).value;
+        boundary_right = base->parameters.read<BoundaryType>("PARI_BOUND_TYPE_RIGHT", BoundaryType::fixed).value;
 
-        const_T_space  = read_parameter_from_file<double>(filename,"PARI_CONST_TEMP", debug, 1.).value;
-        TEMPERATURE_BUMP_STRENGTH    = read_parameter_from_file<double>(filename,"TEMPERATURE_BUMP_STRENGTH", debug, 0.).value; 
-        pressure_broadening_factor   = read_parameter_from_file<double>(filename,"PRESSURE_BROADENING", debug, 0.).value; 
-        pressure_broadening_exponent = read_parameter_from_file<double>(filename,"BROADENING_EXP", debug, 1.).value; 
+        const_T_space  = base->parameters.read<double>("PARI_CONST_TEMP", 1.).value;
+        TEMPERATURE_BUMP_STRENGTH    = base->parameters.read<double>("TEMPERATURE_BUMP_STRENGTH", 0.).value; 
+        pressure_broadening_factor   = base->parameters.read<double>("PRESSURE_BROADENING", 0.).value; 
+        pressure_broadening_exponent = base->parameters.read<double>("BROADENING_EXP", 1.).value; 
         
         if(debug > 0) cout<<"        Species["<<species_index<<"] Init: Finished reading boundaries."<<endl;
         if(debug > 0) cout<<"         Boundaries used in species["<<speciesname<<"]: "<<boundary_left<<" / "<<boundary_right<<endl;
 
-        const_opacity   = read_parameter_from_file<double>(filename,"PARI_CONST_OPAC", debug, 1.).value;
+        const_opacity   = base->parameters.read<double>("PARI_CONST_OPAC", 1.).value;
         
         ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         //
@@ -914,15 +917,15 @@ c_Species::c_Species(c_Sim *base_simulation, string filename, string species_fil
         //
         if(base->problem_number == 1) {
             
-            double u1l = read_parameter_from_file<double>(filename,"PARI_INIT_DATA_U1L", debug, 1.).value;
-            double u2l = read_parameter_from_file<double>(filename,"PARI_INIT_DATA_U2L", debug, 0.).value;
-            double u3l = read_parameter_from_file<double>(filename,"PARI_INIT_DATA_U3L", debug, 1.).value;
+            double u1l = base->parameters.read<double>("PARI_INIT_DATA_U1L", 1.).value;
+            double u2l = base->parameters.read<double>("PARI_INIT_DATA_U2L", 0.).value;
+            double u3l = base->parameters.read<double>("PARI_INIT_DATA_U3L", 1.).value;
             
-            double u1r = read_parameter_from_file<double>(filename,"PARI_INIT_DATA_U1R", debug, 1.).value;
-            double u2r = read_parameter_from_file<double>(filename,"PARI_INIT_DATA_U2R", debug, 0.).value;
-            double u3r = read_parameter_from_file<double>(filename,"PARI_INIT_DATA_U3R", debug, 1.).value;
+            double u1r = base->parameters.read<double>("PARI_INIT_DATA_U1R", 1.).value;
+            double u2r = base->parameters.read<double>("PARI_INIT_DATA_U2R", 0.).value;
+            double u3r = base->parameters.read<double>("PARI_INIT_DATA_U3R", 1.).value;
             
-            SHOCK_TUBE_MID = read_parameter_from_file<double>(filename,"PARI_INIT_SHOCK_MID", debug, 0.5).value;
+            SHOCK_TUBE_MID = base->parameters.read<double>("PARI_INIT_SHOCK_MID", 0.5).value;
             
             u1l *= initial_fraction;
             u1r *= initial_fraction;
@@ -957,11 +960,11 @@ c_Species::c_Species(c_Sim *base_simulation, string filename, string species_fil
         //
         else if(base->problem_number == 2) {
             
-            double u1 = read_parameter_from_file<double>(filename,"PARI_INIT_DATA_U1", debug, 1.).value;
-            double u2 = read_parameter_from_file<double>(filename,"PARI_INIT_DATA_U2", debug, 0.).value;
-            double u3 = read_parameter_from_file<double>(filename,"PARI_INIT_DATA_U3", debug, 1.).value;
+            double u1 = base->parameters.read<double>("PARI_INIT_DATA_U1", 1.).value;
+            double u2 = base->parameters.read<double>("PARI_INIT_DATA_U2", 0.).value;
+            double u3 = base->parameters.read<double>("PARI_INIT_DATA_U3", 1.).value;
             
-            init_static_atmosphere = read_parameter_from_file<int>(filename,"PARI_INIT_STATIC", debug, 1).value; //Yesno, isothermal at the moment
+            init_static_atmosphere = base->parameters.read<int>("PARI_INIT_STATIC", 1).value; //Yesno, isothermal at the moment
             
             if(debug > 0) cout<<"        Species["<<species_index<<"] problem 2 init, pos 1."<<endl;
             
@@ -976,10 +979,10 @@ c_Species::c_Species(c_Sim *base_simulation, string filename, string species_fil
             // If we want to initialize a hydrostatic atmosphere, then we overwrite the so far given density/pressure data and set every velocity to 0
             //
             if(init_static_atmosphere == 1) {
-                initialize_hydrostatic_atmosphere(filename);
+                initialize_hydrostatic_atmosphere();
             }
             else if (init_static_atmosphere == 2) {
-                const_rho_scale = read_parameter_from_file<double>(filename,"CONST_RHO_SCALE", debug, 550.e5).value;
+                const_rho_scale = base->parameters.read<double>("CONST_RHO_SCALE", 550.e5).value;
                 initialize_exponential_atmosphere();
             }
             
@@ -1001,10 +1004,10 @@ c_Species::c_Species(c_Sim *base_simulation, string filename, string species_fil
             initialize_default_test();
         
         
-        USE_WAVE = read_parameter_from_file<int>(filename,"WAVE_USE", debug, 0).value; 
+        USE_WAVE = base->parameters.read<int>("WAVE_USE", 0).value; 
         if(USE_WAVE==1) {
-            WAVE_AMPLITUDE = read_parameter_from_file<double>(filename,"WAVE_AMPLITUDE", debug).value; 
-            WAVE_PERIOD    = read_parameter_from_file<double>(filename,"WAVE_PERIOD", debug).value; 
+            WAVE_AMPLITUDE = base->parameters.read<double>("WAVE_AMPLITUDE").value; 
+            WAVE_PERIOD    = base->parameters.read<double>("WAVE_PERIOD").value; 
         }
         
         // Apply boundary conditions
@@ -1018,13 +1021,13 @@ c_Species::c_Species(c_Sim *base_simulation, string filename, string species_fil
         opacity_twotemp        = Eigen::MatrixXd::Zero(num_cells+2, num_bands_in); //num_cells * num_bands_in
         fraction_total_solar_opacity = Eigen::MatrixXd::Zero(num_cells+2, num_bands_in); //num_cells * num_bands_in
         
-        //NOTE: If the chosen opacity model is such that a *.opa file is read-in, then this initialization can be found in io.cpp, in void c_Species::read_species_data(string filename, int species_index)
+        //NOTE: If the chosen opacity model is such that a *.opa file is read-in, then this initialization can be found in io.cpp, in void c_Species::read_species_data(string  int species_index)
     
 }
 
 
 
-void c_Species::initialize_hydrostatic_atmosphere(string filename) {
+void c_Species::initialize_hydrostatic_atmosphere() {
     
     if(debug > 0) cout<<"            ATTENTION: Initializing hydrostatic construction for species "<<speciesname<<" and overwriting prior initial values."<<endl;
     
@@ -1036,8 +1039,8 @@ void c_Species::initialize_hydrostatic_atmosphere(string filename) {
     //double residual;
     double metric_outer;
     
-    double dphi_factor = read_parameter_from_file<double>(filename,"PARI_DPHI_FACTOR", debug, 1.).value;
-    base->density_floor = read_parameter_from_file<double>(filename,"DENSITY_FLOOR", debug, 1.e-20).value;
+    double dphi_factor = base->parameters.read<double>("PARI_DPHI_FACTOR", 1.).value;
+    base->density_floor = base->parameters.read<double>("DENSITY_FLOOR", 1.e-20).value;
     //
     // Start with the outermost cell and build up a hydrostatic atmosphere
     // Fulfilling KKM16, Eqn. 17
@@ -1290,13 +1293,6 @@ void c_Species::initialize_exponential_atmosphere() {
     cout<<"            Ended expoenential density construction for species "<<speciesname<<endl;
     cout<<endl<<endl;
 }
-
-
-
-void c_Species::initialize_hydrostatic_atmosphere_iter(string filename) {
-    
-}
-
 
 //
 // Initial conditions for shock tubes, dividing the domain into a left constant value and another right constant value

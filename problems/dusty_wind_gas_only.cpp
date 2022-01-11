@@ -158,6 +158,13 @@ void c_Species::user_initial_conditions() {
         a_grain = std::pow(3 / (4 * M_PI) * mass_amu * amu / RHO_DUST, 1 / 3.);
         kappa_dust = DustOpacity(a_grain);
         f_dust = initial_fraction;
+
+        double alpha_stick ;
+        alpha_stick = base->parameters.read<double>("ALPHA_STICK", 0.1).value ;
+        if (alpha_stick != 0.1) {
+            std::cout << "Setting the sticking fraction to" << alpha_stick << "\n" ;
+            silicate.P_stick = alpha_stick ;
+        }
     }
 
     // Get the equilibrium temperature

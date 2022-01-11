@@ -425,7 +425,7 @@ class ParameterError : public std::invalid_argument {
 } ;
 
 template<typename T>
-simulation_parameter<T> read_parameter_from_file(string filename, string variablename, int debug) {
+simulation_parameter<T> Parameterfile::read(string variablename) const {
     
     ifstream file(filename);
     string line;
@@ -477,11 +477,11 @@ simulation_parameter<T> read_parameter_from_file(string filename, string variabl
 
 
 template<typename T>
-simulation_parameter<T> read_parameter_from_file(string filename, string variablename, int debug, T default_) {
+simulation_parameter<T> Parameterfile::read(string variablename, T default_) const {
     simulation_parameter<T> parameter ;
 
     try {
-       parameter = read_parameter_from_file<T>(filename, variablename, debug) ;
+       parameter = read<T>(variablename) ;
     } catch (ParameterError& e) {
         if (e.count == 0) {
             parameter.name = variablename ;
@@ -499,23 +499,23 @@ simulation_parameter<T> read_parameter_from_file(string filename, string variabl
 
 
 
-template simulation_parameter<bool>  read_parameter_from_file(string, string, int, bool);
-template simulation_parameter<bool>  read_parameter_from_file(string, string, int);
-template simulation_parameter<int>   read_parameter_from_file(string, string, int, int);
-template simulation_parameter<int>   read_parameter_from_file(string, string, int);
-template simulation_parameter<double> read_parameter_from_file(string, string, int, double);
-template simulation_parameter<double> read_parameter_from_file(string, string, int);
-template simulation_parameter<char> read_parameter_from_file(string, string, int, char);
-template simulation_parameter<char> read_parameter_from_file(string, string, int);
-template simulation_parameter<string> read_parameter_from_file(string, string, int, string);
-template simulation_parameter<string> read_parameter_from_file(string, string, int);
+template simulation_parameter<bool>  Parameterfile::read(string, bool) const ;
+template simulation_parameter<bool>  Parameterfile::read(string) const ;
+template simulation_parameter<int>   Parameterfile::read(string, int) const ;
+template simulation_parameter<int>   Parameterfile::read(string) const ;
+template simulation_parameter<double> Parameterfile::read(string, double) const ;
+template simulation_parameter<double> Parameterfile::read(string) const ;
+template simulation_parameter<char>  Parameterfile::read(string, char) const ;
+template simulation_parameter<char>  Parameterfile::read(string) const ;
+template simulation_parameter<string> Parameterfile::read(string, string) const ;
+template simulation_parameter<string> Parameterfile::read(string) const ;
 
-template simulation_parameter<Geometry> read_parameter_from_file(string, string, int, Geometry);
-template simulation_parameter<Geometry> read_parameter_from_file(string, string, int);
-template simulation_parameter<BoundaryType> read_parameter_from_file(string, string, int, BoundaryType);
-template simulation_parameter<BoundaryType> read_parameter_from_file(string, string, int);
-template simulation_parameter<IntegrationType> read_parameter_from_file(string, string, int, IntegrationType);
-template simulation_parameter<IntegrationType> read_parameter_from_file(string, string, int);
+template simulation_parameter<Geometry> Parameterfile::read(string, Geometry) const ;
+template simulation_parameter<Geometry> Parameterfile::read(string) const ;
+template simulation_parameter<BoundaryType> Parameterfile::read(string, BoundaryType) const ;
+template simulation_parameter<BoundaryType> Parameterfile::read(string) const ;
+template simulation_parameter<IntegrationType> Parameterfile::read(string, IntegrationType) const ;
+template simulation_parameter<IntegrationType> Parameterfile::read(string) const ;
 
 //
 //

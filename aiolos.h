@@ -132,6 +132,24 @@ struct simulation_parameter {
     T value ;
 };
 
+class Parameterfile {
+  public:
+    Parameterfile() {} ;
+
+    Parameterfile(std::string filename_, int debug_)
+      : filename(filename_), debug(debug_)
+    { }
+
+  template<typename T>
+  simulation_parameter<T> read(std::string parameter, T default_) const ;
+
+  template<typename T>
+  simulation_parameter<T> read(std::string parameter) const ;
+
+  std::string filename ;
+  int debug ;
+} ;
+
 //
 // Array of strings structure, for comfortable use of 3-vectors
 //
@@ -202,12 +220,6 @@ inline std::vector<AOS> init_AOS(int num) { return std::vector<AOS>(num); }
 
 vector<string> stringsplit(const string& str, const string& delim);
 
-template<typename T>
-simulation_parameter<T> read_parameter_from_file(string, string, int);
-
-template<typename T>
-simulation_parameter<T> read_parameter_from_file(string, string, int, T);
-
 void update_cons_prim_after_friction(AOS* cons, AOS_prim* prim, double dEkin, double newv, double mass, double gamma, double cv);
 
 
@@ -236,6 +248,7 @@ public:
 
     string simname;
     string workingdir;
+    Parameterfile parameters ;
     
     int problem_number;
     int debug;
@@ -704,8 +717,7 @@ public:
     void initialize_default_test();
     void initialize_space_test(AOS background);
     void initialize_custom_setup();
-    void initialize_hydrostatic_atmosphere(string);
-    void initialize_hydrostatic_atmosphere_iter(string);
+    void initialize_hydrostatic_atmosphere();
     void initialize_exponential_atmosphere();
     void initialize_sound_wave();
     void compute_analytic_solution();
@@ -793,7 +805,7 @@ public:
     void set_suppress_warnings(int j) {suppress_warnings = j;}    
     
     //c_Species();
-    c_Species(c_Sim *base_simulation, string filename, string species_filename, int species_index, int debug=0);
+    c_Species(c_Sim *base_simulation, string species_filename, int species_index, int debug=0);
     ~c_Species();
     void execute(std::vector<AOS>& u, std::vector<AOS>& dudt);
     
