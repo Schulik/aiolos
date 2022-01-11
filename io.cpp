@@ -459,10 +459,7 @@ simulation_parameter<T> Parameterfile::read(string variablename) const {
     
     if(found == 0) {
         std:: stringstream error ;
-        if(debug > 1)
-            error << "ERROR: Variable "<<variablename<<" not found in parameterfile!"<<endl;
-        else
-            error<<"";
+        error << "ERROR: Variable "<<variablename<<" not found in parameterfile!"<<endl;
         throw ParameterError(0, error.str()) ;
     }
     if(found > 1) {
