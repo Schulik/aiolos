@@ -47,7 +47,7 @@ void c_Species::read_species_data(string filename, int species_index) {
     
     while(std::getline( file, line )) {
     
-        std::vector<string> stringlist = stringsplit(line," ");
+        std::vector<string> stringlist = stringsplit(line," \t");
 
         //if(line.find(variablename) != string::npos) {
         if(stringlist[0].find("@") != string::npos) {
@@ -147,7 +147,7 @@ void c_Species::read_species_data(string filename, int species_index) {
         data_count = 0;
         
         while(std::getline( file2, line2 )) {
-            std::vector<string> stringlist = stringsplit(line2," ");
+            std::vector<string> stringlist = stringsplit(line2," \t");
             //std::vector<string> stringlist = split(line2," ");
             
             file_opacity_data(data_count, 0) = std::stod(stringlist[0]); // Wavelength
@@ -447,7 +447,7 @@ simulation_parameter<T> Parameterfile::read(string variablename) const {
         if(line.find(variablename) != string::npos) {
             tmp_parameter.name = variablename;
             
-            tmp_parameter.value = parse_item<T>(stringsplit(line," ")[1]) ;
+            tmp_parameter.value = parse_item<T>(stringsplit(line," \t")[1]) ;
 
             if(debug > 0)
                 cout<<"Found variable called "<<variablename<<" and set it to "<<tmp_parameter.value<<endl;

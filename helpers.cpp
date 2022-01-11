@@ -108,7 +108,7 @@ vector<string> stringsplit(const string& str, const string& delim)
     size_t prev = 0, pos = 0;
     do
     {
-        pos = str.find(delim, prev);
+        pos = str.find_first_of(delim, prev);
         if (pos == string::npos) pos = str.length();
         string token = str.substr(prev, pos-prev);
         if (!token.empty()) tokens.push_back(token);
