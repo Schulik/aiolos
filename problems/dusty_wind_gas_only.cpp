@@ -317,20 +317,22 @@ void c_Sim::user_loop_function() {
     double heat =
         dt * planet_surf.gas_heating_rate(T_core) * surf[j - 1] / vol[j];
 
-    std::array<double, 2> frac = {1 - f_dust, f_dust};
+    double fe = f_dust*species[1].cv / species[0].cv ;
+    std::array<double, 2> frac_d = {1-f_dust, f_dust} ;
+    std::array<double, 2> frac_e = {1-fe    , fe} ;
 
     for (int s = 0; s < 2; s++) {
         // Update the mass, momentum and energy of the corresponding cell
-        if (frac[s] == 0) continue;
+        if (frac_d[s] == 0) continue;
 
         AOS_prim& prim = species[s].prim[j];
 
         double E_tot = prim.density * (species[s].cv * prim.temperature +
                                        0.5 * prim.speed * prim.speed);
 
-        E_tot += frac[s] * heat;
+        E_tot += frac_e[s] * heat;
 
-        prim.speed /= (1 + frac[s] * drho / prim.density);
+        prim.speed /= (1 + frac_d[s] * drho / prim.density);
         prim.density += frac[s] * drho;
 
         E_tot -= 0.5 * prim.density * prim.speed * prim.speed;
