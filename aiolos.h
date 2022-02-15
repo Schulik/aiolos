@@ -10,6 +10,7 @@
 #include <string>
 #include <vector>
 #include <math.h>
+#include <cmath>
 #include <type_traits>
 #include <gsl/gsl_sf_lambert.h>
 #include <Eigen/Core>
@@ -204,9 +205,20 @@ public:
     int p_num = 0.;
     
     double r = 0.;       //Reaction coefficient (a constant for now)
+    double reac_a = 0.;
+    double reac_b = 0.;
+    double reac_c = 0.;
+    bool is_reverse_reac;
+    double current_dG = 0.;
     
 public:
-    c_reaction(int reacnum, int num_species, std::vector<int> e_indices,std::vector<int> p_indices,std::vector<double> e_stoch, std::vector<double> p_stoch, double reaction_rate);
+    c_reaction(bool is_reverse, int num_species, std::vector<int> e_indices,std::vector<int> p_indices,std::vector<double> e_stoch, std::vector<double> p_stoch, double reaction_rate);
+    c_reaction(bool is_reverse, int num_species, std::vector<int> e_indices,std::vector<int> p_indices,std::vector<double> e_stoch, std::vector<double> p_stoch, double a, double b, double c);
+    void c_reaction_real(int num_species, std::vector<int> e_indices,std::vector<int> p_indices,std::vector<double> e_stoch, std::vector<double> p_stoch, double reaction_rate);
+    
+    void update_reaction_rate(double T);
+    double get_reaction_rate(double T);
+    void set_reac_number(int num) {reaction_number = num;}
 };
     
 class c_photochem_reaction 
@@ -223,8 +235,10 @@ public:
     
     //Photochem specific
     int band;
+    double branching_ratio;
     
-    c_photochem_reaction(int reacnum, int num_species, int num_bands, std::vector<int> e_indices, std::vector<int> p_indices, std::vector<double> e_stoch, std::vector<double> p_stoch, int band);
+    c_photochem_reaction(int num_species, int num_bands, int band, std::vector<int> e_indices, std::vector<int> p_indices, std::vector<double> e_stoch, std::vector<double> p_stoch, double branching);
+    void set_reac_number(int num) {reaction_number = num;}
 };
 
 ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -323,6 +337,7 @@ public:
     int ion_maxiter;
     int ion_heating_maxiter;
     double temperature_floor;
+    double max_temperature;
     
     Geometry geometry ;
     
@@ -584,6 +599,8 @@ public:
     void transport_radiation();     //  Called if use_rad_fluxes == 1
     void reset_dS();
     void update_dS();
+    void update_dS_jb(int j, int b);
+    void update_tau_s_jb(int j, int b);
     void update_opacities();
     
     void do_photochemistry();

@@ -18,69 +18,158 @@
 #include "aiolos.h"
 
 double thermo_get_r(double T, double r1, double delta_stoch);
+std::vector<double> get_thermo_variables(double T,string species_string);
 
 //
 // Wrapper function to make it possible to call different chemistry solvers (such as specialized one-equation solvers, that might be much faster than the general solver)
-//
+// and do sub-cycling in case negative densitites occur.
 //
 //
 //
 //
 void c_Sim::do_chemistry() {
     
-    for (int j = num_cells + 1; j > 0; j--) {
-        solver_cchem_implicit_general(dt, j, 0);
+    for (int j = num_cells+1; j > 0; j--) {
         
-        //update_tau_in_chem();
-        update_dS_jb(int j, int b);
+        double temp_dt = dt;
+        double t_div = 1.;
+        
+        //
+        // Repeat levels
+        //
+        for(int i=1; i<=4; i*=2) {
+            int check_chem;
+            //
+            // Individual repeats
+            //
+            for(int k = 0; k < i; k++) {
+                
+                double dt_eff = dt/((double)i);
+                
+                check_chem = solver_cchem_implicit_general(dt_eff, j, 0);
+                if(i>1)
+                    cout<<" chem cell "<<j<<" repeat level "<<i<<" repeat number "<<k<<" dt_div = "<<dt_eff<<" dt = "<<dt<<" species[0].n = "<<species[0].prim[j].number_density<<endl; 
+                
+            }
+            if(check_chem == 0) break;
+            
+        }
+        
+        /*
+        cout<<" finished chemistry in cell "<<j<<endl;
+        char a;
+        cin>>a;
+        */
+        
+        for(int b=0; b<num_bands_in; b++) {
+            update_tau_s_jb(j, b);
+            //update_dS_jb(j, b);
+        }
     }
     
     //if(chemistry == 2)
     //     solver_cchem_implicit_something_specialized();
 }
 
+void c_reaction::update_reaction_rate(double T) {
+    
+    this->r = reac_a * std::pow(T, reac_b) * std::exp(-reac_c/T);
+    
+    //TODO: If (is_reverse_reaction) r *= gibbs energy stuff;
+    if(is_reverse_reac) {
+        
+        std::vector<double> educt = {0.,0.,0.};
+        std::vector<double> product = {0.,0.,0.};
+        std::vector<double> temp = {0.,0.,0.};
+        for(int& ej : educts ) {
+                //temp = get_thermo_variables( T, species[ej].speciesname); //{H0, s0, cp};
+                temp = get_thermo_variables( T, "H0"); //{H0, s0, cp};
+                educt[0] += temp[0];
+                educt[1] += temp[1];
+        }
+        for(int& ej : products ) {
+                temp = get_thermo_variables( T, "H2"); //{H0, s0, cp};
+                product[0] += temp[0];
+                product[1] += temp[1];
+        }
+        
+        double dH = product[0]-educt[0]; //products - reactants
+        double dS = product[1]-educt[1]; //products - reactants
+        current_dG = dH - T*dS;
+        
+        this->r *= pow(kb*T/1e6, -delta_stoch) * std::exp(current_dG/(Rgas*T));
+    } 
+    //cout<<" Reaction "<<reaction_number<<" r = "<<r<<endl;
+}
 
-c_reaction::c_reaction(int reacnum, int num_species, std::vector<int> e_indices,std::vector<int> p_indices,std::vector<double> e_stoch, std::vector<double> p_stoch, double reaction_rate) 
+double c_reaction::get_reaction_rate(double T) {
+    
+    update_reaction_rate(T);
+    
+    return r;
+}
+
+c_reaction::c_reaction(bool is_reverse, int num_species, std::vector<int> e_indices,std::vector<int> p_indices,std::vector<double> e_stoch, std::vector<double> p_stoch, double reaction_rate) 
 {
-        for(int e=0; e<e_indices.size(); e++) {
-            if(e_indices[e] > num_species)
-                throw 0;
-        }
-        for(int p=0; p<p_indices.size(); p++) {
-            if(p_indices[p] > num_species)
-                throw 1;
-        }
-        
-        this->reaction_number    = reacnum;
-        this->educts   = e_indices;
-        this->products = p_indices;
-        
-        this->e_num   =     e_indices.size();
-        this->p_num   = p_indices.size();
-        
-        this->e_stoch = std::vector<double>(num_species); //e_stoch;
-        this->p_stoch = std::vector<double>(num_species); //p_stoch;
-        this->r       = reaction_rate   ;
-        
-        for(int s=0; s<num_species; s++) {
-            this->e_stoch[s] = 0;
-            this->p_stoch[s] = 0;
-        }
-        
-        delta_stoch = 0.;
-        for(int e=0; e<e_num; e++) {
-            this->e_stoch[e_indices[e]] = e_stoch[e];
-            delta_stoch += e_stoch[e];
-        }
+    this->is_reverse_reac    = is_reverse;
+    
+    if(!is_reverse_reac)
+        c_reaction_real(num_species, e_indices, p_indices, e_stoch, p_stoch, reaction_rate);
+    else
+        c_reaction_real(num_species, p_indices, e_indices, p_stoch, e_stoch, reaction_rate);
             
-        for(int p=0; p<p_num; p++) {
-            this->p_stoch[p_indices[p]] = p_stoch[p];
-            delta_stoch -= p_stoch[p];
-        }
-            
-    }
+}
 
-c_photochem_reaction::c_photochem_reaction(int reacnum, int num_species, int num_bands, std::vector<int> e_indices, std::vector<int> p_indices, std::vector<double> e_stoch, std::vector<double> p_stoch, int band)
+void c_reaction::c_reaction_real(int num_species, std::vector<int> e_indices,std::vector<int> p_indices,std::vector<double> e_stoch, std::vector<double> p_stoch, double reaction_rate) {
+    
+    for(int e=0; e<e_indices.size(); e++) {
+        if(e_indices[e] > num_species)
+            throw 0;
+    }
+    for(int p=0; p<p_indices.size(); p++) {
+        if(p_indices[p] > num_species)
+            throw 1;
+    }
+        
+    this->educts   = e_indices;
+    this->products = p_indices;
+            
+    this->e_num   = e_indices.size();
+    this->p_num   = p_indices.size();
+        
+    this->e_stoch = std::vector<double>(num_species); //e_stoch;
+    this->p_stoch = std::vector<double>(num_species); //p_stoch;
+    this->reac_a  = reaction_rate;
+    this->r       = reaction_rate;
+        
+    for(int s=0; s<num_species; s++) {
+        this->e_stoch[s] = 0;
+        this->p_stoch[s] = 0;
+    }
+        
+    delta_stoch = 0.;
+    for(int e=0; e<e_num; e++) {
+        this->e_stoch[e_indices[e]] = e_stoch[e];
+        delta_stoch += e_stoch[e];
+    }
+                
+    for(int p=0; p<p_num; p++) {
+        this->p_stoch[p_indices[p]] = p_stoch[p];
+        delta_stoch -= p_stoch[p];
+    }
+}
+
+c_reaction::c_reaction(bool is_reverse, int num_species, std::vector<int> e_indices,std::vector<int> p_indices,std::vector<double> e_stoch, std::vector<double> p_stoch, double a, double b, double c) {
+    this->reac_a = a;
+    this->reac_b = b;
+    this->reac_c = c;
+    double reaction_rate = get_reaction_rate(300.);
+    
+    c_reaction(is_reverse, num_species, e_indices, p_indices, e_stoch, p_stoch, reaction_rate);
+} 
+
+
+c_photochem_reaction::c_photochem_reaction(int num_species, int num_bands, int band, std::vector<int> e_indices, std::vector<int> p_indices, std::vector<double> e_stoch, std::vector<double> p_stoch, double branching)
 {
         //cout<<"in init photochem reaction "<<endl;
         for(int e=0; e<e_indices.size(); e++) {
@@ -96,7 +185,7 @@ c_photochem_reaction::c_photochem_reaction(int reacnum, int num_species, int num
         
         //cout<<"e_indices = "<<e_indices<<" p_indices = "<<p_indices<<endl;
         //cout<<"pos1"<<endl;
-        this->reaction_number = reacnum;
+        //this->reaction_number = reacnum;
         this->educts   = e_indices;
         this->products = p_indices;
         //cout<<"pos2"<<endl;
@@ -133,7 +222,7 @@ c_photochem_reaction::c_photochem_reaction(int reacnum, int num_species, int num
             throw 4;
         
         this->band = band; //TODO: Check that band <= num_bands
-        
+        this->branching_ratio = branching;
         //cout<<"pos7"<<endl;
     }
 
@@ -142,27 +231,64 @@ void c_Sim::init_reactions(int cdebug) {
     
     //std::vector<c_reaction> reactions;
     //std::vector<c_photochem_reaction> photoreactions;
-    cout<<"starting photoreactions"<<endl;
+    cout<<"Init photoreactions..."<<endl;
     
-    double kf = 1e0;
+    double kf = 1e-15;
     double ns = num_species;
     
-    //photoreactions.push_back(c_photochem_reaction( 4, ns, num_bands_in, {1}, {2,3}, {1.}, {1.,1.}, 0 ));
+    // H+ H2+ ion system
+    photoreactions.push_back(c_photochem_reaction( ns, num_bands_in, 0, {0}, {1,4}, {1.}, {1.,1.}, 1. )); //H + gamma -> H+ + e-
     
-    cout<<"starting reactions"<<endl;
+    //photoreactions.push_back(c_photochem_reaction( ns, num_bands_in, 0, {2}, {3,4}, {1.}, {1.,1.}, 1./3. )); //H2 + gamma-> H2+ + e-
     
-    //reactions.push_back(c_reaction(1, ns, {2,3}, {1}, {1.,1.}, {1.}, 2.7e-13 )); //Electron-proton recombination
-    //reactions.push_back(c_reaction(2, ns, {0}, {1}, {1.}, {2.}, kf));            //H2 Chemistry there
-    //reactions.push_back(c_reaction(3, ns, {1}, {0}, {2.}, {1.}, kf*1e-2));             //H2 Chemistry back
-    reactions.push_back(c_reaction(0, ns, {0,1}, {2,3}, {3.,1.}, {1.,1.}, 1e-40 )); //CO + 3 H2 -> CH4 + H2O
-    reactions.push_back(c_reaction(0, ns, {2,3}, {0,1}, {1.,1.}, {3.,1.}, 1e-30 )); //CO + 3 H2 <- CH4 + H2O
+    //photoreactions.push_back(c_photochem_reaction( ns, num_bands_in, 0, {2}, {0}, {1.}, {2.}, 1.e15)); //H2 + gamma-> 2H
+    //photoreactions.push_back(c_photochem_reaction( ns, num_bands_in, 0, {2}, {0,1,4}, {1.}, {1.,1.,1.}, 1./3.)); //H2 + gamma-> H + H+ + e-
+    
+    //photoreactions.push_back(c_photochem_reaction( ns, num_bands_in, 0, {3}, {0,1}, {1.}, {1.,1.}, 1. )); //H2+ + gamma-> H + H+
+    
+    //photoreactions.push_back(c_photochem_reaction( 4, ns, num_bands_in, {1}, {2,3}, {1.}, {1.,1.}, 0 )); //??????
+    
+    cout<<"Init reactions..."<<endl;
+    
+    //reactions.push_back(c_reaction(0, ns, {2}, {0}, {1.}, {2.}, 2.3e-31));            //H2 -> 2H
+    //reactions.push_back(c_reaction(1, ns, {2}, {0}, {1.}, {2.}, 2.3e-31));            //2H -> H2
+    
+    reactions.push_back(c_reaction(0, ns, {1,4}, {0}, {1.,1.}, {1.}, 2.7e-13 )); //Electron-proton recombination
+    //reactions.push_back(c_reaction(6, ns, {3,4}, {2}, {1.,1.}, {1.}, 2.7e-13, 0.5, 0. )); //Electron-H2+ recombination
+    
+    //reactions.push_back(c_reaction(0, ns, {0,1}, {2,3}, {3.,1.}, {1.,1.}, 1e-40 )); //CO + 3 H2 -> CH4 + H2O
+    //reactions.push_back(c_reaction(0, ns, {2,3}, {0,1}, {1.,1.}, {3.,1.}, 1e-30 )); //CO + 3 H2 <- CH4 + H2O
+    
+    int cnt = 0;
+    for(c_reaction& reaction : reactions) {
+            reaction.set_reac_number(cnt);
+            cnt++;
+    }
+    for(c_photochem_reaction& reaction : photoreactions) {
+            reaction.set_reac_number(cnt);
+            cnt++;
+    }
     
     //if(cdebug > 0) {
         
         cout<<" Reporting reactions in init chemistry... "<<endl;
         
+        
+        for(c_reaction& reaction : reactions) {
+            cout<<" Reaction #"<<reaction.reaction_number<<": ";
+            
+            for(int& ei : reaction.educts) {
+                cout<<int(reaction.e_stoch[ei]*1.01)<<" "<<species[ei].speciesname<<" + ";
+            }
+            cout<<" -> ";
+            for(int& pi : reaction.products) {
+                cout<<int(reaction.p_stoch[pi]*1.01)<<" "<<species[pi].speciesname<<" + ";
+            }
+            cout<<" ...... dStoch = "<<reaction.delta_stoch<<endl;
+        }
+        cout<<"Photoreaction: "<<endl;
         for(c_photochem_reaction& reaction : photoreactions) {
-            cout<<" Photoreaction "<<reaction.reaction_number<<": ";
+            cout<<" Reaction #"<<reaction.reaction_number<<": ";
             
             for(int& ei : reaction.educts) {
                 cout<<int(reaction.e_stoch[ei]*1.01)<<" "<<species[ei].speciesname<<" + ";
@@ -174,19 +300,6 @@ void c_Sim::init_reactions(int cdebug) {
         }
         cout<<endl;
         
-        for(c_reaction& reaction : reactions) {
-            cout<<" Reaction "<<reaction.reaction_number<<": ";
-            
-            for(int& ei : reaction.educts) {
-                cout<<int(reaction.e_stoch[ei]*1.01)<<" "<<species[ei].speciesname<<" + ";
-            }
-            cout<<" -> ";
-            for(int& pi : reaction.products) {
-                cout<<int(reaction.p_stoch[pi]*1.01)<<" "<<species[pi].speciesname<<" + ";
-            }
-            cout<<" #### dStoch = "<<reaction.delta_stoch<<endl;
-        }
-        
     //char a;
     //cin>>a;
         
@@ -195,25 +308,33 @@ void c_Sim::init_reactions(int cdebug) {
     
 }
 
-
 //
 //
 // Here we split all reactions into forward, backward and individual summation steps.
-// Each term in a dn/dt equation is approximate via the semi-implicit Euler approximation. 
-// k denotes the timestep, k+1 being the advanced one, A and B are number densities for species A and B
+// Each term in a dn/dt equation is approximated via the semi-implicit Euler method. 
+// k denotes the timestep, k+1 being the advanced one, A and B are number densities for species A and B (e.g. n_A, n_B etc.)
+// where the chemical rate of change is the product of power-laws f(x^k) = f(A^k, B^k, ...) = = k_r * (A^k)^a * (B^k)^b * ....
+// and the number density equation becomes with S-I-Euler:
 //
-// 1/s * dn/dt = f(x^k+1) = k_r * (  (A^k+1)^a * (B^k+1)^b \approx f(x^k) + sum_educts dfdn_e * (e^k+1 - e^k )  )
+//        1/s * dn/dt = f(x^k+1)  \approx f(x^k) + sum_reactants dfdn_e * (e^k+1 - e^k )  )
+// 
 // where we define labels 
-//                                                      t1     + t2_e1 +  t3_e1                         +t2_e2 + t3_e2 + ....
+//                                       t1     + t2_e1 +  t3_e1                         +t2_e2 + t3_e2 + ....
+//
+// and the stochiometric coefficient is s.
 // 
 // It is t1 = f(x^k), and f1 and all f3 terms need to appear in the b-vector element i, as b_i = stoch[i] (t1 + sum_e t3_e)
 //                      whereas all t2-terms go on the left hand side of the equation, as they are multiplied by the advanced time educt e^k+1
 //                      they will find their ways into the matrix.
+// 
+// The same is done for the photoionizing reactions, only f(x^k) changes, it is related to the ionisation rate per particle n_H as Gamma G = F_b*exp(-\tau) /(hnu * n_H * dx) * (1 - exp(-d\tau))
+// and the photoionising rate equation, for example for the atomic hydrogen reaction H + hnu -> p+ + e- is then 
 //
+//           dn_H/dt = - n * G
 //
-int c_Sim::solver_cchem_implicit_general(double dt, int cell, int cdebug) {
-    
-    //cout<<"Starting solver_chem_implicit_general."<<endl;
+// Recombination reactions are regular chemical reactions which don't conserve particle number (by using the appropriate stochiometric coefficients).
+//
+int c_Sim::solver_cchem_implicit_general(double dtt, int cell, int cdebug) {
     
     reaction_matrix = Matrix_t::Zero(num_species, num_species);
     reaction_b      = Vector_t(num_species);
@@ -228,59 +349,87 @@ int c_Sim::solver_cchem_implicit_general(double dt, int cell, int cdebug) {
     for(int s=0;s<num_species; s++) {
         n_olds[s]     = species[s].prim[cell].number_density / n_tot;
         reaction_b[s] = n_olds[s];
-        //cout<<n_olds[s]<<" ";
     }
-    //cout<<endl;
-    //cout<<"pos2."<<endl;    
     //
     // Photochemical reactions
     //
     //for ri,reac in enumerate(photochem_reactions) {
     
     for(c_photochem_reaction& reaction : photoreactions) {
-        //cout<<"pc pos3. reaction = "<<reaction.reaction_number<<" b = "<<reaction.band<<" cell = "<<cell<<endl;
+        //cout<<"pc pos3. Starting photoreaction = "<<reaction.reaction_number<<" b = "<<reaction.band<<" cell = "<<cell<<endl;
     
         int b = reaction.band;
         double temptau = 0.;
         
         double dlognu = 1.;
         double ds = dx[cell];
-        //cout<<" dx "<<ds<<endl;
-        //cout<<" S "<<solar_heating(b)<<endl;
-        //cout<<" E "<<photon_energies[b]<<endl;
         
         if(cell < num_cells)
             temptau = radial_optical_depth_twotemp(cell+1,b);
         
-        double F = 0.25 * solar_heating(b) / photon_energies[b] * std::exp(-temptau) / ds * dlognu;
+        double F = 0.25 * solar_heating(b) / photon_energies[b] * std::exp(-temptau) * dlognu;
         
-        //cout<<"tau "<<temptau<<endl;
-        //cout<<" F "<<F<<endl;
-        //cout<<" kappa "<<kappa<<endl;
-        //cout<<"pc pos4 "<<endl;
-        //for i,educt in enumerate(reac.educt) {
+        //cout<<" F = "<<F<<" kappa = "<<kappa<<" tau = "<<temptau<<endl;
+        //cout<<" dx = "<<ds<<" S = "<<solar_heating(b)<<" E = "<<photon_energies[b]<<endl;
+        
+        //
+        // Term t1 = F/dx (1-exp(-dtau))
+        //
+        double t1    = 0.;
+        
         for(int& ei : reaction.educts) { //We assue that photochem reactions look likes reaction.educts[ei] + hv -> products, but leave the more general case open here
             
             double dtau = 0.;
             double dfdn = 0.;
             double dfdn_po = 0.;
             //cout<<"pc pos5, ei = "<<ei<<endl;
-            double kappa = species[reaction.educts[ei]].opacity_twotemp(cell, b) * species[reaction.educts[ei]].mass_amu*amu; 
+            double kappa = species[ei].opacity_twotemp(cell, b) * species[ei].mass_amu*amu; 
             
-            dtau    = ds*kappa*n_olds[ei];
-            dfdn    = dt*F*kappa*std::exp(-dtau) / n_tot;  //TODO: Replaces F, kappa, dx with the appropriate values for species and flux in cell 
+            dtau    = ds*kappa*n_olds[ei]*n_tot;
+            dfdn    = dtt*F*kappa*std::exp(-dtau) / n_tot * reaction.branching_ratio;  //TODO: Replaces F, kappa, dx with the appropriate values for species and flux in cell 
+            
+            if(globalTime > 2.9e10 && cell == 280) {
+                double nh = species[ei].prim[cell].number_density;
+                double np = species[reaction.products[0]].prim[cell].number_density;
+                double ne = species[reaction.products[1]].prim[cell].number_density;
+                cout<<cell<<" F "<<F<<" dx = "<<ds<<" kappa "<<kappa<<" hnu/eV = "<<photon_energies[b]/(kb * ev_to_K)<<" F*kappa ="<<F*kappa<<endl;
+                cout<<" F/hnu = "<<0.25 * solar_heating(b) / photon_energies[b]<<" F/hnu/dx = "<<0.25 * solar_heating(b) / photon_energies[b]/ds<<endl;
+                cout<<" ntot = "<<(nh + np);
+                cout<<" other ntot = "<<(nh + ne);
+                cout<<" steady-steate fzero/fplus = "<<nh/(nh+np)<<"/"<<np/(nh+np)<<endl;
+                
+                double lhs = F*kappa;
+                double a = 2.7e-13/lhs;
+                double b = 1.;
+                double c = -(nh+np);
+                double nplus = (-1 + std::sqrt(1.-4.*a*c))/2./a;
+                double fplus = -nplus / c;
+                //double ac = 1./(a*c);
+                //double fplus = 0.5*(+1.*ac - std::sqrt(ac*(ac-4.)));
+                long double temp2 = 1.-4.*a*c;
+                //double fzero = 1.-(+1 - std::sqrt(1.-4.*a*c))/(2.*a*c); //(1.-fplus);
+                double fzero = 1.-(+1 - (double)sqrtl(temp2))/(2.*a*c); //(1.-fplus);
+                
+                double temp = -0.5 * (b + 1. * std::sqrt(b*b - 4*a*c));
+                double x1 = temp / a;
+                double x2 = - c / temp;
+                fzero = 1.+1./temp;
+                
+                cout<<" 1-4ac = "<<1.-4*a*c<<" sqrt(...) = "<<std::sqrt(1.-4.*a*c)<<" -b + sqrt(...) = "<<-1 + std::sqrt(1.-4.*a*c)<<" a = "<<a<<" a*c = "<<a*c<<endl;
+                cout<<" theory steady-steate fzero/fplus = "<<fzero<<"/"<<fplus<<" nplus = "<<nplus<<" other fzero = "<<(c+nplus)/c<<"/"<<1.+nplus/c<<endl;
+                char aaa;
+                cin>>aaa;
+            }
             
             dfdn_po = -dfdn*n_olds[ei];  //df/dn|k * n^k
             
-            //print("i/reac_educt[i]/dfdn/dfdn_po = " + repr([i,reac.educt[i], dfdn, dfdn_po]))
+            //
             //
             // This distributes t2 = dfdn*stoch throughout the matrix
             // and adds dfdn*n to b for this educt
             //
-            //for j,edu in enumerate(reac.educt) {
+            //
             for(int& ej : reaction.educts ) {
-                //cout<<"pc pos5, ej = "<<ej<<endl;
-                //print(" in i/j = " + repr([i,j]) + " indices = " + repr([reac.educt[i],reac.educt[j]]) + " adding " + repr([reac.e_stoch[j], dfdn]))
                 
                 reaction_matrix(ei, ej) += reaction.e_stoch[ej] * dfdn;           //Change e_stoch j --> ej!
                 reaction_b(ej)          -= reaction.e_stoch[ej] * dfdn_po;
@@ -289,23 +438,18 @@ int c_Sim::solver_cchem_implicit_general(double dt, int cell, int cdebug) {
             //Now add alpha in column for products
             //for j,pro in enumerate(reac.product) {
             for(int& pj : reaction.products ) { 
-                //cout<<"pc pos6, pj = "<<pj<<endl;
                 
                 reaction_matrix(ei, pj) -= reaction.p_stoch[pj] * dfdn;        //Same with p_stoch --> change j-> pj for memory access!
                 reaction_b(pj)          += reaction.p_stoch[pj] * dfdn_po;
             }
-        }
             
-        //
-        // Term t1 = F/dx (1-exp(-dtau))
-        //
-        double t1    = 0.;
-        //for i,educt in enumerate(reac.educt) { //For multibands different kappa, F
-        for(int& ei : reaction.educts) {
-            double dtau    = ds*kappa*n_olds[ei];
-            t1     += dt*F/ds*(-std::expm1(-dtau))/n_tot;
+            t1     += dtt*F/ds*(-std::expm1(-dtau))/n_tot * reaction.branching_ratio;
         }
         
+        
+        //
+        // Write the RHS of the Matrix equation
+        //
         for(int& ei : reaction.educts) {
         //for i,educt in enumerate(reac.educt) {
             reaction_b(ei)              -= reaction.e_stoch[ei] * t1;           
@@ -322,34 +466,49 @@ int c_Sim::solver_cchem_implicit_general(double dt, int cell, int cdebug) {
     // Regular reactions
     //
     //for ri,reac in enumerate(reactions) {
+    double total_chem_dG = 0.;
+    
     for(c_reaction& reaction : reactions) {
-        //cout<<"pos4. reaction = "<<reaction.reaction_number<<endl;
+        double meanT = 0.;
+        double denom = 0.;
+        for(int& ei : reaction.educts) {
+            meanT += species[ei].prim[cell].temperature * species[ei].prim[cell].density;
+            denom += species[ei].prim[cell].density;
+        }
+        meanT = std::sqrt(meanT/denom);
         
-        double reac_r = thermo_get_r(Tcell, reaction.r, reaction.delta_stoch);
+        double reac_r = reaction.get_reaction_rate(meanT);
+        total_chem_dG += reaction.current_dG;
+        
+        /*if(globalTime > 1e3) {
+                
+                cout<<"reaction "<<reaction.reaction_number<<" reac_r "<<reac_r<<" meanT "<<meanT<<endl;
+                
+                char a;
+                cin>>a;
+            }*/
+        
+        //cout<<" reaction number "<<reaction.reaction_number<<" r = "<<reaction.r<<" a/b/c = "<<reaction.reac_a<<" / "<<std::pow(meanT, reaction.reac_b)<<" / "<<std::exp(-meanT/reaction.reac_c)<<" c = "<<reaction.reac_c<<endl;
+        
         double eStochsum = 0.;
         for(int& ei : reaction.educts) {
             eStochsum += reaction.e_stoch[ei];
         }
         
-        //for i,educt in enumerate(reac.educt) {
         for(int& ei : reaction.educts) {
-            //cout<<" educt i "<<ei<<endl;
-            double dfdn    = dt * reac_r * std::pow(n_tot, eStochsum-1.);
+            
+            double dfdn    = dtt * reac_r * std::pow(n_tot, eStochsum-1.);
             double dfdn_po = 0.;
-            //print("dt / reac.r / dfdn = " + repr([dt, reac.r, dfdn]))
+            
             //
-            // This loop constructs df/dn_d as (mathematical) product of all educts (A^k)^a * (B^k)^b * .... (d-1) * (D^k)^(d-1) ..... (Z^k)^z
+            // This loop constructs df/dn_d as product of all educts (A^k)^a * (B^k)^b * .... (d-1) * (D^k)^(d-1) ..... (Z^k)^z
             //
             for(int& ej : reaction.educts) {
-                //cout<<" educt j "<<ej<<endl;
-                //for j,eparter in enumerate(reac.educt):
                 if(ei==ej) {
-                    //print(" in i/j = " + repr([i,j]) + " e[j]/n[e[j]] = " + repr([reac.educt[j],n_olds[int(reac.educt[j])]] ) + " adding " + repr([(float(reac.e_stoch[j]))*n_olds[  reac.educt[j]  ]**(reac.e_stoch[ j ]-1.)]) + " g-1 = " +repr(reac.e_stoch[ j ]-1.))
                     dfdn *= (double(reaction.e_stoch[ej]))* std::pow(n_olds[  ej  ], (reaction.e_stoch[ ej ]-1.));
                 }
                     
                 else {
-                    //print(" in i/j = " + repr([i,j]) + " e[j]/n[e[j]] = " + repr([reac.educt[j],n_olds[int(reac.educt[j])]] ) + " adding " + repr([n_olds[reac.educt[j]]**reac.e_stoch[j]]) + " n,g-1 = " + repr([n_olds[reac.educt[j]],reac.e_stoch[ j ]]))
                     dfdn *= std::pow(n_olds[ej], reaction.e_stoch[ej]);
                 }
                     
@@ -359,7 +518,6 @@ int c_Sim::solver_cchem_implicit_general(double dt, int cell, int cdebug) {
             //
             dfdn_po = -dfdn * n_olds[ei];  //df/dn|k * n^k
             //cout<<" dfdn_po "<<dfdn_po<<endl;
-            //print("i/reac_educt[i]/dfdn/dfdn_po = " + repr([i,reac.educt[i], dfdn, dfdn_po]))
             //
             // This distributes t2 = dfdn*stoch throughout the matrix
             // and adds dfdn*n to b for this educt
@@ -368,16 +526,12 @@ int c_Sim::solver_cchem_implicit_general(double dt, int cell, int cdebug) {
             
             for(int& ej : reaction.educts) {
                 //cout<<"matrix educt j "<<ej<<endl;
-            //for j,edu in enumerate(reac.educt):
-                //print(" in i/j = " + repr([i,j]) + " indices = " + repr([reac.educt[i],reac.educt[j]]) + " adding " + repr([reac.e_stoch[j], dfdn]))
                 reaction_matrix(ei, ej) += reaction.e_stoch[ej] * dfdn;
                 reaction_b(ej)          -= reaction.e_stoch[ej] * dfdn_po;
             }
                 
             //Now add alpha in column for products
             for(int& pj : reaction.products) {
-                //cout<<"matrix product j "<<pj<<endl;
-            //for j,pro in enumerate(reac.product):
                 reaction_matrix(ei,pj) -= reaction.p_stoch[pj] * dfdn;
                 reaction_b(pj)         += reaction.p_stoch[pj] * dfdn_po;
             }
@@ -387,18 +541,15 @@ int c_Sim::solver_cchem_implicit_general(double dt, int cell, int cdebug) {
         //
         // Term t1 = k * (A^k)^a * (B^k)^b ...  as final act
         //
-        double t1    = dt * reac_r * std::pow(n_tot, eStochsum-1.);
-        //for i,educt in enumerate(reac.educt) {
+        double t1    = dtt * reac_r * std::pow(n_tot, eStochsum-1.);
         for(int& ei : reaction.educts) {
             t1 *= std::pow(n_olds[ei], reaction.e_stoch[ei]);
         }
         
-        //for i,educt in enumerate(reac.educt)
         for(int& ei : reaction.educts) {
             reaction_b(ei)              -= reaction.e_stoch[ei] * t1;           
         }
         for(int& pi : reaction.products) {
-        //for i,product in enumerate(reac.product)
             reaction_b(pi)            += reaction.p_stoch[pi] * t1 ;
         }
         
@@ -410,6 +561,8 @@ int c_Sim::solver_cchem_implicit_general(double dt, int cell, int cdebug) {
         cout<<"b="<<endl;
         cout<<reaction_b<<endl;
     
+        char a;
+        cin>>a;
     }
     
     LUchem.compute(identity_matrix + reaction_matrix.transpose()) ;
@@ -421,40 +574,54 @@ int c_Sim::solver_cchem_implicit_general(double dt, int cell, int cdebug) {
     
     for(int s=0;s<num_species; s++) {
         if(n_news(s) < 0) {
+            
+            cout<<"NEGATIVE DENSITY IN SPECIES["<<s<<"] = " <<n_news(s)<<" at time = "<<globalTime<< " steps/cell = "<<steps<<"/"<<cell<<" dt_chem = "<<dtt<<endl;
+            
+            return 1;
+            
             cout<<"In solver_implicit_cchem3 cell, = "<<cell<<" matrix = "<<endl;
             cout<<reaction_matrix.transpose()<<endl;
             cout<<"b="<<endl;
             cout<<reaction_b<<endl;
             cout<<"nolds = "<<endl<<n_olds<<endl;
             cout<<"nnews = "<<endl<<n_news* n_tot<<endl;
-            cout<<"NEGATIVE DENSITY IN SPECIES["<<s<<"] = " <<n_news(s)<<" at time = "<<globalTime<<endl;
-            char aa;
-            cin>>aa;
+            cout<<"NEGATIVE DENSITY IN SPECIES["<<s<<"] = " <<n_news(s)<<" at time = "<<globalTime<< " steps/cell = "<<steps<<"/"<<cell<<endl;
+            cout<<" This species density is being now floored. If you don't think this is a good idea, please ctrl+x."<<endl;
             
-            return 1;
+            //species[s].prim[cell].number_density = n_olds(s); //density_floor / species[s].mass_amu / amu;
+            //species[s].prim[cell].density        = species[s].prim[cell].number_density * species[s].mass_amu*amu;
+            //species[s].prim[cell].density        = density_floor * species[s].mass_amu;
+            
+            cout<<" Replaced new relative number density (comapre to nnews just above) = "<<species[s].prim[cell].number_density/n_tot<<endl;
+            
+            //char aa;
+            //cin>>aa;
+            
         }
         else {
             
             species[s].prim[cell].number_density = n_news(s) * n_tot;
-            species[s].prim[cell].density            = species[s].prim[cell].number_density * species[s].mass_amu*amu;
-            
+            species[s].prim[cell].density        = species[s].prim[cell].number_density * species[s].mass_amu*amu;
+            //species[s].prim[cell].internal_energy *= n_news(s)/n_olds[s];
         }
             
     }
     
+    //Correct species internal energy and speed due to change in number density
+    //Correct species internal energy due to total change in Gibbs energy dU = dG - PdV + TdS
     for (int s = 0; s < num_species; s++) {
                     //species[s].prim[cell].number_density = n_news(s);
         
                     //species[s].prim[j].speed = vX[s] ;
                     //species[s].prim[j].internal_energy = uX[s];
                     //species[s].prim[j].temperature = TX[s];
-                }
+    }
     
     for (int s = 0; s < num_species; s++) {
-                species[s].eos->update_eint_from_T(&species[s].prim[0], num_cells + 2);
-                species[s].eos->update_p_from_eint(&species[s].prim[0], num_cells + 2);
-                species[s].eos->compute_auxillary(&species[s].prim[0], num_cells + 2);
-                species[s].eos->compute_conserved(&species[s].prim[0], &species[s].u[0], num_cells + 2);
+                //species[s].eos->update_eint_from_T(&species[s].prim[cell], 1);
+                species[s].eos->update_p_from_eint(&species[s].prim[cell], 1);
+                species[s].eos->compute_auxillary(&species[s].prim[cell], 1);
+                species[s].eos->compute_conserved(&species[s].prim[cell], &species[s].u[cell], 1);
             }
     
     /*
@@ -540,7 +707,7 @@ std::vector<double> get_thermo_variables(double T,string species_string) {
     //
     // Numbering of a-coefficients deliberately omits a[0] as nonexistent value, due to confusion. Data from Tsai et al. (2017) The VULCAN paper
     //
-    if(species_string.compare("H")==0)
+    if(species_string.compare("H0")==0)
         if(T < 1000)
             temp = thermo_poly(T, 0.00000000E+00, 0.00000000E+00, 2.50000000E+00, 0.00000000E+00, 0.00000000E+00, 0.00000000E+00, 0.00000000E+00, 2.54737080E+04, -4.46682853E-01);
         else

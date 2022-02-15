@@ -168,6 +168,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
         photochemistry_level = read_parameter_from_file<int>(filename,"PHOTOCHEM_LEVEL", debug, 0).value;
         dust_to_gas_ratio = read_parameter_from_file<double>(filename,"DUST_TO_GAS", debug, 0.).value;
         temperature_floor = read_parameter_from_file<double>(filename,"TEMPERATURE_FLOOR", debug, 0.).value;  
+        max_temperature   = read_parameter_from_file<double>(filename,"TEMPERATURE_MAX", debug, 9e99).value;  
         use_chemistry      = read_parameter_from_file<int>(filename,"DO_CHEM", debug, 0).value;
         
         ion_precision         = read_parameter_from_file<double>(filename,"ION_PRECISION", debug, 1e-12).value;
@@ -907,7 +908,7 @@ c_Species::c_Species(c_Sim *base_simulation, string filename, string species_fil
         this->workingdir   = base->workingdir;
         this->debug        = debug;
         
-        if(debug > 0) cout<<"        Species["<<species_index<<"] Init: Begin"<<endl;
+        if(debug >= 0) cout<<"        Species["<<species_index<<"] = "<<speciesname<<" Beginning init."<<endl;
         
         ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         //
@@ -1140,10 +1141,13 @@ void c_Species::initialize_hydrostatic_atmosphere(string filename) {
     //
     // First, initialize (adiabatic) temperature
     //
-    for(int i=num_cells+2; i>=0; i--) {
+    for(int i=num_cells+1; i>=0; i--) {
             
         if(base->temperature_model == 'P')
-            prim[i].temperature = - dphi_factor * base->phi[i] / (cv * gamma_adiabat) + const_T_space;
+            if (i==num_cells+2)
+                prim[i].temperature = const_T_space;
+            else
+                prim[i].temperature = - dphi_factor * base->phi[i] / (cv * gamma_adiabat) + const_T_space;
         else
             prim[i].temperature = const_T_space + 0.e-3*std::pow(base->x_i12[i]/base->x_i12[0],-1);
         
@@ -1155,7 +1159,7 @@ void c_Species::initialize_hydrostatic_atmosphere(string filename) {
         }
     }
     
-    cout<<" POS1 dens[2] = "<<u[2].u1<<" temp[2] = "<<prim[2].temperature<<" num_cells+2 = "<<num_cells+2<<endl;
+    //cout<<" POS1 dens[2] = "<<u[2].u1<<" temp[2] = "<<prim[2].temperature<<" num_cells+2 = "<<num_cells+2<<endl;
     
     //At this point, the right ghost cell is already initialized, so we can just build up a hydrostatic state from there
     int iter_start;
@@ -1235,7 +1239,7 @@ void c_Species::initialize_hydrostatic_atmosphere(string filename) {
             temp_rhofinal = u[i].u1 *  (factor_inner - metric_inner)/(factor_outer + metric_outer);
             
             //////////////////////////////////////////////////////////////////////////////////////
-            double floor = base->density_floor * mass_amu * std::pow(base->x_i12[i]/base->x_i12[1], -4.);
+            double floor = base->density_floor / mass_amu * std::pow(base->x_i12[i]/base->x_i12[1], -4.);
             if(temp_rhofinal < floor) {
                 
                 if(temp_rhofinal < 0.)
@@ -1286,10 +1290,10 @@ void c_Species::initialize_hydrostatic_atmosphere(string filename) {
         //prim[0] = prim[3];
     }
     
-    cout<<" POS2 dens[2] = "<<u[2].u1<<" temp[2] = "<<prim[2].temperature<<" rhoe1, rhoe2 = "<<u[1].u3<<"/"<<u[2].u3<<" cv ="<<cv<<endl;
-    cout<<"Assigned densities in num_cell-1 = "<<u[num_cells-1].u1<<endl;
-    cout<<"Assigned densities in num_cell = "<<  u[num_cells].u1<<endl;
-    cout<<"Assigned densities in num_cell+1 = "<<u[num_cells+1].u1<<endl;
+    //cout<<" POS2 dens[2] = "<<u[2].u1<<" temp[2] = "<<prim[2].temperature<<" rhoe1, rhoe2 = "<<u[1].u3<<"/"<<u[2].u3<<" cv ="<<cv<<endl;
+    //cout<<"Assigned densities in num_cell-1 = "<<u[num_cells-1].u1<<endl;
+    //cout<<"Assigned densities in num_cell = "<<  u[num_cells].u1<<endl;
+    //cout<<"Assigned densities in num_cell+1 = "<<u[num_cells+1].u1<<endl;
     
     if(base->type_of_grid == -2) {
         
@@ -1300,7 +1304,7 @@ void c_Species::initialize_hydrostatic_atmosphere(string filename) {
     }
     
     for(int i = 0; i<num_cells+1; i++) {
-            double floor = base->density_floor * mass_amu * std::pow(base->x_i12[i]/base->x_i12[1], -4.);
+            double floor = base->density_floor / mass_amu * std::pow(base->x_i12[i]/base->x_i12[1], -4.);
             if(u[i].u1 < floor) {
                 //cout<<"FIXING SMALL DENSITIES in i ="<<i<<" for species = "<<this_species_index<<endl;
                 u[i] = AOS(floor, 0., cv * floor * prim[i].temperature) ;
@@ -1380,7 +1384,7 @@ void c_Species::initialize_hydrostatic_atmosphere(string filename) {
                 cout<<"In initwind: First smoothed factor = "<<smoothed_factor<<endl;
         }
         
-        cout<<"@@@ Ended hydrostatic construction for species "<<speciesname<<", last smoothed factor was "<<smoothed_factor<<" while  density_excess="<<density_excess<<" r_b="<<bondi_radius<<endl<<endl;
+        cout<<"......... Ended hydrostatic construction for species "<<speciesname<<", last density was "<<u[num_cells+1].u1<<" while  density_excess="<<density_excess<<" r_b="<<bondi_radius<<endl<<endl;
     }
     else
         cout<<"@@@ Ended hydrostatic construction for species "<<speciesname<<endl<<endl;
@@ -1392,9 +1396,9 @@ void c_Species::initialize_hydrostatic_atmosphere(string filename) {
     //    cout<<" POS3 dens["<<j<<"] = "<<u[j].u1<<" temp = "<<prim[j].temperature<<" E/e/p = "<<u[j].u3<<"/"<<prim[j].internal_energy<<"/"<<prim[j].pres<<" rho*cv*T = "<<cv*u[j].u1*prim[j].temperature<<endl;
 
     cout<<"End of hydrostat"<<endl;
-    cout<<"Assigned densities in num_cell-1 = "<<u[num_cells-1].u1<<endl;
-    cout<<"Assigned densities in num_cell = "<<  u[num_cells].u1<<endl;
-    cout<<"Assigned densities in num_cell+1 = "<<u[num_cells+1].u1<<endl;
+    //cout<<"Assigned densities in num_cell-1 = "<<u[num_cells-1].u1<<endl;
+    //cout<<"Assigned densities in num_cell = "<<  u[num_cells].u1<<endl;
+    //cout<<"Assigned densities in num_cell+1 = "<<u[num_cells+1].u1<<endl;
 }
 
 void c_Species::initialize_exponential_atmosphere() {

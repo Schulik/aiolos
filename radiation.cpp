@@ -47,30 +47,28 @@ void c_Sim::reset_dS() {
             solar_heating(b) = solar_heating_final(b);
         }        
     }
-    
-       
-        if(steps==1107) {
-            
-            cout<<" in reset_dS Steps == 1107, dS = "<<dS_band(60,0)<<" S = "<<S_band(60,0)<<" F = "<<solar_heating(0)<<" F0 = "<<solar_heating_final(0)<<endl;
-            
-        }   
                 
+}
+
+void c_Sim::update_tau_s_jb(int j, int b) {
+    
+    total_opacity_twotemp(j,b)        = 0 ;
+    radial_optical_depth_twotemp(j,b) = 0.;
+                
+    for(int s=0; s<num_species; s++) 
+        total_opacity_twotemp(j,b)  += species[s].opacity_twotemp(j,b) * species[s].u[j].u1 ;
+                
+    cell_optical_depth_twotemp(j,b) = total_opacity_twotemp(j, b) * dx[j] ;
+                
+    if(j==num_cells+1)
+        radial_optical_depth_twotemp(j,b) = 0.; //cell_optical_depth(j,b);
+    else
+        radial_optical_depth_twotemp(j,b) = radial_optical_depth_twotemp(j+1,b) + cell_optical_depth_twotemp(j,b);
+    
 }
 
 void c_Sim::update_dS_jb(int j, int b) {
     
-                total_opacity_twotemp(j,b)        = 0 ;
-                radial_optical_depth_twotemp(j,b) = 0.;
-                
-                for(int s=0; s<num_species; s++) 
-                    total_opacity_twotemp(j,b)  += species[s].opacity_twotemp(j,b) * species[s].u[j].u1 ;
-                
-                cell_optical_depth_twotemp(j,b) = total_opacity_twotemp(j, b) * dx[j] ;
-                
-                if(j==num_cells+1)
-                    radial_optical_depth_twotemp(j,b) = 0.; //cell_optical_depth(j,b);
-                else
-                    radial_optical_depth_twotemp(j,b) = radial_optical_depth_twotemp(j+1,b) + cell_optical_depth_twotemp(j,b);
                 
                 //
                 // After the total optical depth per band is known, we assign the fractional optical depths
@@ -123,7 +121,7 @@ void c_Sim::update_dS_jb(int j, int b) {
                 for(int s=0; s<num_species; s++) {
                     //if lowenergy or photochem < 2
                     
-                    if(photochem < 2)
+                    if(photochemistry_level <= 2)
                         species[s].dS(j)  += dS_band(j,b) * species[s].fraction_total_solar_opacity(j,b);
                     else {
                         
@@ -188,11 +186,13 @@ void c_Sim::update_dS() {
         //////////////////////////////////////////////////////////////////
         for(int b=0; b<num_bands_in; b++) {
             
-            if(!BAND_IS_HIGHENERGY[b]) {
+            update_tau_s_jb(j, b);
             
-                update_dS_jb(int j, int b);
+            //if(!BAND_IS_HIGHENERGY[b]) {
             
-            }
+            update_dS_jb(j, b);
+            
+            //}
         }
         
         //TODO: Add chemical energy to dS
@@ -331,11 +331,6 @@ void c_Sim::update_dS() {
         
     }
     
-    if(steps==1107) {
-            
-            cout<<" in update_dS Steps == 1107, dS = "<<dS_band(60,0)<<" S = "<<S_band(60,0)<<" F = "<<solar_heating(0)<<endl;
-            
-        }
 }
 
 
@@ -757,6 +752,9 @@ void c_Sim::update_fluxes_FLD() {
             
             if(tt<temperature_floor)
                 tt=temperature_floor;
+            
+            if(tt>max_temperature)
+                tt=max_temperature;
             
             species[s].prim[j].temperature = tt ;
             //if(j==num_cells)
