@@ -30,15 +30,20 @@ double c_Sim::get_cfl_timestep() {
     double maxde = 0;
     
     for(int s = 0; s < num_species; s++) {
-        for(int i=num_cells-1; i>=0; i--)  {
+        for(int i=num_cells-1; i>0; i--)  {
             species[s].de_e[i] = std::abs(species[s].primlast[i].internal_energy - species[s].prim[i].internal_energy)/species[s].prim[i].internal_energy;
             
             species[s].timesteps_de[i] = dt / species[s].de_e[i] * energy_epsilon;
             
             maxde = std::max(species[s].de_e[i], maxde) ;
-            if(debug > 2)
+            if(debug >= 1 && globalTime > 1e-1)
                 cout<<" steps "<<steps<<" species "<<s<<" i = "<<i<<" de/e = "<<species[s].de_e[i]<<" de/e/cflfactor = "<<species[s].de_e[i]/cflfactor<<endl;
         }
+    }
+    
+    if(debug >= 1 && globalTime > 1e-1) {
+        char a;
+        cin>>a;
     }
     
     timestep_rad2 = dt / maxde * energy_epsilon;

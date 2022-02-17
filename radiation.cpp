@@ -69,7 +69,6 @@ void c_Sim::update_tau_s_jb(int j, int b) {
 
 void c_Sim::update_dS_jb(int j, int b) {
     
-                
                 //
                 // After the total optical depth per band is known, we assign the fractional optical depths
                 // Maybe merge with previous loop for optimization
@@ -210,7 +209,8 @@ void c_Sim::update_dS() {
                 radial_optical_depth(j,b)         = 0.;
                 
                 for(int s=0; s<num_species; s++) {
-                    total_opacity(j,b)          += species[s].opacity(j,b)         * species[s].u[j].u1 ; //TODO: Replace this with sensible addition rule for Rosseland opacities!
+                    //total_opacity(j,b)          += species[s].opacity(j,b)         * species[s].u[j].u1 ; //TODO: Replace this with sensible addition rule for Rosseland opacities!
+                    total_opacity(j,b)          = std::fmax(species[s].opacity(j,b) * species[s].u[j].u1, total_opacity(j,b)) ; //TODO: Replace this with sensible addition rule for Rosseland opacities!
                 }
                 cell_optical_depth(j,b)         = total_opacity(j, b)         * dx[j] ;
                 
@@ -567,15 +567,22 @@ void c_Sim::update_fluxes_FLD() {
                 }
             }
             if (use_collisional_heating && num_species > 1) {
-                fill_alpha_basis_arrays(j);
-                compute_collisional_heat_exchange_matrix(j);
+                
+                double tau = total_opacity(j,0) * (x_i12[j+1]-x_i12[j]);
+                
+                if (tau < 1e3) { //Heuristic fix for boundary heat bug at large optical depth
+                    fill_alpha_basis_arrays(j);
+                    compute_collisional_heat_exchange_matrix(j);
 
-                for (int si=0; si < num_species; si++) { 
-                    int idx  = j*stride + (si + num_bands_out) * num_vars + num_bands_out;
-                    for (int sj=0; sj < num_species; sj++) {
-                        d[idx+sj] -= friction_coefficients(si,sj) ;
-                        //cout<<" si/sj = "<<si<<"/"<<sj<<" coeff = "<<friction_coefficients(si,sj);
+                    for (int si=0; si < num_species; si++) { 
+                        int idx  = j*stride + (si + num_bands_out) * num_vars + num_bands_out;
+                        for (int sj=0; sj < num_species; sj++) {
+                            d[idx+sj] -= friction_coefficients(si,sj) ;
+                            //cout<<" si/sj = "<<si<<"/"<<sj<<" coeff = "<<friction_coefficients(si,sj);
+                        }
                     }
+                    
+                    
                 }
                 
                 //char a;

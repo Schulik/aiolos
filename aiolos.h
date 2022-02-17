@@ -188,12 +188,15 @@ void update_cons_prim_after_friction(AOS* cons, AOS_prim* prim, double dEkin, do
 
 
 class c_Species;
+class c_Sim;
 //class c_reaction;
 //class c_photochem_reaction;
 
 class c_reaction
 {    
 public:
+    c_Sim *base;
+    
     int reaction_number = -1;
     std::vector<int> educts;   //A list of indices
     std::vector<int> products; //A list of indices
@@ -212,9 +215,11 @@ public:
     double current_dG = 0.;
     
 public:
-    c_reaction(bool is_reverse, int num_species, std::vector<int> e_indices,std::vector<int> p_indices,std::vector<double> e_stoch, std::vector<double> p_stoch, double reaction_rate);
+    
     c_reaction(bool is_reverse, int num_species, std::vector<int> e_indices,std::vector<int> p_indices,std::vector<double> e_stoch, std::vector<double> p_stoch, double a, double b, double c);
+    c_reaction(bool is_reverse, int num_species, std::vector<int> e_indices,std::vector<int> p_indices,std::vector<double> e_stoch, std::vector<double> p_stoch, double reaction_rate);
     void c_reaction_real(int num_species, std::vector<int> e_indices,std::vector<int> p_indices,std::vector<double> e_stoch, std::vector<double> p_stoch, double reaction_rate);
+    void set_base_pointer(c_Sim *base_simulation);
     
     void update_reaction_rate(double T);
     double get_reaction_rate(double T);
@@ -397,7 +402,11 @@ public:
     std::vector<double> phi;
     std::vector<double> enclosed_mass;
     std::vector<double> enclosed_mass_tmp;
-    std::vector<double> total_pressure;
+    //std::vector<double> total_pressure;
+    std::vector<double> total_press_l ; // Reconstructed left/ right edges
+    std::vector<double> total_press_r ;
+    std::vector<double> total_adiabatic_index;
+    int use_total_pressure;
     
     //
     // Friction
@@ -558,16 +567,7 @@ public:
     void print_monitor(int i);
     void print_diagnostic_file(int i);
     
-    
-    void compute_total_pressure() {
-        /*for(int i=num_cells; i>=0; i--)  {
-            
-            total_pressure[i] = 0.;
-            for(int s = 0; s < num_species; s++) {
-                total_pressure[i] += species[s].prim[i].pressure;
-            }
-        }*/
-    }
+    void compute_total_pressure();
     
     //
     // Friction
@@ -600,6 +600,7 @@ public:
     void reset_dS();
     void update_dS();
     void update_dS_jb(int j, int b);
+    void update_dS_jb_photochem(int j, int b);
     void update_tau_s_jb(int j, int b);
     void update_opacities();
     

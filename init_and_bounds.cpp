@@ -170,6 +170,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
         temperature_floor = read_parameter_from_file<double>(filename,"TEMPERATURE_FLOOR", debug, 0.).value;  
         max_temperature   = read_parameter_from_file<double>(filename,"TEMPERATURE_MAX", debug, 9e99).value;  
         use_chemistry      = read_parameter_from_file<int>(filename,"DO_CHEM", debug, 0).value;
+        use_total_pressure = read_parameter_from_file<int>(filename,"USE_TOTAL_PRESSURE", debug, 0).value;
         
         ion_precision         = read_parameter_from_file<double>(filename,"ION_PRECISION", debug, 1e-12).value;
         ion_heating_precision = read_parameter_from_file<double>(filename,"ION_HEATING_PRECISION", debug, 1e-12).value;
@@ -236,7 +237,10 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
         enclosed_mass     = np_zeros(num_cells+2);
         enclosed_mass_tmp = np_zeros(num_cells+2);
         phi               = np_zeros(num_cells+2);
-        total_pressure    = np_zeros(num_cells+2);
+        //total_pressure    = np_zeros(num_cells+2);
+        total_press_l            = std::vector<double>(num_cells+2);
+        total_press_r            = std::vector<double>(num_cells+2);
+        total_adiabatic_index   = std::vector<double>(num_cells+2);
         
         if(num_bands_in < 1) {
             cout<<" In INIT RADIATION, invalid num_bands_in = "<<num_bands_in<<" changing to num_bands_in = 1."<<endl;
@@ -866,6 +870,8 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
                 cout<<" FATAL ERROR caught in init_chemistry: Photochem reaction product index exceeds num_species! "<<endl;
             else if(i==4)
                 cout<<" FATAL ERROR caught in init_chemistry: Photochem reaction band index exceeds num_bands! "<<endl;
+            else
+                cout<<"Misc integer error code caught in init_chemistry."<<endl;
             
         } 
         catch(...) {
@@ -1306,6 +1312,7 @@ void c_Species::initialize_hydrostatic_atmosphere(string filename) {
     for(int i = 0; i<num_cells+1; i++) {
             double floor = base->density_floor / mass_amu * std::pow(base->x_i12[i]/base->x_i12[1], -4.);
             if(u[i].u1 < floor) {
+                //floor = 1e6 * mass_amu*amu / (kb * prim[i].temperature); 
                 //cout<<"FIXING SMALL DENSITIES in i ="<<i<<" for species = "<<this_species_index<<endl;
                 u[i] = AOS(floor, 0., cv * floor * prim[i].temperature) ;
             }

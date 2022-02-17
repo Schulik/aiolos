@@ -301,6 +301,7 @@ void c_Sim::execute() {
         
         for(int s = 0; s < num_species; s++) 
             species[s].compute_pressure(species[s].u);
+        compute_total_pressure();
         
         //cout<<" POS2 num_cells+1 = "<<num_cells+1<<" temp = "<<species[0].prim[num_cells+1].temperature<<endl;
         //cout<<" POS2 num_cells+1 = "<<num_cells+1<<" temp = "<<species[1].prim[num_cells+1].temperature<<endl;
@@ -492,6 +493,34 @@ void c_Sim::execute() {
         
 }
 
+void c_Sim::compute_total_pressure() {
+    
+    for(int i=num_cells+2; i>=0; i--)  {
+            
+        total_press_l[i] = 0.;
+        total_press_r[i] = 0.;
+            
+        for(int s = 0; s < num_species; s++) {
+                //total_pressure[i] += species[s].prim[i].pressure;
+                
+            if(species[s].prim_l[i].pres > 0.) {
+                total_press_l[i] += species[s].prim_l[i].pres;
+                total_press_r[i] += species[s].prim_r[i].pres;
+                
+            }
+                
+            //if(i<5) cout<<" i/s = "<<i<<"/"<<s<<" pl/pr = "<<species[s].prim_l[i].pres<<"/"<<species[s].prim_r[i].pres<<" dens = "<<species[s].prim_l[i].density<<endl;
+        }
+            
+        //cout<<"total pressure, cell "<<i<<" pl/pr = "<<total_press_l[i]<<"/"<<total_press_r[i]<<endl;
+            
+    }
+    
+    //char a;
+    //cin>>a;
+}
+    
+
 
 ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -677,7 +706,13 @@ AOS c_Species::hllc_flux(int j)
     double ur = prim_l[jright].speed; 
     
     double pl = prim_r[jleft].pres;  
-    double pr = prim_l[jright].pres; 
+    double pr = prim_l[jright].pres;
+    double pl_e = pl;
+    double pr_e = pr;
+    if(base->use_total_pressure) {
+            pl = base->total_press_r[jleft];
+            pr = base->total_press_l[jright];
+    }
     
     double dl = prim_r[jleft].density;  
     double dr = prim_l[jright].density;
@@ -700,8 +735,8 @@ AOS c_Species::hllc_flux(int j)
     double SS     = ( pr-pl+mom_l*(SL - ul)-mom_r*(SR-ur) )/(dl*(SL - ul)-dr*(SR-ur) );
     
     if ((SL <= 0) &&  (SS >= 0)) {
-        AOS FL         = AOS (mom_l, mom_l * ul + pl, ul * (El + pl) );
-        double comp3_L = El/dl + (SS-ul)*(SS + pl/(dl*(SL-ul)));
+        AOS FL         = AOS (mom_l, mom_l * ul + pl, ul * (El + pl_e) );
+        double comp3_L = El/dl + (SS-ul)*(SS + pl_e/(dl*(SL-ul)));
         AOS US_L       = AOS(1,SS, comp3_L) * dl * (SL - ul)/(SL-SS);
         AOS FS_L       = FL + (US_L - AOS(dl, mom_l, El))  * SL;    
            
@@ -710,8 +745,8 @@ AOS c_Species::hllc_flux(int j)
     }
     else if ((SS <= 0) && (SR >= 0)) {
         
-        AOS FR         = AOS (mom_r, mom_r * ur + pr, ur * (Er + pr) );
-        double comp3_R = Er/dr + (SS-ur)*(SS + pr/(dr*(SR-ur)));
+        AOS FR         = AOS (mom_r, mom_r * ur + pr, ur * (Er + pr_e) );
+        double comp3_R = Er/dr + (SS-ur)*(SS + pr_e/(dr*(SR-ur)));
         AOS US_R       = AOS(1,SS, comp3_R) * dr * (SR - ur)/(SR-SS);
         AOS FS_R       = FR + (US_R - AOS(dr, mom_r, Er)) * SR;
         
@@ -719,12 +754,12 @@ AOS c_Species::hllc_flux(int j)
         option = 2;
     }
     else if (SL >= 0) {
-        AOS FL = AOS (mom_l, mom_l * ul + pl, ul * (El + pl) );
+        AOS FL = AOS (mom_l, mom_l * ul + pl, ul * (El + pl_e) );
         flux = FL;
         option = 3;
     }
     else if (SR <= 0) {
-        AOS FR = AOS(mom_r, mom_r * ur + pr, ur * (Er + pr) );
+        AOS FR = AOS(mom_r, mom_r * ur + pr, ur * (Er + pr_e) );
         flux = FR;
         option= 4 ;
     }
@@ -739,8 +774,6 @@ AOS c_Species::dust_flux(int j)
 {
     AOS_prim Wl = prim_r[j] ;
     AOS_prim Wr = prim_l[j+1] ;
-
-
 
     // Case 1: Vacuum central state, no flux
     if (Wl.speed < 0 && Wr.speed > 0)
