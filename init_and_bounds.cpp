@@ -776,7 +776,9 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
 
     total_opacity_twotemp        = Eigen::MatrixXd::Zero(num_cells+2, num_bands_in);
     cell_optical_depth_twotemp   = Eigen::MatrixXd::Zero(num_cells+2, num_bands_in);
+    cell_optical_depth_highenergy= Eigen::MatrixXd::Zero(num_cells+2, num_bands_in);
     radial_optical_depth_twotemp = Eigen::MatrixXd::Zero(num_cells+2, num_bands_in);
+    highenergy_switch            = Eigen::MatrixXd::Ones(num_species, num_bands_in);
     
     Etot_corrected = Eigen::MatrixXd::Zero(num_cells+2, 1);
     
@@ -1676,4 +1678,190 @@ c_Sim::~c_Sim() {
 
 c_Species::~c_Species() {
     //Empty
+}
+
+
+void c_reaction::set_base_pointer(c_Sim *base_simulation) {
+    base = base_simulation;
+}
+
+void c_photochem_reaction::set_base_pointer(c_Sim *base_simulation) {
+    base = base_simulation;
+    
+    energy_split_factor = 1.;
+    double denom = 0.;
+    for(int& pj : products) {
+            this->products_total_mass += p_stoch[pj] * base->species[pj].mass_amu;
+            
+            cout<<"In photochem setup, added species number pj = "<<pj<<" mass = "<<base->species[pj].mass_amu<<" and stoch = "<<p_stoch[pj]<<endl;
+            
+            energy_split_factor *= base->species[pj].mass_amu;
+            double temp = 1.;
+            for(int& pk : products) {
+                    if(pk != pj)
+                        temp *= base->species[pk].mass_amu;
+            }
+            cout<<" energy split denom sum "<<temp<<endl;
+            denom += temp;
+    }
+    cout<<" nom = "<<energy_split_factor<<endl;
+    energy_split_factor /= denom;
+    
+    cout<<" energy split factor = "<<energy_split_factor<<" / 1/energy_split_factor = "<<1./energy_split_factor<<" denom = "<<denom<<endl;
+    
+    base->highenergy_switch(educts[0], this->band) = 0.;
+}
+
+
+
+c_reaction::c_reaction(bool is_reverse, int num_species, std::vector<int> e_indices,std::vector<int> p_indices,std::vector<double> e_stoch, std::vector<double> p_stoch, double a, double b, double c) {
+    this->is_reverse_reac = is_reverse;
+    this->reac_a = a;
+    this->reac_b = b;
+    this->reac_c = c;
+    double reaction_rate = get_reaction_rate(300.);
+    
+    if(!is_reverse_reac)
+        c_reaction_real(num_species, e_indices, p_indices, e_stoch, p_stoch, reaction_rate);
+    else
+        c_reaction_real(num_species, p_indices, e_indices, p_stoch, e_stoch, reaction_rate);
+    
+} 
+
+
+c_reaction::c_reaction(bool is_reverse, int num_species, std::vector<int> e_indices,std::vector<int> p_indices,std::vector<double> e_stoch, std::vector<double> p_stoch, double reaction_rate) 
+{
+    this->is_reverse_reac    = is_reverse;
+    
+    if(!is_reverse_reac)
+        c_reaction_real(num_species, e_indices, p_indices, e_stoch, p_stoch, reaction_rate);
+    else
+        c_reaction_real(num_species, p_indices, e_indices, p_stoch, e_stoch, reaction_rate);
+            
+}
+
+void c_reaction::c_reaction_real(int num_species, std::vector<int> e_indices,std::vector<int> p_indices,std::vector<double> e_stoch, std::vector<double> p_stoch, double reaction_rate) {
+    
+    for(int e=0; e<e_indices.size(); e++) {
+        if(e_indices[e] >= num_species) {
+            
+            cout<<" FATAL ERROR caught in init_chemistry: Target ochem reactant index exceeds num_species! "<<endl;
+            char wait;
+            cin>>wait;
+            throw 0;
+        }
+            
+    }
+    for(int p=0; p<p_indices.size(); p++) {
+        if(p_indices[p] >= num_species) {
+            
+            cout<<" FATAL ERROR caught in init_chemistry: Target chem product index exceeds num_species! "<<endl;
+            char wait;
+            cin>>wait;
+            throw 1;
+        }
+            
+    }
+        
+    this->educts   = e_indices;
+    this->products = p_indices;
+            
+    this->e_num   = e_indices.size();
+    this->p_num   = p_indices.size();
+        
+    this->e_stoch = std::vector<double>(num_species); //e_stoch;
+    this->p_stoch = std::vector<double>(num_species); //p_stoch;
+    this->reac_a  = reaction_rate;
+    this->r       = reaction_rate;
+        
+    for(int s=0; s<num_species; s++) {
+        this->e_stoch[s] = 0;
+        this->p_stoch[s] = 0;
+    }
+        
+    delta_stoch = 0.;
+    for(int e=0; e<e_num; e++) {
+        this->e_stoch[e_indices[e]] = e_stoch[e];
+        delta_stoch += e_stoch[e];
+    }
+                
+    for(int p=0; p<p_num; p++) {
+        this->p_stoch[p_indices[p]] = p_stoch[p];
+        delta_stoch -= p_stoch[p];
+    }
+}
+
+
+c_photochem_reaction::c_photochem_reaction(int num_species, int num_bands, int band, std::vector<int> e_indices, std::vector<int> p_indices, std::vector<double> e_stoch, std::vector<double> p_stoch, double branching, double threshold)
+{
+        //cout<<"in init photochem reaction "<<endl;
+        for(int e=0; e<e_indices.size(); e++) {
+            //cout<<" e = "<<e_indices[e]<<endl;
+            if(e_indices[e] >= num_species) {
+                cout<<" FATAL ERROR caught in init_chemistry: Target photochem reactant index exceeds num_species! "<<endl;
+                char wait;
+                cin>>wait;
+                throw 2;
+            }
+                
+        }
+        for(int p=0; p<p_indices.size(); p++) {
+            //cout<<" p ="<<p_indices[p]<<endl;
+            if(p_indices[p] >= num_species) {
+                cout<<" FATAL ERROR caught in init_chemistry: Target photochem product index exceeds num_species! "<<endl;
+                char wait;
+                cin>>wait;
+                throw 3;
+            }
+                
+        }
+        
+        //cout<<"e_indices = "<<e_indices<<" p_indices = "<<p_indices<<endl;
+        //cout<<"pos1"<<endl;
+        //this->reaction_number = reacnum;
+        this->educts   = e_indices;
+        this->products = p_indices;
+        //cout<<"pos2"<<endl;
+        this->e_num   = e_indices.size();
+        this->p_num   = p_indices.size();
+        //cout<<"pos3, enum/pnum = "<<this->e_num<<" "<<this->p_num<<endl;
+        this->e_stoch = std::vector<double>(num_species);//  e_stoch;
+        this->p_stoch = std::vector<double>(num_species); // p_stoch;
+        //cout<<"pos4"<<endl;
+        
+        for(int s=0; s<num_species; s++) {
+            this->e_stoch[s] = 0.;
+            this->p_stoch[s] = 0.;
+        }
+        for(int s=0; s<num_species; s++) {
+            //cout<<" s = "<<s<<" "<<e_stoch[s]<<"/"<<p_stoch[s]<<endl;
+        }
+        //cout<<"pos5"<<endl;
+        for(int e=0; e<e_num; e++) {
+            this->e_stoch[e_indices[e]] = e_stoch[e];
+            //cout<<" set e_stoch = "<<e_stoch[e]<<endl;
+            //cout<<" set e_indices = "<<e_indices[e]<<endl;
+        }
+        
+        count_p = 0;
+        for(int p=0; p<p_num; p++) {
+            this->p_stoch[p_indices[p]] = p_stoch[p];
+            count_p ++;
+            //cout<<" set p_stoch = "<<p_stoch[p]<<endl;
+            //cout<<" set p_indices = "<<p_indices[p]<<endl;
+        }
+            
+        this->products_total_mass = 0.; // Needs to be set after the base pointer is set.
+        
+        //cout<<"pos6"<<endl;
+        if(band >= num_bands) {
+            cout<<" FATAL ERROR IN SETTING UP PHOTOCHEM: band = "<<band<<" >= num_bands = "<<num_bands<<endl;
+            throw 4;
+        }
+            
+        
+        this->band = band; //TODO: Check that band <= num_bands
+        this->branching_ratio = branching;
+        this->threshold_energy = threshold * ev_to_K * kb ;
+        //cout<<"pos7"<<endl;
 }

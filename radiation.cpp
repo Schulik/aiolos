@@ -75,7 +75,7 @@ void c_Sim::update_dS_jb(int j, int b) {
                 //
                 
                 for(int s=0; s<num_species; s++) 
-                    species[s].fraction_total_solar_opacity(j,b) = species[s].opacity_twotemp(j,b) * species[s].u[j].u1 * dx[j] / cell_optical_depth_twotemp(j,b);
+                    species[s].fraction_total_solar_opacity(j,b) = highenergy_switch(s,b) * species[s].opacity_twotemp(j,b) * species[s].u[j].u1 * dx[j] / cell_optical_depth_twotemp(j,b);
                     //species[s].fraction_total_opacity(j,b) = species[s].opacity(j,b) * species[s].u[j].u1 * dx[j] / cell_optical_depth(j,b);
                 
                 //
@@ -90,8 +90,33 @@ void c_Sim::update_dS_jb(int j, int b) {
                 // Regular dS computation
                 if(steps > -1) {
                             
-                    if(j<num_cells+1)
-                        dS_band(j,b) = 0.25 * solar_heating(b) * (-exp(-radial_optical_depth_twotemp(j+1,b)) * expm1( const_opacity_solar_factor* ( radial_optical_depth_twotemp(j+1,b) - radial_optical_depth_twotemp(j,b))) ) /dx[j] * (1.-bond_albedo);
+                    if(j<num_cells+1){
+                        dS_band(j,b) = 0.25 * solar_heating(b) * exp(-radial_optical_depth_twotemp(j+1,b))  /dx[j] * (1.-bond_albedo);
+                        double dtau_tot = -(radial_optical_depth_twotemp(j+1,b) - radial_optical_depth_twotemp(j,b));
+                        double dS_he_temp = dS_band(j,b);
+                        
+                        dS_band(j,b) *= (-expm1(-const_opacity_solar_factor * dtau_tot));
+                        dS_he_temp   *=  -expm1(-const_opacity_solar_factor * cell_optical_depth_highenergy(j,b)) ;
+                        
+                        //dS_band(j,b) *= ( std::exp( const_opacity_solar_factor* (cell_optical_depth_highenergy(j,b)) ) - std::exp( const_opacity_solar_factor* (dtau_tot) ) );
+                        
+                        
+                        
+                        dS_band(j,b) -= dS_he_temp;
+                        dS_band(j,b) = std::max(dS_band(j,b), 0.); //Safeguard against highenergy shenanigans
+                        
+                        if(b==1000) {
+                            cout<<" in thermal heating: total heating ~ "<<dS_band(j,b)<<" of which highenergy is "<<dS_he_temp;
+                            cout<<" resulting in dS_band("<<j<<","<<b<<") = "<<dS_band(j,b)<<" F*e-tau = "<<solar_heating(b) * exp(-radial_optical_depth_twotemp(j+1,b))<<" tau "<<dtau_tot<<" ";
+                            for(int s=0; s<num_species; s++) {
+                                cout<<species[s].u[j].u1<<" ";
+                            }
+                            cout<<endl;
+                            
+                        }
+                        
+                        
+                    }
                     else
                         // Use optically thin limit  
                         dS_band(j,b) = 0.25 * solar_heating(b)*total_opacity_twotemp(j,b)*(1-bond_albedo);
@@ -121,7 +146,7 @@ void c_Sim::update_dS_jb(int j, int b) {
                     //if lowenergy or photochem < 2
                     
                     if(photochemistry_level <= 2)
-                        species[s].dS(j)  += dS_band(j,b) * species[s].fraction_total_solar_opacity(j,b);
+                        species[s].dS(j)  += highenergy_switch(s,b) * dS_band(j,b) * species[s].fraction_total_solar_opacity(j,b);
                     else {
                         
                         //if(species.s participates in photoreaction)
@@ -570,20 +595,24 @@ void c_Sim::update_fluxes_FLD() {
                 
                 double tau = total_opacity(j,0) * (x_i12[j+1]-x_i12[j]);
                 
-                if (tau < 1e3) { //Heuristic fix for boundary heat bug at large optical depth
+                 //Heuristic fix for boundary heat bug at large optical depth
                     fill_alpha_basis_arrays(j);
                     compute_collisional_heat_exchange_matrix(j);
 
                     for (int si=0; si < num_species; si++) { 
                         int idx  = j*stride + (si + num_bands_out) * num_vars + num_bands_out;
                         for (int sj=0; sj < num_species; sj++) {
+                            
+                            if (tau < 1e3) {
+                            
                             d[idx+sj] -= friction_coefficients(si,sj) ;
+                            
+                            } else
+                                d[idx+sj] -= friction_coefficients(si,sj) * 1.e-4 ;
                             //cout<<" si/sj = "<<si<<"/"<<sj<<" coeff = "<<friction_coefficients(si,sj);
                         }
                     }
-                    
-                    
-                }
+                
                 
                 //char a;
                 //cin>>a;

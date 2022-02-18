@@ -229,6 +229,8 @@ public:
 class c_photochem_reaction 
 {
 public:
+    c_Sim *base;
+    
     int reaction_number = -1;
     std::vector<int> educts;   //A list of indices
     std::vector<int> products; //A list of indices
@@ -237,13 +239,18 @@ public:
     
     int e_num = 0.;
     int p_num = 0.;
+    int count_p;
     
     //Photochem specific
     int band;
     double branching_ratio;
+    double threshold_energy;
+    double products_total_mass;
+    double energy_split_factor;
     
-    c_photochem_reaction(int num_species, int num_bands, int band, std::vector<int> e_indices, std::vector<int> p_indices, std::vector<double> e_stoch, std::vector<double> p_stoch, double branching);
+    c_photochem_reaction(int num_species, int num_bands, int band, std::vector<int> e_indices, std::vector<int> p_indices, std::vector<double> e_stoch, std::vector<double> p_stoch, double branching, double threshold);
     void set_reac_number(int num) {reaction_number = num;}
+    void set_base_pointer(c_Sim *base_simulation);
 };
 
 ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -489,6 +496,9 @@ public:
     Eigen::MatrixXd total_opacity_twotemp;   //num_bands_in
     Eigen::MatrixXd cell_optical_depth_twotemp;
     Eigen::MatrixXd radial_optical_depth_twotemp;
+    
+    Eigen::MatrixXd cell_optical_depth_highenergy;     // Book-keeping for already used photons
+    Eigen::MatrixXd highenergy_switch;                 // Switch off thermal heating for species in high-energy bands
     
     double *data_opacity[4], *opa_gas_tscale, *opa_gas_pscale, *opa_gas_ross, *opa_gas_planck;
     int opacity_gas_rows = 126, opacity_gas_cols = 94;

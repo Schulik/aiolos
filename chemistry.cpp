@@ -34,13 +34,13 @@ void c_Sim::init_reactions(int cdebug) {
     double ns = num_species;
     
     // H+ H2+ ion system
-    photoreactions.push_back(c_photochem_reaction( ns, num_bands_in, 0, {0}, {1,4}, {1.}, {1.,1.}, 1. )); //H + gamma -> H+ + e-
+    photoreactions.push_back(c_photochem_reaction( ns, num_bands_in, 0, {0}, {1,4}, {1.}, {1.,1.}, 1., 13.6 )); //H + gamma -> H+ + e-
     
-    photoreactions.push_back(c_photochem_reaction( ns, num_bands_in, 0, {2}, {3,4}, {1.}, {1.,1.}, 1./3.)); //H2 + gamma-> H2+ + e-
-    photoreactions.push_back(c_photochem_reaction( ns, num_bands_in, 0, {2}, {0}, {1.}, {2.}, 1./3.)); //H2 + gamma-> 2H
-    photoreactions.push_back(c_photochem_reaction( ns, num_bands_in, 0, {2}, {0,1,4}, {1.}, {1.,1.,1.}, 1./3.)); //H2 + gamma-> H + H+ + e-
+    photoreactions.push_back(c_photochem_reaction( ns, num_bands_in, 0, {2}, {3,4}, {1.}, {1.,1.}, 1./3., 13.6)); //H2 + gamma-> H2+ + e-
+    photoreactions.push_back(c_photochem_reaction( ns, num_bands_in, 0, {2}, {0}, {1.}, {2.}, 1./3., 13.6)); //H2 + gamma-> 2H
+    photoreactions.push_back(c_photochem_reaction( ns, num_bands_in, 0, {2}, {0,1,4}, {1.}, {1.,1.,1.}, 1./3., 13.6)); //H2 + gamma-> H + H+ + e-
     
-    photoreactions.push_back(c_photochem_reaction( ns, num_bands_in, 0, {3}, {0,1}, {1.}, {1.,1.}, 1. )); //H2+ + gamma-> H + H+
+    photoreactions.push_back(c_photochem_reaction( ns, num_bands_in, 0, {3}, {0,1}, {1.}, {1.,1.}, 1., 13.6)); //H2+ + gamma-> H + H+
     
     cout<<"Init reactions..."<<endl;
     
@@ -71,6 +71,7 @@ void c_Sim::init_reactions(int cdebug) {
     }
     for(c_photochem_reaction& reaction : photoreactions) {
             reaction.set_reac_number(cnt);
+            reaction.set_base_pointer(this);
             cnt++;
     }
     
@@ -212,10 +213,6 @@ void c_Sim::do_chemistry() {
 }
 
 
-void c_reaction::set_base_pointer(c_Sim *base_simulation) {
-    base = base_simulation;
-}
-
 void c_reaction::update_reaction_rate(double T) {
     
     this->r = reac_a * std::pow(T, reac_b) * std::exp(-reac_c/T);
@@ -259,152 +256,6 @@ double c_reaction::get_reaction_rate(double T) {
     
     return r;
 }
-
-
-c_reaction::c_reaction(bool is_reverse, int num_species, std::vector<int> e_indices,std::vector<int> p_indices,std::vector<double> e_stoch, std::vector<double> p_stoch, double a, double b, double c) {
-    this->is_reverse_reac = is_reverse;
-    this->reac_a = a;
-    this->reac_b = b;
-    this->reac_c = c;
-    double reaction_rate = get_reaction_rate(300.);
-    
-    if(!is_reverse_reac)
-        c_reaction_real(num_species, e_indices, p_indices, e_stoch, p_stoch, reaction_rate);
-    else
-        c_reaction_real(num_species, p_indices, e_indices, p_stoch, e_stoch, reaction_rate);
-    
-} 
-
-
-c_reaction::c_reaction(bool is_reverse, int num_species, std::vector<int> e_indices,std::vector<int> p_indices,std::vector<double> e_stoch, std::vector<double> p_stoch, double reaction_rate) 
-{
-    this->is_reverse_reac    = is_reverse;
-    
-    if(!is_reverse_reac)
-        c_reaction_real(num_species, e_indices, p_indices, e_stoch, p_stoch, reaction_rate);
-    else
-        c_reaction_real(num_species, p_indices, e_indices, p_stoch, e_stoch, reaction_rate);
-            
-}
-
-void c_reaction::c_reaction_real(int num_species, std::vector<int> e_indices,std::vector<int> p_indices,std::vector<double> e_stoch, std::vector<double> p_stoch, double reaction_rate) {
-    
-    for(int e=0; e<e_indices.size(); e++) {
-        if(e_indices[e] >= num_species) {
-            
-            cout<<" FATAL ERROR caught in init_chemistry: Target ochem reactant index exceeds num_species! "<<endl;
-            char wait;
-            cin>>wait;
-            throw 0;
-        }
-            
-    }
-    for(int p=0; p<p_indices.size(); p++) {
-        if(p_indices[p] >= num_species) {
-            
-            cout<<" FATAL ERROR caught in init_chemistry: Target chem product index exceeds num_species! "<<endl;
-            char wait;
-            cin>>wait;
-            throw 1;
-        }
-            
-    }
-        
-    this->educts   = e_indices;
-    this->products = p_indices;
-            
-    this->e_num   = e_indices.size();
-    this->p_num   = p_indices.size();
-        
-    this->e_stoch = std::vector<double>(num_species); //e_stoch;
-    this->p_stoch = std::vector<double>(num_species); //p_stoch;
-    this->reac_a  = reaction_rate;
-    this->r       = reaction_rate;
-        
-    for(int s=0; s<num_species; s++) {
-        this->e_stoch[s] = 0;
-        this->p_stoch[s] = 0;
-    }
-        
-    delta_stoch = 0.;
-    for(int e=0; e<e_num; e++) {
-        this->e_stoch[e_indices[e]] = e_stoch[e];
-        delta_stoch += e_stoch[e];
-    }
-                
-    for(int p=0; p<p_num; p++) {
-        this->p_stoch[p_indices[p]] = p_stoch[p];
-        delta_stoch -= p_stoch[p];
-    }
-}
-
-
-c_photochem_reaction::c_photochem_reaction(int num_species, int num_bands, int band, std::vector<int> e_indices, std::vector<int> p_indices, std::vector<double> e_stoch, std::vector<double> p_stoch, double branching)
-{
-        //cout<<"in init photochem reaction "<<endl;
-        for(int e=0; e<e_indices.size(); e++) {
-            //cout<<" e = "<<e_indices[e]<<endl;
-            if(e_indices[e] >= num_species) {
-                cout<<" FATAL ERROR caught in init_chemistry: Target photochem reactant index exceeds num_species! "<<endl;
-                char wait;
-                cin>>wait;
-                throw 2;
-            }
-                
-        }
-        for(int p=0; p<p_indices.size(); p++) {
-            //cout<<" p ="<<p_indices[p]<<endl;
-            if(p_indices[p] >= num_species) {
-                cout<<" FATAL ERROR caught in init_chemistry: Target photochem product index exceeds num_species! "<<endl;
-                char wait;
-                cin>>wait;
-                throw 3;
-            }
-                
-        }
-        
-        //cout<<"e_indices = "<<e_indices<<" p_indices = "<<p_indices<<endl;
-        //cout<<"pos1"<<endl;
-        //this->reaction_number = reacnum;
-        this->educts   = e_indices;
-        this->products = p_indices;
-        //cout<<"pos2"<<endl;
-        this->e_num   = e_indices.size();
-        this->p_num   = p_indices.size();
-        //cout<<"pos3, enum/pnum = "<<this->e_num<<" "<<this->p_num<<endl;
-        this->e_stoch = std::vector<double>(num_species);//  e_stoch;
-        this->p_stoch = std::vector<double>(num_species); // p_stoch;
-        //cout<<"pos4"<<endl;
-        
-        for(int s=0; s<num_species; s++) {
-            this->e_stoch[s] = 0.;
-            this->p_stoch[s] = 0.;
-        }
-        for(int s=0; s<num_species; s++) {
-            //cout<<" s = "<<s<<" "<<e_stoch[s]<<"/"<<p_stoch[s]<<endl;
-        }
-        //cout<<"pos5"<<endl;
-        for(int e=0; e<e_num; e++) {
-            this->e_stoch[e_indices[e]] = e_stoch[e];
-            //cout<<" set e_stoch = "<<e_stoch[e]<<endl;
-            //cout<<" set e_indices = "<<e_indices[e]<<endl;
-        }
-            
-        for(int p=0; p<p_num; p++) {
-            this->p_stoch[p_indices[p]] = p_stoch[p];
-            //cout<<" set p_stoch = "<<p_stoch[p]<<endl;
-            //cout<<" set p_indices = "<<p_indices[p]<<endl;
-        }
-            
-        
-        //cout<<"pos6"<<endl;
-        if(band+1 > num_bands)
-            throw 4;
-        
-        this->band = band; //TODO: Check that band <= num_bands
-        this->branching_ratio = branching;
-        //cout<<"pos7"<<endl;
-    }
 
 //
 //
@@ -512,8 +363,8 @@ int c_Sim::solver_cchem_implicit_general(double dtt, int cell, int cdebug) {
                     double kappa = species[ei].opacity_twotemp(cell, b) * species[ei].mass_amu*amu; 
                     
                     dtau    = ds*kappa*n_olds[ei]*n_tot;
-                    dfdn    = dtt*F*kappa / n_tot * reaction.branching_ratio * std::exp(-dtau);  //TODO: Replaces F, kappa, dx with the appropriate values for species and flux in cell 
-                    //dfdn    = dtt*F*kappa/ n_tot * reaction.branching_ratio;
+                    //dfdn    = dtt*F*kappa / n_tot * reaction.branching_ratio * std::exp(-dtau);  //TODO: Replaces F, kappa, dx with the appropriate values for species and flux in cell 
+                    dfdn    = dtt*F*kappa/ n_tot * reaction.branching_ratio;
                     dfdn   *= (dtau * std::exp(-tau_tot_b) - std::expm1(-tau_tot_b) * (1. - dtau/tau_tot_b)  ) / tau_tot_b;
                     
                     if(globalTime > 2.9e10 && cell == 280) {
@@ -784,12 +635,82 @@ int c_Sim::solver_cchem_implicit_general(double dtt, int cell, int cdebug) {
 // Take the already solved chemical and photochemical equations and update dS(j,s) for each species according to the ionizing photons absorbed
 //
 //
-void c_Sim::update_dS_jb_photochem(int j, int b) {
+void c_Sim::update_dS_jb_photochem(int cell, int b) {
     
+    n_olds          = Vector_t(num_species);
+    double n_tot = 0.;
     
+    for(int s=0;s<num_species; s++) {
+        n_tot += species[s].prim[cell].number_density;
+    }
     
+    for(int s=0;s<num_species; s++) {
+        n_olds[s]     = species[s].prim[cell].number_density / n_tot;
+        reaction_b[s] = n_olds[s];
+    }
     
+    for (int b=0; b<num_bands_in; b++) {
+        
+        cell_optical_depth_highenergy(cell, b) = 0.;
+        
+        double temptau = 0.;
+                
+        double dlognu = 1.;
+        double ds = dx[cell];
+                
+        if(cell < num_cells)
+            temptau = radial_optical_depth_twotemp(cell+1,b);
+                
+        double F = 0.25 * solar_heating(b) * std::exp(-temptau) * dlognu;
+            
+        double ntot_b = 0.;
+        double tau_tot_b = 0.;
+        
+        //
+        // First run through photoreactions: Compute n_tot and dtau_tot at retarded time k. Take branching ratios into account for not-double counting.
+        // CAUTION: This requires the user to correctly specify branching ratios, so that they add up to one 
+        //
+        for(c_photochem_reaction& reaction : photoreactions) {
+            
+            if(reaction.band >= b) {
+                
+                ntot_b    +=  reaction.branching_ratio * n_olds[reaction.educts[0]];
+                tau_tot_b +=  reaction.branching_ratio * n_olds[reaction.educts[0]] * species[reaction.educts[0]].opacity_twotemp(cell, b) * species[reaction.educts[0]].mass_amu*amu ;
+                
+            }
+            
+        }
+        ntot_b    *= n_tot;
+        tau_tot_b *= n_tot*ds;
+        cell_optical_depth_highenergy(cell, b) = tau_tot_b;
+        
+        double dS = -std::expm1(-tau_tot_b) * F / ds;
     
+        for(c_photochem_reaction& reaction : photoreactions) {
+            
+            if(reaction.band >= b) {
+            
+                //Does this work???
+                double tau_i =  reaction.branching_ratio * n_olds[reaction.educts[0]] * species[reaction.educts[0]].opacity_twotemp(cell, b) * species[reaction.educts[0]].mass_amu*amu ;
+                
+                //Get fraction of total cell-heating
+                double fractional_dS = tau_i/tau_tot_b * dS * (1.- reaction.threshold_energy/photon_energies[b]);
+                
+                //Distribute energy according to mass
+                for(int& pj : reaction.products) {
+                    if(reaction.count_p == 1)
+                        species[pj].dS(cell) += fractional_dS;
+                    else {
+                        species[pj].dS(cell) += fractional_dS * reaction.energy_split_factor/species[pj].mass_amu;
+                        //cout<<" In highenergy heating cell "<<cell<<": target = "<<species[pj].speciesname<<" recieving a fraction = "<< reaction.energy_split_factor/species[pj].mass_amu<<" of the fractional "<<fractional_dS<<" heating. tau_tot_b = "<<tau_tot_b<<" expm-dtau = "<<-std::expm1(-tau_tot_b)<<endl;
+                        
+                    }
+                        
+                }
+                
+            }
+        }
+    }
     
     
 }
