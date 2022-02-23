@@ -429,6 +429,9 @@ void c_Sim::update_fluxes_FLD() {
                 double R       = 4. * tau_inv * std::abs(Jrad_FLD(j+1,b) - Jrad_FLD(j,b)) / (Jrad_FLD(j+1,b) + Jrad_FLD(j, b) + 1e-300) ; // Put in 1.0 as prefactor to get correct rad shock
                 double D       = 1. * tau_inv * no_rad_trans * surf[j] * flux_limiter(R);
                 
+                //if(1./tau_inv < 1.e-13)
+                //    D = 0.;
+                
                 // restarting iteration with 4 0.25 0.25 (everything was working)
                 //titan single species tables works with 4 0.5 0.25
                 
@@ -494,33 +497,55 @@ void c_Sim::update_fluxes_FLD() {
         }
         else {//   Right boundary: free stream, no emission / absorbtion.
             
-            int Ncell   = num_cells - 2*(num_ghosts - 1) ;
-            for (int j=0; j < num_ghosts-1; j++) {
-                int i       = Ncell + num_ghosts + j;
-
-                int idx = i*stride + b*(num_vars + 1) ;
-                int idxim1 = (i-1)*stride + b*(num_vars + 1) ;
-                int idx_r = i*num_vars + b ;  
-
-                if (j == 0) // FLD flux at the edge of the last cell
-                    l[idx] = -surf[i-1] / (x_i12[i]-x_i12[i-1]) ; //u[i-1] ;u[idxim1];//;
-                else // Free-stream 
-                    l[idx] = -surf[i-1] / (x_i12[i]-x_i12[i-1]) ;
-                
-                //l[idx] = -surf[i-1] / (x_i12[i]-x_i12[i-1]);// (x_i12[i]-x_i12[i-1]) ;
-                
-                
-                d[idx] = -0.*l[idx] + surf[ i ] / (x_i12[i+1]-x_i12[i]); // (x_i12[i+1]-x_i12[i]) ;//;// 
-                u[idx] = 0 ;
-                r[idx_r] = 0 ;
-            }
+            // Only need to set the very last cell.
+            //  Assume F = J and \div(F) = const
 
             int idx = (num_cells+1)*stride + b*(num_vars + 1) ;
             int idx_r = (num_cells+1)*num_vars + b ;  
-            l[idx] = -1;
-            d[idx] = 1;
+            
+            double f = x_i12[num_cells]/x_i12[num_cells+1] ;
+            switch (geometry) {
+                case Geometry::cartesian:
+                    f = 1 ;
+                    break;
+                case Geometry::cylindrical:
+                    break;
+                case Geometry::spherical:
+                    f *= f;
+                    break;
+            }
+            
+            l[idx] = -f*d[idx] ;
             u[idx] = 0;
             r[idx_r] = 0 ;
+            
+//             int Ncell   = num_cells - 2*(num_ghosts - 1) ;
+//             for (int j=0; j < num_ghosts-1; j++) {
+//                 int i       = Ncell + num_ghosts + j;
+// 
+//                 int idx = i*stride + b*(num_vars + 1) ;
+//                 int idxim1 = (i-1)*stride + b*(num_vars + 1) ;
+//                 int idx_r = i*num_vars + b ;  
+// 
+//                 if (j == 0) // FLD flux at the edge of the last cell
+//                     l[idx] = -surf[i-1] / (x_i12[i]-x_i12[i-1]) ; //u[i-1] ;u[idxim1];//;
+//                 else // Free-stream 
+//                     l[idx] = -surf[i-1] / (x_i12[i]-x_i12[i-1]) ;
+//                 
+//                 //l[idx] = -surf[i-1] / (x_i12[i]-x_i12[i-1]);// (x_i12[i]-x_i12[i-1]) ;
+//                 
+//                 
+//                 d[idx] = -1.*l[idx] + surf[ i ] / (x_i12[i+1]-x_i12[i]); // (x_i12[i+1]-x_i12[i]) ;//;// 
+//                 u[idx] = 0 ;
+//                 r[idx_r] = 0 ;
+//             }
+// 
+//             int idx = (num_cells+1)*stride + b*(num_vars + 1) ;
+//             int idx_r = (num_cells+1)*num_vars + b ;  
+//             l[idx] = -1;
+//             d[idx] = 1;
+//             u[idx] = 0;
+//             r[idx_r] = 0 ;
         }
         
         if(debug >= 1) {

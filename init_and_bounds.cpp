@@ -1155,7 +1155,8 @@ void c_Species::initialize_hydrostatic_atmosphere(string filename) {
             if (i==num_cells+2)
                 prim[i].temperature = const_T_space;
             else
-                prim[i].temperature = - dphi_factor * base->phi[i] / (cv * gamma_adiabat) + const_T_space;
+                prim[i].temperature = - dphi_factor * base->get_phi_grav(base->x_i12[i], base->planet_mass) / (cv * gamma_adiabat) + const_T_space;
+                //prim[i].temperature = - dphi_factor * base->phi[i] / (cv * gamma_adiabat) + const_T_space; get_phi_grav(x_i12[i], enclosed_mass[0]);
         else
             prim[i].temperature = const_T_space + 0.e-3*std::pow(base->x_i12[i]/base->x_i12[0],-1);
         
@@ -1348,28 +1349,13 @@ void c_Species::initialize_hydrostatic_atmosphere(string filename) {
         cout<<"    The well-balanced scheme seems to be unable to compensate minor velocity fluctuations under those circumstances."<<endl;
         cout<<"    Be advised, your solution is probably about to unphysically explode."<<endl;
     }
-    
     cout<<endl;
     
-    
-    
-    /*for(int si=0; si<num_species; si++) {
-        species[si].eos->update_eint_from_T(&(species[si].prim[0]), num_cells+2);
-        species[si].eos->update_p_from_eint(&(species[si].prim[0]), num_cells+2);
-        species[si].eos->compute_conserved(&(species[si].prim[0]), &(species[si].u[0]), num_cells+2);        
-    }
-    
-    eos->compute_primitive(&(u[0]), &(prim[0]), num_cells+2) ;    
-    eos->compute_auxillary(&(prim[0]), num_cells+2);
-    */
     compute_pressure(u);
-    //for(int j=15;j<18;j++)
-    //    cout<<" POS2.3 dens["<<j<<"] = "<<u[j].u1<<" temp = "<<prim[j].temperature<<" E/e/p = "<<u[j].u3<<"/"<<prim[j].internal_energy<<"/"<<prim[j].pres<<" rho*cv*T = "<<cv*u[j].u1*prim[j].temperature<<endl;
-    
+
     for(int i=num_cells; i>=0; i--)  {
         primlast[i].internal_energy = prim[i].internal_energy;
     }
-    
     //
     // Apply multiplicators for over/underdensities just below and above the sonic point
     //
@@ -1398,16 +1384,9 @@ void c_Species::initialize_hydrostatic_atmosphere(string filename) {
     else
         cout<<"@@@ Ended hydrostatic construction for species "<<speciesname<<endl<<endl;
     
-    //cout<<" POS3 dens[2] = "<<u[2].u1<<" temp[2] = "<<prim[2].temperature<<" mass = "<<mass_amu<<" dens flor = "<<base->density_floor<<endl;
-    //TODO:Give some measure if hydrostatic construction was also successful, and give warning if not.
-    
-    //for(int j=15;j<18;j++)
-    //    cout<<" POS3 dens["<<j<<"] = "<<u[j].u1<<" temp = "<<prim[j].temperature<<" E/e/p = "<<u[j].u3<<"/"<<prim[j].internal_energy<<"/"<<prim[j].pres<<" rho*cv*T = "<<cv*u[j].u1*prim[j].temperature<<endl;
+    //TODO:Give some measure if hydrostatic construction was also successful, and give warning if not (e.g. when resolution too low and floors were reached).
 
     cout<<"End of hydrostat"<<endl;
-    //cout<<"Assigned densities in num_cell-1 = "<<u[num_cells-1].u1<<endl;
-    //cout<<"Assigned densities in num_cell = "<<  u[num_cells].u1<<endl;
-    //cout<<"Assigned densities in num_cell+1 = "<<u[num_cells+1].u1<<endl;
 }
 
 void c_Species::initialize_exponential_atmosphere() {

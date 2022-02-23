@@ -17,6 +17,8 @@
 
 #include "aiolos.h"
 
+extern double HOnly_cooling(const std::array<double, 3> nX, double Te);
+
 double thermo_get_r(double T, double r1, double delta_stoch);
 std::vector<double> get_thermo_variables(double T,string species_string);
 
@@ -34,33 +36,26 @@ void c_Sim::init_reactions(int cdebug) {
     double ns = num_species;
     
     // H+ H2+ ion system
-    photoreactions.push_back(c_photochem_reaction( ns, num_bands_in, 0, {0}, {1,4}, {1.}, {1.,1.}, 1., 13.6 )); //H + gamma -> H+ + e-
+    //photoreactions.push_back(c_photochem_reaction( ns, num_bands_in, 0, {0}, {1,4}, {1.}, {1.,1.}, 1., 13.6 )); //H + gamma -> H+ + e-
+    photoreactions.push_back(c_photochem_reaction( ns, num_bands_in, 0, {0}, {1,2}, {1.}, {1.,1.}, 1., 13.6 )); //H + gamma -> H+ + e-
     
-    photoreactions.push_back(c_photochem_reaction( ns, num_bands_in, 0, {2}, {3,4}, {1.}, {1.,1.}, 1./3., 13.6)); //H2 + gamma-> H2+ + e-
-    photoreactions.push_back(c_photochem_reaction( ns, num_bands_in, 0, {2}, {0}, {1.}, {2.}, 1./3., 13.6)); //H2 + gamma-> 2H
-    photoreactions.push_back(c_photochem_reaction( ns, num_bands_in, 0, {2}, {0,1,4}, {1.}, {1.,1.,1.}, 1./3., 13.6)); //H2 + gamma-> H + H+ + e-
+    //photoreactions.push_back(c_photochem_reaction( ns, num_bands_in, 0, {2}, {3,4}, {1.}, {1.,1.}, 1./3., 13.6)); //H2 + gamma-> H2+ + e-
+    //photoreactions.push_back(c_photochem_reaction( ns, num_bands_in, 0, {2}, {0}, {1.}, {2.}, 1./3., 13.6)); //H2 + gamma-> 2H
+    //photoreactions.push_back(c_photochem_reaction( ns, num_bands_in, 0, {2}, {0,1,4}, {1.}, {1.,1.,1.}, 1./3., 13.6)); //H2 + gamma-> H + H+ + e-
     
-    photoreactions.push_back(c_photochem_reaction( ns, num_bands_in, 0, {3}, {0,1}, {1.}, {1.,1.}, 1., 13.6)); //H2+ + gamma-> H + H+
+    //photoreactions.push_back(c_photochem_reaction( ns, num_bands_in, 0, {3}, {0,1}, {1.}, {1.,1.}, 1., 13.6)); //H2+ + gamma-> H + H+
     
     cout<<"Init reactions..."<<endl;
     
-    //reactions.push_back(c_reaction(0, ns, {1}, {0}, {1.}, {2.}, 2.3e-42));            //H2 -> 2H
-    //reactions.push_back(c_reaction(1, ns, {1}, {0}, {1.}, {2.}, 2.3e-42));            //2H -> H2
+    //reactions.push_back(c_reaction(0, ns, {0,2}, {2}, {2.,1.}, {2.}, 2.7e-31, -0.600, 0.));       //H+H+H2 -> H2+H2  From Gail&Sedlmayer Chapter 10.5
+    //reactions.push_back(c_reaction(1, ns, {0,2}, {2}, {2.,1.}, {2.}, 2.7e-31, -0.600, 0.));       //H+H+H2 <- H2+H2
     
-    reactions.push_back(c_reaction(0, ns, {0,2}, {2}, {2.,1.}, {2.}, 2.7e-31, -0.600, 0.));       //H+H+H2 -> H2+H2  From Gail&Sedlmayer Chapter 10.5
-    reactions.push_back(c_reaction(1, ns, {0,2}, {2}, {2.,1.}, {2.}, 2.7e-31, -0.600, 0.));       //H+H+H2 <- H2+H2
+    //reactions.push_back(c_reaction(0, ns, {0}, {0,2}, {3.}, {1.,1.}, 2.3e-35)); //8.82e-33      //H+H+H -> H2 + H
+    //reactions.push_back(c_reaction(1, ns, {0}, {0,2}, {3.}, {1.,1.}, 2.3e-35));      //H+H+H <- H2 + H
     
-    //reactions.push_back(c_reaction(0, ns, {0,0,2}, {2,2}, {1.,1.,1.}, {1.,1.}, 2.7e-31, -0.600, 0.));       //H+H+H2 -> H2+H2  From Gail&Sedlmayer Chapter 10.5
-    //reactions.push_back(c_reaction(1, ns, {0,0,2}, {2,2}, {1.,1.,1.}, {1.,1.}, 2.7e-31, -0.600, 0.));       //H+H+H2 -> H2+H2  From Gail&Sedlmayer Chapter 10.5
-    
-    reactions.push_back(c_reaction(0, ns, {0}, {0,2}, {3.}, {1.,1.}, 2.3e-35)); //8.82e-33      //H+H+H -> H2 + H
-    reactions.push_back(c_reaction(1, ns, {0}, {0,2}, {3.}, {1.,1.}, 2.3e-35));      //H+H+H <- H2 + H
-    
-    //reactions.push_back(c_reaction(0, ns, {0,0,0}, {0,2}, {1.,1.,1.}, {1.,1.}, 2.3e-35));      //H+H+H -> H2 + H
-    //reactions.push_back(c_reaction(1, ns, {0,0,0}, {0,2}, {1.,1.,1.}, {1.,1.}, 2.3e-35));      //H+H+H -> H2 + H
-    
-    reactions.push_back(c_reaction(0, ns, {1,4}, {0}, {1.,1.}, {1.}, 2.7e-13 )); //Electron-proton recombination
-    reactions.push_back(c_reaction(0, ns, {3,4}, {2}, {1.,1.}, {1.}, 2.7e-13 )); //Electron-H2+ recombination
+    reactions.push_back(c_reaction(0, ns, {1,2}, {0}, {1.,1.}, {1.}, 2.7e-13 )); //Electron-proton recombination
+    //reactions.push_back(c_reaction(0, ns, {1,4}, {0}, {1.,1.}, {1.}, 2.7e-13 )); //Electron-proton recombination
+    //reactions.push_back(c_reaction(0, ns, {3,4}, {2}, {1.,1.}, {1.}, 2.7e-13 )); //Electron-H2+ recombination
     
     
     int cnt = 0;
@@ -711,6 +706,34 @@ void c_Sim::update_dS_jb_photochem(int cell, int b) {
             }
         }
     }
+    
+    
+    //
+    // Do highenergy-cooling
+    //
+    int e_idx     = get_species_index("e-");
+    int hnull_idx = get_species_index("H0"); 
+    int hplus_idx = get_species_index("H+");
+    
+    if( e_idx!=-1 && hnull_idx!=-1 && hplus_idx!=-1  ) {
+        
+        std::array<double, 3> nX = {
+                    species[hnull_idx].prim[cell].number_density,
+                    species[hplus_idx].prim[cell].number_density,
+                    species[e_idx].prim[cell].number_density};
+    
+        double cooling = nX[2] * HOnly_cooling(nX, species[e_idx].prim[cell].temperature);
+        species[e_idx].dG(cell) += cooling;
+        
+        cout<<" We indeed found all cooling species, and cooling is = "<<cooling;
+    }
+    
+    
+    
+    
+    //
+    // Do momentum correction
+    //
     
     
 }

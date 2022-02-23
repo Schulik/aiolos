@@ -578,6 +578,7 @@ public:
     void print_diagnostic_file(int i);
     
     void compute_total_pressure();
+    int get_species_index(const string name);
     
     //
     // Friction
