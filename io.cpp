@@ -101,7 +101,8 @@ int c_Species::read_species_data(string filename, int species_index) {
     
     }
     
-    if(std::abs(temp_static_charge) > 1.1 || std::abs(temp_static_charge) < 0.1) {
+    //if(std::abs(temp_static_charge) > 1.1 || std::abs(temp_static_charge) < 0.1) {
+    if(std::abs(temp_static_charge) < 0.1) {
         this->static_charge = 0;
     }
     else {
@@ -132,8 +133,8 @@ int c_Species::read_species_data(string filename, int species_index) {
     //////////////////////////////////////////////////////////
     
     //if(num_opacity_datas > -1) 
-    if(base->opacity_model == 'P' || base->opacity_model == 'M' || base->opacity_model == 'C') {
-        
+    if(base->opacity_model == 'P' || base->opacity_model == 'M' || base->opacity_model == 'C' ) {
+        //opacity_data_string = "14N-1H3_T200.opa"; //TODO: REMEMBER TO DELETE THIS LINE AGAIN!
         cout<<"P or M or C opacity chosen & enough data to read in files. Reading file = "<<("inputdata/" +opacity_data_string)<<endl;
         //
         // Start reading opacity data
@@ -416,10 +417,11 @@ int c_Species::read_species_data(string filename, int species_index) {
         cout<<endl;
         
     }
-    else if(base->opacity_model == 'T') {
+    else if(base->opacity_model == 'T') { 
         //
         // Tabulated data from opacit averages
         //
+        //opacity_data_string = "14N-1H3_T800_zeroes.aiopa";
         string opacityinputfile = "inputdata/" + opacity_data_string;
         std::vector<string> stringending = stringsplit(opacityinputfile,".");
         
@@ -534,7 +536,7 @@ void c_Species::read_opacity_table(string tablename) {
     // Planck two-temperature mean-opacity grid
     //
     std::getline( file, line );
-    for(int bi = 0; bi<num_bands_in; bi++) {
+    for(int bi = 0; bi<1; bi++) { //for(int bi = 0; bi<num_bands_in; bi++) { TODO: REMOVE THIS LATER!
         
         //std::getline( file, line );
         for(int i=0; i<opa_pgrid_size; i++) {
@@ -776,7 +778,7 @@ void c_Species::print_AOS_component_tofile(int timestepnumber) {
             
             //outfile<<base->x_i12[i]<<'\t'<<u[i].u1<<'\t'<<u[i].u2<<'\t'<<u[i].u3<<'\t'<<flux[i].u1<<'\t'<<flux[i].u2<<'\t'<<flux[i].u3<<'\t'<<balance1<<'\t'<<balance2<<'\t'<<balance3<<'\t'<<prim[i].pres<<'\t'<<u[i].u2/u[i].u1<<'\t'<<prim[i].temperature <<'\t'<<timesteps_cs[i]<<'\t'<<base->cflfactor/timesteps[i]<<'\t'<<prim[i].sound_speed<<'\t'<<timesteps_de[i]<<'\t'<<u_analytic[i]<<'\t'<<base->alphas_sample(i)<<'\t'<<base->phi[i]<<'\t'<<base->enclosed_mass_tmp[i]<<'\t'<<Jtot<<'\t'<<Stot<<'\t'<<base->friction_sample(i)<<endl;
             
-            outfile<<base->x_i12[i]<<'\t'<<u[i].u1<<'\t'<<u[i].u2<<'\t'<<u[i].u3<<'\t'<<flux[i].u1<<'\t'<<flux[i].u2<<'\t'<<flux[i].u3<<'\t'<<balance1<<'\t'<<balance2<<'\t'<<balance3<<'\t'<<prim[i].pres<<'\t'<<u[i].u2/u[i].u1<<'\t'<<prim[i].temperature <<'\t'<<timesteps_cs[i]<<'\t'<<base->cflfactor/timesteps[i]<<'\t'<<prim[i].sound_speed<<'\t'<<timesteps_de[i]<<'\t'<<u_analytic[i]<<'\t'<<base->alphas_sample(i)<<'\t'<<base->phi[i]<<'\t'<<base->enclosed_mass_tmp[i]<<'\t'<<dG(i)<<'\t'<<dS(i)<<'\t'<<base->friction_sample(i)<<endl;
+            outfile<<base->x_i12[i]<<'\t'<<u[i].u1<<'\t'<<u[i].u2<<'\t'<<u[i].u3<<'\t'<<flux[i].u1<<'\t'<<flux[i].u2<<'\t'<<flux[i].u3<<'\t'<<balance1<<'\t'<<balance2<<'\t'<<balance3<<'\t'<<prim[i].pres<<'\t'<<u[i].u2/u[i].u1<<'\t'<<prim[i].temperature <<'\t'<<timesteps_cs[i]<<'\t'<<base->cflfactor/timesteps[i]<<'\t'<<prim[i].sound_speed<<'\t'<<timesteps_de[i]<<'\t'<<u_analytic[i]<<'\t'<<base->alphas_sample(i)<<'\t'<<base->phi[i]<<'\t'<<base->enclosed_mass_tmp[i]<<'\t'<<-dG(i)<<'\t'<<dS(i)<<'\t'<<base->friction_sample(i)<<endl;
         } 
         
         //Print right ghost stuff

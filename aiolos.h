@@ -63,6 +63,7 @@ const double K_to_eV    = 8.621738e-5;
 const double ev_to_K    = 1./K_to_eV;
 const double de_broglie_e = 2.*pi* amu/2000.*kb/h_planck/h_planck;
 const double de_broglie_p = 2.*pi* amu * kb/h_planck/h_planck;
+const double elm_charge   = 4.80320425e-10; //statcoulomb
 
 // For entropy computation, to be set to sensible parameters e.g. at setting of initial conditions
 const double P_ref   = 1e-20;
@@ -203,6 +204,7 @@ public:
     std::vector<double> e_stoch;
     std::vector<double> p_stoch;
     double delta_stoch;
+    double products_total_mass;
     
     int e_num = 0.;
     int p_num = 0.;
@@ -213,6 +215,8 @@ public:
     double reac_c = 0.;
     bool is_reverse_reac;
     double current_dG = 0.;
+    double dndt_old;
+    std::vector<double> dndts;
     
 public:
     
@@ -240,6 +244,7 @@ public:
     int e_num = 0.;
     int p_num = 0.;
     int count_p;
+    double dndt_old;
     
     //Photochem specific
     int band;
@@ -527,16 +532,24 @@ public:
     std::vector<c_photochem_reaction> photoreactions;
     
     Vector_t reaction_b;
-    Vector_t n_olds;
-    Vector_t n_news;
+    Vector_t momentum_b;
+    //Vector_t n_olds;
+    //Vector_t n_news;
+    std::vector<double> n_init;
+    std::vector<double> n_tmp;
     Matrix_t reaction_matrix;
     Eigen::PartialPivLU<Matrix_t> LUchem;
     
+    Matrix_t chem_momentum_matrix;
+    Eigen::PartialPivLU<Matrix_t> LUchem_mom;
+    
+    double chemistry_precision;
+    int chemistry_maxiter;
     
     void init_reactions(int cdebug);
     void do_chemistry();
     
-    int solver_cchem_implicit_general(double dt, int num_spec, int cdebug);
+    std::vector<double> solver_cchem_implicit_general(double dt, int num_spec, int cdebug, const std::vector<double>& n_normalized, double ntot);
     int solver_cchem_implicit_specialized_cochem(double dt, int num_spec, int cdebug);
     
     std::vector<double> thermo_poly(double T,double a1,double a2,double a3,double a4,double a5,double a6,double a7,double a8,double a9);
@@ -611,7 +624,7 @@ public:
     void reset_dS();
     void update_dS();
     void update_dS_jb(int j, int b);
-    void update_dS_jb_photochem(int j, int b);
+    void update_dS_jb_photochem(int j);
     void update_tau_s_jb(int j, int b);
     void update_opacities();
     

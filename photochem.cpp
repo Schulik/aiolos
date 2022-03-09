@@ -40,7 +40,7 @@ double H_radiative_recombination(double T_e) {
     // Case B
     //return 2.753e-14 * pow(x, 1.500) / pow(1 + pow(x / 2.740, 0.407), 2.242);
     ////       2.753e-14 * pow(2 * 157807 / x, 1.500) / pow(1 + pow(2 * 157807 / x / 2.740, 0.407), 2.242)
-    return 1e+0 * 2.7e-13 * pow(T_e/1e4, -0.9); //MC2009 value
+    return 1.e+0 * 2.7e-13 * pow(T_e/1e4, -0.9) ;//* pow(T_e/1e4, -0.9); //MC2009 value
     
     //JOwens code:
     //  rec_coeff =  8.7d-27*tgas**0.5 * t3**(-0.2)*(1+t6**0.7)**(-1)
@@ -51,7 +51,7 @@ double H_threebody_recombination(double T_e) {
     if (T_e < 220) T_e = 220.;
 
     double x = 2 * 157807 / T_e;
-    return 1.e0 * (1.005e-14 / (T_e * T_e * T_e)) * pow(x, -1.089) /
+    return 0.e0 * (1.005e-14 / (T_e * T_e * T_e)) * pow(x, -1.089) /
            pow(1 + pow(x / 0.354, 0.874), 1.101);
 }
 double H_collisional_ionization(double T_e) {
@@ -63,7 +63,7 @@ double H_collisional_ionization(double T_e) {
     double x = 2 * 157807. / T_e;
     double term = 21.11 * pow(T_e, -1.5) * pow(x, -1.089) /
                   pow(1 + pow(x / 0.354, 0.874), 1.101);
-    return 1e0 * term * exp(-0.5 * x);
+    return 0e0 * term * exp(-0.5 * x);
 }
 
 // Cooling rate per electron.
@@ -85,22 +85,58 @@ double HOnly_cooling(const std::array<double, 3> nX, double Te) {
         term = 3.435e-30 * Te * x*x / pow(1 + pow(x / 2.250, 0.376), 3.720);
     else 
         term = 7.562-27 * std::pow(Te, 0.42872) ;
-    cooling += nX[1] * term;
+    cooling += 0.* nX[1] * term;
     
     // Collisional ionization cooling:
     term = kb * T_HI * H_collisional_ionization(Te);
-    cooling += nX[0] * term;
+    cooling += 0. *nX[0] * term;
 
     // HI Line cooling (Lyman alpha):
     //term = 7.5e-19 * exp(-0.75 * T_HI / Te) / (1 + sqrt(Te / 1e5));
-    term = 7.5e-19 * exp(-0.75 * T_HI / Te); //MC2009
-    cooling += nX[0] * term;
+        term = 7.5e-19 * exp(-0.75 * T_HI / Te); //MC2009
+    //term = 7.5e-19 * exp(-0.75 * T_HI / 3000.); //MC2009
+    cooling += 1. * nX[0] * term;
 
     // Free-Free:
     term = 1.426e-27 * 1.3 * sqrt(Te) ;
-    cooling += nX[1] * term  ;
+    cooling += 0. * nX[1] * term  ;
 
     return 1.*cooling;
+}
+
+
+double C_cooling(const double ne, double Te) {
+    double term = 1e-24+3.1e-20*std::exp(-15162/Te)*(1.+std::pow(Te/2e4, 1.5));
+    return term*ne;
+}
+
+double Cp_cooling(const double ne, double Te) {
+    double term = 1.5e-23+3.1e-20*std::exp(-45162/Te)*(1.+std::pow(Te/0.75e4,1.5));
+    
+    return term*ne;
+}
+
+double Cpp_cooling(const double ne, double Te) {
+    return 0.;
+}
+
+double O_cooling(const double ne, double Te) {
+    
+    double term = 5.5e-24+1.1e-20*std::exp(-30162/Te)*(1.+std::pow(Te/0.75e4, 0.5));
+    
+    return term*ne;
+}
+
+double Op_cooling(const double ne, double Te) {
+    
+    double term = 5.1e-20*std::exp(-35162/Te)*(1.+std::pow(Te/0.75e4, 0.5));
+    
+    return term;
+}
+
+double Opp_cooling(const double ne, double Te) {
+    
+    return 0.;
 }
 
 /* class C2Ray_HOnly_ionization
@@ -481,71 +517,6 @@ void c_Sim::do_photochemistry() {
                         double x_bar2 = root_solver_ion.solve(xmin, 1, ion);
                 }
                 catch(...) { }
-                
-                //if(j==num_cells-2 && steps==532928){
-                if(j==132 && ( steps==532928 || steps==866083 || steps==2021166 || steps == 3722009)) {
-                //if(j==244 && steps==532928){
-                
-                        double Tn = species[0].prim[j].temperature;
-                        double Tp = species[1].prim[j].temperature;
-                        double Te = species[2].prim[j].temperature;
-                        double Gamma0final = 0.;
-        
-                        for(int b=1; b < num_he_bands; b++)
-                            Gamma0final += Gamma0[b]/(nX[0]) * -std::expm1(-dtaus[b] * (1 - x_bar));
-                        
-                        double R = H_radiative_recombination(Te);
-                        double C = H_collisional_ionization(Te);
-                        double B = H_threebody_recombination(Te);
-                        double ne = nX[2];
-                        double x_eq = (Gamma0final + ne * C) / (Gamma0final + ne * (C + R + ne * B));
-                        double x_eq_reduced = (Gamma0final ) / (Gamma0final + ne * R);
-                        
-                        double x_eq_reduced2 = (Gamma0final*8. ) / (Gamma0final*8. + ne * R);
-                        
-                        double t_rat = dt * (Gamma0final + ne * (C + R + ne * B));
-                        double t_rat2= globalTime * (Gamma0final + ne * (C + R + ne * B));
-                        double x0 = nX[1]/(nX[0] + nX[1]);
-                        double x_byhand = x_eq + (x0 - x_eq) * std::exp(-t_rat);
-                        double x1 = species[1].u[j].u1  /(species[0].u[j+1].u1+species[1].u[j+1].u1);
-                        double x2 = species[1].u[j+1].u1/(species[0].u[j+1].u1+species[1].u[j+1].u1);
-                        double x_grad = std::abs( x1/x2 );
-                        
-                        //if(globalTime < -1e5) {
-                        double Gmanual = solar_heating(1) * std::exp(-radial_optical_depth_twotemp(j+1,1)) * species[0].opacity_twotemp(j, 1) / photon_energies[1];
-                        
-                            cout<<" (ERROR) IN ROOT steps = "<<steps<<" j= "<<j<<" b == "<<1<<" G0,G1 = "<<Gamma0[0]<<"/"<<Gamma0[1]<<" taus0/1 = "<<dtaus[0]<<"/"<<dtaus[1]<<"/"<<" opa/xbar/xeq/xactual/xbyhand = "<<species[0].opacity_twotemp(j, 1)<<"/"<<x_bar<<"/"<<x_eq<<"/"<<x0<<"/"<<x_byhand<<" dS = "<<dS_band(j,1)<<" SBand = "<<S_band(j,1)<<" t_rat ="<<t_rat<<endl;
-                            cout<<" 1-xbar/1-xeq/1-xactual/1-xbyhand = "<<1-x_bar<<"/"<<1-x_eq<<"/"<<1.-x0<<"/"<<1-x_byhand<<endl;
-                            cout<<" 1-xeq_reduced "<<1.-x_eq_reduced<<endl;
-                            cout<<" 1-xeq_reduced2 "<<1.-x_eq_reduced2<<endl;
-                            cout<<" ERROR: time/G0 = "<<globalTime<<"/"<<Gamma0final<<" R/C/B = "<<R<<"/"<<C<<"/"<<B<<" Tn/Tp/Te ="<<Tn<<"/"<<Tp<<"/"<<Te<<" x_grad "<<x_grad<<" dtau = "<<dtaus[1]<<endl;
-                            std::cout << j << " " <<"\n"
-                                << "\t" << TX[0] << " " << TX[1] << " " << TX[2] << "\n"
-                                << "\t" << uX[0] << " " << uX[1] << " " << uX[2] << "\n" 
-                                << "\t" << nX[0] << " " << nX[1] << " " << nX[2] << "\n" 
-                                << "\t" << pX[0] << " " << pX[1] << " " << pX[2] << "\n" ;
-                                
-                                cout<<" "<<endl
-                                <<" recomb rate = "<<ne*R<<endl
-                                <<" Gamma_manual = "<<Gmanual<<endl
-                                <<" Gamma_manual/nx0 = "<<Gmanual/nX[0]<<endl
-                                <<" Gamma_manual/nx2 = "<<Gmanual/nX[2]<<endl
-                                <<" F = "<<solar_heating(1)<<endl
-                                <<" dt = "<<dt<<" t_recomb = "<<1./(R*nX[1])<< " ratio = "<<dt/(R*nX[1])<<endl
-                                <<" tau, e-tau = "<<radial_optical_depth_twotemp(j+1,1)<<"/"<<std::exp(-radial_optical_depth_twotemp(j+1,1))<<endl
-                                <<" n0 = "<<nX[0]<<" rho0 = "<<nX[0]*mX[0]<<endl
-                                <<" ne = "<<nX[1]<<" rho1 = "<<nX[1]*mX[1]<<endl
-                                <<" sigma = "<<species[0].opacity_twotemp(j, 1) <<endl
-                                <<" hnu = "<<photon_energies[1]<<endl
-                                <<" alpha = "<<R<<endl
-                                <<" alpha/Gmanual = "<<R/Gmanual<<" alpha/Gmanual*nX[1] = "<<R/Gmanual*nX[1]<<endl
-                                <<" alpha/G0 = "<<R/Gamma0[1]<<" alpha/G0*nX[1] = "<<R/Gamma0[1]*nX[1]<<endl
-                                <<" xeq_manual = "<<1./(1.+nX[1]*R/Gmanual)<<endl
-                                <<" xeq_G0 = "<<1./(1.+nX[1]*R/Gamma0[1])<<endl;
-                                
-                        //}
-                }
-                
 
                 std::array<double, 3> nX_new = ion.nX_new(x_bar);
                 std::array<double, 3> nX_bar = ion.nX_average(x_bar);
@@ -561,8 +532,8 @@ void c_Sim::do_photochemistry() {
 
                 // Momentum conservation:
                 double ne = nX_bar[2], nH = nX_bar[0] ;
-                double dn_R = (ion.R + ion.B*ne)*ne*ne*dt ;
-                double dn_I = (ion.C*ne + ion.photoionization_rate(x_bar))*nH*dt ;
+                double dn_R = 1.*(ion.R + ion.B*ne)*ne*ne*dt ;
+                double dn_I = 1.*(ion.C*ne + ion.photoionization_rate(x_bar))*nH*dt ;
 
                 std::array<double, 3> mom = { 
                     nX[0]*mX[0]*vX[0], nX[1]*mX[1]*vX[1], nX[2]*mX[2]*vX[2] } ;
@@ -613,16 +584,6 @@ void c_Sim::do_photochemistry() {
                     GammaH += 0.25 * solar_heating(b)  * std::exp(-radial_optical_depth_twotemp(j+1,b)) * (-std::expm1(-dtaus[b])) * (1 - 13.6 * ev_to_K * kb / photon_energies[b]) / dx[j] * dlognu;
                 }
                 
-                if(debug >= 2) {
-                    
-                    double dtaufinal = dtaus[1];
-                    double ipp = Gamma0[1]/(nX[0]+nX[1]) * -std::expm1(-dtaufinal); 
-                    double hpp = GammaH/(nX[0]+nX[1]);
-                    
-                    cout<<" j= "<<num_cells-3<<" steps == "<<steps<<" ion per particle = "<<ipp<<" heating per particle = "<<hpp<<endl;
-                    
-                }
-                
                 if(use_rad_fluxes) {
                         
                     Te = TX[2];
@@ -635,31 +596,6 @@ void c_Sim::do_photochemistry() {
                     //
                     if(std::abs(cooling[2]) > heating[2])
                         cooling[2] = -heating[2];
-                    
-                    if(j > 39 && j <= 42 && steps <= 2) {
-
-                        double Gamma0final = 0.;
-        
-                        for(int b=0; b < num_he_bands; b++)
-                            Gamma0final += Gamma0[b]/nX[0] * -std::expm1(-dtaus[b] * (1 - x_bar));
-                        
-                        double R = H_radiative_recombination(Te);
-                        double C = H_collisional_ionization(Te);
-                        double B = H_threebody_recombination(Te);
-                        double ne = nX[2];
-                        cout<<" Cooling peak detected in photochem. DEBUG data:"<<endl;
-                        cout<<" Te = "<<Te<<endl;
-                        //cout<<GammaH<<" "<<Gamma0[0]<<" "<<Gamma0[1]<<" "<<Gamma0final<<endl;
-                        cout<<R<<" "<<C<<" "<<B<<endl;
-
-                        
-                        double x_eq = (Gamma0final + ne * C) / (Gamma0final + ne * (C + R + ne * B));
-                        double t_rat = dt * (Gamma0final + ne * (C + R + ne * B));
-                        //double x_new = x_eq + (x0 - x_eq) * std::exp(-t_rat);
-                        
-                        cout<<x_eq<<" "<<t_rat<<" "<<x_bar<<endl;
-                         
-                    }
                     
                 } else {
                     
@@ -737,6 +673,23 @@ void c_Sim::do_photochemistry() {
                 //char a;
                 //cin>>a;
                 
+                int e_idx = get_species_index("S2");
+                int C_idx = get_species_index("S4");
+                int Cp_idx = get_species_index("S5");
+                int Cpp_idx = get_species_index("S6");
+                int O_idx = get_species_index("S7");
+                int Op_idx = get_species_index("S8");
+                int Opp_idx = get_species_index("S9");
+                double tau = total_opacity(j,0)*(x_i12[j+1]-x_i12[j])*1e2;
+                double red = (1.+tau*tau);
+                
+                if( C_idx!=-1 && e_idx!=-1 ) { species[C_idx].dG(j)     -=  C_cooling(species[e_idx].prim[j].number_density, species[e_idx].prim[j].temperature)/red; }
+                if( Cp_idx!=-1 && e_idx!=-1 ) { species[Cp_idx].dG(j)   -=  Cp_cooling(species[e_idx].prim[j].number_density, species[e_idx].prim[j].temperature)/red; }
+                if( Cpp_idx!=-1 && e_idx!=-1 ) { species[Cpp_idx].dG(j) -=  Cpp_cooling(species[e_idx].prim[j].number_density, species[e_idx].prim[j].temperature)/red; }
+                if( O_idx!=-1 && e_idx!=-1 ) { species[O_idx].dG(j)     -=  O_cooling(species[e_idx].prim[j].number_density, species[e_idx].prim[j].temperature)/red; }
+                if( Op_idx!=-1 && e_idx!=-1 ) { species[Op_idx].dG(j)   -=  Op_cooling(species[e_idx].prim[j].number_density, species[e_idx].prim[j].temperature)/red; }
+                if( Opp_idx!=-1 && e_idx!=-1 ) { species[Opp_idx].dG(j) -=  Opp_cooling(species[e_idx].prim[j].number_density, species[e_idx].prim[j].temperature)/red; }
+                
                 double adddS[3] = {0.,0.,0.};
                 for (int b = 0; b < num_he_bands; b++) {
                     
@@ -794,8 +747,8 @@ void c_Sim::do_photochemistry() {
                     
                     for(int s=3; s<num_species; s++) {
                         //species[s].dS(j) += GammaResidual * species[s].opacity_twotemp(j,b) * species[s].u[j].u1 * dx[j] / temp_total_cell_optd;
-                        species[s].dS(j)    += dS_band(j,b) * species[s].fraction_total_solar_opacity(j,b);
-                        adddS[s]            += dS_band(j,b) * species[s].fraction_total_solar_opacity(j,b);
+                        species[s].dS(j)    += 1.* dS_band(j,b) * species[s].fraction_total_solar_opacity(j,b);
+                        adddS[s]            += 1.* dS_band(j,b) * species[s].fraction_total_solar_opacity(j,b);
                     
                         //cout<<" in highe-correction  dS_band(j,b) = "<< dS_band(j,b)<<" to species["<<s<<"]."<<endl;
                     }
@@ -803,7 +756,7 @@ void c_Sim::do_photochemistry() {
                     //cin>>d;
                     
                     
-                    if(dS_band(j,b) > 1e5) {
+                    if(dS_band(j,b) > 1e15) {
                             for(int s=3; s<num_species; s++) {
                                     cout<<" PHOTOCHEM j/s/dS = "<<j<<"/"<<s<<"/"<<species[s].dS(j)<<endl;
                             }
@@ -816,67 +769,6 @@ void c_Sim::do_photochemistry() {
                     
                     //No factor 0.25 here, as we want to see the unaveraged radiation we put in, consistent with low-energy bands
                     //dS_band(j,b) = 0.25 * solar_heating(b) * (1 - 13.6 * ev_to_K * kb / photon_energies[b]) * std::exp(-radial_optical_depth_twotemp(j+1,b)) * (-std::expm1(-dtaus[b])) / dx[j];
-                    
-                    if( (steps == 2 || steps==1000 ) && j == num_cells-10) {
-                        
-                        double GammaHfinal = 0.;
-                        double GammaHfinal2= 0;
-                        double Gamma0final = 0.;
-                        double nphot = 1.;
-                        double npart = nX[0] + nX[1];
-                        
-                        for(int b=0; b < num_he_bands; b++) {
-                            
-                            nphot = solar_heating(b) / photon_energies[b];
-                            
-                            //one  = std::exp(-radial_optical_depth_twotemp(j+1,b)) / photon_energies[b]
-                            //one2 =
-                            
-                            GammaHfinal += 0.25 * solar_heating(b)  * std::exp(-radial_optical_depth_twotemp(j+1,b)) * (-std::expm1(-dtaus[b])) * (1 - 13.6 * ev_to_K * kb / photon_energies[b]) / dx[j] * dlognu; 
-                            
-                            //GammaHfinal2 += 0.25 * solar_heating(b)  * std::exp(-radial_optical_depth_twotemp(j+1,b)) * (1 - 13.6 * ev_to_K * kb / photon_energies[b]) * dlognu * (-std::expm1(-dtaus[b])) / dx[j] ; 
-                            
-                            GammaHfinal2 += (photon_energies[b] - 13.6 * ev_to_K * kb) * (1.-std::exp(-dtaus[b]) ) / dx[j] ;
-                            
-                            //Gamma0[b] = 0.25 * solar_heating(b) / photon_energies[b] * std::exp(-radial_optical_depth_twotemp(j+1,b)) / dx[j];
-                            Gamma0final += Gamma0[b] * -std::expm1(-dtaus[b]);
-                        }
-                        
-                        Gamma0final /= (nphot * npart);
-                        GammaHfinal /= (nphot * npart);
-                        GammaHfinal2 /= (nX[0] + nX[1]);
-                        
-                        cout<<" In photochem, x[j] = "<<x_i12[j]<<" G0/GH/GH2 = "<<Gamma0final<<" / "<<GammaHfinal<<"/"<<GammaHfinal2<<"/"<<GammaHfinal2*4.<<" nphot/npart = "<<nphot<<"/"<<npart<<" ne/nH , ne/(nH+ne), x_bar = "<<nX[2]/ nX[0]<<" / "<<nX[2]/(nX[0]+nX[1])<<"/"<<x_bar<<" photon energy = "<<photon_energies[1]/(ev_to_K * kb)<<endl;
-                        
-                        //cin>>wait;
-                    }
-                    
-                    if(debug >= 0 && j >= debug_cell && j <= debug_cell && steps >= debug_steps && b==1 && steps <= debug_steps+10 ) {
-                        //if(debug >= 0 && j >= 6 && j <= 6 && steps >= 361 && steps <= 371 && b==1) {
-                        
-                        double GammaHfinal = 0.;
-                        double Gamma0final = 0.;
-                        
-                        for(int b=1; b < num_he_bands; b++) {
-                            GammaHfinal += 0.25 * solar_heating(b)  * std::exp(-radial_optical_depth_twotemp(j+1,b)) * (-std::expm1(-dtaus[b]) * x_bar) * (1 - 13.6 * ev_to_K * kb / photon_energies[b]) / dx[j];
-                        }
-                        
-                        double R = H_radiative_recombination(Te);
-                        double C = H_collisional_ionization(Te);
-                        double B = H_threebody_recombination(Te);
-                        double ne = nX[2];
-                        //double x_eq = (Gamma0final + ne * C) / (Gamma0final + ne * (C + R + ne * B));
-                        //double t_rat = dt * (Gamma0final + ne * (C + R + ne * B));
-                        double x1 = species[1].u[j].u1 / (species[0].u[j+1].u1+species[1].u[j+1].u1);
-                        double x2 = species[1].u[j+1].u1/(species[0].u[j+1].u1+species[1].u[j+1].u1);
-                        double x_grad = std::abs( x1/x2 );
-                        double T2 = species[2].prim[j+1].temperature;
-                        double T0 = species[2].prim[j-1].temperature;
-                        
-                        //cout<<" steps/G0 = "<<steps<<"/"<<Gamma0final<<" R/C/B = "<<R<<"/"<<C<<"/"<<B<<" T0/Te/T2 ="<<T0<<"/"<<Te<<"/"<<T2<<" x_grad "<<x_grad<<" dtau/xbar/xeq/xmin = "<<dtaus[b]<<"/"<<x_bar<<"/"<<x_eq<<"/"<<xmin<<endl;
-                        
-                        cout<<" steps/GH = "<<steps<<"/"<<GammaH<<" R/B = "<<R<<"/"<<B<<" T0/Te/T2 ="<<T0<<"/"<<Te<<"/"<<T2<<" x_grad "<<x_grad<<" dS1 dG1 + = "<<species[2].dS(j)<<"/"<<species[2].dG(j)<<"/"<<species[2].dS(j)+species[2].dG(j)<<" dS2 dG2 + = "<<species[2].dS(j+2)<<"/"<<species[2].dG(j+2)<<"/"<<species[2].dS(j+2)+species[2].dG(j+2)<<endl;
-                    }
                                 
                 }
                 

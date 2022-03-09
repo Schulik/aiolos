@@ -76,6 +76,18 @@ void c_Sim::execute() {
     ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~////
     for (globalTime = 0; (globalTime < t_max) && (steps < maxsteps); ) {
         
+//          if(globalTime > 1e3) {
+//              do_hydrodynamics = 0;     
+//          }
+//             if(steps%1000==0){
+//                 
+//                 cout<<" Beginning step "<<steps<<" @ globalTime "<<globalTime<<" dt "<<dt;
+//                 cout<< ", CFL " << cfl_step << ", radiative dt " << timestep_rad2 << "\n";
+//             }
+//                 
+//         }
+            
+        
         //if(steps > 17964) 
         //    cout<<" steps "<<steps<<endl;
         
@@ -301,7 +313,7 @@ void c_Sim::execute() {
         
         for(int s = 0; s < num_species; s++) 
             species[s].compute_pressure(species[s].u);
-        compute_total_pressure();
+        //compute_total_pressure();
         
         //cout<<" POS2 num_cells+1 = "<<num_cells+1<<" temp = "<<species[0].prim[num_cells+1].temperature<<endl;
         //cout<<" POS2 num_cells+1 = "<<num_cells+1<<" temp = "<<species[1].prim[num_cells+1].temperature<<endl;
@@ -495,7 +507,7 @@ void c_Sim::execute() {
 
 void c_Sim::compute_total_pressure() {
     
-    for(int i=num_cells+2; i>=0; i--)  {
+    for(int i=num_cells+1; i>=0; i--)  {
             
         total_press_l[i] = 0.;
         total_press_r[i] = 0.;

@@ -172,6 +172,8 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
         use_chemistry      = read_parameter_from_file<int>(filename,"DO_CHEM", debug, 0).value;
         use_total_pressure = read_parameter_from_file<int>(filename,"USE_TOTAL_PRESSURE", debug, 0).value;
         
+        chemistry_precision         = read_parameter_from_file<double>(filename,"CHEM_PRECISION", debug, 1e-2).value;
+        chemistry_maxiter           = read_parameter_from_file<int>(filename,"CHEM_MAXITER", debug, 4).value;
         ion_precision         = read_parameter_from_file<double>(filename,"ION_PRECISION", debug, 1e-12).value;
         ion_heating_precision = read_parameter_from_file<double>(filename,"ION_HEATING_PRECISION", debug, 1e-12).value;
         ion_maxiter                  = read_parameter_from_file<int>(filename,"ION_MAXITER", debug, 128).value;
@@ -635,11 +637,11 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
                     friction_coeff_mask(si,sj) = 0.;
                     friction_coeff_mask(sj,si) = 0.;
                 }
-                if(std::abs(species[si].static_charge) > 0 && std::abs(species[sj].static_charge) > 0 && (si != sj)) {
-                    cout<<" Setting friction mask to ionic value for species si/sj = "<<si<<"/"<<sj<<endl;
-                    friction_coeff_mask(si,sj) = 10.;
-                    friction_coeff_mask(sj,si) = 10.;
-                }
+//                 if(std::abs(species[si].static_charge) > 0 && std::abs(species[sj].static_charge) > 0 && (si != sj)) {
+//                     //cout<<" Setting friction mask to ionic value for species si/sj = "<<si<<"/"<<sj<<endl;
+//                     friction_coeff_mask(si,sj) = 1.e0;
+//                     friction_coeff_mask(sj,si) = 1.e0;
+//                 }
                 
             }
                 
@@ -729,7 +731,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
         else{
             cout<<"SOLAR HEATING in bin "<<b;
             cout<<" from/to lmin/lmax"<<l_i_in[b];
-            cout<<"/"<<l_i_in[b+1]<<" with T_star = "<<T_star;
+            cout<<"/"<<l_i_in[b+1]<<" with frac = "<<compute_planck_function_integral4(l_i_in[b], l_i_in[b+1], T_star);
             
             solar_heating(b)  = sigma_rad * pow(T_star,4.) * pow(R_star*rsolar,2.)/pow(planet_semimajor*au,2.) * compute_planck_function_integral4(l_i_in[b], l_i_in[b+1], T_star);
             templumi         += solar_heating(b);
@@ -755,7 +757,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
             
     }
     
-    cout<<"TOTAL SOLAR HEATING / Lumi = "<<templumi<<" lumi = "<<(templumi*4.*pi*rsolar*rsolar*pi)<<endl;
+    cout<<"TOTAL SOLAR HEATING / Flux = "<<templumi<<" Luminosity = "<<(templumi*4.*pi*rsolar*rsolar*pi)<<endl;
     
     //for(int j=15;j<18;j++)
     //    cout<<" POS4.3 dens["<<j<<"] = "<<species[0].u[j].u1<<" temp = "<<species[0].prim[j].temperature<<endl;
@@ -764,11 +766,11 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
     double totallumiincr = 0;
     for(int b=0; b < num_bands_in; b++) {
         
-        totallumiincr = compute_planck_function_integral3(l_i_in[b], l_i_in[b+1], T_star);
+        totallumiincr = compute_planck_function_integral4(l_i_in[b], l_i_in[b+1], T_star);
         totallumi     += totallumiincr;
         if(debug > 0 ) cout<<" INIT BANDS, b = "<<b<<" l_i_in[b] = "<<l_i_in[b]<<" l_i[b+1] = "<<l_i_in[b+1]<<" l_i12[b] = "<<l_i12_in[b]<<" fraction = "<<totallumiincr<<" fraction for T=1430 K = "<<compute_planck_function_integral3(l_i_in[b], l_i_in[b+1], 1430.)<<endl;
     }
-    cout<<" Total lumi / sigma T^4/pi is = "<<totallumi<<endl;
+    cout<<" 2nd Luminosity check, L / sigma T^4/pi is = "<<totallumi/compute_planck_function_integral4(l_i_in[0], l_i_in[num_bands_in-1], T_star)<<endl;
     
     total_opacity        = Eigen::MatrixXd::Zero(num_cells+2, num_bands_out);
     cell_optical_depth   = Eigen::MatrixXd::Zero(num_cells+2, num_bands_out);
@@ -853,8 +855,19 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
         
     }
     cout<<"photochem level = "<<photochemistry_level<<endl;
+    n_init = np_zeros(num_species);
+    n_tmp  = np_zeros(num_species);
+    
+    for (int s = 0; s < num_species; s++) {
+        n_init[s] = species[s].prim[num_cells-1].number_density;
+        n_tmp[s]  = n_init[s];
+    }
+    
     if(photochemistry_level == 2) {
         cout<<" Init chemistry."<<endl<<endl;
+        
+        //std::vector<double> n_tmp = np_zeros(num_species);
+        
     
         try {
             
@@ -1151,14 +1164,25 @@ void c_Species::initialize_hydrostatic_atmosphere(string filename) {
     //
     for(int i=num_cells+1; i>=0; i--) {
             
-        if(base->temperature_model == 'P')
-            if (i==num_cells+2)
+        if(base->temperature_model == 'P') {
+            
+            if(i==num_cells+2) {
                 prim[i].temperature = const_T_space;
-            else
-                prim[i].temperature = - dphi_factor * base->get_phi_grav(base->x_i12[i], base->planet_mass) / (cv * gamma_adiabat) + const_T_space;
-                //prim[i].temperature = - dphi_factor * base->phi[i] / (cv * gamma_adiabat) + const_T_space; get_phi_grav(x_i12[i], enclosed_mass[0]);
-        else
+            } else {
+                
+                if(base->x_i12[i] < 1.e9) {
+                    prim[i].temperature = - dphi_factor * base->phi[i] / (cv * gamma_adiabat) + const_T_space; //get_phi_grav(x_i12[i], enclosed_mass[0]);
+                } else {
+                    prim[i].temperature = - dphi_factor * base->get_phi_grav(base->x_i12[i], base->planet_mass) / (cv * gamma_adiabat) + const_T_space;
+                    //prim[i].temperature = - dphi_factor * base->phi[i] / (cv * gamma_adiabat) + const_T_space; get_phi_grav(x_i12[i], enclosed_mass[0]);
+                }
+                    
+            }
+            
+        } else {
             prim[i].temperature = const_T_space + 0.e-3*std::pow(base->x_i12[i]/base->x_i12[0],-1);
+        }
+            
         
         if(debug>=2) {
             cout<<"Just assigned T ="<<prim[i].temperature<<" to i = "<<i<<" with phi_grav = "<<base->phi[i]<<endl;
@@ -1247,9 +1271,25 @@ void c_Species::initialize_hydrostatic_atmosphere(string filename) {
             
             temp_rhofinal = u[i].u1 *  (factor_inner - metric_inner)/(factor_outer + metric_outer);
             
+            if(speciesname.compare("S2")==0) { //Force light electrons to be the same number as protons
+            //if(speciesname.compare("e-")==0 ) { //Force light electrons to be the same number as protons
+                
+                //int p_index = base->get_species_index("H+");
+                int p_index = base->get_species_index("S1");
+                if(p_index == -1)
+                    p_index = base->get_species_index("H+");
+                
+                if(p_index < 0) {
+                    cout<<" IN HYDROSTAT CONSTRUCTION for e-: Protons (H+) species not found! "<<endl;
+                }
+                temp_rhofinal = base->species[p_index].u[i+1].u1 * initial_fraction / base->species[p_index].initial_fraction;
+                
+            }
+            
             //////////////////////////////////////////////////////////////////////////////////////
-            double floor = base->density_floor / mass_amu * std::pow(base->x_i12[i]/base->x_i12[1], -4.);
-            if(temp_rhofinal < floor) {
+            //double floor = base->density_floor / mass_amu * std::pow(base->x_i12[i]/base->x_i12[1], -4.);
+            double floor = base->density_floor * std::pow(base->x_i12[i]/base->x_i12[1], -4.) * initial_fraction;
+            if( (temp_rhofinal < floor) || base->x_i12[i] > 1e10) {
                 
                 if(temp_rhofinal < 0.)
                     negdens = 1;
@@ -1313,7 +1353,8 @@ void c_Species::initialize_hydrostatic_atmosphere(string filename) {
     }
     
     for(int i = 0; i<num_cells+1; i++) {
-            double floor = base->density_floor / mass_amu * std::pow(base->x_i12[i]/base->x_i12[1], -4.);
+            //double floor = base->density_floor / mass_amu * std::pow(base->x_i12[i]/base->x_i12[1], -4.);
+            double floor = base->density_floor * std::pow(base->x_i12[i]/base->x_i12[1], -4.) * initial_fraction;
             if(u[i].u1 < floor) {
                 //floor = 1e6 * mass_amu*amu / (kb * prim[i].temperature); 
                 //cout<<"FIXING SMALL DENSITIES in i ="<<i<<" for species = "<<this_species_index<<endl;
@@ -1328,12 +1369,12 @@ void c_Species::initialize_hydrostatic_atmosphere(string filename) {
                 
             for(int i=num_cells; i>=0; i--)  {
                 
-                //if(x_i12[i]<2.e10) {
+                if(base->x_i12[i]>1.0e10) {
                     
                     double temprho = u[i].u1;
                 
                     u[i] = AOS(temprho, 0., cv * temprho * base->init_T_temp) ;
-                //}
+                }
                 
                 //prim[i].temperature = base->init_T_temp;
             }
@@ -1662,6 +1703,10 @@ c_Species::~c_Species() {
 
 void c_reaction::set_base_pointer(c_Sim *base_simulation) {
     base = base_simulation;
+    
+    for(int& pj : products) {
+            this->products_total_mass += p_stoch[pj] * base->species[pj].mass_amu;
+    }
 }
 
 void c_photochem_reaction::set_base_pointer(c_Sim *base_simulation) {
@@ -1701,9 +1746,9 @@ c_reaction::c_reaction(bool is_reverse, int num_species, std::vector<int> e_indi
     double reaction_rate = get_reaction_rate(300.);
     
     if(!is_reverse_reac)
-        c_reaction_real(num_species, e_indices, p_indices, e_stoch, p_stoch, reaction_rate);
+        c_reaction_real(num_species, e_indices, p_indices, e_stoch, p_stoch, reac_a);
     else
-        c_reaction_real(num_species, p_indices, e_indices, p_stoch, e_stoch, reaction_rate);
+        c_reaction_real(num_species, p_indices, e_indices, p_stoch, e_stoch, reac_a);
     
 } 
 
@@ -1747,12 +1792,15 @@ void c_reaction::c_reaction_real(int num_species, std::vector<int> e_indices,std
             
     this->e_num   = e_indices.size();
     this->p_num   = p_indices.size();
+    
+    this->dndts   = std::vector<double>(num_species);
         
     this->e_stoch = std::vector<double>(num_species); //e_stoch;
     this->p_stoch = std::vector<double>(num_species); //p_stoch;
     this->reac_a  = reaction_rate;
     this->r       = reaction_rate;
-        
+    this->products_total_mass = 0.; // Needs to be set after the base pointer is set.        
+
     for(int s=0; s<num_species; s++) {
         this->e_stoch[s] = 0;
         this->p_stoch[s] = 0;

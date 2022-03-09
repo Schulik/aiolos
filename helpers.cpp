@@ -351,7 +351,8 @@ double c_Sim::compute_planck_function_integral4(double lmin, double lmax, double
 int c_Sim::get_species_index(const string name) {
     
     for(int s = 0; s<num_species; s++) {
-        
+        //cout<<" checking speciesname ="<<species[s].speciesname<<" while looking for "<<name;
+        //cout<<" resulting in "<<species[s].speciesname.compare(name)<<endl;
         if(species[s].speciesname.compare(name)==0)
             return s;
     }

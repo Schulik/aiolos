@@ -98,6 +98,7 @@ void c_Species::update_opacities() {
                 
                 for(int b=0; b<num_bands_in; b++) {
                     opacity_twotemp(j,b) = base->const_opacity_solar_factor * opacity_avg_solar(b); // * (1. + pressure_broadening_factor * pow(prim[j].pres/1e5, pressure_broadening_exponent)); 
+                    //cout<<base->l_i_in[b]<<"   "<<opacity_avg_solar(b)<<endl;
                 }
                 for(int b=0; b<num_bands_out; b++) {
                     opacity(j,b)         = base->const_opacity_rosseland_factor * opacity_avg_rosseland(b);// * (1. + pressure_broadening_factor * pow(prim[j].pres/1e5, pressure_broadening_exponent)); 
@@ -236,6 +237,9 @@ void c_Species::update_opacities() {
                 
                 for(int b=0; b<num_bands_in; b++) {
                     opacity_twotemp(j,b) = base->const_opacity_solar_factor * interpol_tabulated_opacity( opa_grid_solar , b, prim[j].temperature, prim[j].pres) * inv_mass;
+                    
+                    //opacity_twotemp(j,b) = base->const_opacity_solar_factor * opacity_avg_solar(b);
+                    
                     //cout<<" opa_s in j/b "<<j<<"/"<<b<<" = "<<opacity_twotemp(j,b)<<" ";
                 }
                 for(int b=0; b<num_bands_out; b++) {
@@ -320,8 +324,7 @@ void c_Species::update_opacities() {
             
         }
     }
-                    
-    
+
 }
 
 

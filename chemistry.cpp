@@ -18,6 +18,12 @@
 #include "aiolos.h"
 
 extern double HOnly_cooling(const std::array<double, 3> nX, double Te);
+extern double C_cooling(const double ne, double Te);
+extern double Cp_cooling(const double ne, double Te);
+extern double Cpp_cooling(const double ne, double Te);
+extern double O_cooling(const double ne, double Te);
+extern double Op_cooling(const double ne, double Te);
+extern double Opp_cooling(const double ne, double Te);
 
 double thermo_get_r(double T, double r1, double delta_stoch);
 std::vector<double> get_thermo_variables(double T,string species_string);
@@ -36,8 +42,17 @@ void c_Sim::init_reactions(int cdebug) {
     double ns = num_species;
     
     // H+ H2+ ion system
-    //photoreactions.push_back(c_photochem_reaction( ns, num_bands_in, 0, {0}, {1,4}, {1.}, {1.,1.}, 1., 13.6 )); //H + gamma -> H+ + e-
-    photoreactions.push_back(c_photochem_reaction( ns, num_bands_in, 0, {0}, {1,2}, {1.}, {1.,1.}, 1., 13.6 )); //H + gamma -> H+ + e-
+    ////photoreactions.push_back(c_photochem_reaction( ns, num_bands_in, 0, {0}, {1,4}, {1.}, {1.,1.}, 1., 13.6 )); //H + gamma -> H+ + e-
+    
+    photoreactions.push_back(c_photochem_reaction( ns, num_bands_in, 1, {0}, {1,2}, {1.}, {1.,1.}, 1., 13.6 )); //H + gamma -> H+ + e-
+    //photoreactions.push_back(c_photochem_reaction( ns, num_bands_in, 1, {0}, {1,2}, {1.}, {1.,1.}, 1., 13.6 )); //H + gamma -> H+ + e-
+    photoreactions.push_back(c_photochem_reaction( ns, num_bands_in, 1, {4}, {5,2}, {1.}, {1.,1.}, 1., 11.26 )); //C + gamma -> C+ + e-
+    photoreactions.push_back(c_photochem_reaction( ns, num_bands_in, 1, {7}, {8,2}, {1.}, {1.,1.}, 1., 13.6181 )); //O + gamma -> O+ + e-
+    
+    reactions.push_back(c_reaction(0, ns, {1,2}, {0}, {1.,1.}, {1.}, 1.074889e-9, -0.9, 0. )); //Electron-proton recombination
+    //reactions.push_back(c_reaction(0, ns, {1,2}, {0}, {1.,1.}, {1.}, 2.7e-13, -0.0, 0. )); //Electron-proton recombination
+    reactions.push_back(c_reaction(0, ns, {8,2}, {7}, {1.,1.}, {1.}, 5.657e-10, -0.8433, 0. )); //e- + O+(^4S) recombination 400-10.000K   https://journals.aps.org/pra/pdf/10.1103/PhysRevA.43.3433
+    reactions.push_back(c_reaction(0, ns, {5,2}, {4}, {1.,1.}, {1.}, 9.00e-10, -0.9, 0. )); //e- + C+ -> C recombination for at logT=3.5   https://iopscience.iop.org/article/10.1086/313013/pdf
     
     //photoreactions.push_back(c_photochem_reaction( ns, num_bands_in, 0, {2}, {3,4}, {1.}, {1.,1.}, 1./3., 13.6)); //H2 + gamma-> H2+ + e-
     //photoreactions.push_back(c_photochem_reaction( ns, num_bands_in, 0, {2}, {0}, {1.}, {2.}, 1./3., 13.6)); //H2 + gamma-> 2H
@@ -53,9 +68,18 @@ void c_Sim::init_reactions(int cdebug) {
     //reactions.push_back(c_reaction(0, ns, {0}, {0,2}, {3.}, {1.,1.}, 2.3e-35)); //8.82e-33      //H+H+H -> H2 + H
     //reactions.push_back(c_reaction(1, ns, {0}, {0,2}, {3.}, {1.,1.}, 2.3e-35));      //H+H+H <- H2 + H
     
-    reactions.push_back(c_reaction(0, ns, {1,2}, {0}, {1.,1.}, {1.}, 2.7e-13 )); //Electron-proton recombination
+    
     //reactions.push_back(c_reaction(0, ns, {1,4}, {0}, {1.,1.}, {1.}, 2.7e-13 )); //Electron-proton recombination
     //reactions.push_back(c_reaction(0, ns, {3,4}, {2}, {1.,1.}, {1.}, 2.7e-13 )); //Electron-H2+ recombination
+    
+    //reactions.push_back(c_reaction(0, ns, {1,2}, {0}, {1.,1.}, {1.}, 5.657e-8, -0.8433, 0. )); //e- + O+(^4S) recombination for 400-10.000K   https://journals.aps.org/pra/pdf/10.1103/PhysRevA.43.3433
+    
+    //reactions.push_back(c_reaction(0, ns, {1,2}, {0}, {1.,1.}, {1.}, 1.10e-12, 0., 0. )); //e- + C+ -> C recombination for at logT=3.5   https://iopscience.iop.org/article/10.1086/313013/pdf
+    //reactions.push_back(c_reaction(0, ns, {1,2}, {0}, {1.,1.}, {1.}, 1.08e-11, 0., 0. )); //e- + C++ -> C+ recombination for at logT=3.5   https://iopscience.iop.org/article/10.1086/313013/pdf
+    
+    //reactions.push_back(c_reaction(0, ns, {1,2}, {0}, {1.,1.}, {1.}, 1.05e-12, 0., 0. )); //e- + N+ -> N recombination for at logT=3.5   https://iopscience.iop.org/article/10.1086/313013/pdf
+    //reactions.push_back(c_reaction(0, ns, {1,2}, {0}, {1.,1.}, {1.}, 5.27e-12, 0., 0. )); //e- + N+ -> N recombination for at logT=3.5   https://iopscience.iop.org/article/10.1086/313013/pdf
+    
     
     
     int cnt = 0;
@@ -92,7 +116,7 @@ void c_Sim::init_reactions(int cdebug) {
                         cout<<"+ ";
                 }
                 
-                cout<<" ...... dStoch = "<<reaction.delta_stoch<<" initial rrate(100.K, 3000.K) = "<<reaction.get_reaction_rate(100.)<<"/"<<reaction.get_reaction_rate(3000.)<<endl;
+                cout<<" ...... dStoch = "<<reaction.delta_stoch<<" initial rrate(100.K, 3000.K) = "<<reaction.get_reaction_rate(100.)<<"/"<<reaction.get_reaction_rate(3000.)<<" dG = "<<reaction.current_dG<<endl;
                 
                 
             }
@@ -149,68 +173,9 @@ void c_Sim::init_reactions(int cdebug) {
     
 }
 
-
-//
-// Wrapper function to make it possible to call different chemistry solvers (such as specialized one-equation solvers, that might be much faster than the general solver)
-// and do sub-cycling in case negative densitites occur.
-//
-//
-//
-//
-void c_Sim::do_chemistry() {
-    
-    for (int j = num_cells+1; j > 0; j--) {
-        
-        double temp_dt = dt;
-        double t_div = 1.;
-        
-        //
-        // Repeat levels
-        //
-        for(int i=1; i<=32; i*=2) {
-            int check_chem;
-            //
-            // Individual repeats
-            //
-            for(int k = 0; k < i; k++) {
-                
-                double dt_eff = dt/((double)i);
-                
-                check_chem = solver_cchem_implicit_general(dt_eff, j, 0);
-                //if(i>4)
-                //    cout<<" chem cell "<<j<<" repeat level "<<i<<" repeat number "<<k<<" dt_div = "<<dt_eff<<" dt = "<<dt<<" species[0].n = "<<species[0].prim[j].number_density<<endl; 
-                
-            }
-            if(check_chem == 0) break;
-            
-        }
-        
-        /*
-        cout<<" finished chemistry in cell "<<j<<endl;
-        char a;
-        cin>>a;
-        */
-        
-        for(int b=0; b<num_bands_in; b++) {
-            update_tau_s_jb(j, b);
-            //update_dS_jb(j, b);
-            
-            update_dS_jb_photochem(j, b);
-        }
-        
-        //update_dS_jb
-        
-        
-    }
-    
-    //if(chemistry == 2)
-    //     solver_cchem_implicit_something_specialized();
-}
-
-
 void c_reaction::update_reaction_rate(double T) {
     
-    this->r = reac_a * std::pow(T, reac_b) * std::exp(-reac_c/T);
+    this->r = reac_a * pow(T, reac_b) * std::exp(-reac_c/T);
     
     //TODO: If (is_reverse_reaction) r *= gibbs energy stuff;
     if(is_reverse_reac) {
@@ -237,13 +202,166 @@ void c_reaction::update_reaction_rate(double T) {
         double dS = product[1]-educt[1]; //products - reactants
         current_dG = dH - T*dS;
         
-        this->r *= pow(kb*T/1e6, delta_stoch) * std::exp(current_dG/(Rgas*T));
+        this->r *= pow(kb*T/1e6, delta_stoch) * std::exp(current_dG); //Has already /(Rgas*T) in it!
     } 
     
-    //cout<<" Reaction "<<reaction_number<<" r = "<<r<<endl;
-    //char a;
-    //cin>>a;
+    //if(base != NULL && base->steps>1e3) {
+    if(false) {
+     cout<<" Reaction "<<reaction_number<<" is_reverse = "<<is_reverse_reac<<" r = "<<r;
+     cout<<" T = "<<T<<" a= "<<reac_a<<" reac_b "<<reac_b<<endl;
+     char a;
+     cin>>a;   
+    }
+     
 }
+
+//
+// Wrapper function to make it possible to call different chemistry solvers (such as specialized one-equation solvers, that might be much faster than the general solver)
+// and do sub-cycling in case negative densitites occur.
+//
+//
+//
+//
+void c_Sim::do_chemistry() {
+    
+    for (int j = num_cells+1; j > 0; j--) {
+        
+        double temp_dt = dt;
+        double t_div = 1.;
+        
+        std::vector<double> n_init = np_zeros(num_species);
+        std::vector<double> n_tmp  = np_zeros(num_species);
+        
+        int switch_negative  = 0;
+        int switch_precision = 0;
+        //int check_ok = 0;
+        
+        double n_tot = 0.;
+        
+        for(int s=0;s<num_species; s++) {
+            n_tot += species[s].prim[j].number_density;
+            //n_tot += n_olds[s];
+        }
+        for(int s=0;s<num_species; s++) {
+            n_init[s]     = species[s].prim[j].number_density / n_tot;
+            //n_tmp[s]      = n_zero[s];
+        }
+        
+        //
+        // Repeat levels
+        //
+        for(int i=1; i <= chemistry_maxiter; i *= 2) {
+            
+            for(int s=0;s<num_species; s++) {
+                n_tmp[s]      = n_init[s];
+            }
+            
+            int check_chem = 1;
+            //
+            // Individual repeats
+            //
+            double dt_eff = dt/((double)i);
+            
+            for(int k = 0; k < i; k++) {
+                
+                n_tmp = solver_cchem_implicit_general(dt_eff, j, 0, n_tmp, n_tot);
+                //if(globalTime>=1e-3 && j==233)
+                if(i>1e9) {
+                    cout<<" chem cell "<<j<<" repeat level "<<i<<" repeat number "<<k<<" dt_div = "<<dt_eff<<" dt = "<<dt<<" t = "<<globalTime<<" n_tmp[0] = "<<n_tmp[0]<<" dn_absolute[0] = "<<n_tmp[0]-n_init[0]<<endl; 
+                    char b;
+                    cin>>b;
+                }
+                    
+            
+            }
+            
+            //
+            // Check plausibility and convergence
+            //
+            for(int s=0;s<num_species; s++) {
+                
+                if(n_tmp[s] < 0) {
+                    check_chem = 0; // We need to go again
+                }
+                if(fabs(1.-n_tmp[s]/n_init[s]) > chemistry_precision) { //Not a convergence criterion, but precision requirement for wobbling solutions. Obvs the true solution might disobey this criterion, but we enforce higher precision for large Delta n
+                    check_chem = 0;
+                }
+            }
+            
+            // If we survived all checks, let's go and leave
+            //
+            if(check_chem == 1)
+                break;
+            
+        }
+        
+        //
+        // Satisfactory solution found, let's write it into the main arrays
+        //
+        
+        
+        
+        //
+        // We accept the new, normalized number densities and convert them back to non-normalized values
+        //
+        //if(switch1 + switch2 == 0) {
+        for(int s=0;s<num_species; s++) {
+            
+            if(n_tmp[s] < 1e-30)
+                n_tmp[s] = 1e-30;
+                
+            species[s].prim[j].number_density = n_tmp[s] * n_tot;
+            species[s].prim[j].density        = species[s].prim[j].number_density * species[s].mass_amu*amu;
+            //species[s].prim[cell].internal_energy *= n_news(s)/n_olds[s];
+                
+            //species[s].prim[j].speed = vX[s] ;
+            //species[s].prim[j].internal_energy = uX[s];
+            //species[s].prim[j].temperature = TX[s];
+            
+            //species[s].eos->update_eint_from_T(&species[s].prim[cell], 1);
+            species[s].eos->update_p_from_eint(&species[s].prim[j], 1);
+            species[s].eos->compute_auxillary(&species[s].prim[j], 1);
+            species[s].eos->compute_conserved(&species[s].prim[j], &species[s].u[j], 1);
+        }
+        
+        //Correct species internal energy and momentum due to change in number density
+        //Correct species internal energy due to total change in Gibbs energy dU = dG - PdV + TdS
+        
+        for(int b=0; b<num_bands_in; b++) {
+            update_tau_s_jb(j, b);
+            //update_dS_jb(j, b);
+            
+            
+        }
+        
+        //if(steps > 100)
+        update_dS_jb_photochem(j);
+        
+        for(int s=0;s<num_species; s++) {
+            
+            if(n_tmp[s] < 1e-30)
+                n_tmp[s] = 1e-30;
+                
+            species[s].prim[j].number_density = n_tmp[s] * n_tot;
+            species[s].prim[j].density        = species[s].prim[j].number_density * species[s].mass_amu*amu;
+            //species[s].prim[cell].internal_energy *= n_news(s)/n_olds[s];
+                
+            //species[s].prim[j].speed = vX[s] ;
+            //species[s].prim[j].internal_energy = uX[s];
+            //species[s].prim[j].temperature = TX[s];
+                
+            species[s].eos->update_eint_from_T(&species[s].prim[j], 1);
+            species[s].eos->update_p_from_eint(&species[s].prim[j], 1);
+            species[s].eos->compute_auxillary(&species[s].prim[j], 1);
+            species[s].eos->compute_conserved(&species[s].prim[j], &species[s].u[j], 1);
+        }
+        
+    }
+    
+}
+
+
+
 
 double c_reaction::get_reaction_rate(double T) {
     
@@ -278,20 +396,22 @@ double c_reaction::get_reaction_rate(double T) {
 //
 // Recombination reactions are regular chemical reactions which don't conserve particle number (by using the appropriate stochiometric coefficients).
 //
-int c_Sim::solver_cchem_implicit_general(double dtt, int cell, int cdebug) {
+std::vector<double> c_Sim::solver_cchem_implicit_general(double dtt, int cell, int cdebug, const std::vector<double>& n_olds, double n_tot) {
     
     reaction_matrix = Matrix_t::Zero(num_species, num_species);
     reaction_b      = Vector_t(num_species);
-    n_olds          = Vector_t(num_species);
+    Vector_t n_news = Vector_t(num_species);
     double Tcell           = species[0].prim[cell].temperature;
-    double n_tot = 0.;
+    //dtt = 1e-3;
+    //double n_tot = 0.;
     
     for(int s=0;s<num_species; s++) {
-        n_tot += species[s].prim[cell].number_density;
+        //n_tot += species[s].prim[cell].number_density;
+        //n_tot += n_olds[s];
     }
     
     for(int s=0;s<num_species; s++) {
-        n_olds[s]     = species[s].prim[cell].number_density / n_tot;
+        //n_olds[s]     = species[s].prim[cell].number_density / n_tot;
         reaction_b[s] = n_olds[s];
     }
     //
@@ -425,15 +545,20 @@ int c_Sim::solver_cchem_implicit_general(double dtt, int cell, int cdebug) {
                 //
                 // Write the RHS of the Matrix equation
                 //
+                reaction.dndt_old = 0.;
                 for(int& ei : reaction.educts) {
                 //for i,educt in enumerate(reac.educt) {
-                    reaction_b(ei)              -= reaction.e_stoch[ei] * t1;           
+                    reaction_b(ei)              -= reaction.e_stoch[ei] * t1; 
+                    //reaction.dndt_old          += reaction.e_stoch[ei] * t1/dtt * species[ei].u[cell].u2/n_olds[ei]/n_olds[ei]*n_tot; //Total momentum correction term
+                    reaction.dndt_old           -= reaction.e_stoch[ei] * t1/dtt / n_olds[ei]; //Total momentum correction term
                 }
                 
                 for(int& pi : reaction.products) {
                 //for i,product in enumerate(reac.product) {
                     reaction_b(pi)            += reaction.p_stoch[pi] * t1;
                 }
+                
+                
             
             }
         }
@@ -450,11 +575,11 @@ int c_Sim::solver_cchem_implicit_general(double dtt, int cell, int cdebug) {
     for(c_reaction& reaction : reactions) {
         double meanT = 0.;
         double denom = 0.;
-        for(int& ei : reaction.educts) {
-            meanT += species[ei].prim[cell].temperature * species[ei].prim[cell].density;
-            denom += species[ei].prim[cell].density;
+        for(int& pi : reaction.products) {
+            meanT += species[pi].prim[cell].temperature * species[pi].prim[cell].number_density; //Use density here, as it hasn't been updated in between subcyclings. This leaves reac_r constant during subcycling
+            denom += species[pi].prim[cell].number_density;
         }
-        meanT = std::sqrt(meanT/denom);
+        meanT = meanT/denom;
         
         double reac_r = reaction.get_reaction_rate(meanT);
         total_chem_dG += reaction.current_dG;
@@ -520,6 +645,7 @@ int c_Sim::solver_cchem_implicit_general(double dtt, int cell, int cdebug) {
         //
         // Term t1 = k * (A^k)^a * (B^k)^b ...  as final act
         //
+        reaction.dndt_old = 0.;
         double t1    = dtt * reac_r * std::pow(n_tot, eStochsum-1.);
         for(int& ei : reaction.educts) {
             t1 *= std::pow(n_olds[ei], reaction.e_stoch[ei]);
@@ -527,6 +653,9 @@ int c_Sim::solver_cchem_implicit_general(double dtt, int cell, int cdebug) {
         
         for(int& ei : reaction.educts) {
             reaction_b(ei)              -= reaction.e_stoch[ei] * t1;           
+            //reaction.dndts[ei]           = reaction.e_stoch[ei] * t1/dtt * species[ei].u[cell].u2/n_olds[ei]/n_olds[ei]*n_tot; //Momentum correction term 1
+            reaction.dndts[ei]           = -reaction.e_stoch[ei] * t1/dtt /n_olds[ei]; //*n_tot; //Momentum correction term 1
+            reaction.dndt_old           += -reaction.dndts[ei];                                 //Total momentum correction term
         }
         for(int& pi : reaction.products) {
             reaction_b(pi)            += reaction.p_stoch[pi] * t1 ;
@@ -547,82 +676,63 @@ int c_Sim::solver_cchem_implicit_general(double dtt, int cell, int cdebug) {
     LUchem.compute(identity_matrix + reaction_matrix.transpose()) ;
     n_news.noalias() = LUchem.solve(reaction_b);
     
-    //reaction_matrix.diagonal().noalias() += dt * (friction_coefficients * unity_vector);
-     //
-     //   chem_vec_output.noalias() = LUchem.solve(b);
-    
-    for(int s=0;s<num_species; s++) {
-        if(n_news(s) < 0) {
-            
-            return 1;
-            
-            cout<<"NEGATIVE DENSITY IN SPECIES["<<s<<"] = " <<n_news(s)<<" at time = "<<globalTime<< " steps/cell = "<<steps<<"/"<<cell<<" dt_chem = "<<dtt<<endl;
-            
-            cout<<"In solver_implicit_cchem3 cell, = "<<cell<<" matrix = "<<endl;
-            cout<<reaction_matrix.transpose()<<endl;
-            cout<<"b="<<endl;
-            cout<<reaction_b<<endl;
-            cout<<"nolds = "<<endl<<n_olds<<endl;
-            cout<<"nnews = "<<endl<<n_news* n_tot<<endl;
-            cout<<"NEGATIVE DENSITY IN SPECIES["<<s<<"] = " <<n_news(s)<<" at time = "<<globalTime<< " steps/cell = "<<steps<<"/"<<cell<<endl;
-            cout<<" This species density is being now floored. If you don't think this is a good idea, please ctrl+x."<<endl;
-            
-            //species[s].prim[cell].number_density = n_olds(s); //density_floor / species[s].mass_amu / amu;
-            //species[s].prim[cell].density        = species[s].prim[cell].number_density * species[s].mass_amu*amu;
-            //species[s].prim[cell].density        = density_floor * species[s].mass_amu;
-            
-            cout<<" Replaced new relative number density (comapre to nnews just above) = "<<species[s].prim[cell].number_density/n_tot<<endl;
-            
-            
-            
-            //char aa;
-            //cin>>aa;
-            
-        }
-        else {
-            
-            if(n_news(s) < 1e-30)
-                n_news(s) = 1e-30;
-            
-            species[s].prim[cell].number_density = n_news(s) * n_tot;
-            species[s].prim[cell].density        = species[s].prim[cell].number_density * species[s].mass_amu*amu;
-            //species[s].prim[cell].internal_energy *= n_news(s)/n_olds[s];
-        }
-            
-    }
-    
-    //Correct species internal energy and speed due to change in number density
-    //Correct species internal energy due to total change in Gibbs energy dU = dG - PdV + TdS
-    for (int s = 0; s < num_species; s++) {
-                    //species[s].prim[cell].number_density = n_news(s);
-        
-                    //species[s].prim[j].speed = vX[s] ;
-                    //species[s].prim[j].internal_energy = uX[s];
-                    //species[s].prim[j].temperature = TX[s];
-    }
-    
-    for (int s = 0; s < num_species; s++) {
-                //species[s].eos->update_eint_from_T(&species[s].prim[cell], 1);
-                species[s].eos->update_p_from_eint(&species[s].prim[cell], 1);
-                species[s].eos->compute_auxillary(&species[s].prim[cell], 1);
-                species[s].eos->compute_conserved(&species[s].prim[cell], &species[s].u[cell], 1);
-            }
-    
     /*
     cout<<"Intermediate results with dt= "<<dt<<endl;
     cout<<"matrix = "<<endl<<reaction_matrix.transpose()<<endl<<" b ="<<reaction_b<<endl;
     
     for(int si=0; si<num_species; si++)
-        cout<<n_news(si)<<" ";
+        cout<<n_news(si)<<" ";*/
     
-    char aa;
-    cin>>aa;
-    */
-    //
-    // Add conversions
-    //
-            
-    return 0; //No need for returning x anymore, all things are done in place here
+    for(int s=0;s<num_species; s++) {
+        
+        if(cell==3260)
+            cout<<"s = "<<s<<" dn /dt_actual = "<<(n_news[s]-n_olds[s])<<" dn/dt = "<<(n_news[s]-n_olds[s])/dtt<<" from reaction: "<<reactions[0].dndt_old<<endl;
+        
+        
+                if(n_news(s) < 0) {
+                    
+                    if(debug > 0) {
+                        cout<<"NEGATIVE DENSITY IN SPECIES["<<s<<"] = " <<n_news(s)<<" at time = "<<globalTime<< " steps/cell = "<<steps<<"/"<<cell<<" dt_chem = "<<dtt<<endl;
+                    
+                        cout<<"In solver_implicit_cchem3 cell, = "<<cell<<" matrix = "<<endl;
+                        cout<<reaction_matrix.transpose()<<endl;
+                        cout<<"b="<<endl;
+                        cout<<reaction_b<<endl;
+                        //cout<<"nolds = "<<endl<<n_olds<<endl;
+                        //cout<<"nnews = "<<endl<<n_news* n_tot<<endl;
+                        cout<<"NEGATIVE DENSITY IN SPECIES["<<s<<"] = " <<n_news(s)<<" at time = "<<globalTime<< " steps/cell = "<<steps<<"/"<<cell<<endl;
+                        cout<<" This species density is being now floored. If you don't think this is a good idea, please ctrl+x."<<endl;
+                        
+                        //species[s].prim[cell].number_density = n_olds(s); //density_floor / species[s].mass_amu / amu;
+                        //species[s].prim[cell].density        = species[s].prim[cell].number_density * species[s].mass_amu*amu;
+                        //species[s].prim[cell].density        = density_floor * species[s].mass_amu;
+                        
+                        cout<<" Replaced new relative number density (comapre to nnews just above) = "<<species[s].prim[cell].number_density/n_tot<<endl;
+                }
+            }
+    }
+    
+    if(cell==22233) {
+        
+        for(int s=0;s<num_species; s++) {
+                cout<<" dn["<<s<<"] = "<<n_olds[s]-n_news[s]<<endl;
+        }
+        
+        cout<<"In solver_implicit_cchem3 cell, = "<<cell<<" matrix = "<<endl;
+                        cout<<reaction_matrix.transpose()<<endl;
+                        cout<<"b="<<endl;
+                        cout<<reaction_b<<endl;
+        char b;
+        cin>>b;
+        
+    }
+        
+    
+    std::vector<double> n_tmp2  = np_zeros(num_species);
+    for(int s=0; s< num_species; s++)
+        n_tmp2[s] = n_news(s);
+    
+    return n_tmp2;
 }
 
 //
@@ -630,13 +740,21 @@ int c_Sim::solver_cchem_implicit_general(double dtt, int cell, int cdebug) {
 // Take the already solved chemical and photochemical equations and update dS(j,s) for each species according to the ionizing photons absorbed
 //
 //
-void c_Sim::update_dS_jb_photochem(int cell, int b) {
+void c_Sim::update_dS_jb_photochem(int cell) {
     
-    n_olds          = Vector_t(num_species);
+    //dt = 1e-1;
+    
+    Vector_t n_olds          = Vector_t(num_species);
     double n_tot = 0.;
+    
+    chem_momentum_matrix = Matrix_t::Zero(num_species, num_species);
+    momentum_b           = Vector_t(num_species);
+    Vector_t mom_new     = Vector_t(num_species);
     
     for(int s=0;s<num_species; s++) {
         n_tot += species[s].prim[cell].number_density;
+        momentum_b(s) = 0.;
+        mom_new(s)    = 0.;
     }
     
     for(int s=0;s<num_species; s++) {
@@ -644,6 +762,12 @@ void c_Sim::update_dS_jb_photochem(int cell, int b) {
         reaction_b[s] = n_olds[s];
     }
     
+    
+    //
+    //
+    // Photochem reactions have to be checked for every band
+    //
+    //
     for (int b=0; b<num_bands_in; b++) {
         
         cell_optical_depth_highenergy(cell, b) = 0.;
@@ -687,9 +811,10 @@ void c_Sim::update_dS_jb_photochem(int cell, int b) {
             
                 //Does this work???
                 double tau_i =  reaction.branching_ratio * n_olds[reaction.educts[0]] * species[reaction.educts[0]].opacity_twotemp(cell, b) * species[reaction.educts[0]].mass_amu*amu ;
+                tau_i       *= n_tot*ds;
                 
                 //Get fraction of total cell-heating
-                double fractional_dS = tau_i/tau_tot_b * dS * (1.- reaction.threshold_energy/photon_energies[b]);
+                double fractional_dS = tau_i/tau_tot_b * dS * 1.0 * (1.- reaction.threshold_energy/photon_energies[b]);
                 
                 //Distribute energy according to mass
                 for(int& pj : reaction.products) {
@@ -697,39 +822,225 @@ void c_Sim::update_dS_jb_photochem(int cell, int b) {
                         species[pj].dS(cell) += fractional_dS;
                     else {
                         species[pj].dS(cell) += fractional_dS * reaction.energy_split_factor/species[pj].mass_amu;
-                        //cout<<" In highenergy heating cell "<<cell<<": target = "<<species[pj].speciesname<<" recieving a fraction = "<< reaction.energy_split_factor/species[pj].mass_amu<<" of the fractional "<<fractional_dS<<" heating. tau_tot_b = "<<tau_tot_b<<" expm-dtau = "<<-std::expm1(-tau_tot_b)<<endl;
-                        
+                        //cout<<" In highenergy heating cell "<<cell<<": target = "<<species[pj].speciesname<<" recieving a fraction = "<< reaction.energy_split_factor/species[pj].mass_amu<<" of the fractional "<<fractional_dS<<" heating. tau_tot_b = "<<tau_tot_b<<" tau_i/tau_tot_b "<<tau_i/tau_tot_b<<" F = "<<F<<" 1-E/hnu"<< (1.- reaction.threshold_energy/photon_energies[b])<<endl;
                     }
-                        
                 }
                 
+                //
+                // Momentum terms
+                //
+                int ej = reaction.educts[0]; 
+                chem_momentum_matrix(ej, ej) += dt * reaction.dndt_old;
+                //momentum_b(ej)               += dt * reaction.dndt_old;
+                
+                for(int& pj : reaction.products) {
+                        chem_momentum_matrix(pj, ej) -= dt * reaction.dndt_old * species[pj].mass_amu/reaction.products_total_mass;
+                        //momentum_b(pj)               -= dt * reaction.dndt_old * species[pj].mass_amu/reaction.products_total_mass;
+                        
+                        //cout<<" from "<<species[ej].speciesname<<" to "<<species[pj].speciesname<<endl;
+                }
             }
         }
+        
     }
     
+    //
+    //
+    // Regular reactions, enthalpy release and momentum change bookkeeping
+    //
+    //
+    
+    for(c_reaction& reaction : reactions) {
+        
+        //
+        // TODO: Spread dG onto reaction products
+        //
+        
+        //
+        // Momentum terms
+        //
+        //int ej = reaction.educts[0]; 
+        
+        for(int& ej : reaction.educts) {
+            chem_momentum_matrix(ej, ej) += 1.* dt * reaction.dndts[ej]; //reaction.dndt_old;
+            //momentum_b(ej)               += 1.* dt * reaction.dndts[ej];
+        }
+        //momentum_b(ej)               += reaction.dndt_old;
+        for(int& pj : reaction.products) {
+            for(int& ej : reaction.educts) {
+                chem_momentum_matrix(pj, ej) -= 1.*dt * reaction.dndt_old * species[pj].mass_amu/reaction.products_total_mass;
+                //momentum_b(pj)               -= 1.*dt * reaction.dndt_old * species[pj].mass_amu/reaction.products_total_mass;
+            
+                //cout<<" from "<<species[ej].speciesname<<" to "<<species[pj].speciesname<<endl;
+            }
+        }
+        
+        
+        /*
+        for(int& ej : reaction.educts) {
+                 //   chem_momentum_matrix(ej, ej) += dt * reaction.dndts[ej];
+                //    momentum_b(ej)               += dt * reaction.dndts[ej];
+                
+                chem_momentum_matrix(ej, ej) += dt * reaction.dndt_old;
+                momentum_b(ej)               += dt * reaction.dndts(ej);
+                    
+                for(int& pj : reaction.products) {
+                        chem_momentum_matrix(ej, pj) -= dt * reaction.dndt_old * species[pj].mass_amu/reaction.products_total_mass;
+                        momentum_b(pj)               -= dt * reaction.dndt_old * species[pj].mass_amu/reaction.products_total_mass;
+                }
+        }*/
+        
+        
+    }
+    
+    //
+    //
+    // Momentum correction due to density changes
+    //
+    //
+    if(do_hydrodynamics >= 0 && globalTime > 1.1e-20) { //&& steps > 10
+        
+        
+        double dEk = 0.;
+        std::vector<double> mom  = np_zeros(num_species);
+        std::vector<double> vnew = np_zeros(num_species);
+        
+        for(int s=0;s<num_species; s++) {
+            mom[s] = species[s].u[cell].u2;
+            momentum_b(s) = mom[s];
+            
+        }
+        
+        if(globalTime > 1e50) {
+            cout<<cell<<" In correct momentum, matrix = "<<endl<<chem_momentum_matrix<<endl<<" b = "<<endl<<momentum_b;
+            if(photoreactions.size() > 0)
+                cout<<" dndt_photochem = "<<photoreactions.at(0).dndt_old;
+            if(reactions.size() > 0)
+                cout<<" dndt_chem = "<<reactions.at(0).dndt_old;
+            cout<<endl;
+        }
+        //cout<<" reaction_b = "<<reaction_b<<endl;
+        
+        Vector_t mom_news = Vector_t(num_species);
+        LUchem_mom.compute(identity_matrix + chem_momentum_matrix) ;
+
+        //LUchem_mom.compute(chem_momentum_matrix.transpose()) ;
+        mom_news.noalias() = LUchem_mom.solve(momentum_b);
+        
+        double dmom_tot = 0.;
+        
+        if(false) {
+            
+            std::array<double, 3> nX = { species[0].prim[cell].number_density, species[1].prim[cell].number_density, species[2].prim[cell].number_density};
+            std::array<double, 3> vX = { species[0].prim[cell].speed, species[1].prim[cell].speed, species[2].prim[cell].speed};
+            std::array<double, 3> mX = { species[0].mass_amu * amu, species[1].mass_amu * amu, species[2].mass_amu * amu};
+            //std::array<double, 3> mom = { species[0].u[cell].u2, species[1].u[cell].u2, species[2].u[cell].u2 } ;
+            
+            //double ne = nX_bar[2], nH = nX_bar[0] ;
+            double dn_R = 0.; //(ion.R + ion.B*ne)*ne*ne*dt ;
+            double dn_I = photoreactions[0].dndt_old * dt ;// * nX[0];// (ion.C*ne + ion.photoionization_rate(x_bar))*nH*dt ;
+
+            double fe = 1/(1 + mX[2]/mX[1]), fp = 1/(1 + mX[1]/mX[2]) ;
+            double f = nX[0] + dn_I - dn_I*dn_R*(fp/(nX[1]+dn_R) + fe/(nX[2] + dn_R)) ;
+            //mom_nonupdated = 
+            mom_news(0) = (mom[0] + dn_R*(mom[1]/(nX[1]+dn_R) + mom[2]/(nX[2]+dn_R))) / f ;
+            mom_news(1) = (mom[1] + dn_I*mom_news(0)*fp)/(nX[1]+dn_R) ;
+            mom_news(2) = (mom[2] + dn_I*mom_news(0)*fe)/(nX[2]+dn_R) ;
+            //dmom_tot += mom_news(s)-mom[s];
+        }
+        
+        double dEk2 = 0.;
+        
+        //0.5*(mom[0]*mom[0]*nX_new[0] / mX[0] - mX[0]*nX[0]*vX[0]*vX[0] +
+         //                         mom[1]*mom[1]*nX_new[1] / mX[1] - mX[1]*nX[1]*vX[1]*vX[1] +
+          //                        mom[2]*mom[2]*nX_new[2] / mX[2] - mX[2]*nX[2]*vX[2]*vX[2]) ;
+        
+        for (int s = 0; s < num_species; s++) {
+//                 cout<<endl<<" s = "<<species[s].speciesname<<" mom_news(s) = "<<mom_news(s)<<" dm = "<<(mom_news(s)-mom[s])<<" n = "<<n_olds[s]<<endl;
+//                 cout<<" s/j = "<<s<<"/"<<cell;
+//                 cout<<" dens = "<<species[s].u[cell].u1<<" n_tot= "<<n_tot<<endl;
+//                 cout<<" n = "<<species[s].prim[cell].number_density<<endl;
+//                 cout<<" n_init = "<<n_init[s]<<endl;
+//                 cout<<" n_init = "<<n_init[s]-species[s].u[cell].u1/(species[s].mass_amu*amu)<<endl;
+                
+                dmom_tot += mom_news(s)-mom[s];
+                dEk2     += 0.0 * (mom_news(s)*mom_news(s)*species[s].prim[cell].number_density - mom[s]*mom[s]*n_init[s])/(species[s].mass_amu * amu);
+                
+                vnew[s]                     = mom_news(s) / (n_olds[s]*n_tot*species[s].mass_amu*amu) ; 
+                //cout<<" vold/vnew = "<<species[s].prim[cell].speed<<"/"<<vnew[s]<<" dv = "<<vnew[s]-species[s].prim[cell].speed<<" dvrel = "<<1-vnew[s]/species[s].prim[cell].speed<<endl;
+                species[s].prim[cell].speed = vnew[s] ;
+                species[s].dS(cell) -= dEk2/dt;
+        }
+        
+        //species[2].dS(cell) -= dEk2/dt;
+        
+        
+        if(globalTime > 1e50) {
+            
+            for (int s = 0; s < num_species; s++) {
+                cout<<endl<<" s = "<<species[s].speciesname<<" mom_news(s) = "<<mom_news(s)<<" dm = "<<(mom_news(s)-mom[s])<<" dm_rel = "<<(1.-mom_news(s)/mom[s])<<" n = "<<n_olds[s]<<endl;
+            }
+            cout<<" final dmom_tot = "<<dmom_tot<<" with dI = "<<photoreactions[0].dndt_old<<" dEk/dt = "<<dEk2/dt<<endl;
+            
+            char cc;
+            cin>>cc;    
+            
+            
+        }
+        
+        
+    }
     
     //
     // Do highenergy-cooling
     //
-    int e_idx     = get_species_index("e-");
-    int hnull_idx = get_species_index("H0"); 
-    int hplus_idx = get_species_index("H+");
+//     int e_idx     = get_species_index("e-");
+//     int hnull_idx = get_species_index("H0"); 
+//     int hplus_idx = get_species_index("H+");
     
-    if( e_idx!=-1 && hnull_idx!=-1 && hplus_idx!=-1  ) {
-        
+    int hnull_idx = get_species_index("S0"); 
+    if(hnull_idx == -1)
+        hnull_idx = get_species_index("H0"); 
+    int hplus_idx = get_species_index("S1");
+    if(hplus_idx == -1)
+        hplus_idx = get_species_index("H+"); 
+    int e_idx     = get_species_index("S2");
+    if(e_idx == -1)
+        e_idx = get_species_index("e-"); 
+    
+    if( e_idx!=-1 && hnull_idx!=-1 && hplus_idx!=-1  ) { //If all species are there - H0, H+ and e-
         std::array<double, 3> nX = {
                     species[hnull_idx].prim[cell].number_density,
                     species[hplus_idx].prim[cell].number_density,
                     species[e_idx].prim[cell].number_density};
     
-        double cooling = nX[2] * HOnly_cooling(nX, species[e_idx].prim[cell].temperature);
-        species[e_idx].dG(cell) += cooling;
-        
-        cout<<" We indeed found all cooling species, and cooling is = "<<cooling;
+        double cooling = 0.;
+        cooling                 += nX[2] * HOnly_cooling(nX, species[e_idx].prim[cell].temperature) ; /// (1. + cell_optical_depth(cell,0) * cell_optical_depth(cell,0) * 1e2);
+        species[e_idx].dG(cell) -= cooling;
     }
     
+    //e_idx = get_species_index("S2");
+    int C_idx = get_species_index("S4");
+    int Cp_idx = get_species_index("S5");
+    int Cpp_idx = get_species_index("S6");
+    int O_idx = get_species_index("S7");
+    int Op_idx = get_species_index("S8");
+    int Opp_idx = get_species_index("S9");
+    double tau = total_opacity(cell,0)*(x_i12[cell+1]-x_i12[cell])*1e2;
+    double red = (1.+tau*tau);
+                
+    if( C_idx!=-1 && e_idx!=-1 ) { species[C_idx].dG(cell)     -=  C_cooling(species[e_idx].prim[cell].number_density, species[e_idx].prim[cell].temperature)/red; }
+    if( Cp_idx!=-1 && e_idx!=-1 ) { species[Cp_idx].dG(cell)   -=  Cp_cooling(species[e_idx].prim[cell].number_density, species[e_idx].prim[cell].temperature)/red; }
+    if( Cpp_idx!=-1 && e_idx!=-1 ) { species[Cpp_idx].dG(cell) -=  Cpp_cooling(species[e_idx].prim[cell].number_density, species[e_idx].prim[cell].temperature)/red; }
+    if( O_idx!=-1 && e_idx!=-1 ) { species[O_idx].dG(cell)     -=  O_cooling(species[e_idx].prim[cell].number_density, species[e_idx].prim[cell].temperature)/red; }
+    if( Op_idx!=-1 && e_idx!=-1 ) { species[Op_idx].dG(cell)   -=  Op_cooling(species[e_idx].prim[cell].number_density, species[e_idx].prim[cell].temperature)/red; }
+    if( Opp_idx!=-1 && e_idx!=-1 ) { species[Opp_idx].dG(cell) -=  Opp_cooling(species[e_idx].prim[cell].number_density, species[e_idx].prim[cell].temperature)/red; }
     
-    
+//     if(cell==2) {
+//         
+//         char a;
+//         cin>>a;
+//     }
     
     //
     // Do momentum correction

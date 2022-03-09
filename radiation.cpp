@@ -104,6 +104,8 @@ void c_Sim::update_dS_jb(int j, int b) {
                         
                         dS_band(j,b) -= dS_he_temp;
                         dS_band(j,b) = std::max(dS_band(j,b), 0.); //Safeguard against highenergy shenanigans
+                        if(BAND_IS_HIGHENERGY[b] && photochemistry_level==1)
+                            dS_band(j,b) = 0.;
                         
                         if(b==1000) {
                             cout<<" in thermal heating: total heating ~ "<<dS_band(j,b)<<" of which highenergy is "<<dS_he_temp;

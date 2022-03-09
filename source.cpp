@@ -472,7 +472,7 @@ void c_Sim::compute_alpha_matrix(int j) { //Called in compute_friction() and com
         double coll_b;
         double ntot;
         double mtot;
-        double mumass, meanT;
+        double mumass, mumass_amu, meanT;
         
         for(int si=0; si<num_species; si++) {
             for(int sj=0; sj<num_species; sj++) {
@@ -487,6 +487,7 @@ void c_Sim::compute_alpha_matrix(int j) { //Called in compute_friction() and com
                         //mui  = mass_vector(si) / mtot;
                         //muj  = mass_vector(sj) / mtot;
                         mumass = mass_vector(si) * mass_vector(sj) / (mass_vector(si) + mass_vector(sj));
+                        mumass_amu = mumass/amu;
                         meanT  = (mass_vector(sj)*temperature_vector(si) + mass_vector(si)*temperature_vector(sj)) / (mass_vector(si) + mass_vector(sj)); //Mean collisional mu and T from Schunk 1980
                         
                         if (species[si].is_dust_like || species[sj].is_dust_like) {
@@ -509,11 +510,34 @@ void c_Sim::compute_alpha_matrix(int j) { //Called in compute_friction() and com
                             //fi   = numdens_vector(si) / ntot;
                             //fj   = numdens_vector(sj) / ntot;
                             
-                            coll_b      = 5.0e17 * std::sqrt(std::sqrt(meanT*meanT*meanT)) ;     //std::pow(meanT, 0.75) // from Zahnle & Kasting 1986 Tab. 1
+                            int ci = (int)(species[si].static_charge*1.01);
+                            int cj = (int)(species[sj].static_charge*1.01);
+                            double qn = (std::fabs(species[si].static_charge) + std::fabs(species[sj].static_charge));
+                            string ccase = "";
                             
-                            alpha_local = kb * meanT * numdens_vector(sj) / (mass_vector(si) * coll_b) ; // From Burgers book, or Schunk & Nagy.
+                            if(std::abs(ci) + std::abs(cj) == 0) { //n-n collision
+                                coll_b      = 5.0e17 * std::sqrt(std::sqrt(meanT*meanT*meanT)) ;     //std::pow(meanT, 0.75) // from Zahnle & Kasting 1986 Tab. 1
+                                alpha_local = kb * meanT * numdens_vector(sj) / (mass_vector(si) * coll_b) ; // From Burgers book, or Schunk & Nagy.
+                                ccase = " n-n ";
+                            }
+                            else if(std::abs(ci) == 0 || std::abs(cj) == 0) {//i-n collision
+                                
+                                alpha_local = 2.21 * 3.141592 * numdens_vector(sj) * mass_vector(sj)/(mass_vector(sj)+mass_vector(si));
+                                alpha_local *= std::sqrt(0.66 / mumass ) * 1e-12 * qn * elm_charge; //0.66 is the polarizability of neutral atomic H
+                                
+                                ccase = " i-n ";
+                            }
+                            else { //i-i collision
+                                alpha_local = 1.27 * species[si].static_charge * species[si].static_charge * species[sj].static_charge * species[sj].static_charge * std::sqrt(mumass_amu) * amu/mass_vector(si);
+                                alpha_local *= numdens_vector(sj) / std::sqrt(meanT*meanT*meanT);
+                                
+                                ccase = " i-i ";
+                            }
                             
-                            if(photochemistry_level == 1 && (si + sj) == 3)
+                            //if(si!=sj)
+                           //     cout<<"cell "<<j<<" colliding "<<species[si].speciesname<<" q="<<species[si].static_charge<<" with "<<species[sj].speciesname<<" q="<<species[sj].static_charge<<" case = "<<ccase<<" alpha/n = "<<alpha_local/ numdens_vector(sj)<<endl;
+                            
+                            //if(photochemistry_level == 1 && (si + sj) == 3)
                             alpha_local *= alpha_collision;
                         }
                     }
@@ -538,6 +562,8 @@ void c_Sim::compute_alpha_matrix(int j) { //Called in compute_friction() and com
               
             }
         }
+        //char a;
+        //cin>>a;
 }
 
 
