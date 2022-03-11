@@ -107,13 +107,13 @@ double HOnly_cooling(const std::array<double, 3> nX, double Te) {
 
 double C_cooling(const double ne, double Te) {
     double term = 1e-24+3.1e-20*std::exp(-15162/Te)*(1.+std::pow(Te/2e4, 1.5));
-    return term*ne;
+    return term;
 }
 
 double Cp_cooling(const double ne, double Te) {
     double term = 1.5e-23+3.1e-20*std::exp(-45162/Te)*(1.+std::pow(Te/0.75e4,1.5));
     
-    return term*ne;
+    return term;
 }
 
 double Cpp_cooling(const double ne, double Te) {
@@ -124,7 +124,7 @@ double O_cooling(const double ne, double Te) {
     
     double term = 5.5e-24+1.1e-20*std::exp(-30162/Te)*(1.+std::pow(Te/0.75e4, 0.5));
     
-    return term*ne;
+    return term;
 }
 
 double Op_cooling(const double ne, double Te) {
@@ -493,7 +493,7 @@ void c_Sim::do_photochemistry() {
                     dtaus[b]  = species[0].opacity_twotemp(j, b) * (nX[0] + nX[1]) * mX[0] * dx[j]; 
                     
                     if(debug >= 0 && j >= 1053 && steps <= 2) {
-                        cout<<" PH j= "<<j<<" b == "<<b<<" Gamma0[b] = "<<Gamma0[b]<<" dtau = "<<dtaus[b]<<" opa/nX0+nX1/dx[j] = "<<species[0].opacity_twotemp(j, b)<<"/"<<(nX[0] + nX[1])<<"/"<<dx[j]<<endl;
+                        //cout<<" PH j= "<<j<<" b == "<<b<<" Gamma0[b] = "<<Gamma0[b]<<" dtau = "<<dtaus[b]<<" opa/nX0+nX1/dx[j] = "<<species[0].opacity_twotemp(j, b)<<"/"<<(nX[0] + nX[1])<<"/"<<dx[j]<<endl;
                     }
                 }
                 

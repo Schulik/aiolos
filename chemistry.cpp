@@ -44,15 +44,18 @@ void c_Sim::init_reactions(int cdebug) {
     // H+ H2+ ion system
     ////photoreactions.push_back(c_photochem_reaction( ns, num_bands_in, 0, {0}, {1,4}, {1.}, {1.,1.}, 1., 13.6 )); //H + gamma -> H+ + e-
     
-    photoreactions.push_back(c_photochem_reaction( ns, num_bands_in, 1, {0}, {1,2}, {1.}, {1.,1.}, 1., 13.6 )); //H + gamma -> H+ + e-
+    photoreactions.push_back(c_photochem_reaction( ns, num_bands_in, 0, {0}, {1,2}, {1.}, {1.,1.}, 1., 13.6 )); //H + gamma -> H+ + e-
     //photoreactions.push_back(c_photochem_reaction( ns, num_bands_in, 1, {0}, {1,2}, {1.}, {1.,1.}, 1., 13.6 )); //H + gamma -> H+ + e-
-    photoreactions.push_back(c_photochem_reaction( ns, num_bands_in, 1, {4}, {5,2}, {1.}, {1.,1.}, 1., 11.26 )); //C + gamma -> C+ + e-
-    photoreactions.push_back(c_photochem_reaction( ns, num_bands_in, 1, {7}, {8,2}, {1.}, {1.,1.}, 1., 13.6181 )); //O + gamma -> O+ + e-
+    photoreactions.push_back(c_photochem_reaction( ns, num_bands_in, 0, {4}, {5,2}, {1.}, {1.,1.}, 1., 11.26 )); //C + gamma -> C+ + e-
+    photoreactions.push_back(c_photochem_reaction( ns, num_bands_in, 0, {7}, {8,2}, {1.}, {1.,1.}, 1., 13.6181 )); //O + gamma -> O+ + e-
     
     reactions.push_back(c_reaction(0, ns, {1,2}, {0}, {1.,1.}, {1.}, 1.074889e-9, -0.9, 0. )); //Electron-proton recombination
     //reactions.push_back(c_reaction(0, ns, {1,2}, {0}, {1.,1.}, {1.}, 2.7e-13, -0.0, 0. )); //Electron-proton recombination
-    reactions.push_back(c_reaction(0, ns, {8,2}, {7}, {1.,1.}, {1.}, 5.657e-10, -0.8433, 0. )); //e- + O+(^4S) recombination 400-10.000K   https://journals.aps.org/pra/pdf/10.1103/PhysRevA.43.3433
-    reactions.push_back(c_reaction(0, ns, {5,2}, {4}, {1.,1.}, {1.}, 9.00e-10, -0.9, 0. )); //e- + C+ -> C recombination for at logT=3.5   https://iopscience.iop.org/article/10.1086/313013/pdf
+    //reactions.push_back(c_reaction(0, ns, {8,2}, {7}, {1.,1.}, {1.}, 5.657e-10, -0.8433, 0. )); //e- + O+(^4S) recombination 400-10.000K   https://journals.aps.org/pra/pdf/10.1103/PhysRevA.43.3433
+    //reactions.push_back(c_reaction(0, ns, {5,2}, {4}, {1.,1.}, {1.}, 9.00e-10, -0.9, 0. )); //e- + C+ -> C recombination for at logT=3.5   https://iopscience.iop.org/article/10.1086/313013/pdf
+    
+    reactions.push_back(c_reaction(0, ns, {8,2}, {7}, {1.,1.}, {1.}, 5.657e-10, -0.0, 0. )); //e- + O+(^4S) recombination 400-10.000K   https://journals.aps.org/pra/pdf/10.1103/PhysRevA.43.3433
+    reactions.push_back(c_reaction(0, ns, {5,2}, {4}, {1.,1.}, {1.}, 9.00e-10, -0.0, 0. )); //e- + C+ -> C recombination for at logT=3.5   https://iopscience.iop.org/article/10.1086/313013/pdf
     
     //photoreactions.push_back(c_photochem_reaction( ns, num_bands_in, 0, {2}, {3,4}, {1.}, {1.,1.}, 1./3., 13.6)); //H2 + gamma-> H2+ + e-
     //photoreactions.push_back(c_photochem_reaction( ns, num_bands_in, 0, {2}, {0}, {1.}, {2.}, 1./3., 13.6)); //H2 + gamma-> 2H
@@ -224,7 +227,7 @@ void c_reaction::update_reaction_rate(double T) {
 //
 void c_Sim::do_chemistry() {
     
-    for (int j = num_cells+1; j > 0; j--) {
+    for (int j = num_cells+1; j >= 0; j--) {
         
         double temp_dt = dt;
         double t_div = 1.;
@@ -307,8 +310,8 @@ void c_Sim::do_chemistry() {
         //if(switch1 + switch2 == 0) {
         for(int s=0;s<num_species; s++) {
             
-            if(n_tmp[s] < 1e-30)
-                n_tmp[s] = 1e-30;
+            if(n_tmp[s] < 1e-20)
+                n_tmp[s] = 1e-20;
                 
             species[s].prim[j].number_density = n_tmp[s] * n_tot;
             species[s].prim[j].density        = species[s].prim[j].number_density * species[s].mass_amu*amu;
@@ -1027,14 +1030,24 @@ void c_Sim::update_dS_jb_photochem(int cell) {
     int Op_idx = get_species_index("S8");
     int Opp_idx = get_species_index("S9");
     double tau = total_opacity(cell,0)*(x_i12[cell+1]-x_i12[cell])*1e2;
-    double red = (1.+tau*tau);
-                
-    if( C_idx!=-1 && e_idx!=-1 ) { species[C_idx].dG(cell)     -=  C_cooling(species[e_idx].prim[cell].number_density, species[e_idx].prim[cell].temperature)/red; }
-    if( Cp_idx!=-1 && e_idx!=-1 ) { species[Cp_idx].dG(cell)   -=  Cp_cooling(species[e_idx].prim[cell].number_density, species[e_idx].prim[cell].temperature)/red; }
-    if( Cpp_idx!=-1 && e_idx!=-1 ) { species[Cpp_idx].dG(cell) -=  Cpp_cooling(species[e_idx].prim[cell].number_density, species[e_idx].prim[cell].temperature)/red; }
-    if( O_idx!=-1 && e_idx!=-1 ) { species[O_idx].dG(cell)     -=  O_cooling(species[e_idx].prim[cell].number_density, species[e_idx].prim[cell].temperature)/red; }
-    if( Op_idx!=-1 && e_idx!=-1 ) { species[Op_idx].dG(cell)   -=  Op_cooling(species[e_idx].prim[cell].number_density, species[e_idx].prim[cell].temperature)/red; }
-    if( Opp_idx!=-1 && e_idx!=-1 ) { species[Opp_idx].dG(cell) -=  Opp_cooling(species[e_idx].prim[cell].number_density, species[e_idx].prim[cell].temperature)/red; }
+    double beta = 0.;
+    if(tau < 7.) 
+        beta = (1.-std::exp(-2.34*tau))/(4.68*tau);
+    else
+        beta = 1./(4.*tau*std::pow( std::log(tau/1.7724) ,0.5) );
+    if(cell==0)
+        beta = 0.;
+    //cout<<cell<<" = j, tau ="<<tau<<" beta = "<<beta<<endl;
+    double red = beta;
+    double ne = species[e_idx].prim[cell].number_density;
+    double Te = species[e_idx].prim[cell].temperature;
+    
+    if( C_idx!=-1 && e_idx!=-1 ) { species[C_idx].dG(cell)     -=  ne * C_cooling(ne, Te)*red; }
+    if( Cp_idx!=-1 && e_idx!=-1 ) { species[Cp_idx].dG(cell)    -=  ne * Cp_cooling(ne, Te)*red; }
+    if( Cpp_idx!=-1 && e_idx!=-1 ) { species[Cpp_idx].dG(cell) -=  ne * Cpp_cooling(ne, Te)*red; }
+    if( O_idx!=-1 && e_idx!=-1 ) { species[O_idx].dG(cell)     -=  ne * O_cooling(ne, Te)*red; }
+    if( Op_idx!=-1 && e_idx!=-1 ) { species[Op_idx].dG(cell)   -=  ne * Op_cooling(ne, Te)*red; }
+    if( Opp_idx!=-1 && e_idx!=-1 ) { species[Opp_idx].dG(cell) -=  ne * Opp_cooling(ne, Te)*red; }
     
 //     if(cell==2) {
 //         

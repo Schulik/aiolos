@@ -316,6 +316,7 @@ public:
     char temperature_model;
     double T_crit_min;
     double T_crit_max; //Critical min/max temperatures beyond which one should extend the wavelength grid
+    string fluxfile;
     
     int num_cells;
     std::vector<double>dx;

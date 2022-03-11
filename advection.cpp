@@ -357,7 +357,8 @@ void c_Sim::execute() {
                 
             }
             else if(photochemistry_level == 2) {
-                do_chemistry();
+                if(steps > 2)
+                    do_chemistry();
             }
                 
             

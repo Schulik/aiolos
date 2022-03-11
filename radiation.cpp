@@ -147,8 +147,15 @@ void c_Sim::update_dS_jb(int j, int b) {
                 for(int s=0; s<num_species; s++) {
                     //if lowenergy or photochem < 2
                     
-                    if(photochemistry_level <= 2)
+                    if(photochemistry_level <= 2) {
                         species[s].dS(j)  += highenergy_switch(s,b) * dS_band(j,b) * species[s].fraction_total_solar_opacity(j,b);
+                        if(species[s].dS(j) < 1e-20)
+                            species[s].dS(j) = 0.;
+                        
+                        if(species[s].dG(j) > -1e-20)
+                            species[s].dG(j) = 0.;
+                    }
+                        
                     else {
                         
                         //if(species.s participates in photoreaction)
@@ -682,6 +689,7 @@ void c_Sim::update_fluxes_FLD() {
                     double Tavg   = (species[s].prim[j].temperature + species[s].prim[j+1].temperature) * 0.5;
                     double dP     = (species[s].prim[j].pres - species[s].prim[j+1].pres)/Pavg;
                     double dT     = (species[s].prim[j].temperature - species[s].prim[j+1].temperature)/Tavg / dP;
+                    double dTabs  = (species[s].prim[j].temperature - species[s].prim[j+1].temperature);
                     double glocal = -get_phi_grav(x_i[j], enclosed_mass[j])/x_i[j];
                     
                     double nabla_ad = 1.-1./species[s].gamma_adiabat;
@@ -690,9 +698,11 @@ void c_Sim::update_fluxes_FLD() {
                            DT = (dx * total_opacity(j,0)) > 2./3. ? DT : 0.; //Guardian to not use convection in optically thin areas
                     //double DT = dT - nabla_ad;    // Gradient comparison and switch for Lconv
                     
+                    double kappa_conductive = 23.e2 * pow(Tavg/273., 0.7); //From engineering toolbox and Watson 1981 
+                    
                     double alphaconv = 0.5 * species[s].cv * lam * lam * DT * rhoavg * std::sqrt(glocal/Tavg); //Prefactor
-                    double Lconv = alphaconv;
-                    double Lconvsymm = 0;
+                    //double Lconv = alphaconv;    //Convection
+                    double Lconv =  kappa_conductive * dTabs / species[s].cv;  //Conduction
                     
                     u[idx] += -Lconv ;
                     d[idx] += Lconv ;

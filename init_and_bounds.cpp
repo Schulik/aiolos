@@ -48,6 +48,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
         lambda_min_out       = read_parameter_from_file<double>(filename,"PARI_LAM_MIN_OUT", debug, lambda_min_in).value;
         lambda_max_out       = read_parameter_from_file<double>(filename,"PARI_LAM_MAX_OUT", debug, lambda_max_in).value;
         lambda_per_decade_out= read_parameter_from_file<double>(filename,"PARI_LAM_PER_DECADE_OUT", debug, lambda_per_decade_in).value;
+        fluxfile             = read_parameter_from_file<string>(filename,"FLUX_FILE", debug, "---").value;
         
         star_mass        =  read_parameter_from_file<double>(filename,"PARI_MSTAR", debug, 1.).value;
         star_mass        *= msolar;
@@ -716,46 +717,103 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
     if(debug > 0) cout<<"Init: Assigning stellar luminosities 2."<<endl;
     
     double templumi = 0;
-    for(int b=0; b<num_bands_in; b++) {
-        if(debug > 0) cout<<"Init: Assigning stellar luminosities. b ="<<b<<endl;
+    
+    if(fluxfile.compare("---")==0) {
         
-        if(num_bands_in == 1) {
-            solar_heating(b)  = sigma_rad * pow(T_star,4.) * pow(R_star*rsolar,2.)/pow(planet_semimajor*au,2.);
-            solar_heating(b) += UV_star/(4.*pi*pow(planet_semimajor*au,2.));
-            solar_heating(b) += X_star/(4.*pi*pow(planet_semimajor*au,2.));
-            templumi += solar_heating(b);
+            for(int b=0; b<num_bands_in; b++) {
+            if(debug > 0) cout<<"Init: Assigning stellar luminosities. b ="<<b<<endl;
             
-            solar_heating_final(b) = solar_heating(b);
-            cout<<" Solar heating is "<<solar_heating(b)<<" T_star = "<<T_star<<" pow(R_star*rsolar,2.) "<<pow(R_star*rsolar,2.)<<" pow(planet_semimajor*au,2.) "<<planet_semimajor<<endl;
-        }
-        else{
-            cout<<"SOLAR HEATING in bin "<<b;
-            cout<<" from/to lmin/lmax"<<l_i_in[b];
-            cout<<"/"<<l_i_in[b+1]<<" with frac = "<<compute_planck_function_integral4(l_i_in[b], l_i_in[b+1], T_star);
-            
-            solar_heating(b)  = sigma_rad * pow(T_star,4.) * pow(R_star*rsolar,2.)/pow(planet_semimajor*au,2.) * compute_planck_function_integral4(l_i_in[b], l_i_in[b+1], T_star);
-            templumi         += solar_heating(b);
-            
-            //if (BAND_IS_HIGHENERGY[b] == 1) {
-            if(l_i_in[b+1] <= 0.09161) { //Detect the EUV band 
-                    
-                if(l_i_in[b+1] <= 0.0161 ) { //Detect the X ray band
-                    solar_heating(b) += X_star/(4.*pi*pow(planet_semimajor*au,2.));
-                    cout<<endl<<"        band "<<b<<" detected as X band. Currently, this is treated as thermal band. Assigning X flux "<<X_star/(4.*pi*pow(planet_semimajor*au,2.))<<" based on X lumi "<<X_star;
-                    BAND_IS_HIGHENERGY[b] = 0;
+            if(num_bands_in == 1) {
+                solar_heating(b)  = sigma_rad * pow(T_star,4.) * pow(R_star*rsolar,2.)/pow(planet_semimajor*au,2.);
+                solar_heating(b) += UV_star/(4.*pi*pow(planet_semimajor*au,2.));
+                solar_heating(b) += X_star/(4.*pi*pow(planet_semimajor*au,2.));
+                templumi += solar_heating(b);
+                
+                solar_heating_final(b) = solar_heating(b);
+                cout<<" Solar heating is "<<solar_heating(b)<<" T_star = "<<T_star<<" pow(R_star*rsolar,2.) "<<pow(R_star*rsolar,2.)<<" pow(planet_semimajor*au,2.) "<<planet_semimajor<<endl;
+            }
+            else{
+                cout<<"SOLAR HEATING in bin "<<b;
+                cout<<" from/to lmin/lmax"<<l_i_in[b];
+                cout<<"/"<<l_i_in[b+1]<<" with frac = "<<compute_planck_function_integral4(l_i_in[b], l_i_in[b+1], T_star);
+                
+                solar_heating(b)  = sigma_rad * pow(T_star,4.) * pow(R_star*rsolar,2.)/pow(planet_semimajor*au,2.) * compute_planck_function_integral4(l_i_in[b], l_i_in[b+1], T_star);
+                templumi         += solar_heating(b);
+                
+                //if (BAND_IS_HIGHENERGY[b] == 1) {
+                if(l_i_in[b+1] <= 0.09161) { //Detect the EUV band 
+                        
+                    if(l_i_in[b+1] <= 0.0161 ) { //Detect the X ray band
+                        solar_heating(b) += X_star/(4.*pi*pow(planet_semimajor*au,2.));
+                        cout<<endl<<"        band "<<b<<" detected as X band. Currently, this is treated as thermal band. Assigning X flux "<<X_star/(4.*pi*pow(planet_semimajor*au,2.))<<" based on X lumi "<<X_star;
+                        BAND_IS_HIGHENERGY[b] = 0;
+                    }
+                    else {
+                        solar_heating(b) += UV_star/(4.*pi*pow(planet_semimajor*au,2.));
+                        cout<<endl<<"        band "<<b<<" detected as UV band. Assigning UV flux "<<UV_star/(4.*pi*pow(planet_semimajor*au,2.))<<" based on UV lumi "<<UV_star;
+                    }
                 }
-                else {
-                    solar_heating(b) += UV_star/(4.*pi*pow(planet_semimajor*au,2.));
-                    cout<<endl<<"        band "<<b<<" detected as UV band. Assigning UV flux "<<UV_star/(4.*pi*pow(planet_semimajor*au,2.))<<" based on UV lumi "<<UV_star;
-                }
+                
+                solar_heating_final(b) = solar_heating(b);
             }
             
-            solar_heating_final(b) = solar_heating(b);
+            cout<<" is F = "<<solar_heating(b)<<endl;
+                
         }
         
-        cout<<" is F = "<<solar_heating(b)<<endl;
+    } else {
+        
+        for(int b = 0; b<num_bands_in; b++) {
             
+            double tempenergy = 0.;
+            int cnt = 0;
+            
+            double flux;
+            double lam;
+            
+            ifstream file(fluxfile);
+            string line;
+            if(!file) {
+                cout<<"Couldnt open flux spectrum file "<<filename<<"!!!!!!!!!!1111"<<endl;
+            }
+            
+            while(std::getline( file, line )) {
+    
+                std::vector<string> stringlist = stringsplit(line," ");
+                
+                lam   = std::stod(stringlist[0]);
+                flux  = std::stod(stringlist[1]);
+                
+                if(lam > l_i_in[b] && lam < l_i_in[b+1]) {
+                    tempenergy += lam*flux;
+                    cnt++;
+                    
+                    cout<<" Found datapoint in band b = "<<b<<" as lam/flux = "<<lam<<"/"<<flux<<endl;
+                }
+             }
+             file.close();
+             
+             if(cnt > 0) {
+                 tempenergy /= (double)cnt;
+                 solar_heating(b) = tempenergy;
+            } else {
+                solar_heating(b) = 0.;
+            }
+                 
+             
+             
+             
+            cout<<"SOLAR HEATING read from file in bin "<<b;
+            cout<<" from/to lmin/lmax"<<l_i_in[b];
+            cout<<" is F = "<<solar_heating(b)<<endl;
+        }
+        
+        
+        
+        
     }
+    
+    
     
     cout<<"TOTAL SOLAR HEATING / Flux = "<<templumi<<" Luminosity = "<<(templumi*4.*pi*rsolar*rsolar*pi)<<endl;
     
