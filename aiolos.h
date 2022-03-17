@@ -85,6 +85,54 @@ const int debug2 = 0;
 double delta_ij(int i, int j);
 double lint(double xa, int N, double* X, double* RI);
 double logint(double xa, int N, double* X, double* RI);
+const float log10ff = std::log(10.);
+
+inline float __int_as_float (int32_t a) { float r; memcpy (&r, &a, sizeof r); return r;} 
+inline int32_t __float_as_int (float a) { int32_t r; memcpy (&r, &a, sizeof r); return r;}
+
+//from user njuffa https://stackoverflow.com/questions/39821367/very-fast-approximate-logarithm-natural-log-function-in-c
+
+/* natural log on [0x1.f7a5ecp-127, 0x1.fffffep127]. Maximum relative error 9.4529e-5 */
+inline float njuffas_logf (float a) 
+{
+    float m, r, s, t, i, f;
+    int32_t e;
+
+    e = (__float_as_int (a) - 0x3f2aaaab) & 0xff800000;
+    m = __int_as_float (__float_as_int (a) - e);
+    i = (float)e * 1.19209290e-7f; // 0x1.0p-23
+    /* m in [2/3, 4/3] */
+    f = m - 1.0f;
+    s = f * f;
+    /* Compute log1p(f) for f in [-1/3, 1/3] */
+    r = fmaf (0.230836749f, f, -0.279208571f); // 0x1.d8c0f0p-3, -0x1.1de8dap-2
+    t = fmaf (0.331826031f, f, -0.498910338f); // 0x1.53ca34p-2, -0x1.fee25ap-2
+    r = fmaf (r, s, t);
+    r = fmaf (r, s, f);
+    r = fmaf (i, 0.693147182f, r); // 0x1.62e430p-1 // log(2) 
+    return r;
+}
+inline float njuffas_log10f(float a) {    
+    return njuffas_logf(a)/log10ff;
+} 
+
+inline float fastpow1(float base, int exp) {
+
+    if( exp == 0)
+       return 1;
+    float temp = fastpow1(base, exp/2);       
+    if (exp%2 == 0)
+        return temp*temp;
+    else {
+        if(exp > 0)
+            return base*temp*temp;
+        else
+            return (temp*temp)/base; //negative exponent computation 
+    }
+
+} 
+
+
 
 //
 // Functions mimicking certain numpy functionalities
@@ -187,7 +235,6 @@ simulation_parameter<T> read_parameter_from_file(string, string, int, T);
 
 void update_cons_prim_after_friction(AOS* cons, AOS_prim* prim, double dEkin, double newv, double mass, double gamma, double cv);
 
-
 class c_Species;
 class c_Sim;
 //class c_reaction;
@@ -201,6 +248,8 @@ public:
     int reaction_number = -1;
     std::vector<int> educts;   //A list of indices
     std::vector<int> products; //A list of indices
+    std::vector<int> e_stoch_i;
+    std::vector<int> p_stoch_i;
     std::vector<double> e_stoch;
     std::vector<double> p_stoch;
     double delta_stoch;
@@ -369,6 +418,7 @@ public:
     double energy_epsilon;
     double globalTime;
     double output_time;
+    double output_time_offset;
     double monitor_time;
     double max_snd_crs_time;
     double rad_energy_multiplier;
@@ -398,6 +448,7 @@ public:
     
     double star_mass;
     int    use_tides;
+    double rhill;
     
     double planet_mass;     //in Earth masses
     double planet_position; //inside the simulation domain
@@ -529,6 +580,8 @@ public:
     // (Photo)Chemistry
     //
     int use_chemistry;
+    int num_reactions;
+    int num_photoreactions;
     std::vector<c_reaction> reactions;
     std::vector<c_photochem_reaction> photoreactions;
     
@@ -546,6 +599,7 @@ public:
     
     double chemistry_precision;
     int chemistry_maxiter;
+    int chemistry_miniter;
     
     void init_reactions(int cdebug);
     void do_chemistry();
@@ -633,6 +687,7 @@ public:
     
     void update_fluxes(double timestep);           //  Called from transport_radiation#   
     void update_fluxes_FLD();           //  Called from transport_radiation#
+    void update_fluxes_FLD_simple(double ddt);           //  Called from transport_radiation#
     void update_temperatures_simple();           //  Called from transport_radiation#
     void update_fluxes_FLD2(double, Eigen::MatrixXd &,Eigen::MatrixXd &,Eigen::MatrixXd &);           //  Called from transport_radiation#
     void update_temperatures(double, Eigen::MatrixXd &,Eigen::MatrixXd &,Eigen::MatrixXd &);
@@ -736,6 +791,12 @@ public:
     Eigen::VectorXd opa_grid_rosseland;
     Eigen::VectorXd opa_grid_planck;
     Eigen::VectorXd opa_grid_solar;
+    
+    Eigen::VectorXd opa_tgrid_log;
+    Eigen::VectorXd opa_pgrid_log;
+    Eigen::VectorXd opa_grid_rosseland_log;
+    Eigen::VectorXd opa_grid_planck_log;
+    Eigen::VectorXd opa_grid_solar_log;
     
     double density_excess;
     double bondi_radius;

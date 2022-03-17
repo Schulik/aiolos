@@ -96,8 +96,8 @@ int main(int argc, char** argv)
             simulationname = "simulation.par";
     }
     if(!speciesfile_found) {
-            cout<<"No speciesfile found, chosing default speciesfile: mix.spc"<<endl;
-            speciesfile = "mix.spc";
+            cout<<"No speciesfile found, chosing default speciesfile: default.spc"<<endl;
+            speciesfile = "default.spc";
     }
         
     

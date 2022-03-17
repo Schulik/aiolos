@@ -35,11 +35,13 @@
             phi[i]           = get_phi_grav(x_i12[i], enclosed_mass[i]);
             
             if(use_tides == 1)
-                phi[i] -= 3.*G*star_mass*x_i12[i]*x_i12[i]/pow(planet_semimajor*au,3.);
+                phi[i] -=0.5* 3.*G*star_mass*x_i12[i]*x_i12[i]/pow(planet_semimajor*au,3.);
             
         }
         phi[0]           = get_phi_grav(x_i12[1],         planet_mass);
         //phi[1]           = get_phi_grav(x_i12[2],         planet_mass);
+        
+        rhill = planet_semimajor*au * std::pow(planet_mass / 3. / star_mass, 0.333333333333333333333);
     }
 
     //
@@ -71,7 +73,12 @@
             for(int s = 0; s < num_species; s++)
                 species_dens_sum += species[s].u[i].u1;
         
-            enclosed_mass[i] = enclosed_mass[i-1] +  4. * 3.141592 * (pow(x_i[i],3.)-pow(x_i[i-1],3.) )/3. * species_dens_sum; //Straightfoward integration of the poisson eqn
+            double xn3 = x_i[i];
+            xn3 = xn3*xn3*xn3;
+            double xl3 = x_i[i-1];
+            xl3 = xl3*xl3*xl3;
+            
+            enclosed_mass[i] = enclosed_mass[i-1] +  4. * 3.141592 * (xn3 - xl3)/3. * species_dens_sum; //Straightfoward integration of the poisson eqn
             
             if (use_self_gravity == 1) 
                 phi[i]           = get_phi_grav(x_i12[i], enclosed_mass[i]);
@@ -79,8 +86,12 @@
                 phi[i]           = get_phi_grav(x_i12[i], enclosed_mass[0]);
             
             //if use tidal gravity
-            if(use_tides == 1)
-                phi[i] -= 3.*G*star_mass*x_i12[i]*x_i12[i]/pow(planet_semimajor*au,3.);
+            if(use_tides == 1) {
+                double d3 = planet_semimajor*au;
+                d3 = d3*d3*d3;
+                phi[i] -= 0.5* 3.*G*star_mass*x_i12[i]*x_i12[i]/d3;
+            }
+                
             //            -G*mass/abs(r-planet_position);
         }
         
@@ -522,7 +533,8 @@ void c_Sim::compute_alpha_matrix(int j) { //Called in compute_friction() and com
                             }
                             else if(std::abs(ci) == 0 || std::abs(cj) == 0) {//i-n collision
                                 
-                                alpha_local = 2.21 * 3.141592 * numdens_vector(sj) * mass_vector(sj)/(mass_vector(sj)+mass_vector(si));
+                                double mul = 1.e1*std::exp(-globalTime/1e4) + 1.;
+                                alpha_local = mul * 2.21 * 3.141592 * numdens_vector(sj) * mass_vector(sj)/(mass_vector(sj)+mass_vector(si));
                                 alpha_local *= std::sqrt(0.66 / mumass ) * 1e-12 * qn * elm_charge; //0.66 is the polarizability of neutral atomic H
                                 
                                 ccase = " i-n ";

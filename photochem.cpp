@@ -85,11 +85,11 @@ double HOnly_cooling(const std::array<double, 3> nX, double Te) {
         term = 3.435e-30 * Te * x*x / pow(1 + pow(x / 2.250, 0.376), 3.720);
     else 
         term = 7.562-27 * std::pow(Te, 0.42872) ;
-    cooling += 0.* nX[1] * term;
+    cooling += 1.* nX[1] * term;
     
     // Collisional ionization cooling:
     term = kb * T_HI * H_collisional_ionization(Te);
-    cooling += 0. *nX[0] * term;
+    cooling += 1. *nX[0] * term;
 
     // HI Line cooling (Lyman alpha):
     //term = 7.5e-19 * exp(-0.75 * T_HI / Te) / (1 + sqrt(Te / 1e5));
@@ -99,7 +99,7 @@ double HOnly_cooling(const std::array<double, 3> nX, double Te) {
 
     // Free-Free:
     term = 1.426e-27 * 1.3 * sqrt(Te) ;
-    cooling += 0. * nX[1] * term  ;
+    cooling += 1. * nX[1] * term  ;
 
     return 1.*cooling;
 }

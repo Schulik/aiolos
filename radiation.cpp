@@ -129,11 +129,11 @@ void c_Sim::update_dS_jb(int j, int b) {
                     // Planetary heating 2
                     //
                     if(use_planetary_temperature == 1){
-                        
+                        double lum = 0.5 * sigma_rad * T_core*T_core*T_core*T_core;
                         //Spread the luminosity for fewer crashes
-                        dS_band(2,b) += 3./6. *0.5* pow(T_core,4.)*sigma_rad / (dx[2]); 
-                        dS_band(3,b) += 2./6. *0.5* pow(T_core,4.)*sigma_rad / (dx[3]); 
-                        dS_band(4,b) += 1./6. *0.5* pow(T_core,4.)*sigma_rad / (dx[4]); 
+                        dS_band(2,b) += 3./6. * lum / (dx[2]); 
+                        dS_band(3,b) += 2./6. * lum / (dx[3]); 
+                        dS_band(4,b) += 1./6. * lum / (dx[4]); 
                     }
                     
                 }// Irregular dS computation, in case we want to fix the solar heating function to its initial value
@@ -149,10 +149,10 @@ void c_Sim::update_dS_jb(int j, int b) {
                     
                     if(photochemistry_level <= 2) {
                         species[s].dS(j)  += highenergy_switch(s,b) * dS_band(j,b) * species[s].fraction_total_solar_opacity(j,b);
-                        if(species[s].dS(j) < 1e-20)
+                        if(species[s].dS(j) < 1e-50)
                             species[s].dS(j) = 0.;
                         
-                        if(species[s].dG(j) > -1e-20)
+                        if(species[s].dG(j) > -1e-50)
                             species[s].dG(j) = 0.;
                     }
                         
@@ -383,19 +383,19 @@ void c_Sim::update_fluxes_FLD() {
         }
     }
     
-    /*auto flux_limiter = [](double R) {
+    auto flux_limiter = [](double R) {
         if (R <= 2)
             return 2 / (3 + std::sqrt(9 + 10*R*R)) ;
         else 
             return 10 / (10*R + 9 + std::sqrt(81 + 180*R)) ;
-    } ;*/
-    
+    } ;
+    /*
     auto flux_limiter = [](double R) {
         if (R <= 1.5)
             return 2 / (3 + std::sqrt(9 + 12*R*R)) ;
         else 
             return 1. / (1. + R + std::sqrt(1. + 2.*R)) ;
-    } ; 
+    } ;*/ 
     
     /*
      auto flux_limiter = [](double R) {

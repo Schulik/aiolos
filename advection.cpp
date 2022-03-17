@@ -86,28 +86,13 @@ void c_Sim::execute() {
 //             }
 //                 
 //         }
-            
-        
-        //if(steps > 17964) 
-        //    cout<<" steps "<<steps<<endl;
-        
-        //if(steps > 18024) 
-        //    debug = 2;
-        
-        //cout<<" POS-1 num_cells+1 = "<<num_cells+1<<" temp = "<<species[0].prim[num_cells+1].temperature<<endl;
-        //cout<<" POS-1 num_cells+1 = "<<num_cells+1<<" temp = "<<species[1].prim[num_cells+1].temperature<<endl;
+
         
         if(steps==0) {
             for(int s = 0; s < num_species; s++)
                 species[s].compute_pressure(species[s].u);
             compute_total_pressure();
         }
-        
-        //if(steps>1000)
-        //    cout<<"steps/dt/time = "<<steps<<"/"<<dt<<"/"<<globalTime<<endl;
-        
-        //if(steps==3209954)
-        //    debug = 1;
             
         dt = get_cfl_timestep();
         dt = std::min(dt, timestep_rad2) ;
@@ -162,7 +147,7 @@ void c_Sim::execute() {
             monitor_counter+=1.;
             output_counter +=1.;
          }
-         if(globalTime > output_counter*output_time){
+         if(globalTime > output_counter*output_time + output_time_offset){
              if(debug >= 1)
                  cout<<" Globaltime is "<<globalTime<<" and comparevalue is "<<output_counter<<" "<<output_time<<endl;
              
@@ -186,26 +171,9 @@ void c_Sim::execute() {
         //
         ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~////
         
-        
-        //if(steps >= 4345)
-        //    debug = 2;
-        
-        
         //
         // Step 0: Hydrodynamics, if so desired
         //
-        
-        /*
-        cout<<" POS0 num_cells-1 = "<<num_cells-1<<" T/p/rho/e = "<<species[0].prim[num_cells-1].temperature<<"/"<<species[0].prim[num_cells-1].pres<<"/"<<species[0].prim[num_cells-1].density<<"/"<<species[0].prim[num_cells-1].internal_energy<<" u1/u3 = "<<species[0].u[num_cells-1].u1<<"/"<<species[0].u[num_cells-1].u3<<endl;
-        cout<<" POS0 num_cells = "<<num_cells<<" T/p/rho/e = "<<species[0].prim[num_cells].temperature<<"/"<<species[0].prim[num_cells].pres<<"/"<<species[0].prim[num_cells].density<<"/"<<species[0].prim[num_cells].internal_energy<<" u1/u3 = "<<species[0].u[num_cells].u1<<"/"<<species[0].u[num_cells].u3<<endl;
-        cout<<" POS0 num_cells+1 = "<<num_cells+1<<" T/p/rho/e = "<<species[0].prim[num_cells+1].temperature<<"/"<<species[0].prim[num_cells+1].pres<<"/"<<species[0].prim[num_cells+1].density<<"/"<<species[0].prim[num_cells+1].internal_energy<<" u1/u3 = "<<species[0].u[num_cells+1].u1<<"/"<<species[0].u[num_cells+1].u3<<endl;
-        */
-        
-        //cout<<" POS0 num_cells = "<<num_cells<<" T/p/rho/e = "<<species[1].prim[num_cells].temperature<<"/"<<species[1].prim[num_cells].pres<<"/"<<species[1].prim[num_cells].density<<"/"<<species[1].prim[num_cells].internal_energy<<" u1/u3 = "<<species[1].u[num_cells].u1<<"/"<<species[1].u[num_cells].u3<<endl;
-        //cout<<" POS0 num_cells+1 = "<<num_cells+1<<" T/p/rho/e = "<<species[1].prim[num_cells+1].temperature<<"/"<<species[1].prim[num_cells+1].pres<<"/"<<species[1].prim[num_cells+1].density<<"/"<<species[1].prim[num_cells+1].internal_energy<<" u1/u3 = "<<species[1].u[num_cells+1].u1<<"/"<<species[1].u[num_cells+1].u3<<endl;
-        
-        //cout<<" POS0 num_cells-1 = "<<num_cells-1<<" T/p/rho/e = "<<species[0].prim[num_cells-1].temperature<<"/"<<species[0].prim[num_cells-1].pres<<"/"<<species[0].prim[num_cells-1].density<<"/"<<species[0].prim[num_cells-1].internal_energy<<" u1/u3 = "<<species[0].u[num_cells-1].u1<<"/"<<species[0].u[num_cells-1].u3<<endl;
-        //cout<<" POS0 num_cells = "<<num_cells<<" T/p/rho/e = "<<species[0].prim[num_cells].temperature<<"/"<<species[0].prim[num_cells].pres<<"/"<<species[0].prim[num_cells].density<<"/"<<species[0].prim[num_cells].internal_energy<<" u1/u3 = "<<species[0].u[num_cells].u1<<"/"<<species[0].u[num_cells].u3<<endl;
         
         
         if (do_hydrodynamics == 1) {
@@ -219,17 +187,6 @@ void c_Sim::execute() {
                     species[s].u[j] = species[s].u[j] + species[s].dudt[0][j]*dt ;
             }
         }
-        //cout<<endl;
-        
-        /*
-        cout<<" POS0.5 num_cells-1 = "<<num_cells-1<<" T/p/rho/e = "<<species[0].prim[num_cells-1].temperature<<"/"<<species[0].prim[num_cells-1].pres<<"/"<<species[0].prim[num_cells-1].density<<"/"<<species[0].prim[num_cells-1].internal_energy<<" u1/u3 = "<<species[0].u[num_cells-1].u1<<"/"<<species[0].u[num_cells-1].u3<<endl;
-        cout<<" POS0.5 num_cells = "<<num_cells<<" T/p/rho/e = "<<species[0].prim[num_cells].temperature<<"/"<<species[0].prim[num_cells].pres<<"/"<<species[0].prim[num_cells].density<<"/"<<species[0].prim[num_cells].internal_energy<<" u1/u3 = "<<species[0].u[num_cells].u1<<"/"<<species[0].u[num_cells].u3<<endl;
-        cout<<" POS0.5 num_cells+1 = "<<num_cells+1<<" T/p/rho/e = "<<species[0].prim[num_cells+1].temperature<<"/"<<species[0].prim[num_cells+1].pres<<"/"<<species[0].prim[num_cells+1].density<<"/"<<species[0].prim[num_cells+1].internal_energy<<" u1/u3 = "<<species[0].u[num_cells+1].u1<<"/"<<species[0].u[num_cells+1].u3<<endl;
-        */
-        
-        //cout<<" POS0.5 num_cells = "<<num_cells<<" T/p/rho/e = "<<species[1].prim[num_cells].temperature<<"/"<<species[1].prim[num_cells].pres<<"/"<<species[1].prim[num_cells].density<<"/"<<species[1].prim[num_cells].internal_energy<<" u1/u3 = "<<species[1].u[num_cells].u1<<"/"<<species[1].u[num_cells].u3<<endl;
-        //cout<<" POS0.5 num_cells+1 = "<<num_cells+1<<" T/p/rho/e = "<<species[1].prim[num_cells+1].temperature<<"/"<<species[1].prim[num_cells+1].pres<<"/"<<species[1].prim[num_cells+1].density<<"/"<<species[1].prim[num_cells+1].internal_energy<<" u1/u3 = "<<species[1].u[num_cells+1].u1<<"/"<<species[1].u[num_cells+1].u3<<endl;
-        
         
         if (order == IntegrationType::first_order) {
             globalTime += dt;
@@ -250,7 +207,7 @@ void c_Sim::execute() {
                 
                     compute_drag_update() ;
                     if (use_collisional_heating)
-                        compute_collisional_heat_exchange() ;
+                        compute_collisional_heat_exchange() ; //Disable if radiation is used?
                 }
 
                 //debug = 2;
@@ -274,73 +231,10 @@ void c_Sim::execute() {
             }
         }
         
-        //cout<<" POS1 num_cells+1 = "<<num_cells+1<<" T/p/rho/e = "<<species[0].prim[num_cells+1].temperature<<"/"<<species[0].prim[num_cells+1].pres<<"/"<<species[0].prim[num_cells+1].density<<"/"<<species[0].prim[num_cells+1].internal_energy<<endl;
-        //cout<<" POS1 num_cells+1 = "<<num_cells+1<<" T/p/rho/e = "<<species[1].prim[num_cells+1].temperature<<"/"<<species[1].prim[num_cells+1].pres<<"/"<<species[1].prim[num_cells+1].density<<"/"<<species[1].prim[num_cells+1].internal_energy<<endl;
-        
-        /*
-        if( (species[0].u[21].u3 - 0.5*pow(species[0].u[21].u2,2.)/species[0].u[21].u1) < 0. ) {
-            
-            cout<<" p_nom1<0 at steps ="<<steps<< " after 2nd, before pressure, T = "<<species[0].prim[21].temperature<<" p_nominal = "<<(species[0].u[21].u3 - 0.5*std::pow(species[0].u[21].u2,2.)/species[0].u[21].u1)<<endl;
-            
-            cout<<" p_nom1<0 at steps ="<<steps<< " after 2nd, before pressure, T = "<<species[0].prim[21].temperature<<" p_nominal2 = "<<(species[0].u[21].u3 - 0.5*species[0].u[21].u2 * species[0].prim[21].speed)<<endl;
-        }
-        
-        if( (species[0].u[21].u3 - 0.5*species[0].u[21].u2 * species[0].prim[21].speed) < 0. ) {
-            
-            cout<<" p_nom2<0 at steps ="<<steps<< " after 2nd, before pressure, T = "<<species[0].prim[21].temperature<<" p_nominal = "<<(species[0].u[21].u3 - 0.5*std::pow(species[0].u[21].u2,2.)/species[0].u[21].u1)<<endl;
-            cout<<" p_nom2<0 at steps ="<<steps<< " after 2nd, before pressure, T = "<<species[0].prim[21].temperature<<" p_nominal2 = "<<(species[0].u[21].u3 - 0.5*species[0].u[21].u2 * species[0].prim[21].speed)<<endl;
-        }
-        
-        if(species[0].prim[21].temperature < 0. ) {
-            
-            cout<<" T<0 at steps ="<<steps<< " after 2nd, before pressure, T = "<<species[0].prim[21].temperature<<" p_nominal = "<<(species[0].u[21].u3 - 0.5*std::pow(species[0].u[21].u2,2.)/species[0].u[21].u1)<<endl;
-            cout<<" T<0 at steps ="<<steps<< " after 2nd, before pressure, T = "<<species[0].prim[21].temperature<<" p_nominal2 = "<<(species[0].u[21].u3 - 0.5*species[0].u[21].u2 * species[0].prim[21].speed)<<endl;
-        }*/
-        
-        /*for(int s = 0; s < num_species; s++) {
-            
-            //temporary fix for the boundary conditions
-            for(int i=0; i<=3; i++)  {
-                AOS TMP = species[s].u[i];
-                double temp_temp = species[s].prim[4].temperature;
-                
-                species[s].u[i] = AOS(TMP.u1, TMP.u2, species[s].cv * TMP.u1 * temp_temp + 0.5 * TMP.u2*TMP.u2/TMP.u1);
-                
-                //species[s].compute_pressure(species[s].u);
-            }
-            
-        }*/
         
         for(int s = 0; s < num_species; s++) 
             species[s].compute_pressure(species[s].u);
-        //compute_total_pressure();
         
-        //cout<<" POS2 num_cells+1 = "<<num_cells+1<<" temp = "<<species[0].prim[num_cells+1].temperature<<endl;
-        //cout<<" POS2 num_cells+1 = "<<num_cells+1<<" temp = "<<species[1].prim[num_cells+1].temperature<<endl;
-        
-        //compute_total_pressure();
-        /*
-        if(species[0].prim[21].temperature < 0. ) {
-            
-            cout<<" T<0 at steps ="<<steps<< " after 2nd, after pressure, T = "<<species[0].prim[21].temperature<<" p_nominal = "<<(species[0].u[21].u3 - 0.5*std::pow(species[0].u[21].u2,2.)/species[0].u[21].u1)<<endl;
-            
-            cout<<" T<0 at steps ="<<steps<< " after 2nd, after pressure, T = "<<species[0].prim[21].temperature<<" p_nominal2 = "<<(species[0].u[21].u3 - 0.5*species[0].u[21].u2 * species[0].prim[21].speed)<<endl;
-        }
-         
-        if( (species[0].u[21].u3 - 0.5*pow(species[0].u[21].u2,2.)/species[0].u[21].u1) < 0. ) {
-            
-            cout<<" p_nom1<0 at steps ="<<steps<< " after 2nd, after pressure, T = "<<species[0].prim[21].temperature<<" p_nominal = "<<(species[0].u[21].u3 - 0.5*std::pow(species[0].u[21].u2,2.)/species[0].u[21].u1)<<endl;
-            
-            cout<<" p_nom1<0 at steps ="<<steps<< " after 2nd, after pressure, T = "<<species[0].prim[21].temperature<<" p_nominal2 = "<<(species[0].u[21].u3 - 0.5*species[0].u[21].u2 * species[0].prim[21].speed)<<endl;
-        }
-        
-        if( (species[0].u[21].u3 - 0.5*species[0].u[21].u2 * species[0].prim[21].speed) < 0. ) {
-            
-            cout<<" p_nom2<0 at steps ="<<steps<< " after 2nd, after pressure, T = "<<species[0].prim[21].temperature<<" p_nominal = "<<(species[0].u[21].u3 - 0.5*std::pow(species[0].u[21].u2,2.)/species[0].u[21].u1)<<endl;
-            cout<<" p_nom2<0 at steps ="<<steps<< " after 2nd, after pressure, T = "<<species[0].prim[21].temperature<<" p_nominal2 = "<<(species[0].u[21].u3 - 0.5*species[0].u[21].u2 * species[0].prim[21].speed)<<endl;
-        }
-        
-        */
         if (do_hydrodynamics == 1)
             compute_drag_update() ;
         
@@ -367,46 +261,11 @@ void c_Sim::execute() {
             if(use_rad_fluxes==1) {
                 update_fluxes_FLD();   //FLD Radiation transport, updating Temperatures and photon band energies
             }
-            else {
-                //update_temperatures_simple();//Fast eulerian temperature update, no stability guaranteed!
-                //if (use_collisional_heating)
-                //    compute_collisional_heat_exchange();
+            else if (use_rad_fluxes == 2){
+                update_fluxes_FLD_simple(dt);
+                
             }
         }
-
-        //cout<<" POS3 num_cells+1 = "<<num_cells+1<<" temp[0] = "<<species[0].prim[num_cells+1].temperature<<endl;
-        //cout<<" POS3 num_cells+1 = "<<num_cells+1<<" temp[1] = "<<species[1].prim[num_cells+1].temperature<<endl;
-        //
-        // Fix temperature to a minimum
-        //
-        
-        /*for(int s = 0; s < num_species; s++) {
-            species[s].user_species_loop_function() ;
-            
-            
-            for(int i=num_cells+1; i>=0; i--)  {
-                AOS TMP = species[s].u[i];
-                double temp_temp = species[s].prim[i].temperature;
-                
-                if(temp_temp < init_T_temp)
-                    temp_temp = init_T_temp;
-                species[s].u[i] = AOS(TMP.u1, TMP.u2, species[s].cv * TMP.u1 * temp_temp + 0.5 * TMP.u2*TMP.u2/TMP.u1) ;
-            }
-            
-            //temporary fix for the boundary conditions
-            for(int i=0; i<=3; i++)  {
-                AOS TMP = species[s].u[i];
-                double temp_temp = species[s].prim[4].temperature;
-                
-                //if(temp_temp < init_T_temp)
-                //temp_temp = init_T_temp;
-                //cout<<" fixing boundary temperayres to "<<temp_temp<<"whie having started with T = "<<species[s].prim[i].temperature<<endl;
-                species[s].u[i] = AOS(TMP.u1, TMP.u2, species[s].cv * TMP.u1 * temp_temp + 0.5 * TMP.u2*TMP.u2/TMP.u1);
-                
-                species[s].compute_pressure(species[s].u);
-            }
-            
-        }*/
         
         if(steps==0)
             cout<<"Initial sound crossing time = "<<max_snd_crs_time<<", debug = "<<debug<<endl;

@@ -22,8 +22,14 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
         this->debug_steps= debug_steps;
         simname          = filename_solo;
         this->workingdir = workingdir;
-        
         string filename    = workingdir + filename_solo;
+        
+        
+        if(speciesfile_solo.compare("default.spc")==0)
+            speciesfile_solo = read_parameter_from_file<string>(filename,"SPECIES_FILE", debug, "default.spc").value;
+        
+        cout<<" Starting construction of simulation. Attempting to find required speciesfile = "<<speciesfile_solo<<endl;
+        
         string speciesfile = workingdir + speciesfile_solo;
         
         cout<<" Opening parameter file "<<filename<<endl;
@@ -108,10 +114,11 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
         if(debug > 0) cout<<"Init: Finished reading grid parameters."<<endl;
         
         cflfactor   = read_parameter_from_file<double>(filename,"PARI_CFLFACTOR", debug, 1.).value;
-        t_max       = read_parameter_from_file<double>(filename,"PARI_TIME_TMAX", debug).value;
+        t_max       = read_parameter_from_file<double>(filename,"PARI_TIME_TMAX", debug, 1e0).value;
         max_timestep_change = read_parameter_from_file<double>(filename,"MAX_TIMESTEP_CHANGE", debug, 1.1).value;
         dt_min_init         = read_parameter_from_file<double>(filename,"DT_MIN_INIT", debug, 1e-20).value;
-        output_time = read_parameter_from_file<double>(filename,"PARI_TIME_OUTPUT", debug).value; 
+        output_time = read_parameter_from_file<double>(filename,"PARI_TIME_OUTPUT", debug, 1e99).value; 
+        output_time_offset = read_parameter_from_file<double>(filename,"TIME_OUTPUT_OFFSET", debug, 0.).value; 
         monitor_time = read_parameter_from_file<double>(filename,"PARI_TIME_DT", debug).value;
         CFL_break_time = read_parameter_from_file<double>(filename,"CFL_BREAK_TIME", debug, std::numeric_limits<double>::max()).value ;
         energy_epsilon = read_parameter_from_file<double>(filename,"ENERGY_EPSILON", debug, 0.01).value;
@@ -175,6 +182,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
         
         chemistry_precision         = read_parameter_from_file<double>(filename,"CHEM_PRECISION", debug, 1e-2).value;
         chemistry_maxiter           = read_parameter_from_file<int>(filename,"CHEM_MAXITER", debug, 4).value;
+        chemistry_miniter           = read_parameter_from_file<int>(filename,"CHEM_MINITER", debug, 4).value;
         ion_precision         = read_parameter_from_file<double>(filename,"ION_PRECISION", debug, 1e-12).value;
         ion_heating_precision = read_parameter_from_file<double>(filename,"ION_HEATING_PRECISION", debug, 1e-12).value;
         ion_maxiter                  = read_parameter_from_file<int>(filename,"ION_MAXITER", debug, 128).value;
@@ -571,7 +579,6 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
         }
 
         init_T_temp   = read_parameter_from_file<double>(filename,"INIT_T_TEMP", debug, 1.).value;
-
         if(debug > 0) cout<<"Init: About to setup species with num_species = "<<num_species<<endl;
         
         species.reserve(num_species);
@@ -844,8 +851,11 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
     
     Jrad_FLD       = Eigen::MatrixXd::Zero(num_cells+2, num_bands_out);
     Jrad_init      = Eigen::MatrixXd::Zero(num_cells+2, num_bands_out);
-    tridiag        = BlockTriDiagSolver<Eigen::Dynamic>(num_cells+2, num_bands_out + num_species) ;
-    
+    if(use_rad_fluxes == 1)
+        tridiag        = BlockTriDiagSolver<Eigen::Dynamic>(num_cells+2, num_bands_out + num_species) ;
+    else if(use_rad_fluxes == 2)
+        tridiag        = BlockTriDiagSolver<Eigen::Dynamic>(num_cells+2, num_bands_out) ;
+        
     double rade_l = read_parameter_from_file<double>(filename,"PARI_RADSHOCK_ERL", debug, 1.).value;
     double rade_r = read_parameter_from_file<double>(filename,"PARI_RADSHOCK_ERR", debug, 1.).value;
     init_J_factor = read_parameter_from_file<double>(filename,"INIT_J_FACTOR", debug, -1.).value;
@@ -1237,15 +1247,32 @@ void c_Species::initialize_hydrostatic_atmosphere(string filename) {
                     
             }
             
-        } else {
-            prim[i].temperature = const_T_space + 0.e-3*std::pow(base->x_i12[i]/base->x_i12[0],-1);
+        } else if(base->temperature_model == '0') {
+            
+            if(this_species_index == 0) {
+                if(base->x_i12[i] < 1.e9) {
+                    prim[i].temperature = - dphi_factor * base->phi[i] / (cv * gamma_adiabat) + const_T_space; //get_phi_grav(x_i12[i], enclosed_mass[0]);
+                } else {
+                    prim[i].temperature = - dphi_factor * base->get_phi_grav(base->x_i12[i], base->planet_mass) / (cv * gamma_adiabat) + const_T_space;
+                    //prim[i].temperature = - dphi_factor * base->phi[i] / (cv * gamma_adiabat) + const_T_space; get_phi_grav(x_i12[i], enclosed_mass[0]);
+                }
+            } else {
+                
+                prim[i].temperature = base->species[0].prim[i].temperature;
+                
+            }
+            
         }
+        else {
+            prim[i].temperature = const_T_space;
+        }
+            
             
         
         if(debug>=2) {
             cout<<"Just assigned T ="<<prim[i].temperature<<" to i = "<<i<<" with phi_grav = "<<base->phi[i]<<endl;
-            char a;
-            cin>>a;
+            //char a;
+            //cin>>a;
             
         }
     }
@@ -1347,7 +1374,7 @@ void c_Species::initialize_hydrostatic_atmosphere(string filename) {
             //////////////////////////////////////////////////////////////////////////////////////
             //double floor = base->density_floor / mass_amu * std::pow(base->x_i12[i]/base->x_i12[1], -4.);
             double floor = base->density_floor * std::pow(base->x_i12[i]/base->x_i12[1], -4.) * initial_fraction;
-            if( (temp_rhofinal < floor) || base->x_i12[i] > 1e10) {
+            if( (temp_rhofinal < floor) || base->x_i12[i] > base->rhill) {
                 
                 if(temp_rhofinal < 0.)
                     negdens = 1;
@@ -1852,6 +1879,9 @@ void c_reaction::c_reaction_real(int num_species, std::vector<int> e_indices,std
     this->p_num   = p_indices.size();
     
     this->dndts   = std::vector<double>(num_species);
+    
+    this->e_stoch_i = std::vector<int>(num_species);//  e_stoch;
+    this->p_stoch_i = std::vector<int>(num_species); // p_stoch;
         
     this->e_stoch = std::vector<double>(num_species); //e_stoch;
     this->p_stoch = std::vector<double>(num_species); //p_stoch;
@@ -1866,12 +1896,14 @@ void c_reaction::c_reaction_real(int num_species, std::vector<int> e_indices,std
         
     delta_stoch = 0.;
     for(int e=0; e<e_num; e++) {
-        this->e_stoch[e_indices[e]] = e_stoch[e];
+        this->e_stoch[e_indices[e]]   = e_stoch[e];
+        this->e_stoch_i[e_indices[e]] = (int) (e_stoch[e]*1.01);
         delta_stoch += e_stoch[e];
     }
                 
     for(int p=0; p<p_num; p++) {
-        this->p_stoch[p_indices[p]] = p_stoch[p];
+        this->p_stoch[p_indices[p]]   = p_stoch[p];
+        this->p_stoch_i[p_indices[p]] = (int) (p_stoch[p]*1.01);
         delta_stoch -= p_stoch[p];
     }
 }
@@ -1918,10 +1950,7 @@ c_photochem_reaction::c_photochem_reaction(int num_species, int num_bands, int b
             this->e_stoch[s] = 0.;
             this->p_stoch[s] = 0.;
         }
-        for(int s=0; s<num_species; s++) {
-            //cout<<" s = "<<s<<" "<<e_stoch[s]<<"/"<<p_stoch[s]<<endl;
-        }
-        //cout<<"pos5"<<endl;
+        
         for(int e=0; e<e_num; e++) {
             this->e_stoch[e_indices[e]] = e_stoch[e];
             //cout<<" set e_stoch = "<<e_stoch[e]<<endl;

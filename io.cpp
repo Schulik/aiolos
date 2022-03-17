@@ -506,9 +506,16 @@ void c_Species::read_opacity_table(string tablename) {
     opa_pgrid = Eigen::VectorXd::Zero(opa_pgrid_size);
     opa_tgrid = Eigen::VectorXd::Zero(opa_tgrid_size);
     
+    opa_pgrid_log = Eigen::VectorXd::Zero(opa_pgrid_size);
+    opa_tgrid_log = Eigen::VectorXd::Zero(opa_tgrid_size);
+    
     opa_grid_solar     = Eigen::VectorXd::Zero(opa_pgrid_size * opa_tgrid_size * num_bands_in);
     opa_grid_rosseland = Eigen::VectorXd::Zero(opa_pgrid_size * opa_tgrid_size * num_bands_out);
     opa_grid_planck    = Eigen::VectorXd::Zero(opa_pgrid_size * opa_tgrid_size * num_bands_out);
+    
+    opa_grid_solar_log     = Eigen::VectorXd::Zero(opa_pgrid_size * opa_tgrid_size * num_bands_in);
+    opa_grid_rosseland_log = Eigen::VectorXd::Zero(opa_pgrid_size * opa_tgrid_size * num_bands_out);
+    opa_grid_planck_log    = Eigen::VectorXd::Zero(opa_pgrid_size * opa_tgrid_size * num_bands_out);
     
     //cout<<" After memory allocation. Sizes are "<<opa_pgrid_size * opa_tgrid_size * num_bands_in<<" and "<<opa_pgrid_size * opa_tgrid_size * num_bands_out<<endl;
     
@@ -521,6 +528,7 @@ void c_Species::read_opacity_table(string tablename) {
     stringlist = stringsplit(line," ");
     for(int i=0; i<opa_pgrid_size; i++) {
         opa_pgrid(i) = std::stod(stringlist[i]);
+        opa_pgrid_log(i) = std::log10(opa_pgrid(i));
         //cout<<" opa_pgrid = "<<opa_pgrid(i)<<endl;
     }
     
@@ -530,6 +538,7 @@ void c_Species::read_opacity_table(string tablename) {
     stringlist = stringsplit(line," ");
     for(int i=0; i<opa_tgrid_size; i++) {
         opa_tgrid(i) = std::stod(stringlist[i]);
+        opa_tgrid_log(i) = std::log10(opa_tgrid(i));
         //cout<<" opa_tgrid = "<<opa_tgrid(i)<<endl;
     }
     
@@ -545,7 +554,8 @@ void c_Species::read_opacity_table(string tablename) {
             
             for(int j=0; j<opa_tgrid_size; j++) {
                 //cout<<" opas_ = "<<std::stod(stringlist[j])<<" assigned to "<< j + i * opa_tgrid_size + bi * opa_pgrid_size * opa_tgrid_size<<" list pos "<<j<<endl;
-                opa_grid_solar( j + i * opa_tgrid_size + bi * opa_pgrid_size * opa_tgrid_size ) = std::stod(stringlist[j]);
+                opa_grid_solar( j + i * opa_tgrid_size + bi * opa_pgrid_size * opa_tgrid_size )     = std::stod(stringlist[j]);
+                opa_grid_solar_log( j + i * opa_tgrid_size + bi * opa_pgrid_size * opa_tgrid_size ) = std::log10(std::stod(stringlist[j]));
             }
         }
         
@@ -564,7 +574,8 @@ void c_Species::read_opacity_table(string tablename) {
             
             for(int j=0; j<opa_tgrid_size; j++) {
                 //cout<<" opap_ = "<<std::stod(stringlist[j])<<" assigned to "<< j + i * opa_tgrid_size + bo * opa_pgrid_size * opa_tgrid_size<<" list pos "<<j<<endl;
-                opa_grid_planck( j + i * opa_tgrid_size + bo * opa_pgrid_size * opa_tgrid_size ) = std::stod(stringlist[j]);
+                opa_grid_planck( j + i * opa_tgrid_size + bo * opa_pgrid_size * opa_tgrid_size )     = std::stod(stringlist[j]);
+                opa_grid_planck_log( j + i * opa_tgrid_size + bo * opa_pgrid_size * opa_tgrid_size ) = std::log10(std::stod(stringlist[j]));
             }
         }
     }
@@ -582,7 +593,8 @@ void c_Species::read_opacity_table(string tablename) {
             
             for(int j=0; j<opa_tgrid_size; j++) {
                 //cout<<" opar_ = "<<std::stod(stringlist[j])<<" assigned to "<< j + i * opa_tgrid_size + bo * opa_pgrid_size * opa_tgrid_size<<endl;
-                opa_grid_rosseland( j + i * opa_tgrid_size + bo * opa_pgrid_size * opa_tgrid_size ) = std::stod(stringlist[j]);
+                opa_grid_rosseland( j + i * opa_tgrid_size + bo * opa_pgrid_size * opa_tgrid_size )     = std::stod(stringlist[j]);
+                opa_grid_rosseland_log( j + i * opa_tgrid_size + bo * opa_pgrid_size * opa_tgrid_size ) = std::log10(std::stod(stringlist[j]));
             }
         }
         

@@ -25,6 +25,21 @@
        __typeof__ (b) _b = (b); \
      _a < _b ? _a : _b; })
 
+   
+//float __int_as_float (int32_t a) { float r; memcpy (&r, &a, sizeof r); return r;}
+//int32_t __float_as_int (float a) { int32_t r; memcpy (&r, &a, sizeof r); return r;}
+
+/* natural log on [0x1.f7a5ecp-127, 0x1.fffffep127]. Maximum relative error 9.4529e-5 */
+//float my_faster_logf (float a)
+//float njuffas_logf (float a)
+
+
+
+
+//float njuffas_log10f(float a) 
+
+
+
 double lint(double xa, int N, double* X, double* RI) {
     int i2, i1, i;
     if(xa < X[0])
@@ -233,44 +248,27 @@ void c_Species::update_opacities() {
     }
     else if (base->opacity_model == 'T'){ //Tabulated opacities, assuming data comes in cm^2/particle, hence divide by particle mass
         
-        for(int j=0; j< num_cells+2; j++) {
+        //if(base->steps%2==0) {
+            
+            for(int j=0; j< num_cells+2; j++) {
                 
                 for(int b=0; b<num_bands_in; b++) {
-                    opacity_twotemp(j,b) = base->const_opacity_solar_factor * interpol_tabulated_opacity( opa_grid_solar , b, prim[j].temperature, prim[j].pres) * inv_mass;
+                    opacity_twotemp(j,b) = base->const_opacity_solar_factor * interpol_tabulated_opacity( opa_grid_solar_log , b, prim[j].temperature, prim[j].pres) * inv_mass;
                     
                     //opacity_twotemp(j,b) = base->const_opacity_solar_factor * opacity_avg_solar(b);
                     
                     //cout<<" opa_s in j/b "<<j<<"/"<<b<<" = "<<opacity_twotemp(j,b)<<" ";
                 }
                 for(int b=0; b<num_bands_out; b++) {
-                    opacity_planck(j,b)  = base->const_opacity_planck_factor * interpol_tabulated_opacity( opa_grid_planck , b, prim[j].temperature, prim[j].pres) * inv_mass;
-                    opacity(j,b)         = base->const_opacity_rosseland_factor * interpol_tabulated_opacity( opa_grid_rosseland, b, prim[j].temperature, prim[j].pres) * inv_mass;
+                    opacity_planck(j,b)  = base->const_opacity_planck_factor * interpol_tabulated_opacity( opa_grid_planck_log , b, prim[j].temperature, prim[j].pres) * inv_mass;
+                    opacity(j,b)         = base->const_opacity_rosseland_factor * interpol_tabulated_opacity( opa_grid_rosseland_log, b, prim[j].temperature, prim[j].pres) * inv_mass;
                     //opacity(j,b)         = 1e-24 * inv_mass;
                     //cout<<" opa_p  = "<<opacity_planck(j,b);
                     //cout<<" opa_r  = "<<opacity(j,b)<<" had P/T = "<<prim[j].pres<<"/"<<prim[j].temperature<<endl;
                 }
                 
             }
-        
-        /*
-        double pp[3] = {1e-40,1.5e4,1e40};
-        double tt[3] = {1e-40,510,1e40};
-        
-        for(int p=0; p<3; p++) {
-            for(int t=0; t<3; t++) {
-                
-                double opas = interpol_tabulated_opacity( opa_grid_solar    , 0, tt[t], pp[p]) * inv_mass;
-                double opap = interpol_tabulated_opacity( opa_grid_planck   , 0, tt[t], pp[p]) * inv_mass;
-                double opar = interpol_tabulated_opacity( opa_grid_rosseland, 0, tt[t], pp[p]) * inv_mass;
-                cout<<" p/t = "<<pp[p]<<"/"<<tt[t]<<" opas/opap/opar = "<<opas<<"/"<<opap<<"/"<<opar<<endl;
-            }
-            
-        }
-        
-        char a;
-        cin>>a; */
-        //double c_Species::interpol_tabulated_opacity(int whichone, int band, double rho, double T_gas, double pressure) {
-        
+        //}
         
     } else { //opacity_model == 'C', the default
         
@@ -801,7 +799,8 @@ void c_Sim::kappa_landscape()
 
 double c_Species::interpol_tabulated_opacity(const Eigen::VectorXd& array, int band, double T_gas, double pressure) {
 	
-  	double tP, tT, denom, kappa;	//tempPressure and denominator
+  	double tT, denom, kappa;	//tempPressure and denominator
+  	float tP;
   	static double mul1, mul2, mul3, mul4; //temp doubles for the interpolation. static for faster speed
   	static int Plow, Phigh;
 	int Tlow, Thigh;
@@ -900,24 +899,61 @@ double c_Species::interpol_tabulated_opacity(const Eigen::VectorXd& array, int b
                         + mul4 * array(Thigh + Phigh * opa_tgrid_size + band * opa_tgrid_size * opa_pgrid_size));
 */
     
-    double pmax = std::log(opa_pgrid(Phigh));
-	double pmin = std::log(opa_pgrid(Plow));
-	double pval = std::log(tP);
-	
-	denom = 1.0/((opa_tgrid(Thigh) - opa_tgrid(Tlow)) * (pmax - pmin));
-	mul1 = (opa_tgrid(Thigh) - tT) * (pmax - pval);
-	mul2 = (tT - opa_tgrid(Tlow))  * (pmax - pval);
-	mul3 = (opa_tgrid(Thigh) - tT) * (pval - pmin);
-	mul4 = (tT - opa_tgrid(Tlow))  * (pval - pmin);
+    //Floats for speed!
     
-    kappa = denom *      (mul1 * std::log10(array(Tlow + Plow * opa_tgrid_size + band * opa_tgrid_size * opa_pgrid_size))
-                        + mul2 * std::log10(array(Thigh + Plow * opa_tgrid_size + band * opa_tgrid_size * opa_pgrid_size))
-						+ mul3 * std::log10(array(Tlow + Phigh * opa_tgrid_size + band * opa_tgrid_size * opa_pgrid_size)) 
-                        + mul4 * std::log10(array(Thigh + Phigh * opa_tgrid_size + band * opa_tgrid_size * opa_pgrid_size)) );
+//     float k11 = array(Tlow + Plow * opa_tgrid_size + band * opa_tgrid_size * opa_pgrid_size);
+//     float k22 = array(Thigh + Plow * opa_tgrid_size + band * opa_tgrid_size * opa_pgrid_size);
+//     float k33 = array(Tlow + Phigh * opa_tgrid_size + band * opa_tgrid_size * opa_pgrid_size);
+//     float k44 = array(Thigh + Phigh * opa_tgrid_size + band * opa_tgrid_size * opa_pgrid_size);
+//     
+//     float k1 = njuffas_log10f(k11);// std::log10(k11);
+//     float k2 = njuffas_log10f(k22);
+//     float k3 = njuffas_log10f(k33);
+//     float k4 = njuffas_log10f(k44);
+
+    float k1 = array(Tlow + Plow * opa_tgrid_size + band * opa_tgrid_size * opa_pgrid_size);
+    float k2 = array(Thigh + Plow * opa_tgrid_size + band * opa_tgrid_size * opa_pgrid_size);
+    float k3 = array(Tlow + Phigh * opa_tgrid_size + band * opa_tgrid_size * opa_pgrid_size);
+    float k4 = array(Thigh + Phigh * opa_tgrid_size + band * opa_tgrid_size * opa_pgrid_size);
     
-    pmax = std::log(opa_pgrid(Phigh));
-	pmin = std::log(opa_pgrid(Plow));
-	pval = std::log(tP*1.01);
+    //cout<<" logs, njuffa = "<<njuffas_log10f(k11)<< " vs regular "<<std::log10(k11)<<endl;
+    //char a;
+    //cin>>a;
+    
+//     float fPhigh = opa_pgrid(Phigh);
+//     float fPlow  = opa_pgrid(Plow);
+//     
+//     float pmax = njuffas_log10f(fPhigh);
+// 	float pmin = njuffas_log10f(fPlow);
+//     
+    float pmax = opa_pgrid_log(Phigh);
+	float pmin = opa_pgrid_log(Plow);
+    
+    denom = ((opa_tgrid(Thigh) - opa_tgrid(Tlow)) * (pmax - pmin));
+    denom = 1.0/denom;
+    
+    float ktotal = 0;
+    float muls[3]  = {0.99, 1.00, 1.01};
+    
+    for(int i=0; i<3; i++) {
+        float tpp = tP * muls[i];
+        float pval = njuffas_log10f(tpp);
+        
+        mul1 = (opa_tgrid(Thigh) - tT) * (pmax - pval);
+        mul2 = (tT - opa_tgrid(Tlow))  * (pmax - pval);
+        mul3 = (opa_tgrid(Thigh) - tT) * (pval - pmin);
+        mul4 = (tT - opa_tgrid(Tlow))  * (pval - pmin);
+        
+        ktotal += denom *     (mul1 * k1
+                            + mul2 * k2
+                            + mul3 * k3 
+                            + mul4 * k4 );
+    }
+    
+	/*
+    pmax = std::log10(opa_pgrid(Phigh));
+	pmin = std::log10(opa_pgrid(Plow));
+	pval = std::log10(tP*1.01);
 	
 	denom = 1.0/((opa_tgrid(Thigh) - opa_tgrid(Tlow)) * (pmax - pmin));
 	mul1 = (opa_tgrid(Thigh) - tT) * (pmax - pval);
@@ -930,9 +966,9 @@ double c_Species::interpol_tabulated_opacity(const Eigen::VectorXd& array, int b
 						+ mul3 * std::log10(array(Tlow + Phigh * opa_tgrid_size + band * opa_tgrid_size * opa_pgrid_size)) 
                         + mul4 * std::log10(array(Thigh + Phigh * opa_tgrid_size + band * opa_tgrid_size * opa_pgrid_size)) );
     
-    pmax = std::log(opa_pgrid(Phigh));
-	pmin = std::log(opa_pgrid(Plow));
-	pval = std::log(tP*0.99);
+    pmax = std::log10(opa_pgrid(Phigh));
+	pmin = std::log10(opa_pgrid(Plow));
+	pval = std::log10(tP*0.99);
 	
 	denom = 1.0/((opa_tgrid(Thigh) - opa_tgrid(Tlow)) * (pmax - pmin));
 	mul1 = (opa_tgrid(Thigh) - tT) * (pmax - pval);
@@ -945,6 +981,6 @@ double c_Species::interpol_tabulated_opacity(const Eigen::VectorXd& array, int b
 						+ mul3 * std::log10(array(Tlow + Phigh * opa_tgrid_size + band * opa_tgrid_size * opa_pgrid_size)) 
                         + mul4 * std::log10(array(Thigh + Phigh * opa_tgrid_size + band * opa_tgrid_size * opa_pgrid_size)) );
 	
-    
-  	return std::pow(10.,(kappa+kappa2+kappa3)*0.33333333333333333);
+    */
+  	return std::pow(10., ktotal*0.33333333333333333);
 }
