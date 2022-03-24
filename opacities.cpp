@@ -248,28 +248,53 @@ void c_Species::update_opacities() {
     }
     else if (base->opacity_model == 'T'){ //Tabulated opacities, assuming data comes in cm^2/particle, hence divide by particle mass
         
-        //if(base->steps%2==0) {
             
             for(int j=0; j< num_cells+2; j++) {
                 
                 for(int b=0; b<num_bands_in; b++) {
                     opacity_twotemp(j,b) = base->const_opacity_solar_factor * interpol_tabulated_opacity( opa_grid_solar_log , b, prim[j].temperature, prim[j].pres) * inv_mass;
                     
-                    //opacity_twotemp(j,b) = base->const_opacity_solar_factor * opacity_avg_solar(b);
-                    
-                    //cout<<" opa_s in j/b "<<j<<"/"<<b<<" = "<<opacity_twotemp(j,b)<<" ";
                 }
                 for(int b=0; b<num_bands_out; b++) {
                     opacity_planck(j,b)  = base->const_opacity_planck_factor * interpol_tabulated_opacity( opa_grid_planck_log , b, prim[j].temperature, prim[j].pres) * inv_mass;
                     opacity(j,b)         = base->const_opacity_rosseland_factor * interpol_tabulated_opacity( opa_grid_rosseland_log, b, prim[j].temperature, prim[j].pres) * inv_mass;
-                    //opacity(j,b)         = 1e-24 * inv_mass;
-                    //cout<<" opa_p  = "<<opacity_planck(j,b);
-                    //cout<<" opa_r  = "<<opacity(j,b)<<" had P/T = "<<prim[j].pres<<"/"<<prim[j].temperature<<endl;
+                    
                 }
                 
             }
-        //}
-        
+    } 
+    else if (base->opacity_model == 'K'){ //Mixture model: Solar opacities are wavelength-dependent but based on a const-P-T-spectrum whereas the planck and rosseland opas are P-T dependent
+    
+        for(int j=0; j< num_cells+2; j++) {
+            
+            for(int b=0; b<num_bands_in; b++) {
+                        opacity_twotemp(j,b) = base->const_opacity_solar_factor * opacity_avg_solar(b); // * (1. + pressure_broadening_factor * pow(prim[j].pres/1e5, pressure_broadening_exponent)); 
+                        
+                        if(base->steps >901e99) {
+                                cout<<" b_in = "<<b<<" kS = "<<opacity_twotemp(j,b)<<endl;
+                                //cout<<base->l_i_in[b]<<"   "<<opacity_avg_solar(b)<<endl;
+                        }
+                        
+                    }
+            
+            for(int b=0; b<num_bands_out; b++) {
+                        opacity_planck(j,b)  = base->const_opacity_planck_factor * interpol_tabulated_opacity( opa_grid_planck_log , b, prim[j].temperature, prim[j].pres) * inv_mass;
+                        opacity(j,b)         = base->const_opacity_rosseland_factor * interpol_tabulated_opacity( opa_grid_rosseland_log, b, prim[j].temperature, prim[j].pres) * inv_mass;
+                        
+                        if(base->steps > 901e99) {
+                            cout<<" b_in = "<<b<<" kP = "<<opacity_planck(j,b)<<endl;
+                            cout<<" b_in = "<<b<<" kR = "<<opacity(j,b)<<endl;    
+                        }
+                        
+                    }
+                    
+                    if(base->steps>901e99) {
+                        char a;
+                        cin>>a;
+                    }
+                
+        }
+    
     } else { //opacity_model == 'C', the default
         
         for(int j=0; j< num_cells+2; j++) {

@@ -64,6 +64,10 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
         X_star           = read_parameter_from_file<double>(filename,"PARI_XSTAR", debug, 0.).value;
         Lyalpha_star     = read_parameter_from_file<double>(filename,"PARI_LYASTAR", debug, 0.).value;
         
+        R_other          = read_parameter_from_file<double>(filename,"R_OTHER", debug, 0.).value;
+        T_other          = read_parameter_from_file<double>(filename,"T_OTHER", debug, 0.).value;
+        d_other          = read_parameter_from_file<double>(filename,"D_OTHER", debug, 0.).value;
+        
         T_core           = read_parameter_from_file<double>(filename,"PARI_TPLANET", debug, 200.).value;
         use_planetary_temperature = read_parameter_from_file<int>(filename,"USE_PLANET_TEMPERATURE", debug, 0).value;
         core_cv           = read_parameter_from_file<double>(filename,"PARI_CORE_CV", debug, 1.e9).value;
@@ -732,6 +736,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
             
             if(num_bands_in == 1) {
                 solar_heating(b)  = sigma_rad * pow(T_star,4.) * pow(R_star*rsolar,2.)/pow(planet_semimajor*au,2.);
+                solar_heating(b) += sigma_rad * pow(T_other,4.) * pow(R_other*rsolar,2.)/pow(d_other*au,2.);
                 solar_heating(b) += UV_star/(4.*pi*pow(planet_semimajor*au,2.));
                 solar_heating(b) += X_star/(4.*pi*pow(planet_semimajor*au,2.));
                 templumi += solar_heating(b);
@@ -745,6 +750,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
                 cout<<"/"<<l_i_in[b+1]<<" with frac = "<<compute_planck_function_integral4(l_i_in[b], l_i_in[b+1], T_star);
                 
                 solar_heating(b)  = sigma_rad * pow(T_star,4.) * pow(R_star*rsolar,2.)/pow(planet_semimajor*au,2.) * compute_planck_function_integral4(l_i_in[b], l_i_in[b+1], T_star);
+                solar_heating(b) += sigma_rad * pow(T_other,4.) * pow(R_other*rsolar,2.)/pow(d_other*au,2.) * compute_planck_function_integral4(l_i_in[b], l_i_in[b+1], T_other);;
                 templumi         += solar_heating(b);
                 
                 //if (BAND_IS_HIGHENERGY[b] == 1) {

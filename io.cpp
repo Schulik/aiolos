@@ -88,6 +88,10 @@ int c_Species::read_species_data(string filename, int species_index) {
                 
                 //if(opacity_model == 'P') {}
                 this->opacity_data_string = stringlist[9];
+                
+                if(stringlist.size() == 11) //Assume that additional to an opacity table in opacity_data_string a solar opacity wavelength file has been provided
+                    this->opacity_corrk_string = stringlist[10];
+                    
                 //this->num_opacity_datas= std::stod(stringlist[10]);
                 
                 this->inv_mass = 1./(mass_amu*amu);
@@ -133,9 +137,31 @@ int c_Species::read_species_data(string filename, int species_index) {
     //////////////////////////////////////////////////////////
     
     //if(num_opacity_datas > -1) 
-    if(base->opacity_model == 'P' || base->opacity_model == 'M' || base->opacity_model == 'C' ) {
+    
+    if(base->opacity_model == 'T' || base->opacity_model == 'K') { 
+        //
+        // Tabulated data from opacit averages
+        //
+        //opacity_data_string = "14N-1H3_T800_zeroes.aiopa";
+        string opacityinputfile = "inputdata/" + opacity_data_string;
+        std::vector<string> stringending = stringsplit(opacityinputfile,".");
+        
+        if(stringending[1].compare("aiopa") == 0) {
+            cout<<"Tabulated opacities chosen, reading file = "<<opacityinputfile<<endl;
+        }
+        else
+            cout<<"Invalid file = "<<opacityinputfile<<" should have format *.aitab ."<<endl;
+        
+        read_opacity_table(opacityinputfile);
+    }
+    
+    if(base->opacity_model == 'P' || base->opacity_model == 'M' || base->opacity_model == 'C' || base->opacity_model == 'K' ) {
         //opacity_data_string = "14N-1H3_T200.opa"; //TODO: REMEMBER TO DELETE THIS LINE AGAIN!
-        cout<<"P or M or C opacity chosen & enough data to read in files. Reading file = "<<("inputdata/" +opacity_data_string)<<endl;
+        
+        if( base->opacity_model == 'K' ) //Run the routine with one argument further on in the species list 
+            opacity_data_string = opacity_corrk_string;
+        
+        cout<<"P or M or C or K opacity chosen & enough data to read in files. Reading file = "<<"inputdata/"<<opacity_data_string<<endl;
         //
         // Start reading opacity data
         //
@@ -405,7 +431,7 @@ int c_Species::read_species_data(string filename, int species_index) {
         cout<<endl<<endl;
         
         cout<<"        avg opacities solar = ";
-        for(int b = 0; b < num_bands_in; b++) cout<<opacity_avg_solar(b)<<"/";
+        for(int b = 0; b < num_bands_in; b++) cout<<base->l_i_in[b]<<" "<<opacity_avg_solar(b)<<endl; //"/";
         cout<<endl;
         
         cout<<"        avg opacities plnck = ";
@@ -417,27 +443,15 @@ int c_Species::read_species_data(string filename, int species_index) {
         cout<<endl;
         
     }
-    else if(base->opacity_model == 'T') { 
-        //
-        // Tabulated data from opacit averages
-        //
-        //opacity_data_string = "14N-1H3_T800_zeroes.aiopa";
-        string opacityinputfile = "inputdata/" + opacity_data_string;
-        std::vector<string> stringending = stringsplit(opacityinputfile,".");
-        
-        if(stringending[1].compare("aiopa") == 0) {
-            cout<<"Tabulated opacities chosen, reading file = "<<opacityinputfile<<endl;
-        }
-        else
-            cout<<"Invalid file = "<<opacityinputfile<<" should have format *.aitab ."<<endl;
-        
-        read_opacity_table(opacityinputfile);
-    }
-    else {
+     else {
         for(int b = 0; b < num_bands_in; b++) opacity_avg_solar(b)      =  base->const_opacity_solar_factor * const_opacity;
         for(int b = 0; b < num_bands_out; b++) opacity_avg_planck(b)    =  base->const_opacity_planck_factor * const_opacity;
         for(int b = 0; b < num_bands_out; b++) opacity_avg_rosseland(b) =  base->const_opacity_rosseland_factor * const_opacity;
     }
+    
+    //else if(base->opacity_model == 'T' || base->opacity_model == 'K') { 
+    
+   
     
     
     //cout<<" IN INIT SPECIES, OPACITY_DATA for file "<<opacity_data_string<<" is "<<endl<<opacity_data<<endl;

@@ -7,7 +7,7 @@
 //
 //
 //
-///////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////
 
 #define EIGEN_RUNTIME_NO_MALLOC
 
@@ -367,7 +367,7 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
             
             //if(Jswitch == 1) {
             if(Jrad_FLD(j, b) < 0.) {
-                cout<<" -J in j "<<j<<" rhokr = "<< arr_rhokr[j]<<" R = "<< arr_R[j]<<" D ="<< arr_D[j]<<" dJ = "<<arr_JDJ[j]<<" J = "<<Jrad_FLD(j, b)<<" Ji+Ji+1 = "<<Jrad_FLD(j+1, b)+Jrad_FLD(j, b)<<endl;
+                cout<<" -J in j/steps "<<j<<"/"<<steps<<" rhokr = "<< arr_rhokr[j]<<" R = "<< arr_R[j]<<" D ="<< arr_D[j]<<" dJ = "<<arr_JDJ[j]<<" J = "<<Jrad_FLD(j, b)<<" Ji+Ji+1 = "<<Jrad_FLD(j+1, b)+Jrad_FLD(j, b)<<endl;
                 Jswitch = 1;
             }
             
@@ -472,6 +472,9 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
                 species[si].prim[j].temperature = tt ;
             }
         }
+        
+        
+        
     } else {
         
             
@@ -500,6 +503,81 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
                 //if(j==num_cells)
                 //    cout<<" num_cells = "<<num_cells<<" temp = "<<species[s].prim[j].temperature<<endl;
             }
+        }
+        
+    }
+    
+    
+    // Making space for the convective energy transport, following Tajima & Nakagawa 1997
+    // Lconv = 2pir^2 c_p dT**3/2 std::sqrt(rho g Lmabda \partial rho/\partial T_P=const )
+    //         dT     = Lambda (dT'-dT)/2
+    //         Lambda = P/dP
+    //
+    // Step3: Transport terms for convective fluxes in the T-equation
+    //
+    
+    if(use_convective_fluxes) {
+        
+        double fl = 0;
+        double fr = 0;
+        double lam = 0;
+        bool electrons = 0;
+        double Tavg;
+        double Tdiff;
+        
+        
+        
+        for (int j=0; j < num_cells+1; j++){
+            for(int s=0; s<num_species; s++) {
+                
+                double dx = (x_i12[j+1]-x_i12[j]) ;
+                double rhoavg = (species[s].prim[j].density + species[s].prim[j+1].density) * 0.5;
+                double Pavg   = (species[s].prim[j].pres + species[s].prim[j+1].pres) * 0.5;
+                double Tavg   = (species[s].prim[j].temperature + species[s].prim[j+1].temperature) * 0.5;
+                double dP     = (species[s].prim[j].pres - species[s].prim[j+1].pres)/Pavg;
+                double dT     = (species[s].prim[j].temperature - species[s].prim[j+1].temperature)/Tavg / dP;
+                double dTabs  = (species[s].prim[j].temperature - species[s].prim[j+1].temperature);
+                double glocal = -get_phi_grav(x_i[j], enclosed_mass[j])/x_i[j];
+                            
+                double nabla_ad = 1.-1./species[s].gamma_adiabat;
+                double lam = Pavg / (species[s].prim[j].pres - species[s].prim[j+1].pres);  // The mixing length
+                double DT =  (dT > nabla_ad ? dT - nabla_ad : 0.); //smooth(dT, nabla_ad); //   // Gradient comparison and switch for Lconv
+                       DT = (dx * total_opacity(j,0)) > 2./3. ? DT : 0.; //Guardian to not use convection in optically thin areas
+                            
+                    
+                
+                if(electrons) {
+                    
+                    double denom = 0.;
+                    
+                    for(int sj=0; sj<num_species; sj++) {
+                        if(s!=sj){ //Also if sj == neutral
+                            
+                            double Q = 1.;
+                            
+                            denom += species[sj].prim[j].number_density * Q;
+                        }
+                    }
+                    
+                    denom *= 3.22e4 * Tavg * Tavg * species[s].prim[j].number_density;  //Eqn. 5.146 in Schunk
+                    denom += 1.;
+                
+                    lam = 7.7e5 * Tavg * Tavg * std::pow(Tavg, 0.5) / denom;
+                    
+                }
+                else {
+                    lam = 0. ;//For general expression need 5.167 with 4.130a and the collision integrals 4.114
+                    
+                }
+                
+                //fr = fl;
+                //fl = lam * 
+                    
+                
+            }
+            
+            
+            
         }
         
     }

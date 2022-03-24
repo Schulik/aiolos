@@ -514,6 +514,10 @@ public:
     double Lyalpha_star;
     double R_star;
     
+    double T_other;
+    double R_other;
+    double d_other;
+    
     double T_core;  //Internal heat flux
     double T_surface; //Radiation flux making it through the atmosphere
     double R_core;
@@ -745,6 +749,7 @@ public:
     int debug;
     
     string opacity_data_string;
+    string opacity_corrk_string;
     int num_opacity_datas;
 
     ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
