@@ -181,8 +181,8 @@ void c_Species::update_opacities() {
         for(int j=0; j< num_cells+2; j++) {
             
             for(int b=0; b<num_bands_out; b++) {
-                opacity(j,b)        = base->const_opacity_rosseland_factor * base->opacity_semenov_malygin(1, prim[j].temperature, prim[j].density, prim[j].pres); 
-                opacity_planck(j,b) = base->const_opacity_planck_factor * base->opacity_semenov_malygin(0, prim[j].temperature, prim[j].density, prim[j].pres);
+                opacity(j,b)        = base->const_opacity_rosseland_factor * base->opacity_semenov_malygin(1, prim[j].temperature, prim[j].density, prim[j].pres, this->is_dust_like); 
+                opacity_planck(j,b) = base->const_opacity_planck_factor * base->opacity_semenov_malygin(0, prim[j].temperature, prim[j].density, prim[j].pres, this->is_dust_like);
             }
             
             for(int b=0; b<num_bands_in; b++) {
@@ -547,7 +547,7 @@ double c_Sim::get_gas_malygin(int rosseland, double rho, double T_gas, double pr
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-double c_Sim::opacity_semenov_malygin(int rosseland, double temperature, double rho, double pressure) 
+double c_Sim::opacity_semenov_malygin(int rosseland, double temperature, double rho, double pressure, int caller_is_dust) 
 {
 	//The Malygin gas-opacities live as data on a grid, thus we create a grid
 	//The Semenov dust-opacities live as coefficients in a analytic function, thus we need only those
@@ -746,12 +746,22 @@ double c_Sim::opacity_semenov_malygin(int rosseland, double temperature, double 
     // For now I have switched off the dust opacities as their instantaneous evaporation leads to large oscillations in the opacities.
     // Those didn't influence the temperatures very much, but its ugly and might lead to trouble in the outflow
     //
-	if(rosseland == 0)
-	  	//Planck opacities are additive
-		return kappa_gas + dust_to_gas_ratio * kappa_dust; 
-	else
-	  	//Rosseland opacities are not additive
-        return kappa_gas + dust_to_gas_ratio * kappa_dust;
+	if(rosseland == 0) { //Planck opacities are additive
+        
+        if(caller_is_dust)
+            return kappa_dust;
+        else
+            return kappa_gas + dust_to_gas_ratio * kappa_dust; 
+        
+    }
+	else{ //Rosseland opacities are not additive
+        if(caller_is_dust)
+            return kappa_dust;
+        else
+            return c_max(kappa_gas, dust_to_gas_ratio * kappa_dust); 
+        //return kappa_gas + dust_to_gas_ratio * kappa_dust;
+        
+    }
 }
 
 

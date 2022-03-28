@@ -1724,8 +1724,13 @@ void c_Species::apply_boundary_right(std::vector<AOS>& u) {
                     double r =base->x_i12[i];
                     double mdot      = prim.density*prim.speed*r*r;
                     double freefallv = -std::sqrt(2.*G*base->planet_mass/r);
-                    if(mdot < -1e18)
-                        prim.density = -1e18/freefallv/r/r;
+                    
+                    double mdotlimit = -1e-18;
+                    if(this->is_dust_like)
+                        mdotlimit = 1e-4 * mdotlimit;
+                    
+                    if(mdot < -mdotlimit)
+                        prim.density = -mdotlimit/freefallv/r/r;
                     
                     //cout<<" in boundaries, rhoi rho+1 = "<<prim.density<<"/"<<this->prim[i].density<<" p,p2 = "<<prim.pres;
                     prim.pres = prim.pres - dphi ;

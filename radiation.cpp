@@ -81,8 +81,11 @@ void c_Sim::update_dS_jb(int j, int b) {
                 //
                 // Now compute the attenuation of solar radiation and then assign the lost energy back to individual species in a manner that conserves energy
                 //
-                
-                S_band(j,b) = solar_heating(b) * std::exp(-radial_optical_depth_twotemp(j,b));
+                if(j>=num_cells+1)
+                    S_band(j,b) = solar_heating(b);
+                else
+                    S_band(j,b) = solar_heating(b) * std::exp(-radial_optical_depth_twotemp(j+1,b));
+                //S_band(j,b) = solar_heating(b) * fastexp2(-radial_optical_depth_twotemp(j,b));
                 
                 if(debug >= 1)
                     cout<<" in cell ["<<j<<"] band ["<<b<<"] top-of-the-atmosphere heating = "<<solar_heating(b)<<" tau_rad(j,b) = "<<radial_optical_depth(j,b)<<" exp(tau) = "<<std::exp(-radial_optical_depth(j,b))<<endl;
@@ -91,13 +94,21 @@ void c_Sim::update_dS_jb(int j, int b) {
                 if(steps > -1) {
                             
                     if(j<num_cells+1){
-                        dS_band(j,b) = 0.25 * solar_heating(b) * exp(-radial_optical_depth_twotemp(j+1,b))  /dx[j] * (1.-bond_albedo);
+                        //dS_band(j,b) = 0.25 * solar_heating(b) * fastexp2(-radial_optical_depth_twotemp(j+1,b))  /dx[j] * (1.-bond_albedo);
+                        //dS_band(j,b) = 0.25 * solar_heating(b) * std::exp(-radial_optical_depth_twotemp(j+1,b))  /dx[j] * (1.-bond_albedo);
+                        dS_band(j,b) = 0.25 * S_band(j,b)  /dx[j] * (1.-bond_albedo);
                         double dtau_tot = -(radial_optical_depth_twotemp(j+1,b) - radial_optical_depth_twotemp(j,b));
                         double dS_he_temp = dS_band(j,b);
                         
-                        dS_band(j,b) *= (-expm1(-const_opacity_solar_factor * dtau_tot));
-                        dS_he_temp   *=  -expm1(-const_opacity_solar_factor * cell_optical_depth_highenergy(j,b)) ;
-                        
+                        if(const_opacity_solar_factor * dtau_tot > 1e-3)
+                            dS_band(j,b) *= (-expm1(-const_opacity_solar_factor * dtau_tot));
+                        else
+                            dS_band(j,b) *= (-fastexpm1_2(-const_opacity_solar_factor * dtau_tot));
+                            
+                        if(const_opacity_solar_factor * cell_optical_depth_highenergy(j,b) > 1e-3)
+                            dS_he_temp *=  -expm1(-const_opacity_solar_factor * cell_optical_depth_highenergy(j,b)) ;
+                        else 
+                            dS_he_temp *=  -fastexpm1_2(-const_opacity_solar_factor * cell_optical_depth_highenergy(j,b)) ;
                         //dS_band(j,b) *= ( std::exp( const_opacity_solar_factor* (cell_optical_depth_highenergy(j,b)) ) - std::exp( const_opacity_solar_factor* (dtau_tot) ) );
                         
                         
@@ -435,7 +446,7 @@ void c_Sim::update_fluxes_FLD() {
                        rhokr   = min( 0.5*( total_opacity(j,b) + total_opacity(j+1,b)) , rhokr);
 
                 double tau_inv = 1. / (dx * rhokr) ;
-                double R       = 4. * tau_inv * std::abs(Jrad_FLD(j+1,b) - Jrad_FLD(j,b)) / (Jrad_FLD(j+1,b) + Jrad_FLD(j, b) + 1e-300) ; // Put in 1.0 as prefactor to get correct rad shock
+                double R       = 2. * tau_inv * std::abs(Jrad_FLD(j+1,b) - Jrad_FLD(j,b)) / (Jrad_FLD(j, b) + 1e-300) ; // Put in 1.0 as prefactor to get correct rad shock
                 double D       = 1. * tau_inv * no_rad_trans * surf[j] * flux_limiter(R);
                 
                 //if(1./tau_inv < 1.e-13)
@@ -703,6 +714,9 @@ void c_Sim::update_fluxes_FLD() {
                     double alphaconv = 0.5 * species[s].cv * lam * lam * DT * rhoavg * std::sqrt(glocal/Tavg); //Prefactor
                     //double Lconv = alphaconv;    //Convection
                     double Lconv =  kappa_conductive * dTabs / species[s].cv;  //Conduction
+                    
+                    if(species[s].is_dust_like)
+                        Lconv == 0;
                     
                     u[idx] += -Lconv ;
                     d[idx] += Lconv ;

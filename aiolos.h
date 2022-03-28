@@ -132,6 +132,22 @@ inline float fastpow1(float base, int exp) {
 
 } 
 
+inline
+double fastexp2(double x) {
+  x = 1.0 + x / 1024;
+  x *= x; x *= x; x *= x; x *= x;
+  x *= x; x *= x; x *= x; x *= x;
+  x *= x; x *= x;
+  return x;
+}
+
+inline double fastexpm1(double x) {
+  return x + 0.5*x*x + 0.33333333333*x*x*x;
+}
+
+inline double fastexpm1_2(double x) {
+  return x + 0.5*x*x;
+}
 
 
 //
@@ -672,7 +688,7 @@ public:
     
     //Opacities 
     void init_malygin_opacities();
-    double opacity_semenov_malygin(int rosseland, double temperature, double rho, double pressure) ;
+    double opacity_semenov_malygin(int rosseland, double temperature, double rho, double pressure, int caller_is_dust) ;
     double get_gas_malygin(int rosseland, double rho, double T_gas, double pressure);
     double freedman_opacity(double P, double T, double _Z);
     void kappa_landscape();
