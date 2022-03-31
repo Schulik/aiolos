@@ -66,7 +66,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
         
         R_other          = read_parameter_from_file<double>(filename,"R_OTHER", debug, 0.).value;
         T_other          = read_parameter_from_file<double>(filename,"T_OTHER", debug, 0.).value;
-        d_other          = read_parameter_from_file<double>(filename,"D_OTHER", debug, 0.).value;
+        d_other          = read_parameter_from_file<double>(filename,"D_OTHER", debug, 1.).value;
         
         T_core           = read_parameter_from_file<double>(filename,"PARI_TPLANET", debug, 200.).value;
         use_planetary_temperature = read_parameter_from_file<int>(filename,"USE_PLANET_TEMPERATURE", debug, 0).value;
@@ -150,6 +150,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
         use_linear_gravity= read_parameter_from_file<int>(filename,"PARI_LINEAR_GRAV", debug, 0).value;
         use_rad_fluxes    = read_parameter_from_file<int>(filename,"PARI_USE_RADIATION", debug, 0).value;
         use_convective_fluxes = read_parameter_from_file<int>(filename,"USE_CONVECTION", debug, 0).value;
+        K_zz_init = read_parameter_from_file<double>(filename,"KZZ_INIT", debug, 0.).value;
         convect_boundary_strength = read_parameter_from_file<double>(filename,"CONVECT_BOUNDARY_STRENGTH", debug, 1.1).value;
         
         use_collisional_heating = read_parameter_from_file<int>(filename,"PARI_USE_COLL_HEAT", debug, 1).value;
@@ -564,14 +565,19 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
         //
         
         init_grav_pot();
+        K_zz            = np_somevalue(num_cells+2, K_zz_init);
         
-        //
+        /////////////////////////////////////////////////////////////////////////
+        /////////////////////////////////////////////////////////////////////////
+        /////////////////////////////////////////////////////////////////////////
+        ////
         //
         // Create and initialize the species
         //
-        // 
-        // !!!!IMPORTANT CHANGE HERE TO NUM_SPECIES_ACT
-        //
+        ////
+        ///////////////////////////////////////////////////////////////////////// 
+        /////////////////////////////////////////////////////////////////////////
+        /////////////////////////////////////////////////////////////////////////
         num_species = read_parameter_from_file<int>(filename,"PARI_NUM_SPECIES", debug, 1).value;
 
         if (NUM_SPECIES != Eigen::Dynamic && num_species != NUM_SPECIES) {
@@ -591,11 +597,17 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
             species.push_back(c_Species(this, filename, speciesfile, s, debug)); // Here we call the c_Species constructor
         }
         cout<<endl;
-        //
+        ///////////////////////////////////////////////////////////////////////// 
+        /////////////////////////////////////////////////////////////////////////
+        /////////////////////////////////////////////////////////////////////////
+        ////
         //
         // After successful init, compute all primitive quantities and determine first timestep
         //
-        //
+        ////
+        ///////////////////////////////////////////////////////////////////////// 
+        /////////////////////////////////////////////////////////////////////////
+        /////////////////////////////////////////////////////////////////////////
         
         for(int s = 0; s < num_species; s++)
             species[s].compute_pressure(species[s].u);
@@ -614,8 +626,17 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
         if(debug > 0) cout<<"Init: Setting up friction workspace."<<endl;
 
 
-        alphas_sample  = Eigen::VectorXd::Zero(num_cells+2);
-        friction_sample  = Eigen::VectorXd::Zero(num_cells+2);
+        alphas_sample   = Eigen::VectorXd::Zero(num_cells+2);
+        friction_sample = Eigen::VectorXd::Zero(num_cells+2);
+        
+        reaction_matrix = Matrix_t::Zero(num_species, num_species);
+        reaction_b      = Vector_t(num_species);
+        //n_news          = Vector_t(num_species);
+        
+        for(int s = 0; s < num_species; s++) {
+            species[s].update_kzz_and_gravpot(s);
+        }
+            
         
         if(num_species >= 1) {
             friction_matrix_T     = Matrix_t::Zero(num_species, num_species);
@@ -1070,12 +1091,16 @@ c_Species::c_Species(c_Sim *base_simulation, string filename, string species_fil
         prim_l = std::vector<AOS_prim>(num_cells+2);
         prim_r = std::vector<AOS_prim>(num_cells+2);
         temp_temperature = std::vector<double>(num_cells+2);
+        phi_s            = std::vector<double>(num_cells+2);
         
         timesteps     = np_zeros(num_cells+2);		    
         timesteps_cs  = np_zeros(num_cells+2);	
         timesteps_rad = np_zeros(num_cells+2);
         finalstep     = np_zeros(num_cells+2);
         timesteps_de  = np_zeros(num_cells+2);
+        
+        K_zzf = std::vector<double>(num_cells+2);  
+        this->update_kzz_and_gravpot(species_index);
         
         //////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         //
@@ -1238,11 +1263,14 @@ void c_Species::initialize_hydrostatic_atmosphere(string filename) {
     //
     for(int i=num_cells+1; i>=0; i--) {
             
+        int mode;
+        
         if(base->temperature_model == 'P') {
-            
+            mode = 1;
             if(i==num_cells+2) {
                 prim[i].temperature = const_T_space;
             } else {
+                mode = 11;
                 
                 if(base->x_i12[i] < 1.e9) {
                     prim[i].temperature = - dphi_factor * base->phi[i] / (cv * gamma_adiabat) + const_T_space; //get_phi_grav(x_i12[i], enclosed_mass[0]);
@@ -1254,29 +1282,36 @@ void c_Species::initialize_hydrostatic_atmosphere(string filename) {
             }
             
         } else if(base->temperature_model == '0') {
+            mode = 2;
             
             if(this_species_index == 0) {
+                mode = 22;
                 if(base->x_i12[i] < 1.e9) {
+                    mode = 221;
                     prim[i].temperature = - dphi_factor * base->phi[i] / (cv * gamma_adiabat) + const_T_space; //get_phi_grav(x_i12[i], enclosed_mass[0]);
                 } else {
+                    mode = 222;
                     prim[i].temperature = - dphi_factor * base->get_phi_grav(base->x_i12[i], base->planet_mass) / (cv * gamma_adiabat) + const_T_space;
                     //prim[i].temperature = - dphi_factor * base->phi[i] / (cv * gamma_adiabat) + const_T_space; get_phi_grav(x_i12[i], enclosed_mass[0]);
                 }
             } else {
-                
+                mode = 23;
                 prim[i].temperature = base->species[0].prim[i].temperature;
                 
             }
             
         }
         else {
+            mode = 3;
             prim[i].temperature = const_T_space;
         }
-            
-            
         
         if(debug>=2) {
-            cout<<"Just assigned T ="<<prim[i].temperature<<" to i = "<<i<<" with phi_grav = "<<base->phi[i]<<endl;
+            if(mode == 23) 
+                cout<<"Just assigned T ="<<prim[i].temperature<<" to i = "<<i<<" with phi_grav = "<<base->phi[i]<<" in mode = "<<mode<<" T[0] = "<< base->species[0].prim[i].temperature<<endl;
+            else
+                cout<<"Just assigned T ="<<prim[i].temperature<<" to i = "<<i<<" with phi_grav = "<<base->phi[i]<<" in mode = "<<mode<<endl;
+            
             //char a;
             //cin>>a;
             
@@ -1308,8 +1343,11 @@ void c_Species::initialize_hydrostatic_atmosphere(string filename) {
             eos->get_p_over_rho_analytic(&T_outer, &factor_outer); //sets factor = k*T/mu in the case of an ideal gas EOS
             eos->get_p_over_rho_analytic(&T_inner, &factor_inner);
             
-            metric_outer = (base->phi[i+1] - base->phi[i]) * base->omegaplus[i+1] * base->dx[i+1] / (base->dx[i+1] + base->dx[i]);
-            metric_inner = (base->phi[i+1] - base->phi[i]) * base->omegaminus[i]  * base->dx[i]   / (base->dx[i+1] + base->dx[i]);
+            //double dphi =  (base->phi[i+1] * K_zzf[i+1] - base->phi[i] * K_zzf[i]);
+            double dphi = phi_s[i+1] - phi_s[i];
+            
+            metric_outer = dphi * base->omegaplus[i+1] * base->dx[i+1] / (base->dx[i+1] + base->dx[i]);
+            metric_inner = dphi * base->omegaminus[i]  * base->dx[i]   / (base->dx[i+1] + base->dx[i]);
             
             temp_rhofinal = u[i+1].u1 * (factor_outer + metric_outer) / (factor_inner - metric_inner);
             
@@ -1326,8 +1364,8 @@ void c_Species::initialize_hydrostatic_atmosphere(string filename) {
                     
                 }
                 cout<<endl;
-                cout<<"     dphi debug: phi["<<i+1<<"] = "<<base->phi[i+1]<<" phi["<<i<<"] = "<<base->phi[i]<<" num_cells = "<<num_cells<<endl;
-                cout<<"     metric_inner debug: dPhi = "<<(base->phi[i+1] - base->phi[i])<<" dx[i+1]+dx[i] = "<<(base->dx[i+1] + base->dx[i])<<" omega*dx  = "<<base->omegaminus[i]  * base->dx[i]<<endl;
+                cout<<"     dphi debug: phi["<<i+1<<"] = "<<base->phi[i+1] * K_zzf[i+1]<<" phi["<<i<<"] = "<<base->phi[i]*K_zzf[i]<<" num_cells = "<<num_cells<<endl;
+                cout<<"     metric_inner debug: dPhi = "<<(base->phi[i+1]*K_zzf[i+1] - base->phi[i]*K_zzf[i])<<" dx[i+1]+dx[i] = "<<(base->dx[i+1] + base->dx[i])<<" omega*dx  = "<<base->omegaminus[i]  * base->dx[i]<<endl;
                 cout<<"     factor_inner debug: gamma-1 = "<<(gamma_adiabat-1.)<<" cv = "<<cv<<" T_inner = "<<T_inner<<endl;
                 cout<<"     metric_outer = "<< metric_outer << " metric_inner = "<<metric_inner <<endl;
                 cout<<"     factor_outer = "<< factor_outer << " factor_inner = "<<factor_inner <<endl;
@@ -1346,6 +1384,10 @@ void c_Species::initialize_hydrostatic_atmosphere(string filename) {
     } else {//REVERSE_HYDROSTAT_CONSTRUCTION
             int negdens = 0; 
             
+            //Ghost cells
+            for(int i =0; i<2; i++)
+                u[i] = AOS(u[i].u1, 0., cv * u[i].u1 *prim[i].temperature);
+            
             for(int i=1; i<=iter_start; i++)  {
             
             //
@@ -1357,10 +1399,19 @@ void c_Species::initialize_hydrostatic_atmosphere(string filename) {
             eos->get_p_over_rho_analytic(&T_outer, &factor_outer);
             eos->get_p_over_rho_analytic(&T_inner, &factor_inner);
             
-            metric_outer = (base->phi[i+1] - base->phi[i]) * base->omegaplus[i+1] * base->dx[i+1] / (base->dx[i+1] + base->dx[i]);
-            metric_inner = (base->phi[i+1] - base->phi[i]) * base->omegaminus[i]  * base->dx[i]   / (base->dx[i+1] + base->dx[i]);
+            double dphi = phi_s[i+1] - phi_s[i];
+            //double dphi = base->phi[i+1]*K_zzf[i+1] - base->phi[i]*K_zzf[i];
+            //double dphi = base->phi[i+1] - base->phi[i];
+            
+            metric_outer = dphi * base->omegaplus[i+1] * base->dx[i+1] / (base->dx[i+1] + base->dx[i]);
+            metric_inner = dphi * base->omegaminus[i]  * base->dx[i]   / (base->dx[i+1] + base->dx[i]);
             
             temp_rhofinal = u[i].u1 *  (factor_inner - metric_inner)/(factor_outer + metric_outer);
+            
+            if(dphi < 0.)
+                temp_rhofinal = u[i].u1;
+            
+            //cout<<" s/i = "<<speciesname<<"/"<<i<<"   metric_inner debug: dPhi = "<<dphi<<" rhonew/rhoold = "<<temp_rhofinal<<"/"<<u[i].u1<<endl;
             
             if(speciesname.compare("S2")==0) { //Force light electrons to be the same number as protons
             //if(speciesname.compare("e-")==0 ) { //Force light electrons to be the same number as protons
@@ -1380,7 +1431,7 @@ void c_Species::initialize_hydrostatic_atmosphere(string filename) {
             //////////////////////////////////////////////////////////////////////////////////////
             //double floor = base->density_floor / mass_amu * std::pow(base->x_i12[i]/base->x_i12[1], -4.);
             double floor = base->density_floor * std::pow(base->x_i12[i]/base->x_i12[1], -4.) * initial_fraction;
-            if( (temp_rhofinal < floor) || base->x_i12[i] > base->rhill) {
+            if( (temp_rhofinal < floor) || ( base->x_i12[i] > base->rhill  && base->use_tides == 1       ) ) {
                 
                 if(temp_rhofinal < 0.)
                     negdens = 1;
@@ -1393,9 +1444,12 @@ void c_Species::initialize_hydrostatic_atmosphere(string filename) {
             //    cout<<" electrons, i/rho = "<<i<<"/"<<temp_rhofinal<<endl;
             //}
             
+            //cout<<" s/i = "<<speciesname<<"/"<<i<<"   metric_inner debug: dPhi = "<<(base->phi[i+1]*K_zzf[i+1] - base->phi[i]*K_zzf[i])<<" rhonew/rhoold = "<<temp_rhofinal<<"/"<<u[i].u1<<" kzz = "<<K_zzf[i+1]<<"/"<<K_zzf[i]<<" To/Ti = "<<T_outer<<"/"<<T_inner<<endl;
+            
             u[i+1] = AOS(temp_rhofinal, 0., cv * temp_rhofinal * T_outer);
             
             if(debug > 2) {
+            //if(i < 3) {
                 
                 char a;
                 cout.precision(16);
@@ -1406,8 +1460,8 @@ void c_Species::initialize_hydrostatic_atmosphere(string filename) {
                     
                 }
                 cout<<endl;
-                cout<<"     dphi debug: phi["<<i+1<<"] = "<<base->phi[i+1]<<" phi["<<i<<"] = "<<base->phi[i]<<" num_cells = "<<num_cells<<endl;
-                cout<<"     metric_inner debug: dPhi = "<<(base->phi[i+1] - base->phi[i])<<" dx[i+1]+dx[i] = "<<(base->dx[i+1] + base->dx[i])<<" omega*dx  = "<<base->omegaminus[i]  * base->dx[i]<<endl;
+                cout<<"     dphi debug: phi["<<i+1<<"] = "<<base->phi[i+1]*K_zzf[i+1]<<" phi["<<i<<"] = "<<base->phi[i]*K_zzf[i]<<" num_cells = "<<num_cells<<endl;
+                cout<<"     metric_inner debug: dPhi = "<<(base->phi[i+1]*K_zzf[i+1] - base->phi[i]*K_zzf[i])<<" dx[i+1]+dx[i] = "<<(base->dx[i+1] + base->dx[i])<<" omega*dx  = "<<base->omegaminus[i]  * base->dx[i]<<endl;
                 cout<<"     factor_inner debug: gamma-1 = "<<(gamma_adiabat-1.)<<" cv = "<<cv<<" T_inner = "<<T_inner<<endl;
                 cout<<"     metric_outer = "<< metric_outer << " metric_inner = "<<metric_inner <<endl;
                 cout<<"     factor_outer = "<< factor_outer << " factor_inner = "<<factor_inner <<endl;
@@ -1485,12 +1539,14 @@ void c_Species::initialize_hydrostatic_atmosphere(string filename) {
     
     compute_pressure(u);
 
+    
     for(int i=num_cells; i>=0; i--)  {
         primlast[i].internal_energy = prim[i].internal_energy;
     }
     //
     // Apply multiplicators for over/underdensities just below and above the sonic point
     //
+    
     if(base->init_wind==1) {
         double csi              = prim[num_cells-1].sound_speed;
         double smoothed_factor;
@@ -1658,7 +1714,7 @@ void c_Species::apply_boundary_left(std::vector<AOS>& u) {
             for (int i=num_ghosts; i > 0; i--) {
                 AOS_prim prim ;
                 eos->compute_primitive(&u[i],&prim, 1) ;
-                double dphi = (base->phi[i] - base->phi[i-1]) / (base->dx[i-1] + base->dx[i]) ;
+                double dphi = (base->phi[i]*K_zzf[i] - base->phi[i-1]*K_zzf[i-1]) / (base->dx[i-1] + base->dx[i]) ;
                 dphi       *= (base->omegaplus[i]*base->dx[i] + base->omegaminus[i-1]*base->dx[i-1]) ;
                 prim.pres   = prim.pres + prim.density * dphi ;
                 prim.pres   = std::max( prim.pres, 0.0) ;
@@ -1716,7 +1772,7 @@ void c_Species::apply_boundary_right(std::vector<AOS>& u) {
                 eos->compute_primitive(&u[i-1],&prim, 1) ;
                 
                 if(false) {
-                    double dphi = (base->phi[i] - base->phi[i-1]) / (base->dx[i-1] + base->dx[i]) ;
+                    double dphi = (base->phi[i]*K_zzf[i] - base->phi[i-1]*K_zzf[i-1]) / (base->dx[i-1] + base->dx[i]) ;
                     //dphi *= (base->omegaplus[i]*base->dx[i] + base->omegaminus[i-1]*base->dx[i-1]) ;
                     //dphi *= (prim.density * base->omegaplus[i]*base->dx[i] + this->prim[i].density * base->omegaminus[i-1]*base->dx[i-1]) ;
                     dphi *= (this->prim[i].density* base->omegaplus[i]*base->dx[i] +  prim.density  * base->omegaminus[i-1]*base->dx[i-1]) ;
@@ -1741,7 +1797,7 @@ void c_Species::apply_boundary_right(std::vector<AOS>& u) {
                 
                 
                 if(true) {
-                    double dphi = (base->phi[i] - base->phi[i-1]) / (base->dx[i-1] + base->dx[i]) ;
+                    double dphi = (base->phi[i]*K_zzf[i] - base->phi[i-1]*K_zzf[i-1]) / (base->dx[i-1] + base->dx[i]) ;
                     prim.pres = prim.pres -  prim.density * dphi ;    
                     
                 }

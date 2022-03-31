@@ -151,8 +151,10 @@
         //
         assert(j > 0 && j <= num_cells) ;
 
-        double dphidr_p = (base->phi[j] - base->phi[j-1]) / (base->dx[j] + base->dx[j-1]) ;
-        double dphidr_m = (base->phi[j+1] - base->phi[j]) / (base->dx[j+1] + base->dx[j]) ;
+        double dphidr_p = (phi_s[j] - phi_s[j-1]) / (base->dx[j] + base->dx[j-1]) ;
+        //double dphidr_p = (base->phi[j]*K_zzf[j] - base->phi[j-1]*K_zzf[j-1]) / (base->dx[j] + base->dx[j-1]) ;
+        double dphidr_m = (phi_s[j+1] - phi_s[j]) / (base->dx[j+1] + base->dx[j]) ;
+        //double dphidr_m = (base->phi[j+1]*K_zzf[j+1] - base->phi[j]*K_zzf[j]) / (base->dx[j+1] + base->dx[j]) ;
 
         return AOS(0, u.u1, u.u2) * (-1.) * ( base->omegaplus[j] * dphidr_p  + base->omegaminus[j] * dphidr_m);
         

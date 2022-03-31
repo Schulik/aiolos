@@ -381,8 +381,8 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
     
      if(Jswitch == 1) {
         
-        char a;
-        cin>>a;
+        //char a;
+        //cin>>a;
     }
     
     //

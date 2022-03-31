@@ -49,6 +49,13 @@ void c_Sim::init_reactions(int cdebug) {
     photoreactions.push_back(c_photochem_reaction( ns, num_bands_in, 0, {4}, {5,2}, {1.}, {1.,1.}, 1., 11.26 )); //C + gamma -> C+ + e-
     photoreactions.push_back(c_photochem_reaction( ns, num_bands_in, 0, {7}, {8,2}, {1.}, {1.,1.}, 1., 13.6181 )); //O + gamma -> O+ + e-
     
+    //
+    // Thermal ionization, H data from ????, NCO data from Annaloro+2012 https://aip.scitation.org/doi/pdf/10.1063/1.4737147
+    //reactions.push_back(c_reaction(0, ns, {0}, {1,2}, {1.}, {1.,1.}, 4e-11, +0.55, 0. )); //H (exact below 25e3 K)
+    reactions.push_back(c_reaction(0, ns, {0}, {1,2}, {1.}, {1.,1.}, 2.167e-5, -0.4, 157807. )); //H (exact below 25e3 K)
+    reactions.push_back(c_reaction(0, ns, {4}, {5,2}, {1.}, {1.,1.}, 9.72e-3, -2.074, 127510. )); //C
+    reactions.push_back(c_reaction(0, ns, {7}, {8,2}, {1.}, {1.,1.}, 1.37e-2, -2.237, 157840. )); //O
+    
     //photoreactions.push_back(c_photochem_reaction( ns, num_bands_in, 0, {0}, {1,2}, {1.}, {1.,1.}, 1., 13.6 )); //H + gamma -> H+ + e-
     //photoreactions.push_back(c_photochem_reaction( ns, num_bands_in, 0, {4}, {5,2}, {1.}, {1.,1.}, 1., 11.26 )); //C + gamma -> C+ + e-
     //photoreactions.push_back(c_photochem_reaction( ns, num_bands_in, 0, {7}, {8,2}, {1.}, {1.,1.}, 1., 13.6181 )); //O + gamma -> O+ + e-
@@ -56,11 +63,33 @@ void c_Sim::init_reactions(int cdebug) {
     //reactions.push_back(c_reaction(0, ns, {8,2}, {7}, {1.,1.}, {1.}, 5.657e-10, -0.8433, 0. )); //e- + O+(^4S) recombination 400-10.000K   https://journals.aps.org/pra/pdf/10.1103/PhysRevA.43.3433
     //reactions.push_back(c_reaction(0, ns, {5,2}, {4}, {1.,1.}, {1.}, 9.00e-10, -0.9, 0. )); //e- + C+ -> C recombination for at logT=3.5   https://iopscience.iop.org/article/10.1086/313013/pdf
     
-    reactions.push_back(c_reaction(0, ns, {1,2}, {0}, {1.,1.}, {1.}, 1.074889e-9, -0.9, 0. )); //Electron-proton recombination
-    reactions.push_back(c_reaction(0, ns, {8,2}, {7}, {1.,1.}, {1.}, 5.657e-10, -0.0, 0. )); //e- + O+(^4S) recombination 400-10.000K   https://journals.aps.org/pra/pdf/10.1103/PhysRevA.43.3433
-    reactions.push_back(c_reaction(0, ns, {5,2}, {4}, {1.,1.}, {1.}, 9.00e-10, -0.0, 0. )); //e- + C+ -> C recombination for at logT=3.5   https://iopscience.iop.org/article/10.1086/313013/pdf
     
-    reactions.push_back(c_reaction(0, ns, {0}, {1,2}, {1.}, {1.,1.}, 4e-11, +0.55, 0. )); //Thermal ionization of hydrogen (exact below 25e3 K)
+    //reactions.push_back(c_reaction(0, ns, {8,2}, {7}, {1.,1.}, {1.}, 5.657e-10, -0.0, 0. )); //e- + O+(^4S) recombination 400-10.000K   https://journals.aps.org/pra/pdf/10.1103/PhysRevA.43.3433
+    //reactions.push_back(c_reaction(0, ns, {5,2}, {4}, {1.,1.}, {1.}, 9.00e-10, -0.0, 0. )); //e- + C+ -> C recombination for at logT=3.5   https://iopscience.iop.org/article/10.1086/313013/pdf
+    
+    //
+    // Hydrogen I recombination
+    reactions.push_back(c_reaction(0, ns, {1,2}, {0}, {1.,1.}, {1.}, 1.074889e-9, -0.9, 0. )); //Electron-proton recombination
+    
+    //
+    // Oxygen I recombination: OII + e- -> OI, powerlaw and resonance bump - fit to data from Sultana N. Nahar APJS (in press, 1998) deviates from data for T > 4e7 K
+    reactions.push_back(c_reaction(0, ns, {8,2}, {7}, {1.,1.}, {1.}, 1.357e-10, -0.658, 0. )); 
+    reactions.push_back(c_reaction(0, ns, {8,2}, {7}, {1.,1.}, {1.}, 7.5e-4, -1.5, 180000. )); 
+    
+    // Oxygen II recombination: OIII + e- -> OII, powerlaw and resonance bump - fit to data from Sultana N. Nahar APJS (in press, 1998) deviates from data for T > 4e7 K
+    reactions.push_back(c_reaction(0, ns, {9,2}, {8}, {1.,1.}, {1.}, 5.75e-10, -0.595, 0. )); 
+    reactions.push_back(c_reaction(0, ns, {9,2}, {8}, {1.,1.}, {1.}, 6.55e-3, -1.55, 220000. )); 
+    
+    //
+    // Carbon I recombination: CII + e- -> CI, powerlaw and resonance bump - fit to data from Sultana N. Nahar APJS (in press, 1998) deviates around the bump by up to 20%
+    reactions.push_back(c_reaction(0, ns, {5,2}, {4}, {1.,1.}, {1.}, 1.457e-10, -0.608, 0. )); //e- + C+ -> C recombination for at logT=3.5   https://iopscience.iop.org/article/10.1086/313013/pdf
+    reactions.push_back(c_reaction(0, ns, {5,2}, {4}, {1.,1.}, {1.}, 2.05e-4, -1.35, 117500. )); //e- + C+ -> C recombination for at logT=3.5   https://iopscience.iop.org/article/10.1086/313013/pdf
+    
+    //
+    // Carbon II recombination: CIII + e- -> CII, powerlaw, weak and strong resonance bump - fit to data from Sultana N. Nahar APJS (in press, 1998), deviates for T>4e7
+    reactions.push_back(c_reaction(0, ns, {6,2}, {5}, {1.,1.}, {1.}, 6.457e-10, -0.595, 0. ));
+    reactions.push_back(c_reaction(0, ns, {6,2}, {5}, {1.,1.}, {1.}, 6.55e-3, -1.55, 140500. ));
+    reactions.push_back(c_reaction(0, ns, {6,2}, {5}, {1.,1.}, {1.}, 7.55e-8, -1.05, 3600. ));
     
     //photoreactions.push_back(c_photochem_reaction( ns, num_bands_in, 0, {2}, {3,4}, {1.}, {1.,1.}, 1./3., 13.6)); //H2 + gamma-> H2+ + e-
     //photoreactions.push_back(c_photochem_reaction( ns, num_bands_in, 0, {2}, {0}, {1.}, {2.}, 1./3., 13.6)); //H2 + gamma-> 2H
@@ -241,8 +270,10 @@ void c_Sim::do_chemistry() {
         double temp_dt = dt;
         double t_div = 1.;
         
-        std::vector<double> n_init = np_zeros(num_species);
-        std::vector<double> n_tmp  = np_zeros(num_species);
+        //std::vector<double> n_init = np_zeros(num_species);
+        //std::vector<double> n_tmp  = np_zeros(num_species);
+        Vector_t n_init = Vector_t(num_species);
+        Vector_t n_tmp = Vector_t(num_species);
         
         int switch_negative  = 0;
         int switch_precision = 0;
@@ -255,7 +286,7 @@ void c_Sim::do_chemistry() {
             //n_tot += n_olds[s];
         }
         for(int s=0;s<num_species; s++) {
-            n_init[s]     = species[s].prim[j].number_density / n_tot;
+            n_init(s)     = species[s].prim[j].number_density / n_tot;
             //n_tmp[s]      = n_zero[s];
         }
         
@@ -265,7 +296,7 @@ void c_Sim::do_chemistry() {
         for(int i=chemistry_miniter; i <= chemistry_maxiter; i *= 2) {
             
             for(int s=0;s<num_species; s++) {
-                n_tmp[s]      = n_init[s];
+                n_tmp(s)      = n_init(s);
             }
             
             int check_chem = 1;
@@ -279,7 +310,7 @@ void c_Sim::do_chemistry() {
                 n_tmp = solver_cchem_implicit_general(dt_eff, j, 0, n_tmp, n_tot);
                 //if(globalTime>=1e-3 && j==233)
                 if(i>1e9) {
-                    cout<<" chem cell "<<j<<" repeat level "<<i<<" repeat number "<<k<<" dt_div = "<<dt_eff<<" dt = "<<dt<<" t = "<<globalTime<<" n_tmp[0] = "<<n_tmp[0]<<" dn_absolute[0] = "<<n_tmp[0]-n_init[0]<<endl; 
+                    cout<<" chem cell "<<j<<" repeat level "<<i<<" repeat number "<<k<<" dt_div = "<<dt_eff<<" dt = "<<dt<<" t = "<<globalTime<<" n_tmp[0] = "<<n_tmp(0)<<" dn_absolute[0] = "<<n_tmp(0)-n_init(0)<<endl; 
                     char b;
                     cin>>b;
                 }
@@ -292,10 +323,10 @@ void c_Sim::do_chemistry() {
             //
             for(int s=0;s<num_species; s++) {
                 
-                if(n_tmp[s] < 0) {
+                if(n_tmp(s) < 0) {
                     check_chem = 0; // We need to go again
                 }
-                if(fabs(1.-n_tmp[s]/n_init[s]) > chemistry_precision) { //Not a convergence criterion, but precision requirement for wobbling solutions. Obvs the true solution might disobey this criterion, but we enforce higher precision for large Delta n
+                if(fabs(1.-n_tmp(s)/n_init(s)) > chemistry_precision) { //Not a convergence criterion, but precision requirement for wobbling solutions. Obvs the true solution might disobey this criterion, but we enforce higher precision for large Delta n
                     check_chem = 0;
                 }
             }
@@ -319,10 +350,10 @@ void c_Sim::do_chemistry() {
         //if(switch1 + switch2 == 0) {
         for(int s=0;s<num_species; s++) {
             
-            if(n_tmp[s] < 1e-20)
-                n_tmp[s] = 1e-20;
+            if(n_tmp(s) < 1e-20)
+                n_tmp(s) = 1e-20;
                 
-            species[s].prim[j].number_density = n_tmp[s] * n_tot;
+            species[s].prim[j].number_density = n_tmp(s) * n_tot;
             species[s].prim[j].density        = species[s].prim[j].number_density * species[s].mass_amu*amu;
             //species[s].prim[cell].internal_energy *= n_news(s)/n_olds[s];
                 
@@ -351,10 +382,10 @@ void c_Sim::do_chemistry() {
         
         for(int s=0;s<num_species; s++) {
             
-            if(n_tmp[s] < 1e-30)
-                n_tmp[s] = 1e-30;
+            if(n_tmp(s) < 1e-30)
+                n_tmp(s) = 1e-30;
                 
-            species[s].prim[j].number_density = n_tmp[s] * n_tot;
+            species[s].prim[j].number_density = n_tmp(s) * n_tot;
             species[s].prim[j].density        = species[s].prim[j].number_density * species[s].mass_amu*amu;
             //species[s].prim[cell].internal_energy *= n_news(s)/n_olds[s];
                 
@@ -408,10 +439,21 @@ double c_reaction::get_reaction_rate(double T) {
 //
 // Recombination reactions are regular chemical reactions which don't conserve particle number (by using the appropriate stochiometric coefficients).
 //
-std::vector<double> c_Sim::solver_cchem_implicit_general(double dtt, int cell, int cdebug, const std::vector<double>& n_olds, double n_tot) {
+Vector_t c_Sim::solver_cchem_implicit_general(double dtt, int cell, int cdebug, const Vector_t& n_olds, double n_tot) {
     
-    reaction_matrix = Matrix_t::Zero(num_species, num_species);
-    reaction_b      = Vector_t(num_species);
+    //reaction_matrix = Matrix_t::Zero(num_species, num_species);
+    //reaction_b      = Vector_t(num_species);
+    
+    for(int si=0; si<num_species; si++) {
+        reaction_b(si) = 0.;
+        //n_news(si) = 0.;
+        for(int sj=0; sj<num_species; sj++) {
+            reaction_matrix(si,sj) = 0.;
+        }
+        
+        
+    }
+    
     Vector_t n_news = Vector_t(num_species);
     double Tcell           = species[0].prim[cell].temperature;
     //dtt = 1e-3;
@@ -724,11 +766,11 @@ std::vector<double> c_Sim::solver_cchem_implicit_general(double dtt, int cell, i
     }
         
     
-    std::vector<double> n_tmp2  = np_zeros(num_species);
-    for(int s=0; s< num_species; s++)
-        n_tmp2[s] = n_news(s);
+    //std::vector<double> n_tmp2  = np_zeros(num_species);
+    //for(int s=0; s< num_species; s++)
+    //    n_tmp2[s] = n_news(s);
     
-    return n_tmp2;
+    return n_news; //n_tmp2;
 }
 
 //

@@ -521,6 +521,9 @@ public:
     Eigen::VectorXd alphas_sample;
     Eigen::VectorXd friction_sample;
     
+    double K_zz_init;
+    std::vector<double> K_zz;
+    
     //
     // Radiation
     //
@@ -612,6 +615,7 @@ public:
     std::vector<double> n_init;
     std::vector<double> n_tmp;
     Matrix_t reaction_matrix;
+    //Vector_t n_news;
     Eigen::PartialPivLU<Matrix_t> LUchem;
     
     Matrix_t chem_momentum_matrix;
@@ -624,7 +628,7 @@ public:
     void init_reactions(int cdebug);
     void do_chemistry();
     
-    std::vector<double> solver_cchem_implicit_general(double dt, int num_spec, int cdebug, const std::vector<double>& n_normalized, double ntot);
+    Vector_t solver_cchem_implicit_general(double dt, int num_spec, int cdebug, const Vector_t& n_normalized, double ntot);
     int solver_cchem_implicit_specialized_cochem(double dt, int num_spec, int cdebug);
     
     std::vector<double> thermo_poly(double T,double a1,double a2,double a3,double a4,double a5,double a6,double a7,double a8,double a9);
@@ -787,6 +791,7 @@ public:
     std::vector<AOS> flux;
     std::vector<double> lconvect;
     std::vector<double> u_analytic;
+    std::vector<double> K_zzf;     //(1+K_zz*n/b*mu/m_s) / (1+Kzz*n/b), which can be computed globally, so that every species s in cell i just needs to replace phi_i -> phi_i (1 + k_zzf / m_s)
     
     Eigen::MatrixXd opacity_data;  //superhigh-res lamdba grid, resolution dependent on minimum wl-distance in opacity data
     Eigen::VectorXd opacity_avg_solar;   //num_bands_in, this is the non-weighted average of opacity_data over the bands.
@@ -905,9 +910,11 @@ public:
         double dp_final;
     
         if(plusminus == -1) {
-                dp_final = - base->dx[i] * base->omegaplus[i] * (base->phi[i-1] - base->phi[i]) / (base->dx[i-1] + base->dx[i]);
+                dp_final = - base->dx[i] * base->omegaplus[i] * (phi_s[i-1] - phi_s[i]) / (base->dx[i-1] + base->dx[i]);
+                //dp_final = - base->dx[i] * base->omegaplus[i] * (base->phi[i-1]*K_zzf[i-1] - base->phi[i]*K_zzf[i]) / (base->dx[i-1] + base->dx[i]);
         } else {
-                dp_final = - base->dx[i] * base->omegaminus[i] * (base->phi[i+1] - base->phi[i]) / (base->dx[i+1] + base->dx[i]);
+                dp_final = - base->dx[i] * base->omegaminus[i] * (phi_s[i+1] - phi_s[i]) / (base->dx[i+1] + base->dx[i]);
+                //dp_final = - base->dx[i] * base->omegaminus[i] * (base->phi[i+1]*K_zzf[i+1] - base->phi[i]*K_zzf[i]) / (base->dx[i+1] + base->dx[i]);
         }
             
         return dp_final;
@@ -918,11 +925,14 @@ public:
     AOS hllc_flux(int);
     AOS dust_flux(int);
     AOS source_grav(AOS &u, int &j);
+    std::vector<double> phi_s;
 
     void compute_pressure(std::vector<AOS>& u) {
         eos->compute_primitive(&(u[0]), &(prim[0]), num_cells+2) ;    
         eos->compute_auxillary(&(prim[0]), num_cells+2);
     }
+    
+    void update_kzz_and_gravpot(int argument);
     
     void update_opacities();
     double interpol_tabulated_opacity(const Eigen::VectorXd& array, int band, double T_gas, double pressure);

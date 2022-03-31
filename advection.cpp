@@ -128,6 +128,9 @@ void c_Sim::execute() {
         //if(use_self_gravity==1)
         update_mass_and_pot();
         
+        for(int s=0; s<num_species; s++)
+            species[s].update_kzz_and_gravpot(s);  //Recomputes the homopause boundary and adjusts species-specific potentials
+        
         if(debug >= 2)
             cout<<"Before fluxes... ";
         
@@ -669,4 +672,51 @@ AOS c_Species::dust_flux(int j)
     } else {
         return (flux(Wl) + flux(Wr)) * 0.5 ;
     }
+}
+
+void c_Species::update_kzz_and_gravpot(int argument) {
+    
+    int homopause_boundary_i = 0;
+    double mu = base->species[0].mass_amu;
+    double mi = this->mass_amu;
+    
+    if(argument > 0 && mi > 1e-3) { //Do the kzz buildup for all other species except atomic hydrogen (assumed species[0]) and no electrons (mass = 5e-4).
+        
+        for(int i=0; i<num_cells+2; i++) {
+            double n   = base->species[0].prim[i].number_density;
+            double ni  = this->prim[i].number_density;
+            double kzz = base->K_zz[i]; //This is a meta-parameter for k_zz/b 
+            double par = std::pow(n, 1./1.);
+            
+            K_zzf[i] = (1. + kzz*par*mu/mi) / (1. + kzz*par);
+            if(kzz*n < 1.)
+                K_zzf[i] = 1.;
+            else
+                K_zzf[i] = mu/mi;
+            
+            double one = 0.99999;
+            if(K_zzf[i] > one && K_zzf[i-1] < one) //found homopause
+                homopause_boundary_i = i;
+        }
+            
+    }
+    else {
+        for(int i=0; i<num_cells+2; i++) {
+            K_zzf[i] = 1.;
+        }
+    }
+    
+    
+    for(int i=0; i<num_cells+2; i++) {
+                phi_s[i] = base->phi[i] * K_zzf[i];
+    }
+    double phicorrection = base->phi[homopause_boundary_i]*(1.-mu/mi); //Correct for the jump in Phi at the homopause
+    if(homopause_boundary_i == 0)
+        phicorrection = 0;
+    
+    for(int i=0; i<homopause_boundary_i; i++) 
+        phi_s[i] += phicorrection;
+    
+    //cout<<"s = "<<argument<<" phicorr = "<<phicorrection<<" homopause_i = "<<homopause_boundary_i<<endl;
+    //cout<<"Finished updating kzz in species "<<speciesname<<endl;
 }
