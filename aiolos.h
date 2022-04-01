@@ -382,6 +382,7 @@ public:
     double T_crit_min;
     double T_crit_max; //Critical min/max temperatures beyond which one should extend the wavelength grid
     string fluxfile;
+    double fluxmultiplier; //In case one forgot a unit conversion...
     
     int num_cells;
     std::vector<double>dx;
@@ -624,7 +625,11 @@ public:
     double chemistry_precision;
     int chemistry_maxiter;
     int chemistry_miniter;
+    double chemistry_numberdens_floor;
     
+    int intermediate_chemfloor_check;
+    int chem_momentum_correction;
+    int chem_ekin_correction;
     void init_reactions(int cdebug);
     void do_chemistry();
     

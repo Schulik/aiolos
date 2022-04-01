@@ -458,7 +458,11 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
                 
                 double tt = coll_heat_output(si);
                 
+                int idx_s = j * (num_species) + si;
+                //double tt = eta1[idx_s]/denoms[idx_s] + eta2[idx_s]/denoms[idx_s]*Jrad_FLD(j, 0);
+                
                 if(tt < 0.) {
+                    cout<<" negative T after TiTj s = "<<species[si].speciesname<<" j/s = "<<j<<"/"<<si<<" eta1/eta2/J = "<<eta1[idx_s]<<"/"<<eta2[idx_s]<<"/"<<Jrad_FLD(j, 0)<<" denom/eta2*J = "<<denoms[idx_s]<<"/"<<eta2[idx_s]*Jrad_FLD(j,0)<<" t/dt/steps = "<<globalTime<<"/"<<ddt<<"/"<<steps<<endl;
                         //cout<<" negative T after TiTj in s = "<<species[si].speciesname<<" j/s = "<<j<<"/"<<si<<" t/dt/steps = "<<globalTime<<"/"<<ddt<<"/"<<steps<<endl;
                         //Tswitch = 1;
                 }
@@ -471,6 +475,21 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
                 
                 species[si].prim[j].temperature = tt ;
             }
+        }
+        
+        //misbehaving atoms get reset beyond the sonic point
+        for(int s=0; s<num_species; s++) {
+            if(s==4 || s==7) { 
+                
+                for (int j=num_cells-5; j < num_cells+2; j++){
+                    
+                    species[s].prim[j].temperature = species[s].prim[num_cells-6].temperature ;
+                }
+                
+                //species[s].prim[num_cells+2].temperature = 0.9*species[s].prim[num_cells].temperature;
+                
+            }
+            
         }
         
         
@@ -488,7 +507,7 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
                 //    cout<<"t = "<<steps<<" T = "<<tt<<endl;
                 
                 if(tt < 0.) {
-                    //cout<<" negative T in s = "<<species[s].speciesname<<" j/s = "<<j<<"/"<<s<<" eta1/eta2/J = "<<eta1[idx_s]<<"/"<<eta2[idx_s]<<"/"<<Jrad_FLD(j, 0)<<" denom/eta2*J = "<<denoms[idx_s]<<"/"<<eta2[idx_s]*Jrad_FLD(j,0)<<" t/dt/steps = "<<globalTime<<"/"<<ddt<<"/"<<steps<<endl;
+                    cout<<" negative T in s = "<<species[s].speciesname<<" j/s = "<<j<<"/"<<s<<" eta1/eta2/J = "<<eta1[idx_s]<<"/"<<eta2[idx_s]<<"/"<<Jrad_FLD(j, 0)<<" denom/eta2*J = "<<denoms[idx_s]<<"/"<<eta2[idx_s]*Jrad_FLD(j,0)<<" t/dt/steps = "<<globalTime<<"/"<<ddt<<"/"<<steps<<endl;
                     Tswitch = 1;
                 }
                 
@@ -503,6 +522,20 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
                 //if(j==num_cells)
                 //    cout<<" num_cells = "<<num_cells<<" temp = "<<species[s].prim[j].temperature<<endl;
             }
+        }
+        
+        for(int s=0; s<num_species; s++) {
+            if(s==4 || s==7) { //misbehaving atoms get reset beyond the sonic point
+                
+                for (int j=num_cells-5; j < num_cells+1; j++){
+                    
+                    species[s].prim[j].temperature = species[s].prim[num_cells-6].temperature ;
+                }
+                
+                //species[s].prim[num_cells+2].temperature = 0.9*species[s].prim[num_cells].temperature;
+                
+            }
+            
         }
         
     }
