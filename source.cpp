@@ -535,7 +535,7 @@ void c_Sim::compute_alpha_matrix(int j) { //Called in compute_friction() and com
                             }
                             else if(std::abs(ci) == 0 || std::abs(cj) == 0) {//i-n collision
                                 
-                                alpha_local = 2.21 * 3.141592 * numdens_vector(sj) * mass_vector(sj)/(mass_vector(sj)+mass_vector(si));
+                                alpha_local = 100.*2.21 * 3.141592 * numdens_vector(sj) * mass_vector(sj)/(mass_vector(sj)+mass_vector(si));
                                 alpha_local *= std::sqrt(0.66 / mumass ) * 1e-12 * qn * elm_charge; //0.66 is the polarizability of neutral atomic H
                                 
                                 ccase = " i-n ";

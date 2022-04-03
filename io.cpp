@@ -415,9 +415,20 @@ int c_Species::read_species_data(string filename, int species_index) {
             //}
             
         }*/
+        
             
-            
-        //cout<<"pos4"<<endl;
+        for(int b = 0; b < num_bands_in; b++)  if(std::isnan(opacity_avg_solar(b) )) opacity_avg_solar(b) = 1e-10;
+        for(int b = 0; b < num_bands_out; b++) if(std::isnan(opacity_avg_planck(b) )) opacity_avg_planck(b) = 1e-10;
+        for(int b = 0; b < num_bands_out; b++) if(std::isnan(opacity_avg_rosseland(b) )) opacity_avg_rosseland(b) = 1e-10;
+        
+        for(int b = 0; b < num_bands_in; b++)  if((opacity_avg_solar(b)<1e-10 )) opacity_avg_solar(b) = 1e-10;
+        for(int b = 0; b < num_bands_out; b++) if((opacity_avg_planck(b)<1e-10 )) opacity_avg_planck(b) = 1e-10;
+        for(int b = 0; b < num_bands_out; b++) if((opacity_avg_rosseland(b)<1e-10 )) opacity_avg_rosseland(b) = 1e-10;
+        
+        if(this->this_species_index ==7) {
+            if(num_bands_in >= 10) 
+                opacity_avg_solar(10) = 1e-10;
+        }
         
         for(int b = 0; b < num_bands_in; b++) opacity_avg_solar(b)      *=  base->const_opacity_solar_factor;
         for(int b = 0; b < num_bands_out; b++) opacity_avg_planck(b)    *=  base->const_opacity_planck_factor;
@@ -808,7 +819,7 @@ void c_Species::print_AOS_component_tofile(int timestepnumber) {
         } 
         
         //Print right ghost stuff
-        //outfile<<base->x_i12[num_cells+1]<<'\t'<<u[num_cells+1].u1<<'\t'<<u[num_cells+1].u2<<'\t'<<u[num_cells+1].u3<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<prim[num_cells+1].pres<<'\t'<<u[num_cells+1].u2/u[num_cells+1].u1<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<base->phi[num_cells+1]<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<endl;
+        outfile<<base->x_i12[num_cells+1]<<'\t'<<u[num_cells+1].u1<<'\t'<<u[num_cells+1].u2<<'\t'<<u[num_cells+1].u3<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<prim[num_cells+1].pres<<'\t'<<u[num_cells+1].u2/u[num_cells+1].u1<<'\t'<<prim[num_cells+1].temperature<<'\t'<<'-'<<'\t'<<base->phi[num_cells+1]<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<endl;
    
         cout<<"    Sucessfully written file "<<filename<<" for species = "<<speciesname<<" t = "<<base->globalTime<<" dt = "<<base->dt<<", cfl = "<<base->cflfactor<<" steps = "<<base->steps<<endl;
     }

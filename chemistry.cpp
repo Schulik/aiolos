@@ -44,10 +44,10 @@ void c_Sim::init_reactions(int cdebug) {
     // H+ H2+ ion system
     ////photoreactions.push_back(c_photochem_reaction( ns, num_bands_in, 0, {0}, {1,4}, {1.}, {1.,1.}, 1., 13.6 )); //H + gamma -> H+ + e-
     
-    photoreactions.push_back(c_photochem_reaction( ns, num_bands_in, 0, {0}, {1,2}, {1.}, {1.,1.}, 1., 13.6 )); //H + gamma -> H+ + e-
+    photoreactions.push_back(c_photochem_reaction( ns, num_bands_in, 9, {0}, {1,2}, {1.}, {1.,1.}, 1., 13.6 )); //H + gamma -> H+ + e-
     //photoreactions.push_back(c_photochem_reaction( ns, num_bands_in, 1, {0}, {1,2}, {1.}, {1.,1.}, 1., 13.6 )); //H + gamma -> H+ + e-
-    photoreactions.push_back(c_photochem_reaction( ns, num_bands_in, 0, {4}, {5,2}, {1.}, {1.,1.}, 1., 11.26 )); //C + gamma -> C+ + e-
-    photoreactions.push_back(c_photochem_reaction( ns, num_bands_in, 0, {7}, {8,2}, {1.}, {1.,1.}, 1., 13.6181 )); //O + gamma -> O+ + e-
+    photoreactions.push_back(c_photochem_reaction( ns, num_bands_in, 10, {4}, {5,2}, {1.}, {1.,1.}, 1., 11.26 )); //C + gamma -> C+ + e-
+    photoreactions.push_back(c_photochem_reaction( ns, num_bands_in, 9, {7}, {8,2}, {1.}, {1.,1.}, 1., 13.6181 )); //O + gamma -> O+ + e-
     
     //
     // Thermal ionization, H data from ????, NCO data from Annaloro+2012 https://aip.scitation.org/doi/pdf/10.1063/1.4737147
@@ -314,6 +314,14 @@ void c_Sim::do_chemistry() {
                     char b;
                     cin>>b;
                 }
+                if(intermediate_chemfloor_check == 1) {
+                    
+                    for(int s=0;s<num_species; s++) {
+                        if(n_tmp(s) < chemistry_numberdens_floor) {
+                            n_tmp(s) = chemistry_numberdens_floor;
+                        }
+                    }
+                }
                     
             
             }
@@ -350,8 +358,8 @@ void c_Sim::do_chemistry() {
         //if(switch1 + switch2 == 0) {
         for(int s=0;s<num_species; s++) {
             
-            if(n_tmp(s) < 1e-20)
-                n_tmp(s) = 1e-20;
+            if(n_tmp(s) < chemistry_numberdens_floor)
+                n_tmp(s) = chemistry_numberdens_floor;
                 
             species[s].prim[j].number_density = n_tmp(s) * n_tot;
             species[s].prim[j].density        = species[s].prim[j].number_density * species[s].mass_amu*amu;
@@ -382,8 +390,8 @@ void c_Sim::do_chemistry() {
         
         for(int s=0;s<num_species; s++) {
             
-            if(n_tmp(s) < 1e-30)
-                n_tmp(s) = 1e-30;
+            if(n_tmp(s) < chemistry_numberdens_floor)
+                n_tmp(s) = chemistry_numberdens_floor;
                 
             species[s].prim[j].number_density = n_tmp(s) * n_tot;
             species[s].prim[j].density        = species[s].prim[j].number_density * species[s].mass_amu*amu;
@@ -609,9 +617,11 @@ Vector_t c_Sim::solver_cchem_implicit_general(double dtt, int cell, int cdebug, 
     for(c_reaction& reaction : reactions) {
         double meanT = 0.;
         double denom = 0.;
+        double maxT = 0;
         for(int& pi : reaction.products) {
             meanT += species[pi].prim[cell].temperature * species[pi].prim[cell].number_density; //Use density here, as it hasn't been updated in between subcyclings. This leaves reac_r constant during subcycling
             denom += species[pi].prim[cell].number_density;
+            maxT = std::fmax(species[pi].prim[cell].temperature, maxT);
         }
         meanT = meanT/denom;
         
@@ -936,7 +946,7 @@ void c_Sim::update_dS_jb_photochem(int cell) {
     // Momentum correction due to density changes
     //
     //
-    if(do_hydrodynamics >= 0 && globalTime > 1.1e-20) { //&& steps > 10
+    if(do_hydrodynamics >= 0 && globalTime > 1.0e-19 && chem_momentum_correction == 1) { //&& steps > 10
         
         
         double dEk = 0.;
@@ -1002,7 +1012,10 @@ void c_Sim::update_dS_jb_photochem(int cell) {
 //                 cout<<" n_init = "<<n_init[s]-species[s].u[cell].u1/(species[s].mass_amu*amu)<<endl;
                 
                 dmom_tot += mom_news(s)-mom[s];
-                dEk2     += 0.0 * (mom_news(s)*mom_news(s)*species[s].prim[cell].number_density - mom[s]*mom[s]*n_init[s])/(species[s].mass_amu * amu);
+                if(chem_ekin_correction)
+                    dEk2 += (mom_news(s)*mom_news(s)*species[s].prim[cell].number_density - mom[s]*mom[s]*n_init[s])/(species[s].mass_amu * amu);
+                else
+                    dEk2 += 0.;
                 
                 vnew[s]                     = mom_news(s) / (n_olds[s]*n_tot*species[s].mass_amu*amu) ; 
                 //cout<<" vold/vnew = "<<species[s].prim[cell].speed<<"/"<<vnew[s]<<" dv = "<<vnew[s]-species[s].prim[cell].speed<<" dvrel = "<<1-vnew[s]/species[s].prim[cell].speed<<endl;

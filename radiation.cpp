@@ -111,16 +111,14 @@ void c_Sim::update_dS_jb(int j, int b) {
                             dS_he_temp *=  -fastexpm1_2(-const_opacity_solar_factor * cell_optical_depth_highenergy(j,b)) ;
                         //dS_band(j,b) *= ( std::exp( const_opacity_solar_factor* (cell_optical_depth_highenergy(j,b)) ) - std::exp( const_opacity_solar_factor* (dtau_tot) ) );
                         
-                        
-                        
                         dS_band(j,b) -= dS_he_temp;
                         dS_band(j,b) = std::max(dS_band(j,b), 0.); //Safeguard against highenergy shenanigans
                         if(BAND_IS_HIGHENERGY[b] && photochemistry_level==1)
                             dS_band(j,b) = 0.;
                         
-                        if(b==1000) {
+                        if(b==999) {
                             cout<<" in thermal heating: total heating ~ "<<dS_band(j,b)<<" of which highenergy is "<<dS_he_temp;
-                            cout<<" resulting in dS_band("<<j<<","<<b<<") = "<<dS_band(j,b)<<" F*e-tau = "<<solar_heating(b) * exp(-radial_optical_depth_twotemp(j+1,b))<<" tau "<<dtau_tot<<" ";
+                            cout<<" resulting in dS_band("<<j<<","<<b<<") = "<<dS_band(j,b)<<" F = "<<solar_heating(b)<< " F*e-tau = "<<solar_heating(b) * exp(-radial_optical_depth_twotemp(j+1,b))<<" tau "<<dtau_tot<<" ";
                             for(int s=0; s<num_species; s++) {
                                 cout<<species[s].u[j].u1<<" ";
                             }

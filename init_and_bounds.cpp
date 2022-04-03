@@ -55,6 +55,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
         lambda_max_out       = read_parameter_from_file<double>(filename,"PARI_LAM_MAX_OUT", debug, lambda_max_in).value;
         lambda_per_decade_out= read_parameter_from_file<double>(filename,"PARI_LAM_PER_DECADE_OUT", debug, lambda_per_decade_in).value;
         fluxfile             = read_parameter_from_file<string>(filename,"FLUX_FILE", debug, "---").value;
+        fluxmultiplier       = read_parameter_from_file<double>(filename,"FLUX_MULTIPLIER", debug, 1.).value;
         
         star_mass        =  read_parameter_from_file<double>(filename,"PARI_MSTAR", debug, 1.).value;
         star_mass        *= msolar;
@@ -186,12 +187,16 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
         use_total_pressure = read_parameter_from_file<int>(filename,"USE_TOTAL_PRESSURE", debug, 0).value;
         
         chemistry_precision         = read_parameter_from_file<double>(filename,"CHEM_PRECISION", debug, 1e-2).value;
+        chemistry_numberdens_floor         = read_parameter_from_file<double>(filename,"CHEM_FLOOR", debug, 1e-20).value;
         chemistry_maxiter           = read_parameter_from_file<int>(filename,"CHEM_MAXITER", debug, 4).value;
         chemistry_miniter           = read_parameter_from_file<int>(filename,"CHEM_MINITER", debug, 4).value;
         ion_precision         = read_parameter_from_file<double>(filename,"ION_PRECISION", debug, 1e-12).value;
         ion_heating_precision = read_parameter_from_file<double>(filename,"ION_HEATING_PRECISION", debug, 1e-12).value;
         ion_maxiter                  = read_parameter_from_file<int>(filename,"ION_MAXITER", debug, 128).value;
         ion_heating_maxiter          = read_parameter_from_file<int>(filename,"ION_HEATING_MAXITER", debug, 128).value;
+        intermediate_chemfloor_check = read_parameter_from_file<int>(filename,"INTERMEDIATE_CHEM_CHECK", debug, 0).value;
+        chem_momentum_correction     = read_parameter_from_file<int>(filename,"CHEM_MOMENTUM_CORR", debug, 1).value;
+        chem_ekin_correction         = read_parameter_from_file<int>(filename,"CHEM_EKIN_CORR", debug, 0).value;
         
         //cout<<" ION_HEATING_PRECISION set to "<<ion_heating_precision<<" heating+maxiters = "<<ion_heating_maxiter<<endl;
         //cout<<" ION_PRECISION set to "<<ion_precision<<" ion_maxiter = "<<ion_maxiter<<endl;
@@ -822,14 +827,16 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
                     tempenergy += lam*flux;
                     cnt++;
                     
-                    cout<<" Found datapoint in band b = "<<b<<" as lam/flux = "<<lam<<"/"<<flux<<endl;
+                    //cout<<" Found datapoint in band b = "<<b<<" as lam/flux = "<<lam<<"/"<<flux<<endl;
                 }
              }
              file.close();
              
              if(cnt > 0) {
                  tempenergy /= (double)cnt;
-                 solar_heating(b) = tempenergy;
+                 solar_heating(b) = tempenergy * fluxmultiplier;
+                 templumi += solar_heating(b);
+                 solar_heating_final(b) = solar_heating(b);
             } else {
                 solar_heating(b) = 0.;
             }
@@ -849,7 +856,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
     
     
     
-    cout<<"TOTAL SOLAR HEATING / Flux = "<<templumi<<" Luminosity = "<<(templumi*4.*pi*rsolar*rsolar*pi)<<endl;
+    cout<<"TOTAL SOLAR HEATING / Flux = "<<templumi-solar_heating(num_bands_in-1)<<" Luminosity = "<<(templumi*4.*pi*rsolar*rsolar*pi)<<endl;
     
     //for(int j=15;j<18;j++)
     //    cout<<" POS4.3 dens["<<j<<"] = "<<species[0].u[j].u1<<" temp = "<<species[0].prim[j].temperature<<endl;
@@ -1431,7 +1438,7 @@ void c_Species::initialize_hydrostatic_atmosphere(string filename) {
             //////////////////////////////////////////////////////////////////////////////////////
             //double floor = base->density_floor / mass_amu * std::pow(base->x_i12[i]/base->x_i12[1], -4.);
             double floor = base->density_floor * std::pow(base->x_i12[i]/base->x_i12[1], -4.) * initial_fraction;
-            if( (temp_rhofinal < floor) || ( base->x_i12[i] > base->rhill  && base->use_tides == 1       ) ) {
+            if( (temp_rhofinal < floor) || ( base->x_i12[i] > 0.5*base->rhill  && base->use_tides == 1       ) ) {
                 
                 if(temp_rhofinal < 0.)
                     negdens = 1;
@@ -1772,10 +1779,10 @@ void c_Species::apply_boundary_right(std::vector<AOS>& u) {
                 eos->compute_primitive(&u[i-1],&prim, 1) ;
                 
                 if(false) {
-                    double dphi = (base->phi[i]*K_zzf[i] - base->phi[i-1]*K_zzf[i-1]) / (base->dx[i-1] + base->dx[i]) ;
-                    //dphi *= (base->omegaplus[i]*base->dx[i] + base->omegaminus[i-1]*base->dx[i-1]) ;
+                    double dphi = (phi_s[i] - phi_s[i-1]) / (base->dx[i-1] + base->dx[i]) ;
+                    dphi *= (base->omegaplus[i]*base->dx[i] + base->omegaminus[i-1]*base->dx[i-1]) ;
                     //dphi *= (prim.density * base->omegaplus[i]*base->dx[i] + this->prim[i].density * base->omegaminus[i-1]*base->dx[i-1]) ;
-                    dphi *= (this->prim[i].density* base->omegaplus[i]*base->dx[i] +  prim.density  * base->omegaminus[i-1]*base->dx[i-1]) ;
+                      //dphi *= (this->prim[i].density* base->omegaplus[i]*base->dx[i] +  prim.density  * base->omegaminus[i-1]*base->dx[i-1]) ;
                     
                     double r =base->x_i12[i];
                     double mdot      = prim.density*prim.speed*r*r;
@@ -1798,7 +1805,7 @@ void c_Species::apply_boundary_right(std::vector<AOS>& u) {
                 
                 if(true) {
                     double dphi = (base->phi[i]*K_zzf[i] - base->phi[i-1]*K_zzf[i-1]) / (base->dx[i-1] + base->dx[i]) ;
-                    prim.pres = prim.pres -  prim.density * dphi ;    
+                    prim.pres = prim.pres - 0.99* prim.density * dphi ;    
                     
                 }
                 
