@@ -430,7 +430,7 @@ int c_Species::read_species_data(string filename, int species_index) {
         for(int b = 0; b <= num_bands_out; b++) cout<<base->l_i_out[b]<<"/";
         cout<<endl<<endl;
         
-        cout<<"        avg opacities solar = ";
+        cout<<"        avg opacities solar = "<<endl;
         for(int b = 0; b < num_bands_in; b++) cout<<base->l_i_in[b]<<" "<<opacity_avg_solar(b)<<endl; //"/";
         cout<<endl;
         
