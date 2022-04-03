@@ -32,8 +32,9 @@
 void c_Sim::reset_dS() {
     for(int j = num_cells + 1; j>0; j--) {
         for(int s=0; s<num_species; s++) {
-            species[s].dS(j)  = 0.;
-            species[s].dG(j)  = 0.;
+            species[s].dS(j)    = 0.;
+            species[s].dG(j)    = 0.;
+            species[s].dGdT(j)  = 0.;
         }
     }
         

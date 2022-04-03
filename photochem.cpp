@@ -105,36 +105,36 @@ double HOnly_cooling(const std::array<double, 3> nX, double Te) {
 }
 
 
-double C_cooling(const double ne, double Te) {
+double C_cooling(double Te) {
     double term = 1e-24+3.1e-20*std::exp(-15162/Te)*(1.+std::pow(Te/2e4, 1.5));
     return term;
 }
 
-double Cp_cooling(const double ne, double Te) {
+double Cp_cooling(double Te) {
     double term = 1.5e-23+3.1e-20*std::exp(-45162/Te)*(1.+std::pow(Te/0.75e4,1.5));
     
     return term;
 }
 
-double Cpp_cooling(const double ne, double Te) {
+double Cpp_cooling(double Te) {
     return 0.;
 }
 
-double O_cooling(const double ne, double Te) {
+double O_cooling(double Te) {
     
     double term = 5.5e-24+1.1e-20*std::exp(-30162/Te)*(1.+std::pow(Te/0.75e4, 0.5));
     
     return term;
 }
 
-double Op_cooling(const double ne, double Te) {
+double Op_cooling(double Te) {
     
     double term = 5.1e-20*std::exp(-35162/Te)*(1.+std::pow(Te/0.75e4, 0.5));
     
     return term;
 }
 
-double Opp_cooling(const double ne, double Te) {
+double Opp_cooling(double Te) {
     
     return 0.;
 }
@@ -683,12 +683,12 @@ void c_Sim::do_photochemistry() {
                 double tau = total_opacity(j,0)*(x_i12[j+1]-x_i12[j])*1e2;
                 double red = (1.+tau*tau);
                 
-                if( C_idx!=-1 && e_idx!=-1 ) { species[C_idx].dG(j)     -=  C_cooling(species[e_idx].prim[j].number_density, species[e_idx].prim[j].temperature)/red; }
-                if( Cp_idx!=-1 && e_idx!=-1 ) { species[Cp_idx].dG(j)   -=  Cp_cooling(species[e_idx].prim[j].number_density, species[e_idx].prim[j].temperature)/red; }
-                if( Cpp_idx!=-1 && e_idx!=-1 ) { species[Cpp_idx].dG(j) -=  Cpp_cooling(species[e_idx].prim[j].number_density, species[e_idx].prim[j].temperature)/red; }
-                if( O_idx!=-1 && e_idx!=-1 ) { species[O_idx].dG(j)     -=  O_cooling(species[e_idx].prim[j].number_density, species[e_idx].prim[j].temperature)/red; }
-                if( Op_idx!=-1 && e_idx!=-1 ) { species[Op_idx].dG(j)   -=  Op_cooling(species[e_idx].prim[j].number_density, species[e_idx].prim[j].temperature)/red; }
-                if( Opp_idx!=-1 && e_idx!=-1 ) { species[Opp_idx].dG(j) -=  Opp_cooling(species[e_idx].prim[j].number_density, species[e_idx].prim[j].temperature)/red; }
+                if( C_idx!=-1 && e_idx!=-1 ) { species[C_idx].dG(j)     -=  C_cooling(species[e_idx].prim[j].temperature)/red; }
+                if( Cp_idx!=-1 && e_idx!=-1 ) { species[Cp_idx].dG(j)   -=  Cp_cooling(species[e_idx].prim[j].temperature)/red; }
+                if( Cpp_idx!=-1 && e_idx!=-1 ) { species[Cpp_idx].dG(j) -=  Cpp_cooling(species[e_idx].prim[j].temperature)/red; }
+                if( O_idx!=-1 && e_idx!=-1 ) { species[O_idx].dG(j)     -=  O_cooling(species[e_idx].prim[j].temperature)/red; }
+                if( Op_idx!=-1 && e_idx!=-1 ) { species[Op_idx].dG(j)   -=  Op_cooling(species[e_idx].prim[j].temperature)/red; }
+                if( Opp_idx!=-1 && e_idx!=-1 ) { species[Opp_idx].dG(j) -=  Opp_cooling(species[e_idx].prim[j].temperature)/red; }
                 
                 double adddS[3] = {0.,0.,0.};
                 for (int b = 0; b < num_he_bands; b++) {

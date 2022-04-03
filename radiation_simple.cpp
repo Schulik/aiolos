@@ -257,7 +257,8 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
                 double kappa = species[s].opacity_planck(j, 0);
                 
                 double fac = ddt * no_rad_trans * kappa / species[s].cv * sigma_rad * Ts3;
-                double denom = 1. + 16. * fac ;
+                double moredenom = - photocooling_multiplier * species[s].dGdT(j) * ddt / ( species[s].cv * species[s].u[j].u1);
+                double denom = 1. + 16. * fac + moredenom ;
                 
                 if(j==48000){
                     cout<<"j=48, fac1, fac2 = "<<Ts * ( 1. + fac * 12. * sigma_rad * Ts3)<<"/"<<ddt * (species[s].dS(j) + species[s].dG(j)) / species[s].u[j].u1 / species[s].cv;
@@ -268,8 +269,16 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
                 
                 denoms[idx_s] = denom;
                 eta1[idx_s] += Ts * ( 1. + 12. * fac);
-                eta1[idx_s] += 1. * ddt * (species[s].dS(j) + species[s].dG(j)) / species[s].u[j].u1 / species[s].cv;
-                //eta1[idx_s] /= denom;
+                eta1[idx_s] += 1. * ddt * (species[s].dS(j) + species[s].dG(j) - photocooling_multiplier * species[s].dGdT(j)*Ts     ) / species[s].u[j].u1 / species[s].cv;
+                
+                /*if(j == 100 && steps > 1000) {
+                    cout<<"reporting cooling terms: dG / dGdT * Ts "<<species[s].dG(j)<<" / "<< - photocooling_multiplier * species[s].dGdT(j)*Ts <<endl;
+                    cout<<"reporting denom cooling terms : 16*fac / "<<16.*fac<<" / "<<moredenom<<endl;
+                    char a;
+                    cin>>a;
+                    
+                }*/
+                
                 eta2[idx_s] += 4.* pi * ddt * kappa * no_rad_trans / species[s].cv;
                 //if(j == 90 && steps > 41800)
                 if(false)

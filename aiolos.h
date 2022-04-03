@@ -7,6 +7,7 @@
 #include <memory>
 #include <new>
 #include <exception>
+#include <functional>
 #include <string>
 #include <vector>
 #include <math.h>
@@ -86,6 +87,11 @@ double delta_ij(int i, int j);
 double lint(double xa, int N, double* X, double* RI);
 double logint(double xa, int N, double* X, double* RI);
 const float log10ff = std::log(10.);
+
+inline double dfdx(const function<double(double)>& f, double x0, double dx) {
+    
+    return (f(x0+dx)-f(x0-dx))/(dx+dx);
+}
 
 inline float __int_as_float (int32_t a) { float r; memcpy (&r, &a, sizeof r); return r;} 
 inline int32_t __float_as_int (float a) { int32_t r; memcpy (&r, &a, sizeof r); return r;}
@@ -556,6 +562,7 @@ public:
     double no_rad_trans;      // Multiplier for the div F radiation transport in the radiation solver to compare to models which don't cool thermally
     double CFL_break_time; //Numerical time after which cflfactor=0.9. Used in get_cfl_timestep()
     double photocooling_multiplier;
+    double cooling_expansion;
     
     std::vector<double> previous_monitor_J;
     std::vector<double> previous_monitor_T;
@@ -808,8 +815,9 @@ public:
     Eigen::MatrixXd opacity_twotemp;//num_cells * num_bands_in
     
     Eigen::MatrixXd fraction_total_solar_opacity; //num_cells * num_bands_in, what fraction of the total opacity is represented by this species in this cell. gives heating of the species
-    Eigen::MatrixXd dS; //num_cells * num_bands_out, Heating, low-energy and high-energy
-    Eigen::MatrixXd dG; //num_cells * num_bands_out, Cooling, high-energy
+    Eigen::MatrixXd dS;  //num_cells * num_bands_out, Heating, low-energy and high-energy
+    Eigen::MatrixXd dG;  //num_cells * num_bands_out, Cooling, high-energy
+    Eigen::MatrixXd dGdT; //num_cells * num_bands_out, Cooling, high-energy
     double dlogOpa;
     
     //////////////

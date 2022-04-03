@@ -18,12 +18,12 @@
 #include "aiolos.h"
 
 extern double HOnly_cooling(const std::array<double, 3> nX, double Te);
-extern double C_cooling(const double ne, double Te);
-extern double Cp_cooling(const double ne, double Te);
-extern double Cpp_cooling(const double ne, double Te);
-extern double O_cooling(const double ne, double Te);
-extern double Op_cooling(const double ne, double Te);
-extern double Opp_cooling(const double ne, double Te);
+extern double C_cooling(double Te);
+extern double Cp_cooling(double Te);
+extern double Cpp_cooling(double Te);
+extern double O_cooling(double Te);
+extern double Op_cooling(double Te);
+extern double Opp_cooling(double Te);
 
 double thermo_get_r(double T, double r1, double delta_stoch);
 std::vector<double> get_thermo_variables(double T,string species_string);
@@ -1068,7 +1068,7 @@ void c_Sim::update_dS_jb_photochem(int cell) {
     int O_idx = get_species_index("S7");
     int Op_idx = get_species_index("S8");
     int Opp_idx = get_species_index("S9");
-    double tau = total_opacity(cell,0)*(x_i12[cell+1]-x_i12[cell])*1e4;
+    double tau = total_opacity(cell,0)*(x_i12[cell+1]-x_i12[cell])*1e8;
     double beta = 0.;
     if(tau < 7.) 
         beta = (1.-std::exp(-2.34*tau))/(4.68*tau);
@@ -1080,41 +1080,56 @@ void c_Sim::update_dS_jb_photochem(int cell) {
     double red = beta;
     double ne = species[e_idx].prim[cell].number_density;
     double Te = species[e_idx].prim[cell].temperature;
+    double Te3 = Te*Te*Te;
     double no   = species[O_idx].prim[cell].number_density;
     double nop  = species[Op_idx].prim[cell].number_density;
     double nopp = species[Opp_idx].prim[cell].number_density;
     double nc   = species[C_idx].prim[cell].number_density;
     double ncp  = species[Cp_idx].prim[cell].number_density;
     double ncpp = species[Cpp_idx].prim[cell].number_density;
+    double dT = 1e-5;
     
      if( e_idx!=-1 && hnull_idx!=-1 && hplus_idx!=-1  ) { //If all species are there - H0, H+ and e-
         std::array<double, 3> nX = {
                     species[hnull_idx].prim[cell].number_density,
                     species[hplus_idx].prim[cell].number_density,
                     species[e_idx].prim[cell].number_density};
-    
-        double cooling = 0.;
-        cooling                 += nX[2] * HOnly_cooling(nX, species[e_idx].prim[cell].temperature) ; /// (1. + cell_optical_depth(cell,0) * cell_optical_depth(cell,0) * 1e2);
-        species[e_idx].dG(cell) -= cooling * red;
+        
+        species[e_idx].dG(cell)   -= nX[2] * red * HOnly_cooling(nX, species[e_idx].prim[cell].temperature);
+        species[e_idx].dGdT(cell) -= nX[2] * red * (HOnly_cooling(nX, species[e_idx].prim[cell].temperature+dT)-HOnly_cooling(nX, species[e_idx].prim[cell].temperature-dT))/(dT+dT);  ;
     }
     
-    if( C_idx!=-1 && e_idx!=-1 ) { species[e_idx].dG(cell)     -=  nc * ne * C_cooling(ne, Te)*red; }
+    if( C_idx!=-1 && e_idx!=-1 ) { 
+        species[e_idx].dG(cell)   -=  nc * ne * red * C_cooling(Te); 
+        species[e_idx].dGdT(cell) -=  nc * ne * red * dfdx(C_cooling, Te, dT);
+    }
     if( Cp_idx!=-1 && e_idx!=-1 ) { 
-        species[e_idx].dG(cell) -= ncp * ne * Cp_cooling(ne, Te)*red; 
+        species[e_idx].dG(cell) -= ncp * ne * red * Cp_cooling(Te); 
         species[e_idx].dG(cell) -= ncp * ne * 1.426e-27 * 1.3 * sqrt(Te)  ;
+        species[e_idx].dGdT(cell) -= ncp * ne * red * dfdx(Cp_cooling, Te, dT);
+        species[e_idx].dGdT(cell) -= ncp * ne * 1.426e-27 * 1.3 * 0.5 /std::sqrt(Te);
     }
     if( Cpp_idx!=-1 && e_idx!=-1 ) { 
-        species[e_idx].dG(cell) -= ncpp * ne * Cpp_cooling(ne, Te)*red; 
+        species[e_idx].dG(cell) -= ncpp * ne * red * Cpp_cooling(Te); 
         species[e_idx].dG(cell) -= ncpp * ne * 4 * 1.426e-27 * 1.3 * sqrt(Te);
+        species[e_idx].dGdT(cell) -= ncpp * ne * red * dfdx(Cpp_cooling, Te, dT);
+        species[e_idx].dGdT(cell) -= ncp * ne * 4 * 1.426e-27 * 1.3 * 0.5 /std::sqrt(Te);
     }
-    if( O_idx!=-1 && e_idx!=-1 ) { species[e_idx].dG(cell)     -=  no * ne * O_cooling(ne, Te)*red; }
+    if( O_idx!=-1 && e_idx!=-1 ) { 
+        species[e_idx].dG(cell)   -=  no * ne * red * O_cooling(Te); 
+        species[e_idx].dGdT(cell) -=  no * ne * red * dfdx(O_cooling, Te, dT);
+    }
     if( Op_idx!=-1 && e_idx!=-1 ) { 
-        species[e_idx].dG(cell) -= nop * ne * Op_cooling(ne, Te)*red; 
+        species[e_idx].dG(cell) -= nop * ne * red * Op_cooling(Te); 
         species[e_idx].dG(cell) -= nop * ne * 1.426e-27 * 1.3 * sqrt(Te);
+        species[e_idx].dGdT(cell) -= nop * ne * red * dfdx(Op_cooling, Te, dT);
+        species[e_idx].dGdT(cell) -= nop * ne * 1.426e-27 * 1.3 * 0.5 /std::sqrt(Te);
     }
     if( Opp_idx!=-1 && e_idx!=-1 ) { 
-        species[e_idx].dG(cell) -= nopp * ne * Opp_cooling(ne, Te)*red;
+        species[e_idx].dG(cell) -= nopp * ne * red * Opp_cooling(Te);
         species[e_idx].dG(cell) -= nopp * ne * 4 * 1.426e-27 * 1.3 * sqrt(Te);
+        species[e_idx].dGdT(cell) -= nopp * ne * red * dfdx(Opp_cooling, Te, dT);
+        species[e_idx].dGdT(cell) -= nopp * ne * 4 * 1.426e-27 * 1.3 * 0.5 /std::sqrt(Te);
     }
     
 //     if(cell==2) {

@@ -169,6 +169,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
         
         no_rad_trans               = read_parameter_from_file<double>(filename,"NO_RAD_TRANS", debug, 1.).value;
         photocooling_multiplier    = read_parameter_from_file<double>(filename,"PHOTOCOOL_MULTIPLIER", debug, 1.).value;
+        cooling_expansion          = read_parameter_from_file<double>(filename,"COOL_EXPANSION", debug, 0.).value;
         radiation_rampup_time      = read_parameter_from_file<double>(filename,"RAD_RAMPUP_TIME", debug, 0.).value;
         init_radiation_factor      = read_parameter_from_file<double>(filename,"INIT_RAD_FACTOR", debug, 0.).value;
         //radiation_solver           = read_parameter_from_file<int>(filename,"RADIATION_SOLVER", debug, 0).value;
@@ -749,6 +750,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
     for(int s=0; s<num_species; s++) {
         species[s].dS = Eigen::VectorXd::Zero(num_cells+2,  1);
         species[s].dG = Eigen::VectorXd::Zero(num_cells+2,  1);
+        species[s].dGdT = Eigen::VectorXd::Zero(num_cells+2,  1);
     }
     
     if(debug > 0) cout<<"Init: Assigning stellar luminosities 2."<<endl;
