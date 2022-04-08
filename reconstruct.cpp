@@ -10,9 +10,13 @@
 ///////////////////////////////////////////////////////////
 #include "aiolos.h"
 
+#ifndef SLOPE_LIMITER
+#define SLOPE_LIMITER MonotonizedCentralSlope
+#endif
+
 double MonotonizedCentralSlope(double ql, double qm, double qr, 
                                double cF=2, double cB=2, double dxF=1, double dxB=1) {
-    // From Mignone's (2005) reconstruction paper
+    // From Mignone's (2014) reconstruction paper
 
     double dF = (qr - qm) / dxF ;
     double dB = (qm - ql) / dxB ;
@@ -28,6 +32,21 @@ double MonotonizedCentralSlope(double ql, double qm, double qr,
     } ;
 
     return min_mod(0.5*(dF + dB), min_mod(cF*dF, cB*dB)) ;
+}
+
+double VanLeerSlope(double ql, double qm, double qr, 
+                    double cF=2, double cB=2, double dxF=1, double dxB=1) {
+    // From Mignone's (2014) reconstruction paper
+
+    double dF = (qr - qm) / dxF ;
+    double dB = (qm - ql) / dxB ;
+
+    if (dF*dB > 0) {
+        double v = dB/dF ;
+        return dB * (cF*v + cB) / (v*v + (cF + cB - 2)*v + 1) ;
+    } else {
+        return 0 ;
+    }
 }
 
 
@@ -81,7 +100,7 @@ void c_Species::reconstruct_edge_states() {
 
             // Pressure perturbation
             double slope ;
-            slope = MonotonizedCentralSlope(
+            slope = SLOPE_LIMITER(
                 prim[i-1].pres - dp_l, prim[i].pres, prim[i+1].pres - dp_r, cF, cB, dxF, dxB) ;
 
             prim_l[i].pres += slope * (x_i[i-1] - x_iVC[i]) ; 
@@ -89,14 +108,14 @@ void c_Species::reconstruct_edge_states() {
 
 
             // Density
-            slope = MonotonizedCentralSlope(
+            slope = SLOPE_LIMITER(
                 prim[i-1].density, prim[i].density, prim[i+1].density, cF, cB, dxF, dxB) ;
 
             prim_l[i].density += slope * (x_i[i-1] - x_iVC[i]) ; 
             prim_r[i].density += slope * (x_i[ i ] - x_iVC[i]) ;
 
             // Speed
-            slope = MonotonizedCentralSlope(
+            slope = SLOPE_LIMITER(
                 prim[i-1].speed, prim[i].speed, prim[i+1].speed, cF, cB, dxF, dxB) ;
 
             prim_l[i].speed += slope * (x_i[i-1] - x_iVC[i]) ; 

@@ -189,7 +189,7 @@ void c_Sim::execute() {
                     species[s].u[j] = species[s].u[j] + species[s].dudt[0][j]*dt ;
             }
         }
-        
+
         if (order == IntegrationType::first_order) {
             globalTime += dt;
         }
@@ -234,12 +234,10 @@ void c_Sim::execute() {
         
         for(int s = 0; s < num_species; s++) 
             species[s].compute_pressure(species[s].u);
-            
-        //compute_total_pressure();
         
         if (do_hydrodynamics == 1)
             compute_drag_update() ;
-        
+
         if( (photochemistry_level + use_rad_fluxes ) > 0 ) {
             
             update_opacities();

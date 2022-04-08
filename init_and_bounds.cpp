@@ -755,10 +755,10 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
                 //Jrad_FLD(j,0) += rad_energy_multipier * sigma_rad*pow(species[s].prim[j].temperature,4) / pi;
                 //cout<<" Assigning value j = "<<j<<" species = "<<s<<" with rad_energy_multiplier = "<<rad_energy_multiplier<<" and T = "<<species[s].prim[j].temperature<<endl;
                 Jrad_init(j,0) = rad_energy_multiplier * c_light /4. /pi;
-                
-                if(radiation_matter_equilibrium_test == 0)
+
+                if(radiation_matter_equilibrium_test == 0) 
                     Jrad_FLD(j,0)  = rad_energy_multiplier * sigma_rad*pow(species[s].prim[j].temperature,4) / pi;
-                    
+                
                 else if(radiation_matter_equilibrium_test == 1)
                     Jrad_FLD(j,0) = Jrad_init(j,0);
                 

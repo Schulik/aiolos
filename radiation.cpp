@@ -439,14 +439,25 @@ bool c_Sim::update_fluxes_FLD(double dt_step) {
     //    If not, repeat with a smaller time-step
     bool passed = true  ;
     double Jmin = 0, Tmin = 0 ;
+    int jmin, bmin ;
     for (int j=0; j < num_cells+2; j++) 
         for(int b=0; b<num_bands_out+num_species; b++)
             if (r[j*num_vars + b] < 0) {
                 passed = false ;
-                if (b < num_bands_out)
-                    Jmin = std::min(Jmin, r[j*num_vars + b]) ;
-                else
-                    Tmin = std::min(Tmin, r[j*num_vars + b]) ;
+                if (b < num_bands_out) {
+                    if (r[j*num_vars + b] < Jmin) {
+                        Jmin = r[j*num_vars + b] ;
+                        jmin = j ;
+                        bmin = b ;
+                    }
+                }
+                else {
+                    if (r[j*num_vars + b] < Tmin) {
+                        Tmin = r[j*num_vars + b] ;
+                        jmin = j ;
+                        bmin = b - num_bands_out ;
+                    }
+                }
             }
     
     if (not passed) {
@@ -457,7 +468,8 @@ bool c_Sim::update_fluxes_FLD(double dt_step) {
         else {
             std::cout << "Radiation failed, halving step:\n\t"
                       << "dt_rad=" << dt_step << ", ratio=" << dt_step/dt
-                      << ", Tmin=" << Tmin << ", Jmin=" << Jmin 
+                      << ", Tmin=" << Tmin << ", Jmin=" << Jmin << "\n"
+                      << "\tjmin=" << jmin << ", bmin=" << bmin 
                       << std::endl ;
             
             if (dt_step == dt)
