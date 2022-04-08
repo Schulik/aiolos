@@ -42,11 +42,11 @@ def check_conservation(problem, species='hydrogen.spc', L1_target=None):
         c4pi = 2.99792458e10/(4*np.pi)
         N = int(params.get('NUM_BANDS', 1))
         diag = 'diagnostic_' + problem
-        d0 = load_aiolos_diag(diag + '_t0.dat')
+        d0 = load_aiolos_diag(diag + '_t0.dat', species=2)
         for i in range(N):
             init[2] += d0['J{}'.format(i)][num_bound-1:-num_bound+1].sum()/c4pi
 
-        df = load_aiolos_diag(diag + '_t-1.dat')
+        df = load_aiolos_diag(diag + '_t-1.dat', species=2)
         for i in range(N):
             final[2] += df['J{}'.format(i)][num_bound-1:-num_bound+1].sum()/c4pi
 
