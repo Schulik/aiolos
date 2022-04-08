@@ -259,10 +259,13 @@ void c_Sim::execute() {
             }
             else {
                 //update_temperatures_simple();//Fast eulerian temperature update, no stability guaranteed!
-                //if (use_collisional_heating)
-                //    compute_collisional_heat_exchange();
+                if (use_collisional_heating)
+                    compute_collisional_heat_exchange();
             }
-        }
+        } 
+        else 
+            if (use_collisional_heating)
+                compute_collisional_heat_exchange();
 
         user_loop_function() ;
         
