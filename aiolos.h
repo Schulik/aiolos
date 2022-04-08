@@ -25,6 +25,9 @@
 #define NUM_SPECIES Eigen::Dynamic
 #endif
 
+template<int NumVars>
+using BlockTriDiagSolverMethod = BlockTriDiagSolver<NumVars> ;
+
 
 using namespace std;
 
@@ -469,7 +472,7 @@ public:
     Eigen::MatrixXd Etot_corrected;
     Eigen::MatrixXd Jrad_FLD;
 
-    BlockTriDiagSolver<Eigen::Dynamic> tridiag;
+    BlockTriDiagSolverMethod<Eigen::Dynamic> tridiag;
     Eigen::MatrixXd Jrad_init;
     
     int rad_solver_max_iter = 1;
@@ -565,7 +568,7 @@ public:
     
     
     void update_fluxes(double timestep);           //  Called from transport_radiation#   
-    void update_fluxes_FLD();           //  Called from transport_radiation#
+    bool update_fluxes_FLD(double dt);           //  Called from transport_radiation#
     void update_temperatures_simple();           //  Called from transport_radiation#
     void update_fluxes_FLD2(double, Eigen::MatrixXd &,Eigen::MatrixXd &,Eigen::MatrixXd &);           //  Called from transport_radiation#
     void update_temperatures(double, Eigen::MatrixXd &,Eigen::MatrixXd &,Eigen::MatrixXd &);

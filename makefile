@@ -10,9 +10,9 @@ CXX = clang++ -std=c++17
 CXXFLAGS = -Wall -Wextra -march=native -flto  #-pg or -g put compiler settings here
 BFLAGS = -I. -O3 -g #or -g
 else
-CXX = g++ -std=c++17 
+CXX = g++ -std=c++17 -g
 CXXFLAGS = -Wall -Wextra -march=native -flto  #-pg or -g put compiler settings here
-BFLAGS = -I. -O3 #or -g
+BFLAGS = -I. -O3 -g #or -g
 endif
 endif
 CPPFLAGS = -I/usr/include/eigen3 -DNDEBUG # put pre-processor settings (-I, -D, etc) here

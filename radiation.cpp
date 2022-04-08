@@ -9,7 +9,7 @@
 //
 ///////////////////////////////////////////////////////////
 
-#define EIGEN_RUNTIME_NO_MALLOC
+//#define EIGEN_RUNTIME_NO_MALLOC
 
 #include <cassert>
 #include "aiolos.h"
@@ -138,10 +138,10 @@ void c_Sim::update_dS() {
             for(int b=0; b<num_bands_out; b++) {
                 
                 if(radial_optical_depth(j,b) < 1.) 
-                    Jrad_FLD(j,b) *= init_J_factor/pow(x_i[j]/x_i[34] ,2.);
+                    Jrad_FLD(j,b) *= init_J_factor/pow(x_i12[j]/x_i12[34] ,2.);
                 
-                for(int s=0; s<num_species; s++)
-                    species[s].prim[j].temperature = init_T_temp;
+                //for(int s=0; s<num_species; s++)
+                  //  species[s].prim[j].temperature = init_T_temp;
                 
             }
         }
@@ -216,7 +216,7 @@ void c_Sim::update_dS() {
 }
 
 
-void c_Sim::update_fluxes_FLD() {
+bool c_Sim::update_fluxes_FLD(double dt_step) {
     
     // If test, then set J to initial values before computing on
     if(radiation_matter_equilibrium_test == 1) {
@@ -246,8 +246,8 @@ void c_Sim::update_fluxes_FLD() {
             int idx_r = j*num_vars + b ;
 
             // Time dependent terms:
-            d[idx] +=  vol[j] / (c_light * dt) ;
-            r[idx_r] += (vol[j] / (c_light * dt)) * Jrad_FLD(j, b) ;
+            d[idx] +=  vol[j] / (c_light * dt_step) ;
+            r[idx_r] += (vol[j] / (c_light * dt_step)) * Jrad_FLD(j, b) ;
 
             // Flux across right boundary
             if (j > 0 && j < num_cells + 1) {
@@ -291,11 +291,11 @@ void c_Sim::update_fluxes_FLD() {
                 double R       = 2 * tau_inv * std::abs(Jrad_FLD(j+1,b) - Jrad_FLD(j,b)) / (Jrad_FLD(j+1,b) + Jrad_FLD(j, b) + 1e-300) ;
 
                 D_core[b]    = no_rad_trans * flux_limiter(R) * tau_inv;
-                double Chi   = 0.25*(1 + 3*eddington_coeff(R)) ;
+                double Chi   = 0.125*(1 + 3*eddington_coeff(R)) ;
                 
                 l[idx] = 0 ;
-                d[idx] = 0.5*(D_core[b] + Chi) * surf[j] ;
-                u[idx] = -0.5*D_core[b] * surf[j] ;
+                d[idx] =  0.5*(D_core[b] + Chi) * surf[j] ;
+                u[idx] = -0.5*(D_core[b] - Chi) * surf[j] ;
                 r[idx_r] = surf[j] * S / (4*pi) ;
             } else {
                 l[idx] = 0 ;
@@ -387,8 +387,8 @@ void c_Sim::update_fluxes_FLD() {
                 double Ts = species[s].prim[j].temperature ;
                 double rhos = species[s].prim[j].density ;
 
-                d[idx_s ] = 1 / dt ;
-                r[idx_rs] = Ts / dt ;
+                d[idx_s ] = 1 / dt_step ;
+                r[idx_rs] = Ts / dt_step ;
                 r[idx_rs] += (species[s].dS(j) + species[s].dG(j)) / species[s].u[j].u1 / species[s].cv;
                 
                 for(int b=0; b<num_bands_out; b++) {
@@ -433,7 +433,50 @@ void c_Sim::update_fluxes_FLD() {
     }
 
     tridiag.factor_matrix(&l[0], &d[0], &u[0]) ;
-    tridiag.solve(&r[0], &r[0]) ; // Solve in place (check it works)
+    tridiag.solve(&r[0], &r[0]) ; 
+
+    // Check whether the solution worked (J, T >= 0)
+    //    If not, repeat with a smaller time-step
+    bool passed = true  ;
+    double Jmin = 0, Tmin = 0 ;
+    for (int j=0; j < num_cells+2; j++) 
+        for(int b=0; b<num_bands_out+num_species; b++)
+            if (r[j*num_vars + b] < 0) {
+                passed = false ;
+                if (b < num_bands_out)
+                    Jmin = std::min(Jmin, r[j*num_vars + b]) ;
+                else
+                    Tmin = std::min(Tmin, r[j*num_vars + b]) ;
+            }
+    
+    if (not passed) {
+        if (dt_step*1024 <= dt) { 
+            std::cout << "Radiation step failed, reached too small timestep fraction\n" ;
+            return false ;
+        }
+        else {
+            std::cout << "Radiation failed, halving step:\n\t"
+                      << "dt_rad=" << dt_step << ", ratio=" << dt_step/dt
+                      << ", Tmin=" << Tmin << ", Jmin=" << Jmin 
+                      << std::endl ;
+            
+            if (dt_step == dt)
+                F_core = 0 ;
+                
+            // If the sub-steps fail we will just use the single full-step, so
+            // pass the failure back up
+            passed = update_fluxes_FLD(dt_step/2) ;
+            if (passed) 
+                passed = update_fluxes_FLD(dt_step/2) ;
+
+            // Exit early if we've passed because the sub-steps have updated the
+            // radiation and temperature
+            if (passed)            
+                return true ;
+        }
+    }
+
+
 
     // Store the result
     for (int j=0; j < num_cells+2; j++) {
@@ -453,9 +496,9 @@ void c_Sim::update_fluxes_FLD() {
     }
     
     if (use_planetary_temperature) {
-        F_core = 0 ;
+        if (dt == dt_step) F_core = 0 ;
         for(int b=0; b<num_bands_out; b++) 
-            F_core -= 4*pi * D_core[b] * (Jrad_FLD(num_ghosts, b) - Jrad_FLD(num_ghosts-1, b)) ;
+            F_core -= 4*pi * D_core[b] * (dt_step / dt) * (Jrad_FLD(num_ghosts, b) - Jrad_FLD(num_ghosts-1, b)) ;
     }
     
     // Update energies. 
@@ -466,6 +509,7 @@ void c_Sim::update_fluxes_FLD() {
         species[si].eos->compute_conserved(&(species[si].prim[0]), &(species[si].u[0]), num_cells+2);        
     }
 
+    return passed ;
 }
 
 

@@ -113,6 +113,11 @@ static double T_core;
 static double f_dust = 1e-15;
 static double a_grain = -1;
 
+static bool mass_taper = 0 ;
+static bool final_mass ;
+
+std::string cooling_terms ;
+
 void c_Sim::user_output_function(int output_counter) {
     std::ofstream file;
     std::string filename = workingdir + "user_output.dat";
@@ -127,7 +132,8 @@ void c_Sim::user_output_function(int output_counter) {
          << 4 * pi * R_core * R_core * F_core << "\n";
     double T_F = std::pow(std::abs(F_core) / sigma_rad, 0.25);
     if (F_core < 0) T_F *= -1;
-    cout << "T_core, Net thermal flux[K]: " << T_core << ", " << T_F << "K\n";
+    cout << "T_core, Net thermal flux[K]: " << T_core << ", " << T_F << "K" << std::endl ;
+    cout << cooling_terms << std::endl ;
 }
 
 void c_Species::user_boundary_left(std::vector<AOS>& u) {
@@ -155,9 +161,23 @@ void c_Species::user_initial_conditions() {
             std::sqrt(base->l_i_in[i - 1] * base->l_i_in[i]);
     }
 
+    // Setup mass taper
+    mass_taper = false ; base->parameters.read<bool>("MASS_TAPER", false).value ;
+    if (mass_taper) {
+        std::cout << "Using mass taper\n" ;
+        final_mass = base->planet_mass / mearth ;
+    }
+
     if (is_dust_like && a_grain < 0) {
         a_grain = std::pow(3 / (4 * M_PI) * mass_amu * amu / RHO_DUST, 1 / 3.);
-        kappa_dust = DustOpacity(a_grain);
+
+        double opac_size_factor = 
+            base->parameters.read<double>("OPACITY_SIZE_FACTOR", 1.0).value ;
+        if (opac_size_factor != 1)
+            std::cout << "Using opacity for differen grain size " 
+                      << a_grain*opac_size_factor*1e4 << "micron\n" ;
+
+        kappa_dust = DustOpacity(a_grain*opac_size_factor);
         f_dust = initial_fraction;
 
         double alpha_stick ;
@@ -194,16 +214,40 @@ void c_Species::user_initial_conditions() {
     // Increase Bondi-radius slightly to over-pressure the gas
     double cs2 = Rgas * T_core / 30;
     double Rb = 1.1 * G * base->planet_mass / cs2;
-    std::cout << "Bondi Radius:" << Rb / 1.01 << "cm\n";
+    std::cout << "Bondi Radius:" << Rb / 1.1 << "cm\n";
     std::cout << initial_fraction << "\n";
+    if (mass_taper) {
+        std::cout << "Setting Rbondi to initial Bondi radius:\n" ;
+        Rb *= 0.01*mearth / base->planet_mass;
+         std::cout << "\t" << Rb/1.1 << "\n" ;
+    }
+
 
     for (int j = 0; j <= num_cells + 1; j++) {
         double f = std::min(1., std::exp(Rb / base->x_i12[j] -
                                          Rb / base->x_i12[base->num_ghosts]));
+	    f = std::max(f, 1e-15) ;
         AOS_prim p = p0;
         p.density *= f;
         p.pres *= f;
         eos->compute_conserved(&p, &u[j], 1);
+        
+        if(is_dust_like) {
+            for (int b = 0; b < num_bands_out; b++) {
+                opacity(j, b) = kappa_dust.kappa_Ross(prim[j].temperature);
+                opacity_planck(j, b) =
+                    kappa_dust.kappa_Planck(prim[j].temperature);
+            }
+        }
+        
+        else {
+            for (int b = 0; b < num_bands_out; b++) {
+                opacity(j, b) = kappa_gas.kappa_Ross(T_core);
+                opacity_planck(j, b) =
+                   kappa_gas.kappa_Planck(T_core);
+            }
+        }
+        
     }
 }
 
@@ -229,9 +273,11 @@ void c_Species::user_opacity() {
                 opacity_twotemp(j, b) = kappa_gas.kappa_2000[b];
             }
             for (int b = 0; b < num_bands_out; b++) {
-                opacity(j, b) = kappa_gas.kappa_Ross(prim[j].temperature);
+                // Take the geometric mean to stabilize the temperature solve when Kappa(T) is a strong
+                // function of T.
+                opacity(j, b) = std::sqrt(opacity(j, b)*kappa_gas.kappa_Ross(prim[j].temperature));
                 opacity_planck(j, b) =
-                    kappa_gas.kappa_Planck(prim[j].temperature);
+                    std::sqrt(opacity_planck(j, b)*kappa_gas.kappa_Planck(prim[j].temperature));
             }
         }
     }
@@ -263,6 +309,8 @@ void c_Sim::user_heating_function() {
             { species[0].prim[j].temperature, species[1].prim[j].temperature };
         std::array<double, 2> v =   
             { species[0].prim[j].speed, species[1].prim[j].speed } ;
+
+        if (rho[1] < 0) rho[1] = 1e-100*rho[0] ;
 
         if (use_rad_fluxes == 1) {
 
@@ -299,29 +347,25 @@ void c_Sim::user_heating_function() {
             // No radiation
             cond.set_state(rho, T, v, dt) ;
         }
-
+        
+        //std::cout << steps << " " << j << " " << rho[0] << "  " << rho[1] << "," << std::flush ;
         double d0, d1 ; 
         std::tie(d0,d1) = cond.bracket_solution() ;
         
         Brent brent(1e-10*rho[1]) ;
-        d0 = brent.solve(d0, d1, cond) ;
+        if (d1 > d0)
+            d0 = brent.solve(d0, d1, cond) ;
 
         std::tie(rho, T, v) = cond.update_T_rho_v(d0) ;
+        //std::cout <<"," << rho[0] << "  " << rho[1] << "\n" ;
 
-        // Store the new values
-        //     Set the new density and velocity
-        species[0].prim[j].density = rho[0] ;
-        species[1].prim[j].density = rho[1] ;
-
-        species[0].prim[j].speed = v[0] ;
-        species[1].prim[j].speed = v[1] ;
-
-        if (T[0] < 0 || T[1] < 0) {
+        if (T[0] < 0 || T[1] < 0 || rho[0] < 0 || rho[1] < 0) {
             std::cout << j << " " << dt 
                       << " (" << rho[0] << " " << rho[1] << ")"
                       << " (" << T[0] << " " << T[1] << ")"
                       << " (" << v[0] << " " << v[1] << ")\n" ;
             std::cout << "\t" << species[0].prim[j].temperature << " " << species[1].prim[j].temperature << "\n" ;
+            std::cout << "\t" << species[0].prim[j].density << " " << species[1].prim[j].density << "\n" ;
 
             std::array<double,2> heating, cooling ;
             heating = rad.compute_stellar_heating(rho) ;
@@ -334,6 +378,13 @@ void c_Sim::user_heating_function() {
                       <<  " " << (heating[1] + cooling[1])*dt / (rho[1]*species[1].cv) << ")\n" ;
         }
 
+        // Store the new values
+        //     Set the new density and velocity
+        species[0].prim[j].density = rho[0] ;
+        species[1].prim[j].density = rho[1] ;
+
+        species[0].prim[j].speed = v[0] ;
+        species[1].prim[j].speed = v[1] ;
 
         //     Compute the net heating/cooling rate:
         if (use_rad_fluxes) {
@@ -341,6 +392,16 @@ void c_Sim::user_heating_function() {
 
             heating = {0, 0 }; // rad.compute_stellar_heating(rho) ;
             cooling = cond.net_heating_rate(rho, T, v) ;
+
+            // Protect against over-cooling
+            double T0 = species[1].prim[j].temperature ;
+            double u_eff = rho[1] * (species[1].cv*T0 + 
+                16*sigma_rad*rad.compute_kappa_thermal()[1] * (T0*T0)*(T0*T0) * dt) ;
+
+            if (-cooling[1]*dt > 0.5*u_eff) {
+                std::cout << "Fixing cooling: Steps=" << steps << ", j=" << j << ". cool=" << cooling[1] << " u_eff=" << u_eff << " dt=" << dt << "\n" ;  
+                cooling[1] = - 0.5*u_eff / dt ;
+            }
 
             for (int s=0; s < 2; s++) {
                 species[s].dS(j) = heating[s] ;
@@ -451,6 +512,8 @@ void c_Sim::user_loop_function() {
     
     L_core = 4*pi*R_core*R_core*sigma_rad*std::pow(T_core, 4) ;
 
+    cooling_terms = planet_surf.print_surface_cooling(T_core) ;
+
     /*
     double Fstar = 0 ;
     for (int b=0; b < num_bands_in; b++)
@@ -495,6 +558,22 @@ void c_Sim::user_loop_function() {
         species[s].eos->compute_auxillary(&species[s].prim[j], 1);
         species[s].eos->compute_conserved(&species[s].prim[j], &species[s].u[j], 1);
     }
+
+    // Update the mass taper
+    if (mass_taper) {
+        double f = (globalTime - 1e4) / 4e4 ;
+        if (f < 0)
+           f = 0.01 ;
+        else if (f < 1)
+            f = 0.01  + (final_mass - 0.01) * (1 - std::cos(M_PI * f)) / 2 ;
+        else 
+            f = final_mass ;
+        
+        planet_mass = f * mearth ;
+
+        update_mass_and_pot() ;
+    }
+
 } ;
 
 // Opacity tables

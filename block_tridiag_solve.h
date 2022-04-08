@@ -5,6 +5,10 @@
 #include <stdexcept>
 
 #include <Eigen/Dense>
+#include <Eigen/Sparse>
+#include <Eigen/SparseLU>
+#include <Eigen/OrderingMethods>
+
 
 class BlockTriDiagSolverBase
 {
@@ -69,6 +73,7 @@ public:
 
       // Update d_0 to give the next denominator:
       S_i.noalias() = d_0 - l_0 * _sLU[i-1].solve(u_m);
+      // std::cout << i << ":\n" << d_0 << "\n\n" << S_i << std::endl ;
 
     // Compute the LU decomposition
       _sLU[i].compute(S_i);
@@ -134,5 +139,90 @@ private:
 
   int _n_blocks, _block_size;
 };
+
+/* Solver a tri-diagonal systems of equations where each
+ * of the blocks have the same size (N x N), using Eigens
+ * Sparse matrix solvers
+ *
+ */
+template <int fixed_block_size = Eigen::Dynamic>
+class BlockTriDiagSolverSparse
+    : public BlockTriDiagSolverBase
+{
+  // Inernal vector/matrix views
+  typedef Eigen::Map<Eigen::Matrix<double, fixed_block_size, 1>> vec_t;
+
+public:
+  BlockTriDiagSolverSparse() {} ;
+  BlockTriDiagSolverSparse(int num_blocks)
+      : _mat(num_blocks*fixed_block_size, num_blocks*fixed_block_size),
+        _n_blocks(num_blocks), _block_size(fixed_block_size) 
+  {
+    _mat.reserve(Eigen::VectorXi::Constant(num_blocks*fixed_block_size, 3*fixed_block_size)) ;
+  } ;
+
+  BlockTriDiagSolverSparse(int num_blocks, int block_size)
+      : _mat(num_blocks*block_size, num_blocks*block_size),
+        _n_blocks(num_blocks), _block_size(block_size)
+  {
+    _mat.reserve(Eigen::VectorXi::Constant(num_blocks*block_size, 3*block_size)) ;
+
+    if (fixed_block_size != Eigen::Dynamic)
+      throw std::invalid_argument("block_size parameter should not be passed "
+                                  "to the constructor unless dynamic memory is "
+                                  "used.");
+  };
+
+  /* Pre-compute the matrix factorization for later solution */
+  void factor_matrix(double *l, double *d, double *u)
+  {
+    // Setup the matrix
+    _mat.setZero() ;
+    for (int i=0; i <_n_blocks; i++) {
+      for (int j=0; j < _block_size; j++) {
+        for(int k=0; k < _block_size; k++) {
+          int idx = i*_block_size*_block_size + j*_block_size + k ;
+            
+          if (i > 0)
+            _mat.insert(i*_block_size+j, (i-1)*_block_size+k) = l[idx] ;
+          _mat.insert  (i*_block_size+j,   i  *_block_size+k) = d[idx] ;
+          if (i+1 < _n_blocks)
+            _mat.insert(i*_block_size+j, (i+1)*_block_size+k) = u[idx] ;
+        } 
+      }  
+    }
+
+    _solver.compute(_mat) ;
+
+    if (_solver.info() != Eigen::Success) 
+        throw std::runtime_error("Factorization failed") ;
+  }
+
+  void solve(double* _rhs, double* _x)
+  {
+    vec_t rhs(_rhs, _block_size*_n_blocks, 1) ;
+    vec_t x(_x, _block_size*_n_blocks, 1) ;
+
+    x = _solver.solve(rhs) ;
+  } ;
+
+
+  BlockTriDiagSolverSparse<fixed_block_size>& operator=(BlockTriDiagSolverSparse<fixed_block_size>&& o) {
+    _mat = std::move(o._mat) ;
+    _n_blocks = o._n_blocks ;
+    _block_size = o._block_size ;
+
+    return *this ;
+  }
+
+private:
+  Eigen::SparseMatrix<double> _mat ;
+  
+  Eigen::SparseLU<decltype(_mat), Eigen::COLAMDOrdering<int>> _solver ;
+  
+
+  int _n_blocks, _block_size;
+};
+
 
 #endif//_BLOCK_TRIDIAG_SOLVE_H

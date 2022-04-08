@@ -97,10 +97,11 @@ void c_Sim::execute() {
 //         if(steps == 1e6) 
 //             cout<<"Radiative equilibrium phase over."<<endl;
         
-        if( globalTime > next_print_time) {
+        if( globalTime > next_print_time || (steps % 10000) == 0) {
             cout<<" Beginning step "<<steps<<" @ globalTime "<<globalTime<<" dt "<<dt;
-            cout<< ", CFL " << cfl_step << ", radiative dt " << timestep_rad2 << "\n";
-            next_print_time *= 10.;
+            cout<< ", CFL " << cfl_step << ", radiative dt " << timestep_rad2 << std::endl;
+            if (globalTime > next_print_time)
+                next_print_time *= 10.;
         }
             
 //         
@@ -254,7 +255,7 @@ void c_Sim::execute() {
             user_heating_function() ;
             
             if(use_rad_fluxes==1) {
-                update_fluxes_FLD();   //FLD Radiation transport, updating Temperatures and photon band energies
+                update_fluxes_FLD(dt);   //FLD Radiation transport, updating Temperatures and photon band energies
             }
             else {
                 //update_temperatures_simple();//Fast eulerian temperature update, no stability guaranteed!

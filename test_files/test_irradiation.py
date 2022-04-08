@@ -21,19 +21,18 @@ def Guillot_2band(tau, Tint4, Tirr40, gamma0, Tirr41, gamma1,
 
 
 def test_structure(sim, Tint, L1_target, make_plots):
-    filename = 'diagnostic_' + sim + '_t5.dat'
+    filename = 'diagnostic_' + sim + '_t-1.dat'
     
-    data = load_aiolos_diag(filename)
+    data = load_aiolos_diag(filename, bands_in=2, bands_out=2)
 
 
     gamma0 = (data['kappa_PTsun0_0'] / data['kappa_P0_0'])[-1]
     gamma1 = (data['kappa_PTsun1_0'] / data['kappa_P1_0'])[-1]
 
-
     Tirr40 = 0.25*data['S0'][-1]/sigma_rad
     Tirr41 = 0.25*data['S1'][-1]/sigma_rad
 
-    tau = data['tau_radial0']
+    tau = data['tau_radial0']/gamma0
     T_guillot = Guillot_2band(tau, Tint**4, Tirr40, gamma0, Tirr41, gamma1)
 
     idx = (tau < 100) & (tau > 1e-10)
@@ -53,7 +52,7 @@ def test_structure(sim, Tint, L1_target, make_plots):
 
         ylim = plt.ylim()
         plt.ylim(ylim[1], 1e-10)
-        plt.xlim(200, 2e4)
+        #plt.xlim(200, 2e4)
 
         plt.xlabel(r'Temperature [K]')
         plt.ylabel(r'Optical Depth')
@@ -72,5 +71,5 @@ if __name__ == "__main__":
                         help="Make plots of the results")
     args = parser.parse_args()
 
-    test_structure('irradiation', 175.0, 1.5e-3, args.make_plots)
+    test_structure('irradiation', 175.0, 1.65e-3, args.make_plots)
 

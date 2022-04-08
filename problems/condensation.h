@@ -119,6 +119,21 @@ struct RadiationProperties {
 
         return S ;
     }
+        // Irradiation of a 'flat' surface
+    std::array<double, 2> surface_irradiation_terms() const {
+
+        std::array<double, 2> S = {0,0} ;
+
+        int num_stellar = flux_star.size() ;
+        for (int b=0; b < num_stellar; b++)
+            S[0] += flux_star[b] ;
+    
+        int num_thermal = J_thermal.size() ;
+        for (int b=0; b < num_thermal; b++)
+            S[1] += pi*J_thermal[b] ;
+
+        return S ;
+    }
 
 
     // Properties of stellar irradiation
@@ -264,7 +279,7 @@ class SingleGrainCondensation {
         }
  
         double fac = 1 / (E + rho[1]) ;
-
+        
         arr_t v ;
         v[0] = (_rho0[0]*_v0[0] + _rho0[1]*_v0[1]*E*fac) / (rho[0] + rho[1]*C*fac) ;
         v[1] = (_rho0[1]*_v0[1] +  v[0]*C) * fac  ;
@@ -306,7 +321,7 @@ class SingleGrainCondensation {
         arr_t T ;
         T[0] = (u[0] + u[1]*E*fac) / (rho[0]*_Ctot[0] + rho[1]*_Ctot[1]*C*fac);
         T[1] = (u[1] + T[0]*C)*fac ;
- 
+        
         return std::make_tuple(rho, T, v) ;
     }
 
@@ -320,17 +335,61 @@ class SingleGrainCondensation {
         rho_min = _rho0[1] ;
         if (this->operator()(rho_min) < 0) {
             rho_max = std::min(rho_min*fac, _rho0[0] + _rho0[1]) ;
-            while(this->operator()(rho_max) < 0) {
+            int count = 0 ;
+            double f ;
+            while((f = this->operator()(rho_max)) < 0) {
                 rho_min = rho_max ;
-                rho_max *= fac ;
+                if (count < 4) 
+                    rho_max *= fac ;
+                else
+                    rho_max *= 10 ;
+                count++ ;
+            }
+
+            if (std::isnan(f)) {
+                while (true) {
+                    double rho = 0.5*(rho_min + rho_max) ;
+                    f = this->operator()(rho) ;
+                    if (f < 0) {
+                        rho_min = rho ;
+                    } else {
+                        rho_max = rho ;
+                        if (not std::isnan(f))
+                            break ;
+                    }
+                    if ((rho_max - rho_min) < 1e-15*rho_max)
+                        return std::make_tuple(rho_min, rho_min) ;
+                }
             }
         }
         else {
             rho_max = rho_min ;
             rho_min /= fac ;
-            while(this->operator()(rho_min) > 0) {
+            int count = 0 ;
+            double f ;
+            while((f = this->operator()(rho_min)) > 0) {
                 rho_max = rho_min ;
-                rho_min /= fac ;
+                if (count < 4) 
+                    rho_min /= fac ;
+                else
+                    rho_min *= 0.1 ;
+                count++ ;
+            }
+
+            if (std::isnan(f)) {
+                while (true) {
+                    double rho = 0.5*(rho_min + rho_max) ;
+                    f = this->operator()(rho) ;
+                    if (f > 0) {
+                        rho_max = rho ;
+                    } else {
+                        rho_min = rho ;
+                        if (not std::isnan(f))
+                            break ;
+                    }
+                    if ((rho_max - rho_min) < 1e-15*rho_max)
+                        return std::make_tuple(rho_max, rho_max) ;
+                }
             }
         }
         return std::make_tuple(rho_min, rho_max) ;
@@ -399,6 +458,22 @@ class SurfaceCondensation {
         return evap - cond ;
     }
  
+    std::string print_surface_cooling(double T_surf) const {
+        std::array<double,2 > S = _rad.surface_irradiation_terms() ;
+
+        std::stringstream out ;
+
+        out << "Surface Heating/Cooling Terms:\n"
+            << "\tStellar irradiation: "  << S[0] << "\n"
+            << "\tNet Thermal Heating: "  << S[1] << "\n"
+            << "\tRainout: " << _Lrain << "\n" 
+            << "\tRadiative cooling: " << sigma_rad*std::pow(T_surf, 4) << "\n" 
+            << "\tLatent Heat: " << _cond.Lsub*mass_flux(T_surf) << "\n" 
+            << "\tGas Heating: " << gas_heating_rate(T_surf) ;
+
+        return out.str() ;
+    }
+
     double gas_heating_rate(double T_surf) const {
         
         double Pv = _cond.P_vap(T_surf) ;

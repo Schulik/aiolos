@@ -740,14 +740,14 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
     
     Jrad_FLD       = Eigen::MatrixXd::Zero(num_cells+2, num_bands_out);
     Jrad_init      = Eigen::MatrixXd::Zero(num_cells+2, num_bands_out);
-    tridiag        = BlockTriDiagSolver<Eigen::Dynamic>(num_cells+2, num_bands_out + num_species) ;
+    tridiag        = BlockTriDiagSolverMethod<Eigen::Dynamic>(num_cells+2, num_bands_out + num_species) ;
     
     double rade_l = parameters.read<double>("PARI_RADSHOCK_ERL", 1.).value;
     double rade_r = parameters.read<double>("PARI_RADSHOCK_ERR", 1.).value;
     init_J_factor = parameters.read<double>("INIT_J_FACTOR", -1.).value;
     
     
-    for(int j = 0; j < num_cells+1; j++) {
+    for(int j = 0; j < num_cells+2; j++) {
         
         if(num_bands_out == 1)  {
             for(int s = 0; s< num_species; s++){
@@ -905,6 +905,14 @@ c_Species::c_Species(c_Sim *base_simulation, string species_filename, int specie
         timesteps_rad = np_zeros(num_cells+2);
         finalstep     = np_zeros(num_cells+2);
         timesteps_de  = np_zeros(num_cells+2);
+
+        opacity                = Eigen::MatrixXd::Zero(num_cells+2, num_bands_out); //num_cells * num_bands_out
+        opacity_planck         = Eigen::MatrixXd::Zero(num_cells+2, num_bands_out); //num_cells * num_bands_out
+        opacity_twotemp        = Eigen::MatrixXd::Zero(num_cells+2, num_bands_in); //num_cells * num_bands_in
+        fraction_total_solar_opacity = Eigen::MatrixXd::Zero(num_cells+2, num_bands_in); //num_cells * num_bands_in
+        
+        //NOTE: If the chosen opacity model is such that a *.opa file is read-in, then this initialization can be found in io.cpp, in void c_Species::read_species_data(string  int species_index)
+    
         
         //////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         //
@@ -1016,13 +1024,6 @@ c_Species::c_Species(c_Sim *base_simulation, string species_filename, int specie
         
         if(debug > 0) cout<<"        Species["<<species_index<<"]: Init done."<<endl;
         
-        opacity                = Eigen::MatrixXd::Zero(num_cells+2, num_bands_out); //num_cells * num_bands_out
-        opacity_planck         = Eigen::MatrixXd::Zero(num_cells+2, num_bands_out); //num_cells * num_bands_out
-        opacity_twotemp        = Eigen::MatrixXd::Zero(num_cells+2, num_bands_in); //num_cells * num_bands_in
-        fraction_total_solar_opacity = Eigen::MatrixXd::Zero(num_cells+2, num_bands_in); //num_cells * num_bands_in
-        
-        //NOTE: If the chosen opacity model is such that a *.opa file is read-in, then this initialization can be found in io.cpp, in void c_Species::read_species_data(string  int species_index)
-    
 }
 
 
