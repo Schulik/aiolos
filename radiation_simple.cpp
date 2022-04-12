@@ -44,6 +44,7 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
     std::vector<double> 
         l(size_M, 0.), d(size_M, 0.), u(size_M, 0.), r(size_r, 0.), eta1(size_etas, 0.), eta2(size_etas, 0.), denoms(size_etas, 0.) ;
      std::vector<double> arr_rhokr(size_r, 0.), arr_R(size_r, 0.), arr_D(size_r, 0.), arr_JDJ(size_r, 0.);
+     std::vector<double> exchange_d_sums(num_cells+2, 0.), exchange_r_sums(num_cells+2, 0.);
     
     // Step 1: setup transport terms (J)
     for(int b=0; b<num_bands_out; b++) {
@@ -271,13 +272,14 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
                 eta1[idx_s] += Ts * ( 1. + 12. * fac);
                 eta1[idx_s] += 1. * ddt * (species[s].dS(j) + species[s].dG(j) - photocooling_multiplier * species[s].dGdT(j)*Ts     ) / species[s].u[j].u1 / species[s].cv;
                 
-                /*if(j == 100 && steps > 1000) {
+                if(false) {
+                //if(j == 100 && steps > 1000) {
                     cout<<"reporting cooling terms: dG / dGdT * Ts "<<species[s].dG(j)<<" / "<< - photocooling_multiplier * species[s].dGdT(j)*Ts <<endl;
                     cout<<"reporting denom cooling terms : 16*fac / "<<16.*fac<<" / "<<moredenom<<endl;
                     char a;
                     cin>>a;
                     
-                }*/
+                }
                 
                 eta2[idx_s] += 4.* pi * ddt * kappa * no_rad_trans / species[s].cv;
                 //if(j == 90 && steps > 41800)
@@ -304,6 +306,8 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
             d[idx_b]  += vol[j] * exchange_d_sum;
             r[idx_rb] += vol[j] * exchange_r_sum;
             
+            exchange_d_sums[j] += exchange_d_sum;
+            exchange_r_sums[j] += exchange_r_sum;
             //Sum up etas to get J source terms
             
         }
@@ -376,7 +380,8 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
             
             //if(Jswitch == 1) {
             if(Jrad_FLD(j, b) < 0.) {
-                cout<<" -J in j/steps "<<j<<"/"<<steps<<" rhokr = "<< arr_rhokr[j]<<" R = "<< arr_R[j]<<" D ="<< arr_D[j]<<" dJ = "<<arr_JDJ[j]<<" J = "<<Jrad_FLD(j, b)<<" Ji+Ji+1 = "<<Jrad_FLD(j+1, b)+Jrad_FLD(j, b)<<endl;
+                cout<<" -J in j/steps "<<j<<"/"<<steps<<" rhokr = "<< arr_rhokr[j]<<" R = "<< arr_R[j]<<" D ="<< arr_D[j]<<" dJ = "<<arr_JDJ[j]<<" J = "<<Jrad_FLD(j, b)<<" Ji+Ji+1 = "<<Jrad_FLD(j+1, b)+Jrad_FLD(j, b)<<" exchange sums = "<<exchange_d_sums[j]<<"/"<<exchange_r_sums[j]<<endl;
+                
                 Jswitch = 1;
             }
             

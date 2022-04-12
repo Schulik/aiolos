@@ -139,7 +139,7 @@ void c_Sim::update_dS_jb(int j, int b) {
                     // Planetary heating 2
                     //
                     if(use_planetary_temperature == 1){
-                        double lum = 0.5 * sigma_rad * T_core*T_core*T_core*T_core;
+                        double lum = 1.0 * sigma_rad * T_core*T_core*T_core*T_core;
                         //Spread the luminosity for fewer crashes
                         dS_band(2,b) += 3./6. * lum / (dx[2]); 
                         dS_band(3,b) += 2./6. * lum / (dx[3]); 

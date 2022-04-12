@@ -157,11 +157,11 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
         use_collisional_heating = read_parameter_from_file<int>(filename,"PARI_USE_COLL_HEAT", debug, 1).value;
         use_drag_predictor_step = read_parameter_from_file<int>(filename, "PARI_SECONDORDER_DRAG", debug, 0).value;
         init_wind         = read_parameter_from_file<int>(filename,"PARI_INIT_WIND", debug, 0).value;
-        alpha_collision   = read_parameter_from_file<double>(filename,"PARI_ALPHA_COLL", debug, 0).value;
+        alpha_collision   = read_parameter_from_file<double>(filename,"PARI_ALPHA_COLL", debug, 1.).value;
         //init_mdot              = read_parameter_from_file<double>(filename,"PARI_MDOT", debug, -1.).value;
         init_sonic_radius = read_parameter_from_file<double>(filename,"INIT_SONIC_RADIUS", debug, -1e10).value;
         rad_energy_multiplier=read_parameter_from_file<double>(filename,"PARI_RAD_MULTIPL", debug, 1.).value;
-        collision_model   = read_parameter_from_file<char>(filename,"PARI_COLL_MODEL", debug, 'C').value;
+        collision_model   = read_parameter_from_file<char>(filename,"PARI_COLL_MODEL", debug, 'P').value;
         opacity_model     = read_parameter_from_file<char>(filename,"PARI_OPACITY_MODEL", debug, 'C').value;
         if(opacity_model == 'M')
             init_malygin_opacities();
@@ -760,45 +760,45 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
     if(fluxfile.compare("---")==0) {
         
             for(int b=0; b<num_bands_in; b++) {
-            if(debug > 0) cout<<"Init: Assigning stellar luminosities. b ="<<b<<endl;
-            
-            if(num_bands_in == 1) {
-                solar_heating(b)  = sigma_rad * pow(T_star,4.) * pow(R_star*rsolar,2.)/pow(planet_semimajor*au,2.);
-                solar_heating(b) += sigma_rad * pow(T_other,4.) * pow(R_other*rsolar,2.)/pow(d_other*au,2.);
-                solar_heating(b) += UV_star/(4.*pi*pow(planet_semimajor*au,2.));
-                solar_heating(b) += X_star/(4.*pi*pow(planet_semimajor*au,2.));
-                templumi += solar_heating(b);
+                if(debug > 0) cout<<"Init: Assigning stellar luminosities. b ="<<b<<endl;
                 
-                solar_heating_final(b) = solar_heating(b);
-                cout<<" Solar heating is "<<solar_heating(b)<<" T_star = "<<T_star<<" pow(R_star*rsolar,2.) "<<pow(R_star*rsolar,2.)<<" pow(planet_semimajor*au,2.) "<<planet_semimajor<<endl;
-            }
-            else{
-                cout<<"SOLAR HEATING in bin "<<b;
-                cout<<" from/to lmin/lmax"<<l_i_in[b];
-                cout<<"/"<<l_i_in[b+1]<<" with frac = "<<compute_planck_function_integral4(l_i_in[b], l_i_in[b+1], T_star);
-                
-                solar_heating(b)  = sigma_rad * pow(T_star,4.) * pow(R_star*rsolar,2.)/pow(planet_semimajor*au,2.) * compute_planck_function_integral4(l_i_in[b], l_i_in[b+1], T_star);
-                solar_heating(b) += sigma_rad * pow(T_other,4.) * pow(R_other*rsolar,2.)/pow(d_other*au,2.) * compute_planck_function_integral4(l_i_in[b], l_i_in[b+1], T_other);;
-                templumi         += solar_heating(b);
-                
-                //if (BAND_IS_HIGHENERGY[b] == 1) {
-                if(l_i_in[b+1] <= 0.09161) { //Detect the EUV band 
-                        
-                    if(l_i_in[b+1] <= 0.0161 ) { //Detect the X ray band
-                        solar_heating(b) += X_star/(4.*pi*pow(planet_semimajor*au,2.));
-                        cout<<endl<<"        band "<<b<<" detected as X band. Currently, this is treated as thermal band. Assigning X flux "<<X_star/(4.*pi*pow(planet_semimajor*au,2.))<<" based on X lumi "<<X_star;
-                        BAND_IS_HIGHENERGY[b] = 0;
+                if(num_bands_in == 1) {
+                    solar_heating(b)  = sigma_rad * pow(T_star,4.) * pow(R_star*rsolar,2.)/pow(planet_semimajor*au,2.);
+                    solar_heating(b) += sigma_rad * pow(T_other,4.) * pow(R_other*rsolar,2.)/pow(d_other*au,2.);
+                    solar_heating(b) += UV_star/(4.*pi*pow(planet_semimajor*au,2.));
+                    solar_heating(b) += X_star/(4.*pi*pow(planet_semimajor*au,2.));
+                    templumi += solar_heating(b);
+                    
+                    solar_heating_final(b) = solar_heating(b);
+                    cout<<" Solar heating is "<<solar_heating(b)<<" T_star = "<<T_star<<" pow(R_star*rsolar,2.) "<<pow(R_star*rsolar,2.)<<" pow(planet_semimajor*au,2.) "<<planet_semimajor<<endl;
+                }
+                else{
+                    cout<<"SOLAR HEATING in bin "<<b;
+                    cout<<" from/to lmin/lmax"<<l_i_in[b];
+                    cout<<"/"<<l_i_in[b+1]<<" with frac = "<<compute_planck_function_integral4(l_i_in[b], l_i_in[b+1], T_star);
+                    
+                    solar_heating(b)  = sigma_rad * pow(T_star,4.) * pow(R_star*rsolar,2.)/pow(planet_semimajor*au,2.) * compute_planck_function_integral4(l_i_in[b], l_i_in[b+1], T_star);
+                    solar_heating(b) += sigma_rad * pow(T_other,4.) * pow(R_other*rsolar,2.)/pow(d_other*au,2.) * compute_planck_function_integral4(l_i_in[b], l_i_in[b+1], T_other);;
+                    templumi         += solar_heating(b);
+                    
+                    //if (BAND_IS_HIGHENERGY[b] == 1) {
+                    if(l_i_in[b+1] <= 0.09161) { //Detect the EUV band 
+                            
+                        if(l_i_in[b+1] <= 0.0161 ) { //Detect the X ray band
+                            solar_heating(b) += X_star/(4.*pi*pow(planet_semimajor*au,2.));
+                            cout<<endl<<"        band "<<b<<" detected as X band. Currently, this is treated as thermal band. Assigning X flux "<<X_star/(4.*pi*pow(planet_semimajor*au,2.))<<" based on X lumi "<<X_star;
+                            BAND_IS_HIGHENERGY[b] = 0;
+                        }
+                        else {
+                            solar_heating(b) += UV_star/(4.*pi*pow(planet_semimajor*au,2.));
+                            cout<<endl<<"        band "<<b<<" detected as UV band. Assigning UV flux "<<UV_star/(4.*pi*pow(planet_semimajor*au,2.))<<" based on UV lumi "<<UV_star;
+                        }
                     }
-                    else {
-                        solar_heating(b) += UV_star/(4.*pi*pow(planet_semimajor*au,2.));
-                        cout<<endl<<"        band "<<b<<" detected as UV band. Assigning UV flux "<<UV_star/(4.*pi*pow(planet_semimajor*au,2.))<<" based on UV lumi "<<UV_star;
-                    }
+                    
+                    solar_heating_final(b) = solar_heating(b);
                 }
                 
-                solar_heating_final(b) = solar_heating(b);
-            }
-            
-            cout<<" is F = "<<solar_heating(b)<<endl;
+                cout<<" is F = "<<solar_heating(b)<<endl;
                 
         }
         
@@ -1802,8 +1802,6 @@ void c_Species::apply_boundary_right(std::vector<AOS>& u) {
                 }
                 
                 //cout<<"/"<<prim.pres<<" i = "<<i<<endl;
-                
-                
                 
                 if(true) {
                     double dphi = (base->phi[i]*K_zzf[i] - base->phi[i-1]*K_zzf[i-1]) / (base->dx[i-1] + base->dx[i]) ;
