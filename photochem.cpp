@@ -38,9 +38,9 @@ double H_radiative_recombination(double T_e) {
     
     double x = 2 * 157807 / T_e;
     // Case B
-    //return 2.753e-14 * pow(x, 1.500) / pow(1 + pow(x / 2.740, 0.407), 2.242);
+    return 2.753e-14 * pow(x, 1.500) / pow(1 + pow(x / 2.740, 0.407), 2.242);
     ////       2.753e-14 * pow(2 * 157807 / x, 1.500) / pow(1 + pow(2 * 157807 / x / 2.740, 0.407), 2.242)
-    return 1.e+0 * 2.7e-13 * pow(T_e/1e4, -0.9) ;//* pow(T_e/1e4, -0.9); //MC2009 value
+    //return 1.e+0 * 2.7e-13 * pow(T_e/1e4, -0.9) ;//* pow(T_e/1e4, -0.9); //MC2009 value
     
     //JOwens code:
     //  rec_coeff =  8.7d-27*tgas**0.5 * t3**(-0.2)*(1+t6**0.7)**(-1)
@@ -117,7 +117,7 @@ double Cp_cooling(double Te) {
 }
 
 double Cpp_cooling(double Te) {
-    return 0.;
+    return 0.*Te;
 }
 
 double O_cooling(double Te) {
@@ -136,7 +136,7 @@ double Op_cooling(double Te) {
 
 double Opp_cooling(double Te) {
     
-    return 0.;
+    return 0.*Te;
 }
 
 /* class C2Ray_HOnly_ionization
@@ -416,10 +416,10 @@ double get_implicit_photochem3(double dt, double n1_old, double n2_old, double F
     
     long double xnew = (x*nom + source) / denom;
     
-    long double n2_new = xnew * ntot;
-    long double n1_new = (1-xnew) * ntot;
+    //long double n2_new = xnew * ntot;
+    //long double n1_new = (1-xnew) * ntot;
     
-    return n2_old/(n1_old+n2_old);
+    return xnew; //n2_old/(n1_old+n2_old);
 }
 
 void c_Sim::do_photochemistry() {
@@ -510,11 +510,11 @@ void c_Sim::do_photochemistry() {
                 
                 Brent root_solver_ion(ion_precision, ion_maxiter);
                 double xmin = std::max((nX[1] - nX[2]) / (nX[0] + nX[1]), 0.0);
-                double x_bar;
+                double x_bar = 1e-10;
                 try {
-                        x_bar = get_implicit_photochem3(dt, nX[0], nX[1], Gamma0[1], dx[j], species[0].opacity_twotemp(j, 1) * mX[0], 2.7e-13);
+                        //x_bar = get_implicit_photochem3(dt, nX[0], nX[1], Gamma0[1], dx[j], species[0].opacity_twotemp(j, 1) * mX[0], 2.7e-13);
                         //x_bar = get_implicit_photochem(); //dt, n1_old, n2_old, F, dx, kappa, alpha
-                        double x_bar2 = root_solver_ion.solve(xmin, 1, ion);
+                        x_bar = root_solver_ion.solve(xmin, 1, ion);
                 }
                 catch(...) { }
 
@@ -668,8 +668,14 @@ void c_Sim::do_photochemistry() {
                     //Even in cases when radiative transport is not used, we want to document those quanitites in the output
                     species[s].dG(j) += cooling[s];
                     species[s].dS(j) += heating[s];
+                    
+                    /*species[s].dS(num_cells+1) = 0;
+                    species[s].dS(num_cells) = 0;
+                    species[s].dS(num_cells-1) = 0; */
                     //cout<<" added  heating[s] = "<< heating[s]<<" to species["<<s<<"]."<<endl;
                 }
+                
+                
                 //char a;
                 //cin>>a;
                 

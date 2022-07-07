@@ -25,7 +25,6 @@ extern double O_cooling(double Te);
 extern double Op_cooling(double Te);
 extern double Opp_cooling(double Te);
 
-double thermo_get_r(double T, double r1, double delta_stoch);
 std::vector<double> get_thermo_variables(double T,string species_string);
 
 //
@@ -37,14 +36,22 @@ void c_Sim::init_reactions(int cdebug) {
     
     //std::vector<c_reaction> reactions;
     //std::vector<c_photochem_reaction> photoreactions;
-    cout<<"Init photoreactions..."<<endl;
+    
+    if(cdebug)
+        cout<<"Init photoreactions..."<<endl;
     
     double ns = num_species;
-    photoreactions.push_back(c_photochem_reaction( ns, num_bands_in, 1, {0}, {1,2}, {1.}, {1.,1.}, 1., 13.6 )); //H + gamma -> H+ + e-
-    //reactions.push_back(c_reaction(0, ns, {1,2}, {0}, {1.,1.}, {1.}, 1.074889e-9, -0.9, 0. )); //Electron-proton recombination
+    //photoreactions.push_back(c_photochem_reaction( ns, num_bands_in, 1, {0}, {1,2}, {1.}, {1.,1.}, 1., 13.6 )); //H + gamma -> H+ + e-
+    //reactions.push_back(c_reaction(0, 0, ns, {1,2}, {0}, {1.,1.}, {1.}, 2.7e-13, 0.0, 0. )); //Electron-proton recombination
     
-    reactions.push_back(c_reaction(0, ns, {1,2}, {0}, {1.,1.}, {1.}, 2.7e-13, 0.0, 0. )); //Electron-proton recombination
+    //reactions.push_back(c_reaction(0, ns, {1,2}, {0}, {1.,1.}, {1.}, 1.074889e-9, -0.9, 0. )); //Electron-proton recombination
     //reactions.push_back(c_reaction(0, ns, {0}, {1,2}, {1.}, {1.,1.}, 2.167e-5, -0.4, 157807. )); //H (exact below 25e3 K)
+    
+    //reactions.push_back(c_reaction(0, 1, ns, {3}, {0}, {1.}, {2.}, 1.5e-9,  0.0, 4.8e4 )); //R4 in Yelle+2004 
+    //reactions.push_back(c_reaction(0, 1, ns, {0}, {3}, {2.}, {1.}, 2.45e-31, -0.6, 0. )); //R5 in Yelle+2004 
+    
+    reactions.push_back(c_reaction(0, 0, ns, {3}, {0}, {1.}, {2.}, 1.5e-9,  0.0, 0. )); //R4 in Yelle+2004 
+    reactions.push_back(c_reaction(0, 0, ns, {0}, {3}, {2.}, {1.}, 2.45e-21, 0., 0. )); //R5 in Yelle+2004
     
     int cnt = 0;
     num_reactions = 0;
@@ -70,6 +77,9 @@ void c_Sim::init_reactions(int cdebug) {
             
             if(reaction.is_reverse_reac) {
                 
+                if(reaction.mtype_reaction)
+                    cout<<" M + ";
+                
                 for(int& pi : reaction.products) {
                         cout<<reaction.p_stoch_i[pi]<<" "<<species[pi].speciesname<<" ";
                         if(reaction.products.back() != pi) 
@@ -78,6 +88,8 @@ void c_Sim::init_reactions(int cdebug) {
                         
                 }
                 cout<<" <- ";
+                if(reaction.mtype_reaction)
+                    cout<<" M + ";
                 for(int& ei : reaction.educts) {
                     cout<<reaction.e_stoch_i[ei]<<" "<<species[ei].speciesname<<" ";
                     if(reaction.educts.back() != ei) 
@@ -89,7 +101,8 @@ void c_Sim::init_reactions(int cdebug) {
                 
             }
             else {
-                
+                if(reaction.mtype_reaction)
+                    cout<<" M + ";
                 for(int& ei : reaction.educts) {
                     cout<<reaction.e_stoch_i[ei]<<" "<<species[ei].speciesname<<" ";
                     
@@ -97,6 +110,8 @@ void c_Sim::init_reactions(int cdebug) {
                         cout<<"+ ";
                 }
                 cout<<" -> ";
+                if(reaction.mtype_reaction)
+                    cout<<" M + ";
                 for(int& pi : reaction.products) {
                     cout<<reaction.p_stoch_i[pi]<<" "<<species[pi].speciesname<<" ";
                     if(reaction.products.back() != pi) 
@@ -137,7 +152,8 @@ void c_Sim::init_reactions(int cdebug) {
     //cin>>a;
         
     //}
-    
+    if(cdebug)
+        cout<<" Finished init chemistry."<<endl;
     
 }
 
@@ -194,17 +210,10 @@ void c_Sim::do_chemistry() {
     
     for (int j = num_cells+1; j >= 0; j--) {
         
-        double temp_dt = dt;
-        double t_div = 1.;
-        
         //std::vector<double> n_init = np_zeros(num_species);
         //std::vector<double> n_tmp  = np_zeros(num_species);
         Vector_t n_init = Vector_t(num_species);
         Vector_t n_tmp = Vector_t(num_species);
-        
-        int switch_negative  = 0;
-        int switch_precision = 0;
-        //int check_ok = 0;
         
         double n_tot = 0.;
         
@@ -385,22 +394,16 @@ Vector_t c_Sim::solver_cchem_implicit_general(double dtt, int cell, int cdebug, 
         for(int sj=0; sj<num_species; sj++) {
             reaction_matrix(si,sj) = 0.;
         }
-        
-        
     }
     
     Vector_t n_news = Vector_t(num_species);
-    double Tcell           = species[0].prim[cell].temperature;
-    //dtt = 1e-3;
-    //double n_tot = 0.;
-    
-    double masses[num_species];
-    double kappas[num_species];
+    //double masses[num_species];
+    //double kappas[num_species];
     
     for(int s=0;s<num_species; s++) {
         //n_olds[s]     = species[s].prim[cell].number_density / n_tot;
+        //masses[s] = species[s].mass_amu*amu;
         reaction_b[s] = n_olds[s];
-        masses[s] = species[s].mass_amu*amu;
     }
     //
     // Photochemical reactions
@@ -536,7 +539,7 @@ Vector_t c_Sim::solver_cchem_implicit_general(double dtt, int cell, int cdebug, 
     
     //cout<<"matrix = "<<endl<<reaction_matrix<<endl<<" b ="<<reaction_b<<endl;
     //
-    // Regular reactions
+    // Regular thermochemistry reactions
     //
     //for ri,reac in enumerate(reactions) {
     double total_chem_dG = 0.;
@@ -553,6 +556,10 @@ Vector_t c_Sim::solver_cchem_implicit_general(double dtt, int cell, int cdebug, 
         meanT = meanT/denom;
         
         double reac_r = reaction.get_reaction_rate(meanT);
+        
+        //Reactions which contain catalysts, are enhanced by the catalyst density in reaction rate. But because the catalyst comes out unharmed, we don't need to compute another additional dn/dt-term
+        if(reaction.mtype_reaction) 
+            reac_r *= n_tot;
         total_chem_dG += reaction.current_dG;
         
         /*if(globalTime > 1e3) {
@@ -701,7 +708,6 @@ Vector_t c_Sim::solver_cchem_implicit_general(double dtt, int cell, int cdebug, 
         cin>>b;
         
     }
-        
     
     //std::vector<double> n_tmp2  = np_zeros(num_species);
     //for(int s=0; s< num_species; s++)
@@ -875,8 +881,6 @@ void c_Sim::update_dS_jb_photochem(int cell) {
     //
     if(do_hydrodynamics >= 0 && globalTime > 1.0e-19 && chem_momentum_correction == 1) { //&& steps > 10
         
-        
-        double dEk = 0.;
         std::vector<double> mom  = np_zeros(num_species);
         std::vector<double> vnew = np_zeros(num_species);
         
@@ -907,7 +911,7 @@ void c_Sim::update_dS_jb_photochem(int cell) {
         if(false) {
             
             std::array<double, 3> nX = { species[0].prim[cell].number_density, species[1].prim[cell].number_density, species[2].prim[cell].number_density};
-            std::array<double, 3> vX = { species[0].prim[cell].speed, species[1].prim[cell].speed, species[2].prim[cell].speed};
+            //std::array<double, 3> vX = { species[0].prim[cell].speed, species[1].prim[cell].speed, species[2].prim[cell].speed};
             std::array<double, 3> mX = { species[0].mass_amu * amu, species[1].mass_amu * amu, species[2].mass_amu * amu};
             //std::array<double, 3> mom = { species[0].u[cell].u2, species[1].u[cell].u2, species[2].u[cell].u2 } ;
             
@@ -917,7 +921,7 @@ void c_Sim::update_dS_jb_photochem(int cell) {
 
             double fe = 1/(1 + mX[2]/mX[1]), fp = 1/(1 + mX[1]/mX[2]) ;
             double f = nX[0] + dn_I - dn_I*dn_R*(fp/(nX[1]+dn_R) + fe/(nX[2] + dn_R)) ;
-            //mom_nonupdated = 
+            
             mom_news(0) = (mom[0] + dn_R*(mom[1]/(nX[1]+dn_R) + mom[2]/(nX[2]+dn_R))) / f ;
             mom_news(1) = (mom[1] + dn_I*mom_news(0)*fp)/(nX[1]+dn_R) ;
             mom_news(2) = (mom[2] + dn_I*mom_news(0)*fe)/(nX[2]+dn_R) ;
@@ -1006,7 +1010,6 @@ void c_Sim::update_dS_jb_photochem(int cell) {
         
         double ne = species[e_idx].prim[cell].number_density;
         double Te = species[e_idx].prim[cell].temperature;
-        double Te3 = Te*Te*Te;
         double dT = 1e-5;
         
         if( e_idx!=-1 && hnull_idx!=-1 && hplus_idx!=-1  ) { //If all species are there - H0, H+ and e-
@@ -1106,17 +1109,12 @@ int solver_cchem_implicit_specialized_cochem(double dt, int num_spec, int cdebug
     
     return np.array([H2_new, CO_new, H2O_new, CH4_new])*/
     
+    //Dummy commands so the compiler doesn't complain about unused arguments
+    if(cdebug > 0)
+        cout<<" In solver_cchem_implicit_specialized_cochem, dt = "<<dt<<" num_spec = "<<num_spec<<endl;
+    
     return 0.;
 }
-
-//
-// Computes the reaction rate for a reaction,  considers also the case that this might be a backward reaction
-//
-double thermo_get_r(double T, double r1, double delta_stoch) {
-    
-    return r1;
-}
-
 
 //
 // Returns H0/RT, s0/R and cp/R according to the NASA polynomials
@@ -1312,7 +1310,7 @@ std::vector<double> get_thermo_variables(double T,string species_string) {
             temp = thermo_poly(T, 2.01356492E+06, -8.20088746E+03, 1.75969407E+01, -1.46454452E-03, 2.69588697E-07, -2.66567484E-11, 1.09420452E-15, 4.17777688E+04, -8.72580358E+01);
     
     else if(species_string.compare("HCCO")==0)
-     if(T < 1000)
+        if(T < 1000)
             temp = thermo_poly(T, 6.95961270E+04, -1.16459440E+03, 9.45661626E+00, -2.33124063E-03, 5.16187360E-06, -3.52616997E-09, 8.59914323E-13, 2.53500399E+04, -2.72635535E+01);
         else
             temp = thermo_poly(T, 1.09392200E+06, -4.49822821E+03, 1.24644643E+01, -6.34331740E-04, 1.10854902E-07, -1.12548868E-11, 5.68915194E-16, 4.65228030E+04, -5.09907043E+01);

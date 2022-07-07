@@ -191,7 +191,7 @@ void c_Sim::compute_friction_analytical() {
             //Apply analytic solutions ...
             double alpha=0, eps=0, f1=0, f2=0;
             double v1b=0, v2b=0, v1a=0, v2a=0;
-            double ntot, mtot, coll_b;
+            double coll_b;
             double mumass, meanT, m0, m1;
             
             for(int j=0; j <= num_cells+1; j++){
@@ -222,10 +222,10 @@ void c_Sim::compute_friction_analytical() {
                         alpha = 4/3. * species[1].prim[j].density * v_th * A/(m0+m1) ;
                     } else {
                         // Gas-gas collisions. Used binary diffusion coefficient                        
-                        ntot = species[0].prim[j].number_density + species[1].prim[j].number_density;
+                        //ntot = species[0].prim[j].number_density + species[1].prim[j].number_density;
                         //fi   = species[0].prim[j].number_density / ntot;
                         //fj   = species[1].prim[j].number_density / ntot;
-                        mtot = species[0].mass_amu*amu + species[1].mass_amu*amu;
+                        //mtot = species[0].mass_amu*amu + species[1].mass_amu*amu;
                         //mui  = species[0].mass_amu*amu / mtot;
                         //muj  = species[1].mass_amu*amu / mtot;
                         
@@ -483,7 +483,7 @@ void c_Sim::compute_alpha_matrix(int j) { //Called in compute_friction() and com
         
         double alpha_local;
         double coll_b;
-        double ntot;
+        //double ntot;
         double mtot;
         double mumass, mumass_amu, meanT;
         
@@ -519,7 +519,7 @@ void c_Sim::compute_alpha_matrix(int j) { //Called in compute_friction() and com
                         } else {
                             // Gas-gas collisions. Used binary diffusion coefficient                        
 
-                            ntot = numdens_vector(si) + numdens_vector(sj);
+                            //ntot = numdens_vector(si) + numdens_vector(sj);
                             //fi   = numdens_vector(si) / ntot;
                             //fj   = numdens_vector(sj) / ntot;
                             
@@ -535,7 +535,7 @@ void c_Sim::compute_alpha_matrix(int j) { //Called in compute_friction() and com
                             }
                             else if(std::abs(ci) == 0 || std::abs(cj) == 0) {//i-n collision
                                 
-                                alpha_local = 100.*2.21 * 3.141592 * numdens_vector(sj) * mass_vector(sj)/(mass_vector(sj)+mass_vector(si));
+                                alpha_local = 1*2.21 * 3.141592 * numdens_vector(sj) * mass_vector(sj)/(mass_vector(sj)+mass_vector(si));
                                 alpha_local *= std::sqrt(0.66 / mumass ) * 1e-12 * qn * elm_charge; //0.66 is the polarizability of neutral atomic H
                                 
                                 ccase = " i-n ";

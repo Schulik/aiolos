@@ -364,13 +364,14 @@ int c_Sim::get_species_index(const string name) {
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 //
 // Compute analytic solution to the wind problem
+// Update: We do not use this function anymore as too many users have trouble getting the gsl lambert_W function. 
+//         If direct in-code comparison is required, comment gsl_lambertW back in and include the gsl library.
 //
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 void c_Species::compute_analytic_solution() {
     
-    //cout<<"In compute_analytic_solution."<<endl;
-    
+    /*
     for(int i=1;i<=num_cells;i++) {
         
         if(prim[num_cells].sound_speed < 0)
@@ -381,21 +382,21 @@ void c_Species::compute_analytic_solution() {
         double D      = pow(rrc,-4.) * std::exp(4.*(1.-1./rrc)-1. );
         
         if(base->x_i12[i] < bondi_radius) {
-            u_analytic[i] = D;//prim[num_cells].sound_speed * std::sqrt( - gsl_sf_lambert_W0(-D) ); 
+            u_analytic[i] = prim[num_cells].sound_speed * std::sqrt( - gsl_sf_lambert_W0(-D) ); 
         }
         else {
             
-            u_analytic[i] = D;//prim[num_cells].sound_speed * std::sqrt( - gsl_sf_lambert_Wm1(-D) ); 
+            u_analytic[i] = prim[num_cells].sound_speed * std::sqrt( - gsl_sf_lambert_Wm1(-D) ); 
         }
     
     
-    }
+    }*/
     
 }
 
 void c_Species::init_analytic_wind_solution() {
     
-    //cout<<"In compute_analytic_solution."<<endl;
+    /*
     double sonic_radius = base->init_sonic_radius;
     
     double ufinal = 0;
@@ -415,13 +416,7 @@ void c_Species::init_analytic_wind_solution() {
         
         prim[i].speed = ufinal;
     }
-    
-   // compute_pressure(u);
-  //  for(int i=num_cells; i>=0; i--)  {
-  //      primlast[i].internal_energy = prim[i].internal_energy;
- //   }
- //   
- //   AOS_prim prim(u1 * initial_fraction, u2, u3);
  
     eos->compute_conserved(&(prim[0]), &(u[0]), num_cells);
+    */
 }

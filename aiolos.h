@@ -13,7 +13,7 @@
 #include <math.h>
 #include <cmath>
 #include <type_traits>
-#include <gsl/gsl_sf_lambert.h>
+//#include <gsl/gsl_sf_lambert.h>
 #include <Eigen/Core>
 #include <Eigen/Dense>
 #include <Eigen/LU>
@@ -40,7 +40,7 @@ const double c_light   = 2.99792458e10;
 const double navo     = 6.02214e23; // particles per mole
 const double amu      = 1.66054e-24; //g
 const double h_planck = 6.62607015e-27;//  cm^2 g/s
-const double Rgas     = 8.31446261815324e7;  //erg/K/g
+const double Rgas     = 8.31446261815324e7;  //erg/K/g    or //erg/K/mole?
 //const double Rgas_fake = 1.;
 const double kb       = 1.380649e-16;  //erg/K
 const double km       = 1e5; //kilometers in cm
@@ -67,8 +67,6 @@ const double de_broglie_p = 2.*pi* amu * kb/h_planck/h_planck;
 const double elm_charge   = 4.80320425e-10; //statcoulomb
 
 // For entropy computation, to be set to sensible parameters e.g. at setting of initial conditions
-const double P_ref   = 1e-20;
-const double Rho_ref = 1e-20; 
 
 const double cflfactor = 0.9;
 const int debug2 = 0;
@@ -259,9 +257,14 @@ void update_cons_prim_after_friction(AOS* cons, AOS_prim* prim, double dEkin, do
 
 class c_Species;
 class c_Sim;
-//class c_reaction;
-//class c_photochem_reaction;
 
+/**
+ * Thermochemistry reactions
+ *
+ * Reactions of the form A + B + ... ->  A' + B' + ... (only unidirectional!), implementing 
+ * terms of the form dn_A/dt = - k * n_A * n_B ..., dn_B/dt = - k * n_A * n_B ..., dn_A'/dt = + k * n_A * n_B ...
+ * If one wants chemical equilibrium to occur, the reverse reaction has to be added manually
+ */
 class c_reaction
 {    
 public:
@@ -274,25 +277,26 @@ public:
     std::vector<int> p_stoch_i;
     std::vector<double> e_stoch;
     std::vector<double> p_stoch;
-    double delta_stoch;
-    double products_total_mass;
+    double delta_stoch;             //Stochiometric exponent difference between reactant and product side
+    double products_total_mass;     //Total mass of products
     
-    int e_num = 0.;
-    int p_num = 0.;
+    int e_num = 0.;      //Number reactants/educts (educt = reactant in German)
+    int p_num = 0.;      //Number products
     
     double r = 0.;       //Reaction coefficient (a constant for now)
-    double reac_a = 0.;
+    double reac_a = 0.;  //Reaction coefficients of the form a * T^b * exp(-c/T)
     double reac_b = 0.;
     double reac_c = 0.;
-    bool is_reverse_reac;
+    bool is_reverse_reac;    //Will try to automatically find the reverse reaction by computing r * exp(-dG/T), where the Gibbs energy difference dG has to be in the chemistry lookup tables
+    bool mtype_reaction = 0; //Reaction has a catalyst in it?
     double current_dG = 0.;
     double dndt_old;
     std::vector<double> dndts;
     
 public:
     
-    c_reaction(bool is_reverse, int num_species, std::vector<int> e_indices,std::vector<int> p_indices,std::vector<double> e_stoch, std::vector<double> p_stoch, double a, double b, double c);
-    c_reaction(bool is_reverse, int num_species, std::vector<int> e_indices,std::vector<int> p_indices,std::vector<double> e_stoch, std::vector<double> p_stoch, double reaction_rate);
+    c_reaction(bool is_reverse, bool mtype_reaction, int num_species, std::vector<int> e_indices,std::vector<int> p_indices,std::vector<double> e_stoch, std::vector<double> p_stoch, double a, double b, double c);
+    c_reaction(bool is_reverse, bool mtype_reaction, int num_species, std::vector<int> e_indices,std::vector<int> p_indices,std::vector<double> e_stoch, std::vector<double> p_stoch, double reaction_rate);
     void c_reaction_real(int num_species, std::vector<int> e_indices,std::vector<int> p_indices,std::vector<double> e_stoch, std::vector<double> p_stoch, double reaction_rate);
     void set_base_pointer(c_Sim *base_simulation);
     
@@ -300,7 +304,14 @@ public:
     double get_reaction_rate(double T);
     void set_reac_number(int num) {reaction_number = num;}
 };
-    
+
+/**
+ * Photoochemistry reactions
+ *
+ * Reactions of the form A ->  A' + B' + ... , implementing 
+ * terms of the form dn_A/dt = - G * n_A, dn_A'/dt = + G * n_A, 
+ * where G will be typically along the lines of flux/photon energy * opacity.
+ */
 class c_photochem_reaction 
 {
 public:
@@ -318,11 +329,11 @@ public:
     double dndt_old;
     
     //Photochem specific
-    int band;
+    int band;                    //Minimum band to start this reaction being relevant (user needs to make sure this is compatible with threshold_energy!!!)
     double branching_ratio;
     double threshold_energy;
     double products_total_mass;
-    double energy_split_factor;
+    double energy_split_factor;  //Ensure most of the heating goes to light products when mass ratios between products are extreme and an even split between reactants of equal mass
     
     c_photochem_reaction(int num_species, int num_bands, int band, std::vector<int> e_indices, std::vector<int> p_indices, std::vector<double> e_stoch, std::vector<double> p_stoch, double branching, double threshold);
     void set_reac_number(int num) {reaction_number = num;}
@@ -562,7 +573,6 @@ public:
     double no_rad_trans;      // Multiplier for the div F radiation transport in the radiation solver to compare to models which don't cool thermally
     double CFL_break_time; //Numerical time after which cflfactor=0.9. Used in get_cfl_timestep()
     double photocooling_multiplier;
-    double cooling_expansion;
     
     std::vector<double> previous_monitor_J;
     std::vector<double> previous_monitor_T;
@@ -606,7 +616,7 @@ public:
     int rad_solver_max_iter = 1;
     double epsilon_rad_min = 1e-1;  // Some convergence measure for the radiation solver, if needed
     double density_floor;
-    
+    double xi_rad;
     //
     // (Photo)Chemistry
     //
@@ -705,7 +715,7 @@ public:
     //Opacities 
     void init_malygin_opacities();
     double opacity_semenov_malygin(int rosseland, double temperature, double rho, double pressure, int caller_is_dust) ;
-    double get_gas_malygin(int rosseland, double rho, double T_gas, double pressure);
+    double get_gas_malygin(int rosseland, double T_gas, double pressure);
     double freedman_opacity(double P, double T, double _Z);
     void kappa_landscape();
     

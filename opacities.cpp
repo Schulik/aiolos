@@ -41,13 +41,13 @@
 
 
 double lint(double xa, int N, double* X, double* RI) {
-    int i2, i1, i;
+    int i2=0, i1=0, i;
     if(xa < X[0])
         xa = X[0];
     else if (xa > X[N])
         xa = X[N];
 
-    // Find position the two 
+    // Find position between the two 
     for(i = 0; i < N; i++) {
         if(xa >= X[i]) {
             i1 = i;
@@ -59,20 +59,20 @@ double lint(double xa, int N, double* X, double* RI) {
 }
 
 double logint(double xa, int N, double* X, double* RI) {
-    int i2, i1, i;
+    int i2=0, i1=0, i;
     if(xa < X[0])
         xa = X[0];
     else if (xa > X[N])
         xa = X[N];
 
-    // Find position the two 
+    // Find position between the two 
     for(i = 0; i < N; i++) {
         if(xa >= X[i]) {
             i1 = i;
             i2 = i+1;
         }
     }
-    //Left and right boundaries are known, interpolate linearly
+    //Left and right boundaries are known, interpolate logly
     return std::pow(10, (std::log10(RI[i2]) - std::log10(RI[i1])) / (std::log10(X[i2]) - std::log10(X[i1])) * (std::log10(xa) - std::log10(X[i1])) + std::log10(RI[i1]) );
 }
 
@@ -182,7 +182,7 @@ void c_Species::update_opacities() {
             
             for(int b=0; b<num_bands_out; b++) {
                 opacity(j,b)        = base->const_opacity_rosseland_factor * base->opacity_semenov_malygin(1, prim[j].temperature, prim[j].density, prim[j].pres, this->is_dust_like); 
-                opacity_planck(j,b) = base->const_opacity_planck_factor * base->opacity_semenov_malygin(0, prim[j].temperature, prim[j].density, prim[j].pres, this->is_dust_like);
+                opacity_planck(j,b) = base->const_opacity_planck_factor * base->opacity_semenov_malygin(0, prim[j].temperature,    prim[j].density, prim[j].pres, this->is_dust_like);
             }
             
             for(int b=0; b<num_bands_in; b++) {
@@ -463,12 +463,12 @@ void c_Sim::init_malygin_opacities()
 //This function uses the data for *opa_gas_tscale, *opa_gas_pscale, *opa_gas_ross, *opa_gas_planck
 // and interpolates them bilinearly on the given grid
 
-double c_Sim::get_gas_malygin(int rosseland, double rho, double T_gas, double pressure) {
+double c_Sim::get_gas_malygin(int rosseland, double T_gas, double pressure) {
 	
-  	double tP, tT, denom, fac, tempKappa;	//tempPressure and denominator
+  	double tP, tT, denom, tempKappa;	//tempPressure and denominator
   	static double mul1, mul2, mul3, mul4; //temp doubles for the interpolation. static for faster speed
-  	static int Plow, Phigh;
-	int Tlow, Thigh;
+  	static int Plow=0, Phigh=0;
+	int Tlow=0, Thigh=0;
 	int i;
 	double *array;
 	
@@ -492,8 +492,8 @@ double c_Sim::get_gas_malygin(int rosseland, double rho, double T_gas, double pr
 
 	if(tP < opa_gas_pscale[0])
 	  		tP = opa_gas_pscale[0];
-	else if (tP > opa_gas_pscale[opacity_gas_rows-1])
-		  tP = opa_gas_pscale[opacity_gas_rows-1];
+	else if (tP > opa_gas_pscale[opacity_gas_rows-2])
+		  tP = opa_gas_pscale[opacity_gas_rows-2];
 
 	for(i = 0; i < opacity_gas_cols; i++) {
 			if(tT >= opa_gas_tscale[i]) {
@@ -501,20 +501,28 @@ double c_Sim::get_gas_malygin(int rosseland, double rho, double T_gas, double pr
 			  	Thigh = i+1;
 			}
 		}
+		
+    for(int j = 0; j < opacity_gas_rows-1; j++) {
+			if(tP >= opa_gas_pscale[j]) {
+			 	Plow  = j;
+			  	Phigh = j+1;
+			}
+		}
 	
 // 	Alternative grid search in P:
-	fac   = ((double) opacity_gas_rows) / log10( opa_gas_pscale[opacity_gas_rows-1]/opa_gas_pscale[0] );
-	Plow  = (int)(fac*log10(tP/opa_gas_pscale[0] ));
-	Phigh = Plow + 1;
+	//fac   = ((double) opacity_gas_rows) / log10( opa_gas_pscale[opacity_gas_rows-1]/opa_gas_pscale[0] );
+	//Plow  = (int)(fac*log10(tP/opa_gas_pscale[0] ));
+	//Phigh = Plow + 1;
 // 	This method is much faster, but should we use a different P-T grid the 7.0 would be wrong
 	
 // 	fprintf(stdout,"%e %i %i %e %e\n",fac, Plow, Phigh, tP, rho);
 // 	fflush(stdout);
-/*	
-	fprintf(stdout,"P = %e found between %e and %e for %i & %i.\n",tP, opa_gas_pscale[Plow], opa_gas_pscale[Phigh],Plow, Phigh);
-	fprintf(stdout,"T = %e found between %e and %e for %i & %i.\n",T_gas, opa_gas_tscale[Tlow], opa_gas_tscale[Thigh],Tlow, Thigh);
-	getchar();
-	*/
+	
+	//fprintf(stdout,"P = %e found between %e and %e for %i & %i.\n",tP, opa_gas_pscale[Plow], opa_gas_pscale[Phigh],Plow, Phigh);
+	if(std::isnan(opa_gas_tscale[Thigh]) )
+        fprintf(stdout,"T = %e found as NaN between %e and %e for %i & %i.\n",T_gas, opa_gas_tscale[Tlow], opa_gas_tscale[Thigh],Tlow, Thigh);
+	//getchar();
+	
 	//Interpolate on pressure-temperature grid
 	
 	double pmax = std::log(opa_gas_pscale[Phigh]);
@@ -532,9 +540,16 @@ double c_Sim::get_gas_malygin(int rosseland, double rho, double T_gas, double pr
 						+ mul3 * std::log10(array[Tlow + Phigh * opacity_gas_cols]) + 
                           mul4 * std::log10(array[Thigh + Phigh * opacity_gas_cols]) );
 	
+    if(T_gas > 1.0e50 ) {
+        fprintf(stdout,"T = %e, rounded %e, p = %e found between %e and %e for Tlow= %i Tlow= %i, pmin,pval,pmax = %e %e %e kappa = %e.\n",T_gas, tT, pressure , opa_gas_tscale[Tlow], opa_gas_tscale[Thigh],Tlow, Thigh,opa_gas_pscale[Plow],tP,opa_gas_pscale[Phigh],std::pow(10.,tempKappa));
+        fprintf(stdout,"mul1 = %e, mul2= %e, mul3 = %e, mul4= %e, denom = %e \n",mul1, mul2, mul3, mul4, denom );
+        fprintf(stdout,"Interpolation kappas: %e %e %e %e \n",array[Tlow + Plow * opacity_gas_cols],array[Thigh + Plow * opacity_gas_cols],array[Tlow + Phigh * opacity_gas_cols],array[Thigh + Phigh * opacity_gas_cols]);
+    }
+
+     
     /*
 // 	return wanted value
-	fprintf(stdout,"Interpolation kappas: %e %e %e %e \n",array[Tlow + Plow * opacity_gas_cols],array[Thigh + Plow * opacity_gas_cols],array[Tlow + Phigh * opacity_gas_cols],array[Thigh + Phigh * opacity_gas_cols]);
+	
    fprintf(stdout,"Found kappa: %e\n",tempKappa);
   */
   	return std::pow(10.,tempKappa);
@@ -718,14 +733,14 @@ double c_Sim::opacity_semenov_malygin(int rosseland, double temperature, double 
     
     if(rosseland == 0) {
         if(temperature > 700.)
-            kappa_gas  = get_gas_malygin(rosseland, rho, temperature, pressure);
+            kappa_gas  = get_gas_malygin(rosseland, temperature, pressure);
         else
-            kappa_gas  = get_gas_malygin(rosseland, rho, 700., pressure) * pow(temperature/700., 5.);
+            kappa_gas  = get_gas_malygin(rosseland, 700., pressure) * pow(temperature/700., 5.);
     } else {
         if(temperature > 700.)
-            kappa_gas  = get_gas_malygin(rosseland, rho, temperature, pressure);
+            kappa_gas  = get_gas_malygin(rosseland, temperature, pressure);
         else {
-            kappa_gas  = get_gas_malygin(rosseland, rho, 700., pressure) * pow(temperature/700., 5.);
+            kappa_gas  = get_gas_malygin(rosseland, 700., pressure) * pow(temperature/700., 5.);
     
      // double F = (log T - log T_L) / (log T_U - log T_L);       
      // double S = (1-cos(F*pi))/2.;
@@ -758,7 +773,9 @@ double c_Sim::opacity_semenov_malygin(int rosseland, double temperature, double 
         if(caller_is_dust)
             return kappa_dust;
         else
-            return c_max(kappa_gas, dust_to_gas_ratio * kappa_dust); 
+            //return c_max(kappa_gas, dust_to_gas_ratio * kappa_dust); 
+            //return kappa_gas + dust_to_gas_ratio * kappa_dust;
+            return kappa_gas;
         //return kappa_gas + dust_to_gas_ratio * kappa_dust;
         
     }
@@ -772,35 +789,42 @@ void c_Sim::kappa_landscape()
 {
   	int i,j;
 	const int arraysize = 500;
-  	double xxkappa,kappa, recentpress;
-  	double opa_freedman[arraysize];
+  	double recentpress;
+  	//double opa_freedman[arraysize];
   	double opa_ross_semenov[arraysize];
     double opa_planck_semenov[arraysize];
     double opa_planck_twotemp[arraysize];
   	double temperature[arraysize];
-	double density[21]={1e-18,1e-17,1e-16,1e-15,1e-14,1e-13,1e-12,3e-12,6e-12,1e-11,1e-10,1e-9,1e-8,1e-7,1e-6,1e-5,1e-4,1e-3,1e-2};
-    double pressure[11]={0.1,1e0,1e1,1e2,1e3,1e4,1e5,1e6,1e7,1e8,1e9};
+	//double density[21]={1e-18,1e-17,1e-16,1e-15,1e-14,1e-13,1e-12,3e-12,6e-12,1e-11,1e-10,1e-9,1e-8,1e-7,1e-6,1e-5,1e-4,1e-1,1e-0};
+    double pressure[12]={0.1,1e0,1e1,1e2,1e3,1e4,1e5,1e6,1e7,1e8,1e9,1e18};
 	
 	printf("In kappa landscape.\n");
 	fflush (stdout);
 	
-	for(j = 0; j < 11; j++) {
+	for(j = 0; j < 12; j++) {
 	   recentpress = pressure[j];
 	   printf("Doing pressure %e \n",pressure[j]);
 		fflush (stdout);
   
   		for(i = 0; i < arraysize; i++) {
-		  	temperature[i] = 1e+1 + pow( 10.0 , 5.0 * ((double)i/(double)arraysize));
+		  	temperature[i] = 1e+1 + pow( 10.0 , 6.0 * ((double)i/(double)arraysize));
 			
-			//printf("Doing temperature %e and density %e \n",temperature[i],density[j]);
+			
 			fflush (stdout);
             
             double inv_mass = species[0].inv_mass;
             //opa_freedman[i] = freedman_opacity(pressure , temperature[i], 0.);
-            opa_planck_twotemp[i] = species[0].interpol_tabulated_opacity( species[0].opa_grid_solar , 0, temperature[i], pressure[j]) * inv_mass;
-            opa_planck_semenov[i] = species[0].interpol_tabulated_opacity( species[0].opa_grid_planck , 0, temperature[i], pressure[j]) * inv_mass;
-            opa_ross_semenov[i]   = species[0].interpol_tabulated_opacity( species[0].opa_grid_rosseland, 0, temperature[i], pressure[j]) * inv_mass;
-			//printf("Semenov planck done \n");
+//             opa_planck_twotemp[i] = species[0].interpol_tabulated_opacity( species[0].opa_grid_solar , 0, temperature[i], pressure[j]) * inv_mass;
+//             opa_planck_semenov[i] = species[0].interpol_tabulated_opacity( species[0].opa_grid_planck , 0, temperature[i], pressure[j]) * inv_mass;
+//             opa_ross_semenov[i]   = species[0].interpol_tabulated_opacity( species[0].opa_grid_rosseland, 0, temperature[i], pressure[j]) * inv_mass;
+// 			
+            //double p_actual = temperature[i] * density[j] * kb * inv_mass;
+            double d_actual = pressure[j] / (kb * temperature[i] * inv_mass);
+            //printf("Doing temperature %e and density %e resulting in pressure/bars = %e \n",temperature[i],d_actual, pressure[j]/1e6);
+            opa_planck_twotemp[i] = 1.;
+            opa_planck_semenov[i] = opacity_semenov_malygin(0, temperature[i], d_actual, pressure[j], 0);
+            opa_ross_semenov[i]   = opacity_semenov_malygin(1, temperature[i], d_actual, pressure[j], 0);
+            //printf("Semenov planck done \n");
 			//fflush (stdout);
   		}
   		
@@ -816,7 +840,7 @@ void c_Sim::kappa_landscape()
   		//output = fopenp (name, "a");
         output = fopen (name, "a");
  		for(i = 0; i < arraysize; i++) {
-  				//fprintf (output, "%e\t%e\t%e\t%e\t%e\n",\
+  				//fprintf (output, "%e\t%e\t%e\t%e\t%e\n",
             
   				fprintf (output, "%e\t%e\t%e\t%e\n",\
 	   			temperature[i], opa_ross_semenov[i], opa_planck_semenov[i], opa_planck_twotemp[i]);
@@ -834,11 +858,11 @@ void c_Sim::kappa_landscape()
 
 double c_Species::interpol_tabulated_opacity(const Eigen::VectorXd& array, int band, double T_gas, double pressure) {
 	
-  	double tT, denom, kappa;	//tempPressure and denominator
+  	double tT, denom;	//tempPressure and denominator
   	float tP;
   	static double mul1, mul2, mul3, mul4; //temp doubles for the interpolation. static for faster speed
-  	static int Plow, Phigh;
-	int Tlow, Thigh;
+  	static int Plow=0, Phigh=0;
+	int Tlow=0, Thigh=0;
 	int i;
 	//Eigen::VectorXd *array;
     

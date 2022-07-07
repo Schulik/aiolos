@@ -91,6 +91,11 @@ void c_Sim::update_dS_jb(int j, int b) {
                 if(debug >= 1)
                     cout<<" in cell ["<<j<<"] band ["<<b<<"] top-of-the-atmosphere heating = "<<solar_heating(b)<<" tau_rad(j,b) = "<<radial_optical_depth(j,b)<<" exp(tau) = "<<std::exp(-radial_optical_depth(j,b))<<endl;
                 
+                /*S_band(num_cells+1,b) = 0.;
+                S_band(num_cells,b) = 0.;
+                S_band(num_cells-1,b) = 0.;
+                S_band(num_cells-2,b) = 0.;
+                */
                 // Regular dS computation
                 if(steps > -1) {
                             
@@ -105,13 +110,16 @@ void c_Sim::update_dS_jb(int j, int b) {
                             dS_band(j,b) *= (-expm1(-const_opacity_solar_factor * dtau_tot));
                         else
                             dS_band(j,b) *= (-fastexpm1_2(-const_opacity_solar_factor * dtau_tot));
+                            //dS_band(j,b) *= (-expm1(-const_opacity_solar_factor * dtau_tot));
                             
                         if(const_opacity_solar_factor * cell_optical_depth_highenergy(j,b) > 1e-3)
                             dS_he_temp *=  -expm1(-const_opacity_solar_factor * cell_optical_depth_highenergy(j,b)) ;
                         else 
                             dS_he_temp *=  -fastexpm1_2(-const_opacity_solar_factor * cell_optical_depth_highenergy(j,b)) ;
-                        //dS_band(j,b) *= ( std::exp( const_opacity_solar_factor* (cell_optical_depth_highenergy(j,b)) ) - std::exp( const_opacity_solar_factor* (dtau_tot) ) );
+                            //dS_he_temp *=  -expm1(-const_opacity_solar_factor * cell_optical_depth_highenergy(j,b)) ;
                         
+                        
+                        //cout<<" j/b = "<<j<<"/"<<b<<" dS_band(j,b) "<<dS_band(j,b)<<" dS_he_temp "<<dS_he_temp<<endl;
                         dS_band(j,b) -= dS_he_temp;
                         dS_band(j,b) = std::max(dS_band(j,b), 0.); //Safeguard against highenergy shenanigans
                         if(BAND_IS_HIGHENERGY[b] && photochemistry_level==1)
@@ -127,11 +135,10 @@ void c_Sim::update_dS_jb(int j, int b) {
                             
                         }
                         
-                        
                     }
                     else
                         // Use optically thin limit  
-                        dS_band(j,b) = 0.25 * solar_heating(b)*total_opacity_twotemp(j,b)*(1-bond_albedo);
+                        dS_band(j,b) = dS_band(j-1,b); //0.25 * solar_heating(b)*total_opacity_twotemp(j,b)*(1-bond_albedo);
                     
                     dS_band_zero(j,b) = dS_band(j,b);
                 
@@ -139,7 +146,8 @@ void c_Sim::update_dS_jb(int j, int b) {
                     // Planetary heating 2
                     //
                     if(use_planetary_temperature == 1){
-                        double lum = 1.0 * sigma_rad * T_core*T_core*T_core*T_core;
+                        //double lum = 1./xi_rad * sigma_rad * T_core*T_core*T_core*T_core;
+                        double lum = 0.5 * sigma_rad * T_core*T_core*T_core*T_core;
                         //Spread the luminosity for fewer crashes
                         dS_band(2,b) += 3./6. * lum / (dx[2]); 
                         dS_band(3,b) += 2./6. * lum / (dx[3]); 
@@ -290,15 +298,16 @@ void c_Sim::update_dS() {
             }
         }
     }
-    
+    //
     //Compute surface temperature from remaining solar flux and core flux
-    double cooling_time  = 1e9 / core_cv;
-    double J_remnant = 0;
-    double T_rad_remnant;
-    double T_target;
+    //
+    //double cooling_time  = 1e9 / core_cv;
+    //double J_remnant = 0;
+    //double T_rad_remnant;
+    //double T_target;
     
     for(int b = 0; b < num_bands_in; b++) {
-        J_remnant += S_band(1,b);
+        //J_remnant += S_band(1,b);
     }
     
     //
@@ -443,10 +452,11 @@ void c_Sim::update_fluxes_FLD() {
                 double dx      = (x_i12[j+1]-x_i12[j]) ;                
                 double rhokr   = max(2.*(total_opacity(j,b)*total_opacity(j+1,b))/(total_opacity(j,b) + total_opacity(j+1,b)), 4./3./dx );
                        rhokr   = min( 0.5*( total_opacity(j,b) + total_opacity(j+1,b)) , rhokr);
+                       //rhokr   = ( 0.5*( total_opacity(j,b) + total_opacity(j+1,b)) );
 
                 double tau_inv = 1. / (dx * rhokr) ;
-                double R       = 2. * tau_inv * std::abs(Jrad_FLD(j+1,b) - Jrad_FLD(j,b)) / (Jrad_FLD(j, b) + 1e-300) ; // Put in 1.0 as prefactor to get correct rad shock
-                double D       = 1. * tau_inv * no_rad_trans * surf[j] * flux_limiter(R);
+                double R       = xi_rad * tau_inv * std::abs(Jrad_FLD(j+1,b) - Jrad_FLD(j,b)) / (Jrad_FLD(j, b) + 1e-300) ; // Put in 1.0 as prefactor to get correct rad shock
+                double D       = 1. * tau_inv * 1. * surf[j] * flux_limiter(R);
                 
                 //if(1./tau_inv < 1.e-13)
                 //    D = 0.;
@@ -618,7 +628,7 @@ void c_Sim::update_fluxes_FLD() {
                     int idx_sb = j*stride + (s + num_bands_out) * num_vars + b ;
                     int idx_rb = j*num_vars + b ; 
                         
-                    double fac = no_rad_trans * species[s].opacity_planck(j, b) * sigma_rad*Ts*Ts*Ts / pi * compute_planck_function_integral3(l_i_out[b], l_i_out[b+1], species[s].prim[j].temperature);
+                    double fac = 1.* no_rad_trans * species[s].opacity_planck(j, b) * sigma_rad*Ts*Ts*Ts / pi * compute_planck_function_integral3(l_i_out[b], l_i_out[b+1], species[s].prim[j].temperature);
                     
                     d[idx_s ] += 16 * pi * fac / species[s].cv ;
                     d[idx_sb] = - 4 * pi * species[s].opacity_planck(j, b) * no_rad_trans / species[s].cv ;
@@ -675,7 +685,6 @@ void c_Sim::update_fluxes_FLD() {
         //
         if(use_convective_fluxes) {
             
-
            auto smooth = [](double dT, double dT_ad) {
                 
                 double dTrel = (dT - dT_ad)/dT_ad;
@@ -691,7 +700,7 @@ void c_Sim::update_fluxes_FLD() {
                 for (int s=0; s < num_species; s++) {
                     
                     int idx      = j*stride   + (s + num_bands_out) * (num_vars+1) ;
-                    int idx_r    = j*num_vars + (s + num_bands_out) ;
+                    //int idx_r    = j*num_vars + (s + num_bands_out) ;
                     
                     double dx = (x_i12[j+1]-x_i12[j]) ;
                     double rhoavg = (species[s].prim[j].density + species[s].prim[j+1].density) * 0.5;
@@ -699,7 +708,7 @@ void c_Sim::update_fluxes_FLD() {
                     double Tavg   = (species[s].prim[j].temperature + species[s].prim[j+1].temperature) * 0.5;
                     double dP     = (species[s].prim[j].pres - species[s].prim[j+1].pres)/Pavg;
                     double dT     = (species[s].prim[j].temperature - species[s].prim[j+1].temperature)/Tavg / dP;
-                    double dTabs  = (species[s].prim[j].temperature - species[s].prim[j+1].temperature);
+                    //double dTabs  = (species[s].prim[j].temperature - species[s].prim[j+1].temperature);
                     double glocal = -get_phi_grav(x_i[j], enclosed_mass[j])/x_i[j];
                     
                     double nabla_ad = 1.-1./species[s].gamma_adiabat;
@@ -708,14 +717,14 @@ void c_Sim::update_fluxes_FLD() {
                            DT = (dx * total_opacity(j,0)) > 2./3. ? DT : 0.; //Guardian to not use convection in optically thin areas
                     //double DT = dT - nabla_ad;    // Gradient comparison and switch for Lconv
                     
-                    double kappa_conductive = 23.e2 * pow(Tavg/273., 0.7); //From engineering toolbox and Watson 1981 
-                    
                     double alphaconv = 0.5 * species[s].cv * lam * lam * DT * rhoavg * std::sqrt(glocal/Tavg); //Prefactor
-                    //double Lconv = alphaconv;    //Convection
-                    double Lconv =  kappa_conductive * dTabs / species[s].cv;  //Conduction
+                    
+                    double Lconv = alphaconv;    //Convection
+                    //double kappa_conductive = 23.e2 * pow(Tavg/273., 0.7); //From engineering toolbox and Watson 1981 
+                    //double Lconv =  kappa_conductive * dTabs / species[s].cv;  //Conduction
                     
                     if(species[s].is_dust_like)
-                        Lconv == 0;
+                        Lconv = 0;
                     
                     u[idx] += -Lconv ;
                     d[idx] += Lconv ;
@@ -749,7 +758,6 @@ void c_Sim::update_fluxes_FLD() {
                 
                 for (int s=0; s < num_species; s++) {
                     int idx      = j*stride   + (s + num_bands_out) * (num_vars+1) ;
-                    int idx_r    = j*num_vars + (s + num_bands_out) ;
                     
                     double Lconv = species[s].lconvect[2]*1.5;
                     

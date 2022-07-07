@@ -62,7 +62,7 @@ int c_Species::read_species_data(string filename, int species_index) {
     }
     //simulation_parameter tmp_parameter = {"NaN",0,0.,0,"NaN"};
     int found = 0;
-    double temp_static_charge;
+    double temp_static_charge = 0.;
     this->num_opacity_datas = -1;
     
     if(debug > 0) cout<<"          In read species Pos1"<<endl;

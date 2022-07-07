@@ -684,7 +684,7 @@ void c_Species::update_kzz_and_gravpot(int argument) {
         
         for(int i=0; i<num_cells+2; i++) {
             double n   = base->species[0].prim[i].number_density;
-            double ni  = this->prim[i].number_density;
+            //double ni  = this->prim[i].number_density;
             double kzz = base->K_zz[i]; //This is a meta-parameter for k_zz/b 
             double par = std::pow(n, 1./1.);
             

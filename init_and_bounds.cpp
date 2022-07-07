@@ -169,7 +169,6 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
         
         no_rad_trans               = read_parameter_from_file<double>(filename,"NO_RAD_TRANS", debug, 1.).value;
         photocooling_multiplier    = read_parameter_from_file<double>(filename,"PHOTOCOOL_MULTIPLIER", debug, 1.).value;
-        cooling_expansion          = read_parameter_from_file<double>(filename,"COOL_EXPANSION", debug, 0.).value;
         radiation_rampup_time      = read_parameter_from_file<double>(filename,"RAD_RAMPUP_TIME", debug, 0.).value;
         init_radiation_factor      = read_parameter_from_file<double>(filename,"INIT_RAD_FACTOR", debug, 0.).value;
         //radiation_solver           = read_parameter_from_file<int>(filename,"RADIATION_SOLVER", debug, 0).value;
@@ -203,6 +202,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
         //cout<<" ION_PRECISION set to "<<ion_precision<<" ion_maxiter = "<<ion_maxiter<<endl;
         
         rad_solver_max_iter = read_parameter_from_file<int>(filename,"MAX_RAD_ITER", debug, 1).value;
+        xi_rad              = read_parameter_from_file<double>(filename,"XI_RAD", debug, 1.).value; 
         bond_albedo       = read_parameter_from_file<double>(filename,"BOND_ALBEDO", debug, 0.).value; 
         planet_semimajor= read_parameter_from_file<double>(filename,"PARI_PLANET_DIST", debug, 1.).value; //in AU
         
@@ -939,8 +939,9 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
                 //if(debug > 1 && j==5) {
                     cout<<" Jrad("<<j<<","<<0<<") = "<<Jrad_FLD(j,0)<<" dJrad_species["<<s<<"] = "<<rad_energy_multiplier * compute_planck_function_integral3(l_i_out[0], l_i_out[1], species[s].prim[j].temperature)<<" T_rad = "<<pow(pi*Jrad_FLD(j,0)/sigma_rad,0.25)<<" at Tgas = "<<species[s].prim[j].temperature<<endl;
                 }
-                    
+                 
             }
+
         } else {
             
             for(int b = 0; b < num_bands_out; b++) {
@@ -957,6 +958,11 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
             }
         }
         
+        //
+        // Set initial gradient for stability: FLD apparently doesn't like to be initialized in thermal equilibrium in the optically thin regions
+        //
+        if(j>10)
+            Jrad_FLD(j,0) = Jrad_FLD(10,0) / (x_i12[j]*x_i12[j]);  
     }
     cout<<"photochem level = "<<photochemistry_level<<endl;
     n_init = np_zeros(num_species);
@@ -1295,7 +1301,8 @@ void c_Species::initialize_hydrostatic_atmosphere(string filename) {
             
             if(this_species_index == 0) {
                 mode = 22;
-                if(base->x_i12[i] < 1.e9) {
+                
+                if(base->x_i12[i] < 1.e99) {
                     mode = 221;
                     prim[i].temperature = - dphi_factor * base->phi[i] / (cv * gamma_adiabat) + const_T_space; //get_phi_grav(x_i12[i], enclosed_mass[0]);
                 } else {
@@ -1312,8 +1319,13 @@ void c_Species::initialize_hydrostatic_atmosphere(string filename) {
         }
         else {
             mode = 3;
-            prim[i].temperature = const_T_space;
+            //prim[i].temperature = const_T_space;
+            //if(i>=num_cells-1)
+                //prim[i].temperature = 1.0*const_T_space - 1e-4 * base->phi[i] / (cv * gamma_adiabat); //Need initial temperature gradient for FLD
+                prim[i].temperature = const_T_space; // - 1e-5 * std::pow(base->x_i12[i], 0.5); //Need initial temperature gradient for FLD
+
         }
+        //prim[i].temperature = - dphi_factor * base->phi[i] / (cv * gamma_adiabat) + const_T_space;
         
         if(debug>=2) {
             if(mode == 23) 
@@ -1422,13 +1434,18 @@ void c_Species::initialize_hydrostatic_atmosphere(string filename) {
             
             //cout<<" s/i = "<<speciesname<<"/"<<i<<"   metric_inner debug: dPhi = "<<dphi<<" rhonew/rhoold = "<<temp_rhofinal<<"/"<<u[i].u1<<endl;
             
-            if(speciesname.compare("S2")==0) { //Force light electrons to be the same number as protons
+            //if(speciesname.compare("S2")==0) { //Force light electrons to be the same number as protons
+            if(mass_amu < 1.e-3) {    
             //if(speciesname.compare("e-")==0 ) { //Force light electrons to be the same number as protons
                 
                 //int p_index = base->get_species_index("H+");
                 int p_index = base->get_species_index("S1");
                 if(p_index == -1)
                     p_index = base->get_species_index("H+");
+                if(p_index == -1)
+                    p_index = base->get_species_index("p+");
+                if(p_index == -1)
+                    p_index = base->get_species_index("p");
                 
                 if(p_index < 0) {
                     cout<<" IN HYDROSTAT CONSTRUCTION for e-: Protons (H+) species not found! "<<endl;
@@ -1486,6 +1503,9 @@ void c_Species::initialize_hydrostatic_atmosphere(string filename) {
                 cin>>a;
             }
         }
+        
+        if(negdens) 
+            cout<<" Negative densities in init_hydrostatic. Check conditions for hydrostatic construction and/or debug."<<endl;
         
         //u[1] = AOS(u[2].u1 , 0., u[2].u3);
         //u[0] = AOS(u[3].u1 , 0., u[3].u3);
@@ -1613,7 +1633,7 @@ void c_Species::initialize_exponential_atmosphere() {
 
 
 void c_Species::initialize_hydrostatic_atmosphere_iter(string filename) {
-    
+    cout<<" Initializing hydrostatic atmosphere based on filename = "<<filename<<endl;
 }
 
 
@@ -1727,6 +1747,7 @@ void c_Species::apply_boundary_left(std::vector<AOS>& u) {
                 dphi       *= (base->omegaplus[i]*base->dx[i] + base->omegaminus[i-1]*base->dx[i-1]) ;
                 prim.pres   = prim.pres + prim.density * dphi ;
                 prim.pres   = std::max( prim.pres, 0.0) ;
+                prim.speed = u[i].u2/u[i].u1;
                 eos->compute_conserved(&prim, &u[i-1], 1) ;
             }
             break ;
@@ -1751,7 +1772,7 @@ void c_Species::apply_boundary_left(std::vector<AOS>& u) {
                     //cout<<" in fixed boundaries for s = "<<this_species_index<<", u1 = "<<BACKGROUND_U.u1<<" dens = "<<BACKGROUND_U.u1 *  mass_amu<<endl;
                     dens_wall = BACKGROUND_U.u1 *  mass_amu;
                 }
-                AOS cons_fixed = AOS(dens_wall, 0., cv * dens_wall * prim[i].temperature);
+                //AOS cons_fixed = AOS(dens_wall, 0., cv * dens_wall * prim[i].temperature);
                 eos->compute_primitive(&u[i],&prim[i], 1) ;
                 //cout<<" found p = "<<prim[i].pres<<endl;
             }
@@ -1805,7 +1826,7 @@ void c_Species::apply_boundary_right(std::vector<AOS>& u) {
                 
                 if(true) {
                     double dphi = (base->phi[i]*K_zzf[i] - base->phi[i-1]*K_zzf[i-1]) / (base->dx[i-1] + base->dx[i]) ;
-                    prim.pres = prim.pres - 0.99* prim.density * dphi ;    
+                    prim.pres = prim.pres - 1.0* prim.density * dphi ;    
                     
                 }
                 
@@ -1897,12 +1918,13 @@ void c_photochem_reaction::set_base_pointer(c_Sim *base_simulation) {
 
 
 
-c_reaction::c_reaction(bool is_reverse, int num_species, std::vector<int> e_indices,std::vector<int> p_indices,std::vector<double> e_stoch, std::vector<double> p_stoch, double a, double b, double c) {
+c_reaction::c_reaction(bool is_reverse, bool mtype_reaction, int num_species, std::vector<int> e_indices,std::vector<int> p_indices,std::vector<double> e_stoch, std::vector<double> p_stoch, double a, double b, double c) {
     this->is_reverse_reac = is_reverse;
+    this->mtype_reaction  = mtype_reaction;
     this->reac_a = a;
     this->reac_b = b;
     this->reac_c = c;
-    double reaction_rate = get_reaction_rate(300.);
+    //double reaction_rate = get_reaction_rate(300.);
     
     if(!is_reverse_reac)
         c_reaction_real(num_species, e_indices, p_indices, e_stoch, p_stoch, reac_a);
@@ -1912,9 +1934,10 @@ c_reaction::c_reaction(bool is_reverse, int num_species, std::vector<int> e_indi
 } 
 
 
-c_reaction::c_reaction(bool is_reverse, int num_species, std::vector<int> e_indices,std::vector<int> p_indices,std::vector<double> e_stoch, std::vector<double> p_stoch, double reaction_rate) 
+c_reaction::c_reaction(bool is_reverse, bool mtype_reaction, int num_species, std::vector<int> e_indices,std::vector<int> p_indices,std::vector<double> e_stoch, std::vector<double> p_stoch, double reaction_rate) 
 {
-    this->is_reverse_reac    = is_reverse;
+    this->is_reverse_reac = is_reverse;
+    this->mtype_reaction  = mtype_reaction;
     
     if(!is_reverse_reac)
         c_reaction_real(num_species, e_indices, p_indices, e_stoch, p_stoch, reaction_rate);
@@ -1928,7 +1951,7 @@ void c_reaction::c_reaction_real(int num_species, std::vector<int> e_indices,std
     for(int e=0; e<e_indices.size(); e++) {
         if(e_indices[e] >= num_species) {
             
-            cout<<" FATAL ERROR caught in init_chemistry: Target ochem reactant index exceeds num_species! "<<endl;
+            cout<<" FATAL ERROR caught in init_chemistry: Target reactant index exceeds num_species! num_species = "<<num_species<<endl;
             char wait;
             cin>>wait;
             throw 0;
@@ -1938,7 +1961,7 @@ void c_reaction::c_reaction_real(int num_species, std::vector<int> e_indices,std
     for(int p=0; p<p_indices.size(); p++) {
         if(p_indices[p] >= num_species) {
             
-            cout<<" FATAL ERROR caught in init_chemistry: Target chem product index exceeds num_species! "<<endl;
+            cout<<" FATAL ERROR caught in init_chemistry: Target product index exceeds num_species! num_species = "<<num_species<<endl;
             char wait;
             cin>>wait;
             throw 1;
