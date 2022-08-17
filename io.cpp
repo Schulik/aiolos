@@ -274,9 +274,6 @@ int c_Species::read_species_data(string filename, int species_index) {
                     //Interpolation on highres grid
                     double m  =  std::log10(file_opacity_data(j+1,col) / file_opacity_data(j,col) ) / std::log10(lmax/lmin);
                     opacity_data(i,col) = pow(10., std::log10(file_opacity_data(j,col)) + m * std::log10(wl/lmin) );
-                    
-                        
-                    
                 }
                 
                     //else if (wl < file_opacity_data(0, 0))

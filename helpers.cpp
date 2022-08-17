@@ -81,8 +81,11 @@ double c_Sim::get_cfl_timestep() {
     
     if(do_hydrodynamics)
         return min(cfl_step, dt*max_timestep_change);
-    else
-        return min(timestep_rad2, dt*max_timestep_change);
+    else {
+        double ddt = min(timestep_rad2, dt*max_timestep_change);
+        return min(ddt, dt_max);
+    }
+        
 }
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

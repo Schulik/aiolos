@@ -120,6 +120,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
         
         cflfactor   = read_parameter_from_file<double>(filename,"PARI_CFLFACTOR", debug, 1.).value;
         t_max       = read_parameter_from_file<double>(filename,"PARI_TIME_TMAX", debug, 1e0).value;
+        dt_max      = read_parameter_from_file<double>(filename,"PARI_DTMAX", debug, 1e99).value;
         max_timestep_change = read_parameter_from_file<double>(filename,"MAX_TIMESTEP_CHANGE", debug, 1.1).value;
         dt_min_init         = read_parameter_from_file<double>(filename,"DT_MIN_INIT", debug, 1e-20).value;
         output_time = read_parameter_from_file<double>(filename,"PARI_TIME_OUTPUT", debug, 1e99).value; 
@@ -168,6 +169,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
         cout<<" CHOSEN OPACITY MODEL = "<<opacity_model<<endl;
         
         no_rad_trans               = read_parameter_from_file<double>(filename,"NO_RAD_TRANS", debug, 1.).value;
+        solve_for_j                = read_parameter_from_file<int>(filename,"SOLVE_FOR_J", debug, 1).value;
         photocooling_multiplier    = read_parameter_from_file<double>(filename,"PHOTOCOOL_MULTIPLIER", debug, 1.).value;
         radiation_rampup_time      = read_parameter_from_file<double>(filename,"RAD_RAMPUP_TIME", debug, 0.).value;
         init_radiation_factor      = read_parameter_from_file<double>(filename,"INIT_RAD_FACTOR", debug, 0.).value;
@@ -637,12 +639,18 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
         
         reaction_matrix = Matrix_t::Zero(num_species, num_species);
         reaction_b      = Vector_t(num_species);
+        
+        reaction_matrix_ptr = new Eigen::MatrixXd[omp_get_max_threads()];
+        reaction_b_ptr      = new Eigen::VectorXd[omp_get_max_threads()];
+        for(int i =0; i<omp_get_max_threads(); i++ ) {
+            reaction_matrix_ptr[i] = Matrix_t::Zero(num_species, num_species);
+            reaction_b_ptr[i]      = Vector_t(num_species);
+        }
         //n_news          = Vector_t(num_species);
         
         for(int s = 0; s < num_species; s++) {
             species[s].update_kzz_and_gravpot(s);
         }
-            
         
         if(num_species >= 1) {
             friction_matrix_T     = Matrix_t::Zero(num_species, num_species);

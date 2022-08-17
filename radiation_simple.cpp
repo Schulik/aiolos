@@ -19,21 +19,21 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
     if(debug > 1)
         cout<<"Starting update_fluxes_FLD_simple.."<<endl;
    
-    auto flux_limiter = [](double R) {
+    /*auto flux_limiter = [](double R) {
         if (R <= 2)
             return 2 / (3 + std::sqrt(9 + 10*R*R)) ;
         else 
             return 10 / (10*R + 9 + std::sqrt(81 + 180*R));
-    };
+    };*/
 //    auto flux_limiter = [](double R) {
 //          
 //          return (2.+ R) / (6. + 3*R + R*R) ;
 //      } ;
 //      
-//      auto flux_limiter = [](double R) {
-// 
- //            return 1. / (3. + R) ;
- //    } ; 
+      auto flux_limiter = [](double R) {
+ 
+             return 1. / (3. + R) ;
+     } ; 
 //     
     int num_vars = num_bands_out; // + num_species
     int stride = num_vars * num_vars ;
@@ -164,7 +164,7 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
             int idx = (num_cells)*stride ;
             int idx_r = (num_cells)*num_vars;  
             
-            double f = x_i12[num_cells]/x_i12[num_cells+1] ;
+            double f = 1./xi_rad * x_i12[num_cells]/x_i12[num_cells+1] ;
             switch (geometry) {
                 case Geometry::cartesian:
                     f = 1 ;
@@ -365,7 +365,8 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
     
     for (int j=0; j <= num_cells+1; j++) {
         for(int b=0; b<num_bands_out; b++) {
-            Jrad_FLD(j, b) = r[j*num_vars + b] ;
+            if(solve_for_j)
+                Jrad_FLD(j, b) = r[j*num_vars + b] ;
             
             //cout<<"j/b = "<<j<<"/"<<b<<" J = "<<r[j*num_vars + b]<<endl;
             
@@ -466,7 +467,7 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
                 int idx_s = j * (num_species) + si;
                 //double tt = eta1[idx_s]/denoms[idx_s] + eta2[idx_s]/denoms[idx_s]*Jrad_FLD(j, 0);
                 
-                if(tt < 0.) {
+                if(tt < 0. && j > 0) {
                     cout<<" negative T after TiTj s = "<<species[si].speciesname<<" j/s = "<<j<<"/"<<si<<" eta1/eta2/J = "<<eta1[idx_s]<<"/"<<eta2[idx_s]<<"/"<<Jrad_FLD(j, 0)<<" denom/eta2*J = "<<denoms[idx_s]<<"/"<<eta2[idx_s]*Jrad_FLD(j,0)<<" t/dt/steps = "<<globalTime<<"/"<<ddt<<"/"<<steps<<endl;
                         //cout<<" negative T after TiTj in s = "<<species[si].speciesname<<" j/s = "<<j<<"/"<<si<<" t/dt/steps = "<<globalTime<<"/"<<ddt<<"/"<<steps<<endl;
                         //Tswitch = 1;
@@ -478,7 +479,10 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
                 if(tt>max_temperature)
                         tt=max_temperature;
                 
-                species[si].prim[j].temperature = tt ;
+                if(globalTime > 1e-10)
+                    species[si].prim[j].temperature = tt ;
+                else
+                    species[si].prim[j].temperature = species[si].const_T_space;
             }
         }
         

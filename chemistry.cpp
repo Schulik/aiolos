@@ -24,6 +24,7 @@ extern double Cpp_cooling(double Te);
 extern double O_cooling(double Te);
 extern double Op_cooling(double Te);
 extern double Opp_cooling(double Te);
+extern double h3plus_cooling(double Te);
 
 std::vector<double> get_thermo_variables(double T,string species_string);
 
@@ -41,17 +42,40 @@ void c_Sim::init_reactions(int cdebug) {
         cout<<"Init photoreactions..."<<endl;
     
     double ns = num_species;
-    //photoreactions.push_back(c_photochem_reaction( ns, num_bands_in, 1, {0}, {1,2}, {1.}, {1.,1.}, 1., 13.6 )); //H + gamma -> H+ + e-
-    //reactions.push_back(c_reaction(0, 0, ns, {1,2}, {0}, {1.,1.}, {1.}, 2.7e-13, 0.0, 0. )); //Electron-proton recombination
+    
+    //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    //Begin H3+ tests
+    //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    
+    
+    reactions.push_back(c_reaction(0, 1, ns, {3}, {0}, {1.}, {2.}, 1.5e-9,  0.0, 4.8e4 )); //R4 in Yelle+2004 
+    reactions.push_back(c_reaction(0, 1, ns, {0}, {3}, {2.}, {1.}, 2.45e-31, -0.6, 0. )); //R5 in Yelle+2004 
+    
+    photoreactions.push_back(c_photochem_reaction( ns, num_bands_in, 0, {3}, {4,2}, {1.}, {1.,1.}, 1., 15.425927 ));      //R1a H2 + gamma -> H2+ + e-
+    photoreactions.push_back(c_photochem_reaction( ns, num_bands_in, 0, {3}, {0,1,2}, {1.}, {1.,1.,1.}, 1., 15.425927 )); //R1b H2 + gamma -> H + H+ + e-
+    photoreactions.push_back(c_photochem_reaction( ns, num_bands_in, 0, {0}, {1,2}, {1.}, {1.,1.}, 1., 13.6 ));      //R2  H + gamma -> H+ + e-
+    
+    reactions.push_back(c_reaction(0, 1, ns, {3,4}, {5,0}, {1.,1.}, {1.,1.}, 2e-9, -0.0, 0. )); //R6 in Yelle+2004 
+    reactions.push_back(c_reaction(0, 1, ns, {5,0}, {3,4}, {1.,1.}, {1.,1.}, 2e-9, -0.0, 0. )); //R7 in Yelle+2004 
+    
+    reactions.push_back(c_reaction(0, 1, ns, {4,0}, {1,3}, {1.,1.}, {1.,1.}, 6.4e-10, -0.0, 0. )); //R8 in Yelle+2004 
+    reactions.push_back(c_reaction(0, 1, ns, {1,3}, {4,0}, {1.,1.}, {1.,1.}, 1.0e-9, -0.0, 2.19e4 )); //R9 in Yelle+2004 
+    
+    reactions.push_back(c_reaction(0, 0, ns, {1,2}, {0}, {1.,1.}, {1.}, 2.7e-13, 0.0, 0. )); //R13 in Y04, Electron-proton recombination
+    reactions.push_back(c_reaction(0, 0, ns, {4,2}, {0}, {1.,1.}, {1.}, 2.25e-7, -0.4, 0. )); //R15 in Y04, H2+- recombination
+    
+    reactions.push_back(c_reaction(0, 0, ns, {5,2}, {0,3}, {1.,1.}, {1.,1.}, 1.18e-6, -0.65, 0. )); //R16a in Y04, H3+- recombination, channel 1
+    reactions.push_back(c_reaction(0, 0, ns, {5,2}, {0},   {1.,1.},  {3.}, 3.5e-6,  -0.65, 0. )); //R16a in Y04, H3+- recombination, channel 2
+    
+    //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    //End H3+ tests
+    //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     
     //reactions.push_back(c_reaction(0, ns, {1,2}, {0}, {1.,1.}, {1.}, 1.074889e-9, -0.9, 0. )); //Electron-proton recombination
     //reactions.push_back(c_reaction(0, ns, {0}, {1,2}, {1.}, {1.,1.}, 2.167e-5, -0.4, 157807. )); //H (exact below 25e3 K)
     
-    //reactions.push_back(c_reaction(0, 1, ns, {3}, {0}, {1.}, {2.}, 1.5e-9,  0.0, 4.8e4 )); //R4 in Yelle+2004 
-    //reactions.push_back(c_reaction(0, 1, ns, {0}, {3}, {2.}, {1.}, 2.45e-31, -0.6, 0. )); //R5 in Yelle+2004 
-    
-    reactions.push_back(c_reaction(0, 0, ns, {3}, {0}, {1.}, {2.}, 1.5e-9,  0.0, 0. )); //R4 in Yelle+2004 
-    reactions.push_back(c_reaction(0, 0, ns, {0}, {3}, {2.}, {1.}, 2.45e-21, 0., 0. )); //R5 in Yelle+2004
+    //reactions.push_back(c_reaction(0, 0, ns, {3}, {0}, {1.}, {2.}, 1.0e-11,  0.0, 0. )); //R4 in Yelle+2004 
+    //reactions.push_back(c_reaction(0, 0, ns, {0}, {3}, {2.}, {1.}, 1.0e-1, 0., 0. ));  //R5 in Yelle+2004
     
     int cnt = 0;
     num_reactions = 0;
@@ -71,9 +95,9 @@ void c_Sim::init_reactions(int cdebug) {
     
     //if(cdebug > 0) {
         
-    cout<<" Reporting reactions in init chemistry... "<<endl;
+    cout<<"In init chemistry, reporting thermochemical reactions: "<<endl;
     for(c_reaction& reaction : reactions) {
-            cout<<" Reaction #"<<reaction.reaction_number<<": ";
+            cout<<"    Reaction #"<<reaction.reaction_number<<": ";
             
             if(reaction.is_reverse_reac) {
                 
@@ -123,9 +147,9 @@ void c_Sim::init_reactions(int cdebug) {
             
             
     }
-    cout<<"Photoreaction: "<<endl;
+    cout<<"Reporting photoreactions: "<<endl;
     for(c_photochem_reaction& reaction : photoreactions) {
-            cout<<" Reaction #"<<reaction.reaction_number<<": ";
+            cout<<"    Reaction #"<<reaction.reaction_number<<": ";
             
             for(int& ei : reaction.educts) {
                 cout<<int(reaction.e_stoch[ei]*1.01)<<" "<<species[ei].speciesname;
@@ -208,12 +232,33 @@ void c_reaction::update_reaction_rate(double T) {
 //
 void c_Sim::do_chemistry() {
     
-    for (int j = num_cells+1; j >= 0; j--) {
+    #pragma omp parallel
+    {
+    int loc_thr = omp_get_thread_num();
+    int num_thr = omp_get_max_threads();
+    int chunksize   = (num_cells + 1)/num_thr;
+    
+    int local_minrange = loc_thr * chunksize;
+    int local_maxrange = (loc_thr + 1) * chunksize - 1; 
+    
+    int residual = num_cells + 1 - ((num_thr) * chunksize);
+    if(loc_thr == num_thr-1)
+        local_maxrange += residual+1;
+    
+    //for (int j = num_cells+1; j >= 0; j--) {
+    for (int j = local_maxrange; j >= local_minrange; j--) {
+
+/*        
+#if defined (_OPENMP)
+        cout<<" id="<<omp_get_thread_num()<<" j="<<j<<" local_minrange/local_maxrange = "<<local_minrange<<"/"<<local_maxrange<<" num_cells+1 = "<<num_cells+1<<" chunksize = "<<chunksize<<" residual = "<<residual<<" local_chunk = "<<local_maxrange-local_minrange<<endl;
+#else
+        cout<<" id="<<omp_get_thread_num()<<" j="<<j<<" local_minrange/local_maxrange = "<<local_minrange<<"/"<<local_maxrange<<" num_cells+1 = "<<num_cells+1<<" chunksize = "<<chunksize<<endl;
+#endif */
         
         //std::vector<double> n_init = np_zeros(num_species);
         //std::vector<double> n_tmp  = np_zeros(num_species);
         Vector_t n_init = Vector_t(num_species);
-        Vector_t n_tmp = Vector_t(num_species);
+        Vector_t n_tmp  = Vector_t(num_species);
         
         double n_tot = 0.;
         
@@ -243,7 +288,9 @@ void c_Sim::do_chemistry() {
             
             for(int k = 0; k < i; k++) {
                 
+                //if(loc_thr==0)
                 n_tmp = solver_cchem_implicit_general(dt_eff, j, 0, n_tmp, n_tot);
+                
                 //if(globalTime>=1e-3 && j==233)
                 if(i>1e9) {
                     cout<<" chem cell "<<j<<" repeat level "<<i<<" repeat number "<<k<<" dt_div = "<<dt_eff<<" dt = "<<dt<<" t = "<<globalTime<<" n_tmp[0] = "<<n_tmp(0)<<" dn_absolute[0] = "<<n_tmp(0)-n_init(0)<<endl; 
@@ -261,6 +308,13 @@ void c_Sim::do_chemistry() {
                     
             
             }
+/*            
+#if defined (_OPENMP)
+        cout<<" id="<<omp_get_thread_num()<<" j="<<j<<" local_minrange/local_maxrange = "<<local_minrange<<"/"<<local_maxrange<<" num_cells+1 = "<<num_cells+1<<" chunksize = "<<chunksize<<" residual = "<<residual<<" local_chunk = "<<local_maxrange-local_minrange<<" n_final(0) = "<<n_tmp(0)<<endl;
+#else
+        cout<<" id="<<omp_get_thread_num()<<" j="<<j<<" local_minrange/local_maxrange = "<<local_minrange<<"/"<<local_maxrange<<" num_cells+1 = "<<num_cells+1<<" chunksize = "<<chunksize<<" residual = "<<residual<<" local_chunk = "<<local_maxrange-local_minrange<<" n_final(0) = "<<n_tmp(0)<<endl;
+#endif */
+
             
             //
             // Check plausibility and convergence
@@ -286,8 +340,6 @@ void c_Sim::do_chemistry() {
         // Satisfactory solution found, let's write it into the main arrays
         //
         
-        
-        
         //
         // We accept the new, normalized number densities and convert them back to non-normalized values
         //
@@ -300,7 +352,7 @@ void c_Sim::do_chemistry() {
             species[s].prim[j].number_density = n_tmp(s) * n_tot;
             species[s].prim[j].density        = species[s].prim[j].number_density * species[s].mass_amu*amu;
             //species[s].prim[cell].internal_energy *= n_news(s)/n_olds[s];
-                
+            
             //species[s].prim[j].speed = vX[s] ;
             //species[s].prim[j].internal_energy = uX[s];
             //species[s].prim[j].temperature = TX[s];
@@ -315,18 +367,18 @@ void c_Sim::do_chemistry() {
         //Correct species internal energy due to total change in Gibbs energy dU = dG - PdV + TdS
         
         for(int b=0; b<num_bands_in; b++) {
-            update_tau_s_jb(j, b);
-            //update_dS_jb(j, b);
+            //update_tau_s_jb(j, b);
+            ////update_dS_jb(j, b);
             
             
         }
         
         //if(steps > 100)
-        update_dS_jb_photochem(j);
+        //update_dS_jb_photochem(j);
         
         for(int s=0;s<num_species; s++) {
             
-            if(n_tmp(s) < chemistry_numberdens_floor)
+            if(n_tmp(s)/n_tot < chemistry_numberdens_floor)
                 n_tmp(s) = chemistry_numberdens_floor;
                 
             species[s].prim[j].number_density = n_tmp(s) * n_tot;
@@ -344,7 +396,18 @@ void c_Sim::do_chemistry() {
         }
         
     }
+    }//END PARALLEL REGION
     
+    for (int j = num_cells+1; j >= 0; j--) {
+        for(int b=0; b<num_bands_in; b++) {
+            update_tau_s_jb(j, b);
+            //update_dS_jb(j, b);
+            
+            
+        }
+    }
+    //char a;
+    //cin>>a;
 }
 
 
@@ -387,12 +450,13 @@ Vector_t c_Sim::solver_cchem_implicit_general(double dtt, int cell, int cdebug, 
     
     //reaction_matrix = Matrix_t::Zero(num_species, num_species);
     //reaction_b      = Vector_t(num_species);
+    int loc_thr = omp_get_thread_num();
     
     for(int si=0; si<num_species; si++) {
-        reaction_b(si) = 0.;
+        reaction_b_ptr[loc_thr](si) = 0.;
         //n_news(si) = 0.;
         for(int sj=0; sj<num_species; sj++) {
-            reaction_matrix(si,sj) = 0.;
+            reaction_matrix_ptr[loc_thr](si,sj) = 0.;
         }
     }
     
@@ -403,7 +467,7 @@ Vector_t c_Sim::solver_cchem_implicit_general(double dtt, int cell, int cdebug, 
     for(int s=0;s<num_species; s++) {
         //n_olds[s]     = species[s].prim[cell].number_density / n_tot;
         //masses[s] = species[s].mass_amu*amu;
-        reaction_b[s] = n_olds[s];
+        reaction_b_ptr[loc_thr](s) = n_olds[s];
     }
     //
     // Photochemical reactions
@@ -452,7 +516,6 @@ Vector_t c_Sim::solver_cchem_implicit_general(double dtt, int cell, int cdebug, 
             
             //mX      = Vector_t(num_species);
             
-            
             if(photoreactions[pr].band >= b) {
             
                 std::vector<double> reac_e_stoch = photoreactions[pr].e_stoch;
@@ -483,7 +546,7 @@ Vector_t c_Sim::solver_cchem_implicit_general(double dtt, int cell, int cdebug, 
                     
                     
                     dtau    = ds*kappa*n_olds[ei]*n_tot;
-                    //dfdn    = dtt*F*kappa / n_tot * reaction.branching_ratio * std::exp(-dtau);  //TODO: Replaces F, kappa, dx with the appropriate values for species and flux in cell 
+                    //dfdn  = dtt*F*kappa / n_tot * reaction.branching_ratio * std::exp(-dtau);  //TODO: Replaces F, kappa, dx with the appropriate values for species and flux in cell 
                     dfdn    = dtt*F*kappa/ n_tot * branching;
                     dfdn   *= (dtau * std::exp(-tau_tot_b) - std::expm1(-tau_tot_b) * (1. - dtau/tau_tot_b)  ) / tau_tot_b;
                     
@@ -497,19 +560,19 @@ Vector_t c_Sim::solver_cchem_implicit_general(double dtt, int cell, int cdebug, 
                     //
                     for(int& ej : reac_educts ) {
                         
-                        reaction_matrix(ei, ej) += reac_e_stoch[ej] * dfdn;           //Change e_stoch j --> ej!
-                        reaction_b(ej)          -= reac_e_stoch[ej] * dfdn_po;
+                        reaction_matrix_ptr[loc_thr](ei, ej) += reac_e_stoch[ej] * dfdn;           //Change e_stoch j --> ej!
+                        reaction_b_ptr[loc_thr](ej)          -= reac_e_stoch[ej] * dfdn_po;
                     }
                     
                     //Now add alpha in column for products
                     //for j,pro in enumerate(reac.product) {
                     for(int& pj : reac_products ) { 
                         
-                        reaction_matrix(ei, pj) -= reac_p_stoch[pj] * dfdn;        //Same with p_stoch --> change j-> pj for memory access!
-                        reaction_b(pj)          += reac_p_stoch[pj] * dfdn_po;
+                        reaction_matrix_ptr[loc_thr](ei, pj) -= reac_p_stoch[pj] * dfdn;        //Same with p_stoch --> change j-> pj for memory access!
+                        reaction_b_ptr[loc_thr](pj)          += reac_p_stoch[pj] * dfdn_po;
                     }
                     
-                    //t1     += dtt*F/ds/n_tot * reaction.branching_ratio*(-std::expm1(-dtau));
+                    //t1   += dtt*F/ds/n_tot * reaction.branching_ratio*(-std::expm1(-dtau));
                     t1     += dtt*F/ds/n_tot * branching * (-std::expm1(-tau_tot_b)) * dtau/tau_tot_b;
                 }
                 
@@ -520,17 +583,17 @@ Vector_t c_Sim::solver_cchem_implicit_general(double dtt, int cell, int cdebug, 
                 
                 for(int& ei : reac_educts) {
                 //for i,educt in enumerate(reac.educt) {
-                    reaction_b(ei)              -= reac_e_stoch[ei] * t1; 
+                    reaction_b_ptr[loc_thr](ei)          -= reac_e_stoch[ei] * t1; 
                     //reaction.dndt_old          += reaction.e_stoch[ei] * t1/dtt * species[ei].u[cell].u2/n_olds[ei]/n_olds[ei]*n_tot; //Total momentum correction term
-                    dndt_local                  -= reac_e_stoch[ei] * t1/dtt / n_olds[ei]; //Total momentum correction term
+                    dndt_local                           -= reac_e_stoch[ei] * t1/dtt / n_olds[ei]; //Total momentum correction term
                 }
                 
                 for(int& pi : reac_products) {
                 //for i,product in enumerate(reac.product) {
-                    reaction_b(pi)            += reac_p_stoch[pi] * t1;
+                    reaction_b_ptr[loc_thr](pi)            += reac_p_stoch[pi] * t1;
                 }
                 
-                photoreactions[pr].dndt_old = dndt_local;
+                photoreactions[pr].dndt_old = dndt_local; //This needs to be saved per cell, if we are parallelizing!
             
             }
         }
@@ -573,7 +636,7 @@ Vector_t c_Sim::solver_cchem_implicit_general(double dtt, int cell, int cdebug, 
         //cout<<" reaction number "<<reaction.reaction_number<<" r = "<<reaction.r<<" a/b/c = "<<reaction.reac_a<<" / "<<std::pow(meanT, reaction.reac_b)<<" / "<<std::exp(-meanT/reaction.reac_c)<<" c = "<<reaction.reac_c<<endl;
         
         double eStochsum = 0.;
-        int    iStochsum = 0;
+        int    iStochsum = 0 ;
         for(int& ei : reaction.educts) {
             eStochsum += reaction.e_stoch[ei];
             iStochsum += reaction.e_stoch_i[ei];
@@ -596,6 +659,7 @@ Vector_t c_Sim::solver_cchem_implicit_general(double dtt, int cell, int cdebug, 
                     
                 else {
                     dfdn *= fastpow1(n_olds[ej], reaction.e_stoch_i[ej]);
+                    //dfdn *= std::pow(n_olds[ej], reaction.e_stoch_i[ej]);
                 }
                     
             }
@@ -604,22 +668,24 @@ Vector_t c_Sim::solver_cchem_implicit_general(double dtt, int cell, int cdebug, 
             //
             dfdn_po = -dfdn * n_olds[ei];  //df/dn|k * n^k
             //cout<<" dfdn_po "<<dfdn_po<<endl;
+            
             //
             // This distributes t2 = dfdn*stoch throughout the matrix
             // and adds dfdn*n to b for this educt
             //
             //Now add alpha in column for educts
             
+            //double pnimo = std::pow(n_tot,iStochsum-1);
             for(int& ej : reaction.educts) {
                 //cout<<"matrix educt j "<<ej<<endl;
-                reaction_matrix(ei, ej) += reaction.e_stoch[ej] * dfdn;
-                reaction_b(ej)          -= reaction.e_stoch[ej] * dfdn_po;
+                reaction_matrix_ptr[loc_thr](ei, ej) += reaction.e_stoch[ej] * dfdn   ;
+                reaction_b_ptr[loc_thr](ej)          -= reaction.e_stoch[ej] * dfdn_po;
             }
                 
             //Now add alpha in column for products
             for(int& pj : reaction.products) {
-                reaction_matrix(ei,pj) -= reaction.p_stoch[pj] * dfdn;
-                reaction_b(pj)         += reaction.p_stoch[pj] * dfdn_po;
+                reaction_matrix_ptr[loc_thr](ei,pj) -= reaction.p_stoch[pj] * dfdn    ;
+                reaction_b_ptr[loc_thr](pj)         += reaction.p_stoch[pj] * dfdn_po ;
             }
             
         }
@@ -628,35 +694,54 @@ Vector_t c_Sim::solver_cchem_implicit_general(double dtt, int cell, int cdebug, 
         // Term t1 = k * (A^k)^a * (B^k)^b ...  as final act
         //
         reaction.dndt_old = 0.;
-        double t1    = dtt * reac_r * fastpow1(n_tot, iStochsum-1.);
+        double t1    = dtt * reac_r * std::pow(n_tot,iStochsum-1); // fastpow1(n_tot, iStochsum-1.); //n_tot^(s-1) comes from the normalization
         for(int& ei : reaction.educts) {
             t1 *= fastpow1(n_olds[ei], reaction.e_stoch_i[ei]);
+            //t1 *= std::pow(n_olds[ei], reaction.e_stoch_i[ei]);
         }
         
         for(int& ei : reaction.educts) {
-            reaction_b(ei)              -= reaction.e_stoch[ei] * t1;           
+            reaction_b_ptr[loc_thr](ei)              -= reaction.e_stoch[ei] * t1;           
             //reaction.dndts[ei]           = reaction.e_stoch[ei] * t1/dtt * species[ei].u[cell].u2/n_olds[ei]/n_olds[ei]*n_tot; //Momentum correction term 1
             reaction.dndts[ei]           = -reaction.e_stoch[ei] * t1/dtt /n_olds[ei]; //*n_tot; //Momentum correction term 1
             reaction.dndt_old           += -reaction.dndts[ei];                                 //Total momentum correction term
         }
         for(int& pi : reaction.products) {
-            reaction_b(pi)            += reaction.p_stoch[pi] * t1 ;
+            reaction_b_ptr[loc_thr](pi)            += reaction.p_stoch[pi] * t1 ;
         }
         
     }
     
+    
     if(cdebug > 0) {
-        cout<<"In solver_implicit_cchem3 matrix, = "<<endl;
-        cout<<reaction_matrix<<endl;
+    //if(globalTime > 8e-16 && cell==390) {
+    //if(cell==780 || cell==10) {
+        cout<<" cell "<<cell<<" thr_id = "<<omp_get_thread_num()<<endl;
+        for(int s=0;s<num_species; s++) {
+            cout<<" species["<<s<<"] = "<<n_olds[s]<<" "<<n_olds[s]-1.<<endl;
+        }
+        cout<<"In solver_implicit_cchem3, n_tot = "<<n_tot<<" dt = "<<dtt<<" matrix, = "<<endl;
+        cout<<reaction_matrix_ptr[loc_thr].transpose()<<endl;
         cout<<"b="<<endl;
         cout<<reaction_b<<endl;
+        
+        cout<<"b-n[s]="<<endl;
+        for(int s=0;s<num_species; s++) {
+            cout<<reaction_b(s)-n_olds[s]<<endl;
+        }
     
         char a;
         cin>>a;
     }
     
-    LUchem.compute(identity_matrix + reaction_matrix.transpose()) ;
+    LUchem.compute(identity_matrix + reaction_matrix_ptr[loc_thr].transpose()) ;
     n_news.noalias() = LUchem.solve(reaction_b);
+    
+    if(cell == 10) {
+    cout<<" cell= "<<cell<<" thread_id = "<<omp_get_thread_num()<<" matrix[0] = "<<endl<<reaction_matrix_ptr[loc_thr]<<endl<<" 1+matrix[0].T = "<<endl<<identity_matrix + reaction_matrix_ptr[loc_thr].transpose()<<endl<<" n_news = "<<n_news<<endl;
+    char bb;
+    cin>>bb;
+    }
     
     /*
     cout<<"Intermediate results with dt= "<<dt<<endl;
@@ -677,7 +762,7 @@ Vector_t c_Sim::solver_cchem_implicit_general(double dtt, int cell, int cdebug, 
                         cout<<"NEGATIVE DENSITY IN SPECIES["<<s<<"] = " <<n_news(s)<<" at time = "<<globalTime<< " steps/cell = "<<steps<<"/"<<cell<<" dt_chem = "<<dtt<<endl;
                     
                         cout<<"In solver_implicit_cchem3 cell, = "<<cell<<" matrix = "<<endl;
-                        cout<<reaction_matrix.transpose()<<endl;
+                        cout<<reaction_matrix_ptr[loc_thr].transpose()<<endl;
                         cout<<"b="<<endl;
                         cout<<reaction_b<<endl;
                         //cout<<"nolds = "<<endl<<n_olds<<endl;
@@ -700,7 +785,7 @@ Vector_t c_Sim::solver_cchem_implicit_general(double dtt, int cell, int cdebug, 
                 cout<<" dn["<<s<<"] = "<<n_olds[s]-n_news[s]<<endl;
         }
         
-        cout<<"In solver_implicit_cchem3 cell, = "<<cell<<" matrix = "<<endl;
+        cout<<"In solver_implicit_cchem3 cell, = "<<cell<<" dt = "<<dtt<<" matrix = "<<endl;
                         cout<<reaction_matrix.transpose()<<endl;
                         cout<<"b="<<endl;
                         cout<<reaction_b<<endl;
@@ -813,6 +898,11 @@ void c_Sim::update_dS_jb_photochem(int cell) {
                 int ej = reaction.educts[0]; 
                 chem_momentum_matrix(ej, ej) += dt * reaction.dndt_old;
                 //momentum_b(ej)               += dt * reaction.dndt_old;
+                //
+                // Internal energy terms
+                //
+                
+                //species[ej].dG(cell) +=  dt * reaction.dndt_old * species[ej].cv * species[ej].mass_amu * species[ej].prim[cell].temperature;
                 
                 for(int& pj : reaction.products) {
                         chem_momentum_matrix(pj, ej) -= dt * reaction.dndt_old * species[pj].mass_amu/reaction.products_total_mass;
@@ -838,19 +928,26 @@ void c_Sim::update_dS_jb_photochem(int cell) {
         //
         
         //
-        // Momentum terms
+        // Momentum terms and internal energy terms
         //
         //int ej = reaction.educts[0]; 
+        double dLambda = 0; //Species change heating/cooling, we will add this flat out to the dG operator, although it can be pos/neg
+        double dLbit   = 0;
         
         for(int& ej : reaction.educts) {
             chem_momentum_matrix(ej, ej) += 1.* dt * reaction.dndts[ej]; //reaction.dndt_old;
             //momentum_b(ej)               += 1.* dt * reaction.dndts[ej];
+            dLbit                =  dt * reaction.dndt_old * species[ej].cv * species[ej].mass_amu * species[ej].prim[cell].temperature;
+            dLambda              += dLbit;
+            species[ej].dG(cell) += dLbit;
+            
         }
         //momentum_b(ej)               += reaction.dndt_old;
         for(int& pj : reaction.products) {
             for(int& ej : reaction.educts) {
                 chem_momentum_matrix(pj, ej) -= 1.*dt * reaction.dndt_old * species[pj].mass_amu/reaction.products_total_mass;
                 //momentum_b(pj)               -= 1.*dt * reaction.dndt_old * species[pj].mass_amu/reaction.products_total_mass;
+                //species[ej].dG(cell)         -= dLambda/reaction.products_total_mass;  //This is reaction heating, but we add it to dG, in order to be able to split it from photon heating
             
                 //cout<<" from "<<species[ej].speciesname<<" to "<<species[pj].speciesname<<endl;
             }
@@ -981,9 +1078,13 @@ void c_Sim::update_dS_jb_photochem(int cell) {
     int hnull_idx = get_species_index("S0"); 
     if(hnull_idx == -1)
         hnull_idx = get_species_index("H0"); 
+    if(hnull_idx == -1)
+        hnull_idx = get_species_index("H"); 
     int hplus_idx = get_species_index("S1");
     if(hplus_idx == -1)
         hplus_idx = get_species_index("H+"); 
+    if(hplus_idx == -1)
+        hplus_idx = get_species_index("p+");
     int e_idx     = get_species_index("S2");
     if(e_idx == -1)
         e_idx = get_species_index("e-"); 
@@ -995,6 +1096,7 @@ void c_Sim::update_dS_jb_photochem(int cell) {
     int O_idx = get_species_index("S7");
     int Op_idx = get_species_index("S8");
     int Opp_idx = get_species_index("S9");
+    int h3plus_idx = get_species_index("H3+");
     double tau = total_opacity(cell,0)*(x_i12[cell+1]-x_i12[cell])*1e8;
     double beta = 0.;
     if(tau < 7.) 
@@ -1061,6 +1163,11 @@ void c_Sim::update_dS_jb_photochem(int cell) {
             species[e_idx].dGdT(cell) -= nopp * ne * 4 * 1.426e-27 * 1.3 * 0.5 /std::sqrt(Te);
         }
         
+        if( h3plus_idx!=-1 && e_idx!=-1 ) { 
+            double n3p   = species[h3plus_idx].prim[cell].number_density;
+            species[e_idx].dG(cell)   -=  n3p * ne * red * h3plus_cooling(Te); 
+            species[e_idx].dGdT(cell) -=  n3p * ne * red * dfdx(h3plus_cooling, Te, dT);
+        }
     }
    
     

@@ -27,6 +27,14 @@
 #define NUM_SPECIES Eigen::Dynamic
 #endif
 
+#if defined(_OPENMP)
+#include <omp.h>
+#else
+typedef int omp_int_t;
+inline omp_int_t omp_get_thread_num() { return 0;}
+inline omp_int_t omp_get_max_threads() { return 1;}
+#endif
+
 using namespace std;
 
 using Matrix_t = Eigen::Matrix<double, NUM_SPECIES,NUM_SPECIES, Eigen::RowMajor>;
@@ -447,6 +455,7 @@ public:
     double t_max;
     double max_timestep_change;
     double dt_min_init;
+    double dt_max;               //When wanting to cap the timestep in static simulations
     double timestep_rad2;
     double cfl_step ;
     double energy_epsilon;
@@ -617,6 +626,7 @@ public:
     double epsilon_rad_min = 1e-1;  // Some convergence measure for the radiation solver, if needed
     double density_floor;
     double xi_rad;
+    int solve_for_j;
     //
     // (Photo)Chemistry
     //
@@ -633,6 +643,8 @@ public:
     std::vector<double> n_init;
     std::vector<double> n_tmp;
     Matrix_t reaction_matrix;
+    Eigen::MatrixXd *reaction_matrix_ptr;
+    Eigen::VectorXd *reaction_b_ptr;
     //Vector_t n_news;
     Eigen::PartialPivLU<Matrix_t> LUchem;
     

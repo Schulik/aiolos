@@ -139,6 +139,11 @@ double Opp_cooling(double Te) {
     return 0.*Te;
 }
 
+double h3plus_cooling(double Te) {
+    
+    return 0.*Te;
+}
+
 /* class C2Ray_HOnly_ionization
  *
  * Helper class for updating ionization fraction in a Hydrogen only model.

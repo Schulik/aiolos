@@ -39,6 +39,11 @@ int main(int argc, char** argv)
     cout<<"Use -spc name.spc to let the program know the name of the required species file."<<endl;
     cout<<"Optional command line parametrs: -debug <int>, for debug level; -war <int>, for suppressing warnings."<<endl;
     
+    #if defined(_OPENMP)
+        cout<<"Running with OMP."<<endl;
+        omp_set_num_threads(1);
+    #endif
+    
     int parameterfile_found = 0;
     int speciesfile_found   = 0;
     debug = 0;

@@ -535,10 +535,18 @@ void c_Sim::compute_alpha_matrix(int j) { //Called in compute_friction() and com
                             }
                             else if(std::abs(ci) == 0 || std::abs(cj) == 0) {//i-n collision
                                 
-                                alpha_local = 1*2.21 * 3.141592 * numdens_vector(sj) * mass_vector(sj)/(mass_vector(sj)+mass_vector(si));
-                                alpha_local *= std::sqrt(0.66 / mumass ) * 1e-12 * qn * elm_charge; //0.66 is the polarizability of neutral atomic H
-                                
-                                ccase = " i-n ";
+                                if(species[si].mass_amu < 1.1 && species[sj].mass_amu < 1.1) {  //Resonant H,H+ collisions
+                                    alpha_local = 2.65e-10 * numdens_vector(sj) * std::sqrt(meanT) * std::pow((1. - 0.083 * std::log10(meanT)), 2.);
+                                    
+                                    ccase = "resonant i-n ";
+                                    
+                                } else {
+
+                                    alpha_local = 1*2.21 * 3.141592 * numdens_vector(sj) * mass_vector(sj)/(mass_vector(sj)+mass_vector(si));
+                                    alpha_local *= std::sqrt(0.66 / mumass ) * 1e-12 * qn * elm_charge; //0.66 is the polarizability of neutral atomic H                                        
+                                    
+                                    ccase = "nonresonant i-n ";
+                                }
                             }
                             else { //i-i collision
                                 alpha_local = 1.27 * species[si].static_charge * species[si].static_charge * species[sj].static_charge * species[sj].static_charge * std::sqrt(mumass_amu) * amu/mass_vector(si);
@@ -548,7 +556,7 @@ void c_Sim::compute_alpha_matrix(int j) { //Called in compute_friction() and com
                             }
                             
                             //if(si!=sj)
-                           //     cout<<"cell "<<j<<" colliding "<<species[si].speciesname<<" q="<<species[si].static_charge<<" with "<<species[sj].speciesname<<" q="<<species[sj].static_charge<<" case = "<<ccase<<" alpha/n = "<<alpha_local/ numdens_vector(sj)<<endl;
+                            //    cout<<"cell "<<j<<" colliding "<<species[si].speciesname<<" q="<<species[si].static_charge<<" with "<<species[sj].speciesname<<" q="<<species[sj].static_charge<<" case = "<<ccase<<" alpha/n = "<<alpha_local/ numdens_vector(sj)<<" n_sj = "<<numdens_vector(sj)<<endl;
                             
                             //if(photochemistry_level == 1 && (si + sj) == 3)
                             alpha_local *= alpha_collision;
