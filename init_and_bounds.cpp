@@ -642,9 +642,12 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
         
         reaction_matrix_ptr = new Eigen::MatrixXd[omp_get_max_threads()];
         reaction_b_ptr      = new Eigen::VectorXd[omp_get_max_threads()];
+        LUchem_ptr          = new Eigen::PartialPivLU<Matrix_t>[omp_get_max_threads()];
+        
         for(int i =0; i<omp_get_max_threads(); i++ ) {
             reaction_matrix_ptr[i] = Matrix_t::Zero(num_species, num_species);
             reaction_b_ptr[i]      = Vector_t(num_species);
+            //LUchem_ptr[i]          = Eigen::PartialPivLU<Matrix_t>;
         }
         //n_news          = Vector_t(num_species);
         

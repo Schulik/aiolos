@@ -26,3 +26,8 @@ done via:
 
 where the "4" refers to a target of 4 species total.
 
+
+Parallelization
+
+aiolos uses a parallelised chemistry module to speed up complex networks. When compiled with the -fopenmp flag, -n <int> will run aiolos from the main command line 
+with <int> OMP threads solving the chemistry loop in parallel.

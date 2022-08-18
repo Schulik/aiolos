@@ -648,6 +648,8 @@ public:
     //Vector_t n_news;
     Eigen::PartialPivLU<Matrix_t> LUchem;
     
+    Eigen::PartialPivLU<Matrix_t> *LUchem_ptr;
+    
     Matrix_t chem_momentum_matrix;
     Eigen::PartialPivLU<Matrix_t> LUchem_mom;
     

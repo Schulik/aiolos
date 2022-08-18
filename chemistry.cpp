@@ -232,6 +232,7 @@ void c_reaction::update_reaction_rate(double T) {
 //
 void c_Sim::do_chemistry() {
     
+    /*
     #pragma omp parallel
     {
     int loc_thr = omp_get_thread_num();
@@ -245,16 +246,11 @@ void c_Sim::do_chemistry() {
     if(loc_thr == num_thr-1)
         local_maxrange += residual+1;
     
-    //for (int j = num_cells+1; j >= 0; j--) {
-    for (int j = local_maxrange; j >= local_minrange; j--) {
+    for (int j = local_maxrange; j >= local_minrange; j--) {} */
+    
+    #pragma omp parallel for schedule(static,5)
+    for (int j = num_cells+1; j >= 0; j--) {
 
-/*        
-#if defined (_OPENMP)
-        cout<<" id="<<omp_get_thread_num()<<" j="<<j<<" local_minrange/local_maxrange = "<<local_minrange<<"/"<<local_maxrange<<" num_cells+1 = "<<num_cells+1<<" chunksize = "<<chunksize<<" residual = "<<residual<<" local_chunk = "<<local_maxrange-local_minrange<<endl;
-#else
-        cout<<" id="<<omp_get_thread_num()<<" j="<<j<<" local_minrange/local_maxrange = "<<local_minrange<<"/"<<local_maxrange<<" num_cells+1 = "<<num_cells+1<<" chunksize = "<<chunksize<<endl;
-#endif */
-        
         //std::vector<double> n_init = np_zeros(num_species);
         //std::vector<double> n_tmp  = np_zeros(num_species);
         Vector_t n_init = Vector_t(num_species);
@@ -396,7 +392,7 @@ void c_Sim::do_chemistry() {
         }
         
     }
-    }//END PARALLEL REGION
+    //} //END MANUAL PARALLEL REGION
     
     for (int j = num_cells+1; j >= 0; j--) {
         for(int b=0; b<num_bands_in; b++) {
@@ -464,10 +460,12 @@ Vector_t c_Sim::solver_cchem_implicit_general(double dtt, int cell, int cdebug, 
     //double masses[num_species];
     //double kappas[num_species];
     
+    //cout<<"n_olds = "<<endl;
     for(int s=0;s<num_species; s++) {
         //n_olds[s]     = species[s].prim[cell].number_density / n_tot;
         //masses[s] = species[s].mass_amu*amu;
         reaction_b_ptr[loc_thr](s) = n_olds[s];
+        //cout<<n_olds[s]<<endl;
     }
     //
     // Photochemical reactions
@@ -701,13 +699,13 @@ Vector_t c_Sim::solver_cchem_implicit_general(double dtt, int cell, int cdebug, 
         }
         
         for(int& ei : reaction.educts) {
-            reaction_b_ptr[loc_thr](ei)              -= reaction.e_stoch[ei] * t1;           
-            //reaction.dndts[ei]           = reaction.e_stoch[ei] * t1/dtt * species[ei].u[cell].u2/n_olds[ei]/n_olds[ei]*n_tot; //Momentum correction term 1
+            reaction_b_ptr[loc_thr](ei)    -= reaction.e_stoch[ei] * t1;           
+            //////////////reaction.dndts[ei]           = reaction.e_stoch[ei] * t1/dtt * species[ei].u[cell].u2/n_olds[ei]/n_olds[ei]*n_tot; //Momentum correction term 1
             reaction.dndts[ei]           = -reaction.e_stoch[ei] * t1/dtt /n_olds[ei]; //*n_tot; //Momentum correction term 1
             reaction.dndt_old           += -reaction.dndts[ei];                                 //Total momentum correction term
         }
         for(int& pi : reaction.products) {
-            reaction_b_ptr[loc_thr](pi)            += reaction.p_stoch[pi] * t1 ;
+            reaction_b_ptr[loc_thr](pi)    += reaction.p_stoch[pi] * t1 ;
         }
         
     }
@@ -720,8 +718,8 @@ Vector_t c_Sim::solver_cchem_implicit_general(double dtt, int cell, int cdebug, 
         for(int s=0;s<num_species; s++) {
             cout<<" species["<<s<<"] = "<<n_olds[s]<<" "<<n_olds[s]-1.<<endl;
         }
-        cout<<"In solver_implicit_cchem3, n_tot = "<<n_tot<<" dt = "<<dtt<<" matrix, = "<<endl;
-        cout<<reaction_matrix_ptr[loc_thr].transpose()<<endl;
+        cout<<"In solver_implicit_cchem3, n_tot = "<<n_tot<<" dt = "<<dtt<<" 1+matrix, = "<<endl;
+        cout<<identity_matrix + reaction_matrix_ptr[loc_thr].transpose()<<endl;
         cout<<"b="<<endl;
         cout<<reaction_b<<endl;
         
@@ -734,11 +732,14 @@ Vector_t c_Sim::solver_cchem_implicit_general(double dtt, int cell, int cdebug, 
         cin>>a;
     }
     
-    LUchem.compute(identity_matrix + reaction_matrix_ptr[loc_thr].transpose()) ;
-    n_news.noalias() = LUchem.solve(reaction_b);
+    LUchem_ptr[loc_thr].compute(identity_matrix + reaction_matrix_ptr[loc_thr].transpose()) ;
+    //LUchem.compute(identity_matrix + reaction_matrix_ptr[loc_thr].transpose()) ;
+    //n_news.noalias() = LUchem.solve(reaction_b_ptr[loc_thr]);
+    n_news.noalias() = LUchem_ptr[loc_thr].solve(reaction_b_ptr[loc_thr]);
     
-    if(cell == 10) {
-    cout<<" cell= "<<cell<<" thread_id = "<<omp_get_thread_num()<<" matrix[0] = "<<endl<<reaction_matrix_ptr[loc_thr]<<endl<<" 1+matrix[0].T = "<<endl<<identity_matrix + reaction_matrix_ptr[loc_thr].transpose()<<endl<<" n_news = "<<n_news<<endl;
+    if(cell == 10e6) {
+    //if(loc_thr == 1) {
+    cout<<" cell= "<<cell<<" thread_id = "<<omp_get_thread_num()<<" matrix[0] = "<<endl<<reaction_matrix_ptr[loc_thr]<<endl<<" 1+matrix[0].T = "<<endl<<identity_matrix + reaction_matrix_ptr[loc_thr].transpose()<<endl<<" b = "<<reaction_b_ptr[loc_thr]<<endl<<" n_news = "<<n_news<<endl;
     char bb;
     cin>>bb;
     }
@@ -754,7 +755,6 @@ Vector_t c_Sim::solver_cchem_implicit_general(double dtt, int cell, int cdebug, 
         
         if(cell==3260)
             cout<<"s = "<<s<<" dn /dt_actual = "<<(n_news[s]-n_olds[s])<<" dn/dt = "<<(n_news[s]-n_olds[s])/dtt<<" from reaction: "<<reactions[0].dndt_old<<endl;
-        
         
                 if(n_news(s) < 0) {
                     
@@ -1425,6 +1425,27 @@ std::vector<double> get_thermo_variables(double T,string species_string) {
     return temp;
     
 }
+
+    //for (int j = num_cells+1; j >= 0; j--) {
+    
+    /*
+    #if defined (_OPENMP)
+        if(loc_thr == 1) {
+                cout<<" thr = "<<loc_thr<<" doing cells = ";
+                for (int j = local_maxrange; j >= local_minrange; j--) {
+                        cout<<j<<" ";
+                }
+                char bb;
+                cin>>bb;
+        }
+    #endif
+    */
+/*        
+#if defined (_OPENMP)
+        cout<<" id="<<omp_get_thread_num()<<" j="<<j<<" local_minrange/local_maxrange = "<<local_minrange<<"/"<<local_maxrange<<" num_cells+1 = "<<num_cells+1<<" chunksize = "<<chunksize<<" residual = "<<residual<<" local_chunk = "<<local_maxrange-local_minrange<<endl;
+#else
+        cout<<" id="<<omp_get_thread_num()<<" j="<<j<<" local_minrange/local_maxrange = "<<local_minrange<<"/"<<local_maxrange<<" num_cells+1 = "<<num_cells+1<<" chunksize = "<<chunksize<<endl;
+#endif */
 
 
 

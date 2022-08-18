@@ -27,6 +27,7 @@ int main(int argc, char** argv)
     int debug_cell = 40;
     int debug_steps = 8965;
     int suppress_warnings_global = 0;
+    int external_thread_num = 1;
     cout<<endl<<"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"<<endl;
           cout<<"~~~ Welcome to AIOLOS! May a gentle breeze lead your way through the bugs."<<endl;
           cout<<"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"<<endl;
@@ -39,10 +40,6 @@ int main(int argc, char** argv)
     cout<<"Use -spc name.spc to let the program know the name of the required species file."<<endl;
     cout<<"Optional command line parametrs: -debug <int>, for debug level; -war <int>, for suppressing warnings."<<endl;
     
-    #if defined(_OPENMP)
-        cout<<"Running with OMP."<<endl;
-        omp_set_num_threads(1);
-    #endif
     
     int parameterfile_found = 0;
     int speciesfile_found   = 0;
@@ -94,6 +91,11 @@ int main(int argc, char** argv)
             cout<<"Debugging info output after steps number "<<debug<<endl;
             i++;
         }
+        if(tmpstring.compare("-n") == 0) {
+            string yet_another_string = argv[i+1];
+            external_thread_num      = std::stoi(yet_another_string);
+            i++;
+        }
     }
     
     if(!parameterfile_found) {
@@ -105,6 +107,10 @@ int main(int argc, char** argv)
             speciesfile = "default.spc";
     }
         
+    #if defined(_OPENMP)
+        omp_set_num_threads(external_thread_num);    
+        cout<<"Running with OMP, omp_thread_num = "<<omp_get_max_threads()<<endl;
+    #endif
     
     try {
 
