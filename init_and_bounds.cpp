@@ -159,7 +159,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
         use_drag_predictor_step = read_parameter_from_file<int>(filename, "PARI_SECONDORDER_DRAG", debug, 0).value;
         init_wind         = read_parameter_from_file<int>(filename,"PARI_INIT_WIND", debug, 0).value;
         alpha_collision   = read_parameter_from_file<double>(filename,"PARI_ALPHA_COLL", debug, 1.).value;
-        //init_mdot              = read_parameter_from_file<double>(filename,"PARI_MDOT", debug, -1.).value;
+        max_mdot              = read_parameter_from_file<double>(filename,"MAX_MDOT", debug, -1.).value;
         init_sonic_radius = read_parameter_from_file<double>(filename,"INIT_SONIC_RADIUS", debug, -1e10).value;
         rad_energy_multiplier=read_parameter_from_file<double>(filename,"PARI_RAD_MULTIPL", debug, 1.).value;
         collision_model   = read_parameter_from_file<char>(filename,"PARI_COLL_MODEL", debug, 'P').value;
@@ -605,6 +605,23 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
             species.push_back(c_Species(this, filename, speciesfile, s, debug)); // Here we call the c_Species constructor
         }
         cout<<endl;
+        
+        for(int cnt=0; cnt<50; cnt++) {
+            //cout<<"Before update mass and pot"<<endl;
+            update_mass_and_pot();
+            
+            //cout<<"Before second run in update dens"<<endl;
+            for(int s = 0; s < num_species; s++) {
+                //species[s].update_kzz_and_gravpot(s); 
+                
+                for(int i=0; i<num_cells+2; i++) {
+                    species[s].phi_s[i] = phi[i];
+                }
+                
+                species[s].initialize_hydrostatic_atmosphere(filename);
+            }
+        }
+      
         ///////////////////////////////////////////////////////////////////////// 
         /////////////////////////////////////////////////////////////////////////
         /////////////////////////////////////////////////////////////////////////
@@ -869,7 +886,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
     
     
     
-    cout<<"TOTAL SOLAR HEATING / Flux = "<<templumi-solar_heating(num_bands_in-1)<<" Luminosity = "<<(templumi*4.*pi*rsolar*rsolar*pi)<<endl;
+    cout<<"TOTAL SOLAR HEATING / Flux = "<<templumi<<" Luminosity = "<<(templumi*4.*pi*rsolar*rsolar*pi)<<endl;
     
     //for(int j=15;j<18;j++)
     //    cout<<" POS4.3 dens["<<j<<"] = "<<species[0].u[j].u1<<" temp = "<<species[0].prim[j].temperature<<endl;
@@ -1202,6 +1219,7 @@ c_Species::c_Species(c_Sim *base_simulation, string filename, string species_fil
             //
             if(init_static_atmosphere == 1) {
                 initialize_hydrostatic_atmosphere(filename);
+                //TODO: PUTIN short Phi- (T,rho)-iteration to allow hydrostatic starts with significant self-garvit
             }
             else if (init_static_atmosphere == 2) {
                 const_rho_scale = read_parameter_from_file<double>(filename,"CONST_RHO_SCALE", debug, 550.e5).value;
@@ -1812,38 +1830,19 @@ void c_Species::apply_boundary_right(std::vector<AOS>& u) {
                 AOS_prim prim ;
                 eos->compute_primitive(&u[i-1],&prim, 1) ;
                 
-                if(false) {
-                    double dphi = (phi_s[i] - phi_s[i-1]) / (base->dx[i-1] + base->dx[i]) ;
-                    dphi *= (base->omegaplus[i]*base->dx[i] + base->omegaminus[i-1]*base->dx[i-1]) ;
-                    //dphi *= (prim.density * base->omegaplus[i]*base->dx[i] + this->prim[i].density * base->omegaminus[i-1]*base->dx[i-1]) ;
-                      //dphi *= (this->prim[i].density* base->omegaplus[i]*base->dx[i] +  prim.density  * base->omegaminus[i-1]*base->dx[i-1]) ;
-                    
-                    double r =base->x_i12[i];
-                    double mdot      = prim.density*prim.speed*r*r;
-                    double freefallv = -std::sqrt(2.*G*base->planet_mass/r);
-                    
-                    double mdotlimit = -1e-18;
-                    if(this->is_dust_like)
-                        mdotlimit = 1e-4 * mdotlimit;
-                    
-                    if(mdot < -mdotlimit)
-                        prim.density = -mdotlimit/freefallv/r/r;
-                    
-                    //cout<<" in boundaries, rhoi rho+1 = "<<prim.density<<"/"<<this->prim[i].density<<" p,p2 = "<<prim.pres;
-                    prim.pres = prim.pres - dphi ;
-                }
+                double dphi = (base->phi[i]*K_zzf[i] - base->phi[i-1]*K_zzf[i-1]) / (base->dx[i-1] + base->dx[i]) ;
+                dphi       *= (base->omegaplus[i]*base->dx[i] + base->omegaminus[i-1]*base->dx[i-1]) ;
+                //prim.pres = prim.pres - prim.density * dphi ;    
+                prim.pres = prim.pres * 2.5;    
                 
-                //cout<<"/"<<prim.pres<<" i = "<<i<<endl;
-                
-                if(true) {
-                    double dphi = (base->phi[i]*K_zzf[i] - base->phi[i-1]*K_zzf[i-1]) / (base->dx[i-1] + base->dx[i]) ;
-                    prim.pres = prim.pres - 1.0* prim.density * dphi ;    
-                    
-                }
-                
-                //prim.pres = std::max( prim.pres, 0.0) ;          //27.10.2021: Not in use anymore, due to this causing problems with negative temperatures. p=0 -> E = 0 -> T = 0  and negative after a bit of hydro
+                //Older variant, should be more precise but has weird pressure slope
+                double dphi2 = (phi_s[i] - phi_s[i-1]) / (base->dx[i-1] + base->dx[i]) ;
+                dphi2 *= (prim.density * base->omegaplus[i]*base->dx[i] + this->prim[i].density * base->omegaminus[i-1]*base->dx[i-1]) ;
+                //prim.pres = prim.pres - dphi2 ; 
+       
                 prim.pres = std::max( prim.pres, 1e-1*prim.pres) ; //TODO: Replace 1e-3 with an estimate for the max pressure jump in a adiabatic shock
-                //prim.pres = std::min( prim.pres, 2.*prim.pres) ; //TODO: Replace 1e-3 with an estimate for the max pressure jump in a adiabatic shock
+                //prim.pres = std::max( prim.pres, 0.0) ;          //27.10.2021: Not in use anymore, due to this causing problems with negative temperatures. p=0 -> E = 0 -> T = 0  and negative after a bit of hydro
+                
                 eos->compute_conserved(&prim, &u[i], 1) ;
             }
             break ;
@@ -1868,6 +1867,42 @@ void c_Species::apply_boundary_right(std::vector<AOS>& u) {
                 base->phi[i]   = base->phi[iact] ; 
             }
             break;
+        case BoundaryType::giantplanet:
+            
+            for (int i=Ncell+num_ghosts; i < Ncell+2*num_ghosts; i++) {
+                AOS_prim prim ;
+                eos->compute_primitive(&u[i-1],&prim, 1) ;
+                
+                double dphi = (phi_s[i] - phi_s[i-1]) / (base->dx[i-1] + base->dx[i]) ;
+                //dphi *= (base->omegaplus[i]*base->dx[i] + base->omegaminus[i-1]*base->dx[i-1]) ;
+                //dphi *= (prim.density * base->omegaplus[i]*base->dx[i] + this->prim[i].density * base->omegaminus[i-1]*base->dx[i-1]) ;
+                      //dphi *= (this->prim[i].density* base->omegaplus[i]*base->dx[i] +  prim.density  * base->omegaminus[i-1]*base->dx[i-1]) ;
+                    
+                double r =base->x_i12[i];
+                double mdot      = 4.*3.141592*prim.density*prim.speed*r*r;
+                double freefallv = -std::sqrt(2.*G*base->planet_mass/r);
+                    
+                double mdotlimit = base->max_mdot; //1.9e+18 g/s = 1e-2 mearth/yr
+                if(this->is_dust_like)
+                    mdotlimit = 1e-4 * mdotlimit;
+                    
+                string cases;
+                if(mdot < mdotlimit) {
+                    prim.pres = prim.pres;// - dphi * (prim.density * base->omegaplus[i]*base->dx[i] + this->prim[i].density * base->omegaminus[i-1]*base->dx[i-1]); //Limiting case
+                    prim.speed = freefallv;
+                    prim.density = mdotlimit/freefallv/r/r;
+                }
+                else {
+                    prim.pres = std::min(prim.pres * 2., 1.);// - prim.density * dphi ; //Forcing inflow
+                }
+                
+                //prim.density = -mdotlimit/freefallv/r/r;
+                //cout<<" in boundaries, rhoi rho+1 = "<<prim.density<<"/"<<this->prim[i].density<<" p,p2 = "<<prim.pres;
+                
+                eos->compute_conserved(&prim, &u[i], 1) ;
+                eos->compute_auxillary(&prim, 1);
+            }
+            break ;
     }
 }
 

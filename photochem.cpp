@@ -51,7 +51,7 @@ double H_threebody_recombination(double T_e) {
     if (T_e < 220) T_e = 220.;
 
     double x = 2 * 157807 / T_e;
-    return 0.e0 * (1.005e-14 / (T_e * T_e * T_e)) * pow(x, -1.089) /
+    return 1.e0 * (1.005e-14 / (T_e * T_e * T_e)) * pow(x, -1.089) /
            pow(1 + pow(x / 0.354, 0.874), 1.101);
 }
 double H_collisional_ionization(double T_e) {
@@ -63,7 +63,7 @@ double H_collisional_ionization(double T_e) {
     double x = 2 * 157807. / T_e;
     double term = 21.11 * pow(T_e, -1.5) * pow(x, -1.089) /
                   pow(1 + pow(x / 0.354, 0.874), 1.101);
-    return 0e0 * term * exp(-0.5 * x);
+    return 1e0 * term * exp(-0.5 * x);
 }
 
 // Cooling rate per electron.

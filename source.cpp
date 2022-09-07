@@ -53,7 +53,7 @@
         
         double species_dens_sum;
         
-        if(debug >= 3)
+        if(debug >= 1)
             cout<<"In update mass. "<<endl;
         
         enclosed_mass[0] = planet_mass;
@@ -61,18 +61,18 @@
         
         for(int i = 2; i <= num_cells; i++) {
             
-            if(debug >= 4) {
-                if(i==0)
-                    cout<<"In update mass, 0th element."<<endl;
+            if(debug >= 1) {
+                if(i>=0)
+                    cout<<"In update mass in "<<i<<"th element."<<endl;
                 if(i==num_cells-1)
                     cout<<"In update mass, last element."<<endl;
             }
             
-            //TODO: PUTIN loop over all species densities
+            //Loop over all species densities
             species_dens_sum = 0.;
             for(int s = 0; s < num_species; s++)
                 species_dens_sum += species[s].u[i].u1;
-        
+            
             double xn3 = x_i[i];
             xn3 = xn3*xn3*xn3;
             double xl3 = x_i[i-1];
@@ -95,7 +95,7 @@
             //            -G*mass/abs(r-planet_position);
         }
         
-        if(debug >= 3)
+        if(debug >= 1)
             cout<<"Done in update mass. "<<endl;
     }
     

@@ -298,8 +298,8 @@ public:
     bool is_reverse_reac;    //Will try to automatically find the reverse reaction by computing r * exp(-dG/T), where the Gibbs energy difference dG has to be in the chemistry lookup tables
     bool mtype_reaction = 0; //Reaction has a catalyst in it?
     double current_dG = 0.;
-    double dndt_old;
-    std::vector<double> dndts;
+    double dndt_old;           //Total momentum correction term, split on reaction products according to their mass
+    std::vector<double> dndts; //Momentum correction term per reactant, needs to be known for all reactants for all reactions
     
 public:
     
@@ -334,7 +334,7 @@ public:
     int e_num = 0.;
     int p_num = 0.;
     int count_p;
-    double dndt_old;
+    double dndt_old;   //Total momentum correction term. No reactant-term is needed as we assume incoming photons carry negligible momentum
     
     //Photochem specific
     int band;                    //Minimum band to start this reaction being relevant (user needs to make sure this is compatible with threshold_energy!!!)
@@ -374,6 +374,7 @@ public:
     
     int problem_number;
     int debug;
+    int cdebug = 0;
     int debug_cell = 40;
     int debug_steps = 8965;
     int use_self_gravity;
@@ -678,7 +679,7 @@ public:
     ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     
     int init_wind;
-    double init_mdot;
+    double max_mdot;
     double init_sonic_radius;
     double T_increment;
     double alpha_collision;
@@ -733,13 +734,14 @@ public:
     double freedman_opacity(double P, double T, double _Z);
     void kappa_landscape();
     
-    //Radiation transport 
+    //Radiation transport and chemistry
     
     void transport_radiation();     //  Called if use_rad_fluxes == 1
     void reset_dS();
     void update_dS();
     void update_dS_jb(int j, int b);
     void update_dS_jb_photochem(int j);
+    void do_highenergy_cooling(int j);
     void update_tau_s_jb(int j, int b);
     void update_opacities();
     

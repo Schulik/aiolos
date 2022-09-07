@@ -25,7 +25,7 @@ IOS_OUTPUT(Geometry);
 
 
 enum class BoundaryType {
-    user = 0, open = 1, reflecting = 2, fixed = 3, periodic = 4,
+    user = 0, open = 1, reflecting = 2, fixed = 3, periodic = 4, giantplanet = 5
 } ;
 IOS_INPUT(BoundaryType);
 IOS_OUTPUT(BoundaryType);

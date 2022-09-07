@@ -181,8 +181,23 @@ void c_Species::update_opacities() {
         for(int j=0; j< num_cells+2; j++) {
             
             for(int b=0; b<num_bands_out; b++) {
-                opacity(j,b)        = base->const_opacity_rosseland_factor * base->opacity_semenov_malygin(1, prim[j].temperature, prim[j].density, prim[j].pres, this->is_dust_like); 
-                opacity_planck(j,b) = base->const_opacity_planck_factor * base->opacity_semenov_malygin(0, prim[j].temperature,    prim[j].density, prim[j].pres, this->is_dust_like);
+                double oldp;
+                if(base->steps<2)
+                    oldp = base->const_opacity_planck_factor * base->opacity_semenov_malygin(0, prim[j].temperature,    prim[j].density, prim[j].pres, this->is_dust_like);
+                else
+                    oldp = opacity_planck(j,b);
+                double newp = base->const_opacity_planck_factor * base->opacity_semenov_malygin(0, prim[j].temperature,    prim[j].density, prim[j].pres, this->is_dust_like);
+                opacity_planck(j,b) = std::sqrt(oldp*newp);
+                
+                double oldopa;
+                if(base->steps<2)
+                    oldopa = base->const_opacity_rosseland_factor * base->opacity_semenov_malygin(1, prim[j].temperature, prim[j].density, prim[j].pres, this->is_dust_like); 
+                else
+                    oldopa = opacity(j,b);
+                double newopa = base->const_opacity_rosseland_factor * base->opacity_semenov_malygin(1, prim[j].temperature, prim[j].density, prim[j].pres, this->is_dust_like); 
+                //if(j>3)
+                    //newopa = base->const_opacity_rosseland_factor * base->opacity_semenov_malygin(1, prim[j-1].temperature, prim[j].density, prim[j].pres, this->is_dust_like); 
+                opacity(j,b)  = std::sqrt(oldopa*newopa);    
             }
             
             for(int b=0; b<num_bands_in; b++) {
@@ -775,7 +790,7 @@ double c_Sim::opacity_semenov_malygin(int rosseland, double temperature, double 
         else
             //return c_max(kappa_gas, dust_to_gas_ratio * kappa_dust); 
             //return kappa_gas + dust_to_gas_ratio * kappa_dust;
-            return kappa_gas;
+            return kappa_gas + 0.*kappa_dust;
         //return kappa_gas + dust_to_gas_ratio * kappa_dust;
         
     }

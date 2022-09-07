@@ -108,7 +108,9 @@ void c_Sim::execute() {
             cout<< ", CFL " << cfl_step << ", radiative dt " << timestep_rad2 << "\n";
             next_print_time *= 10.;
         }
-            
+         
+         //if(steps > 154562 )
+            //cout<<" Beginning step "<<steps<<" @ globalTime "<<globalTime<<" dt "<< ", CFL " << cfl_step << ", radiative dt " << timestep_rad2 << "\n";
 //         
         //
         // Save internal energy before we update it
@@ -139,7 +141,8 @@ void c_Sim::execute() {
         // zeroth output has the initialized conserved values, but already the first fluxes.
         //
         
-        if(steps==0 || ((steps==1 || steps==2) && debug > 0)) {
+        //if(steps==0 || ((steps==221160) && debug > 0)) {
+        if(steps==0 || steps==221160) {
             for(int s=0; s<num_species; s++) {
                 species[s].print_AOS_component_tofile((int) output_counter);
             }
@@ -676,6 +679,8 @@ AOS c_Species::dust_flux(int j)
 
 void c_Species::update_kzz_and_gravpot(int argument) {
     
+    
+    
     int homopause_boundary_i = 0;
     double mu = base->species[0].mass_amu;
     double mi = this->mass_amu;
@@ -716,6 +721,7 @@ void c_Species::update_kzz_and_gravpot(int argument) {
     
     for(int i=0; i<homopause_boundary_i; i++) 
         phi_s[i] += phicorrection;
+    
     
     //cout<<"s = "<<argument<<" phicorr = "<<phicorrection<<" homopause_i = "<<homopause_boundary_i<<endl;
     //cout<<"Finished updating kzz in species "<<speciesname<<endl;

@@ -63,7 +63,7 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
                 
                 rhokr = max(2.*(total_opacity(j,b)*total_opacity(j+1,b))/(total_opacity(j,b) + total_opacity(j+1,b)), 4./3./dx );
                 rhokr   = min( 0.5*( total_opacity(j,b) + total_opacity(j+1,b)) , rhokr);
-                rhokr   = ( 0.5*( total_opacity(j,b) + total_opacity(j+1,b)) );
+                //rhokr   = ( 0.5*( total_opacity(j,b) + total_opacity(j+1,b)) );
                /* if(j > num_cells-3) {
                     
                 }
@@ -405,10 +405,8 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
     }
     
     //
-    // TODO: Compute Ti-Tj terms via a separate coupling step
+    // Compute Ti-Tj terms via a separate coupling step
     //
-    
-    
     
     if (use_collisional_heating && num_species > 1) {
         //compute_collisional_heat_exchange();
@@ -516,6 +514,7 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
                 //    cout<<"t = "<<steps<<" T = "<<tt<<endl;
                 
                 if(tt < 0.) {
+                //if(steps == 221160) {
                     cout<<" negative T in s = "<<species[s].speciesname<<" j/s = "<<j<<"/"<<s<<" eta1/eta2/J = "<<eta1[idx_s]<<"/"<<eta2[idx_s]<<"/"<<Jrad_FLD(j, 0)<<" denom/eta2*J = "<<denoms[idx_s]<<"/"<<eta2[idx_s]*Jrad_FLD(j,0)<<" t/dt/steps = "<<globalTime<<"/"<<ddt<<"/"<<steps<<endl;
                     Tswitch = 1;
                 }

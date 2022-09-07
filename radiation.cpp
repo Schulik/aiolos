@@ -298,51 +298,6 @@ void c_Sim::update_dS() {
             }
         }
     }
-    //
-    //Compute surface temperature from remaining solar flux and core flux
-    //
-    //double cooling_time  = 1e9 / core_cv;
-    //double J_remnant = 0;
-    //double T_rad_remnant;
-    //double T_target;
-    
-    for(int b = 0; b < num_bands_in; b++) {
-        //J_remnant += S_band(1,b);
-    }
-    
-    //
-    // To dampen oscillating outer temperature fluctuations
-    //
-    for(int s=0; s<num_species; s++)  {
-        //species[s].prim[num_cells].temperature   = species[s].prim[num_cells-1].temperature; // species[s].const_T_space;
-        //species[s].prim[num_cells+1].temperature = species[s].prim[num_cells-1].temperature; //species[s].const_T_space;
-    }
-    
-    for(int b=0; b<num_bands_out; b++)  {
-        //Jrad_FLD(num_cells, b)   = 0.9*Jrad_FLD(num_cells-1, b);
-        //Jrad_FLD(num_cells+1,b)  = 0.8*Jrad_FLD(num_cells-1, b);
-    }
-        //if (species[s].const_T_space > 0) {
-            
-        //}
-    
-    
-    /*T_rad_remnant = pow(pi * J_remnant / sigma_rad, 0.25);
-    T_target      = pow(pow(T_core,4.) + pow(T_rad_remnant,4.), 0.25);
-    T_surface     = T_target; //+ (T_surface - T_target)*std::exp(-dt/cooling_time);
-    
-    //Set planetary temperature (computed in update_opacities)
-    if(use_planetary_temperature == 1) {
-        for(int s=0; s<num_species; s++) {
-            species[s].prim[1].temperature = T_surface;
-            species[s].prim[0].temperature = T_surface;
-        }
-        for(int b=0; b<num_bands_out; b++) {
-            Jrad_FLD(1, b)            = sigma_rad * pow(T_surface,4.) * pow(R_core,2.) * compute_planck_function_integral3(l_i_out[b], l_i_out[b+1], T_surface) ;
-            Jrad_FLD(0, b)            = sigma_rad * pow(T_surface,4.) * pow(R_core,2.) * compute_planck_function_integral3(l_i_out[b], l_i_out[b+1], T_surface) ;
-        }
-        //cout<<"t ="<<globalTime<<" Jrad(0,b) = "<<Jrad_FLD(0, 0)<<" Tsurface = "<<T_surface<<" Tcore = "<<T_core<<" T_rad_remnant = "<<T_rad_remnant<<endl;
-    }*/
     
     if(debug >= 1) {
         
@@ -453,6 +408,7 @@ void c_Sim::update_fluxes_FLD() {
                 double rhokr   = max(2.*(total_opacity(j,b)*total_opacity(j+1,b))/(total_opacity(j,b) + total_opacity(j+1,b)), 4./3./dx );
                        rhokr   = min( 0.5*( total_opacity(j,b) + total_opacity(j+1,b)) , rhokr);
                        //rhokr   = ( 0.5*( total_opacity(j,b) + total_opacity(j+1,b)) );
+                       //rhokr = std::sqrt(total_opacity(j,b)*total_opacity(j+1,b));
 
                 double tau_inv = 1. / (dx * rhokr) ;
                 double R       = xi_rad * tau_inv * std::abs(Jrad_FLD(j+1,b) - Jrad_FLD(j,b)) / (Jrad_FLD(j, b) + 1e-300) ; // Put in 1.0 as prefactor to get correct rad shock
@@ -688,36 +644,42 @@ void c_Sim::update_fluxes_FLD() {
            auto smooth = [](double dT, double dT_ad) {
                 
                 double dTrel = (dT - dT_ad)/dT_ad;
-               
+                return (dT-dT_ad) *1e-20 * (-std::expm1(-dTrel*dTrel));//; (1.-std::exp(-dTrel*dTrel));
+                
                 if(dT - dT_ad > 0.)
                    return (dT-dT_ad) *0.01 * (1.-std::exp(-dTrel*dTrel));
                 else
                     return 0.;
-               
             } ;
         
            for (int j=2; j < num_cells-1; j++) {
                 for (int s=0; s < num_species; s++) {
                     
                     int idx      = j*stride   + (s + num_bands_out) * (num_vars+1) ;
-                    //int idx_r    = j*num_vars + (s + num_bands_out) ;
+                    int idx_r    = j*num_vars + (s + num_bands_out) ;
                     
                     double dx = (x_i12[j+1]-x_i12[j]) ;
-                    double rhoavg = (species[s].prim[j].density + species[s].prim[j+1].density) * 0.5;
-                    double Pavg   = (species[s].prim[j].pres + species[s].prim[j+1].pres) * 0.5;
-                    double Tavg   = (species[s].prim[j].temperature + species[s].prim[j+1].temperature) * 0.5;
+                    //double rhoavg = (species[s].prim[j].density + species[s].prim[j+1].density) * 0.5;
+                    double rhoavg = std::sqrt(species[s].prim[j].density * species[s].prim[j+1].density) ;
+                    //double Pavg   = (species[s].prim[j].pres + species[s].prim[j+1].pres) * 0.5;
+                    double Pavg   = std::sqrt(species[s].prim[j].pres * species[s].prim[j+1].pres);
+                    //double Tavg   = (species[s].prim[j].temperature + species[s].prim[j+1].temperature) * 0.5;
+                    double Tavg   = std::sqrt(species[s].prim[j].temperature * species[s].prim[j+1].temperature);
                     double dP     = (species[s].prim[j].pres - species[s].prim[j+1].pres)/Pavg;
-                    double dT     = (species[s].prim[j].temperature - species[s].prim[j+1].temperature)/Tavg / dP;
+                    
                     //double dTabs  = (species[s].prim[j].temperature - species[s].prim[j+1].temperature);
                     double glocal = -get_phi_grav(x_i[j], enclosed_mass[j])/x_i[j];
                     
+                    double dT     = (species[s].prim[j].temperature - species[s].prim[j+1].temperature)/Tavg / dP;
                     double nabla_ad = 1.-1./species[s].gamma_adiabat;
+                    
                     double lam = Pavg / (species[s].prim[j].pres - species[s].prim[j+1].pres);  // The mixing length
-                    double DT =  (dT > nabla_ad ? dT - nabla_ad : 0.); //smooth(dT, nabla_ad); //   // Gradient comparison and switch for Lconv
-                           DT = (dx * total_opacity(j,0)) > 2./3. ? DT : 0.; //Guardian to not use convection in optically thin areas
+                    double DT = smooth(dT, nabla_ad);//(dT > nabla_ad ? dT - nabla_ad : 0.); //smooth(dT, nabla_ad); //   // Gradient comparison and switch for Lconv
+                           DT = (dx * total_opacity(j,0)) > 2./3. ? DT : DT*(dx * total_opacity(j,0)); //Guardian to not use convection in optically thin areas
+                           DT = max(0.,DT);
                     //double DT = dT - nabla_ad;    // Gradient comparison and switch for Lconv
                     
-                    double alphaconv = 0.5 * species[s].cv * lam * lam * DT * rhoavg * std::sqrt(glocal/Tavg); //Prefactor
+                    double alphaconv = 0.5 * species[s].cv * lam * lam * std::sqrt(DT) * rhoavg * std::sqrt(glocal/Tavg); //Prefactor
                     
                     double Lconv = alphaconv;    //Convection
                     //double kappa_conductive = 23.e2 * pow(Tavg/273., 0.7); //From engineering toolbox and Watson 1981 
@@ -730,16 +692,13 @@ void c_Sim::update_fluxes_FLD() {
                     d[idx] += Lconv ;
                     d[idx+stride] += Lconv ;
                     l[idx+stride] += -Lconv ;
-                    //r[idx_r]      += Lconv * nabla_ad;
+                    //r[idx_r]      -= Lconv * nabla_ad;
                     
                     species[s].lconvect[j] = Lconv * dT;
                     
-                    if(false) {
+                    if(globalTime > 1e100) {
                     //if(dT > nabla_ad) {
-                        cout<<" step "<<steps<<" j = "<<j<<" DT = "<<DT<<" convective flux nonzero = "<<alphaconv<<endl;
-                        
-                        char a;
-                        cin>>a;
+                        cout<<" step "<<steps<<" j = "<<j<<"DT = "<<DT<<" dT = "<<dT<<" nabla= "<<nabla_ad<<" dt= "<<dT*dP<<" dTrel= "<<(dT - nabla_ad)/nabla_ad<<" convective flux nonzero = "<<alphaconv<<endl;
                     }
                         
                     if(globalTime > 1e16) {
@@ -752,6 +711,11 @@ void c_Sim::update_fluxes_FLD() {
                 }
             }
             
+            if(globalTime > 1e100) {
+                char a;
+                cin>>a;
+            }
+            
             // Convective boundaries
             //
             for (int j=0; j < num_ghosts; j++) {
@@ -759,7 +723,7 @@ void c_Sim::update_fluxes_FLD() {
                 for (int s=0; s < num_species; s++) {
                     int idx      = j*stride   + (s + num_bands_out) * (num_vars+1) ;
                     
-                    double Lconv = species[s].lconvect[2]*1.5;
+                    double Lconv = 0.*species[s].lconvect[2]*1.5;
                     
                     u[idx] += -Lconv ;
                     d[idx] += Lconv ;
