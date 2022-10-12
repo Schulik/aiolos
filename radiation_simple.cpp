@@ -467,6 +467,9 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
                 
                 if(tt < 0. && j > 0) {
                     cout<<" negative T after TiTj s = "<<species[si].speciesname<<" j/s = "<<j<<"/"<<si<<" eta1/eta2/J = "<<eta1[idx_s]<<"/"<<eta2[idx_s]<<"/"<<Jrad_FLD(j, 0)<<" denom/eta2*J = "<<denoms[idx_s]<<"/"<<eta2[idx_s]*Jrad_FLD(j,0)<<" t/dt/steps = "<<globalTime<<"/"<<ddt<<"/"<<steps<<endl;
+                    
+                    for(int ss=0; ss<num_species; ss++)
+                        cout<<" +heating/+cooling/-dGdT = "<<species[ss].dS(j)<<"/"<<species[ss].dG(j)<<"/"<<photocooling_multiplier * species[ss].dGdT(j)*species[si].prim[j].temperature<<" sum = "<<(species[ss].dS(j)+species[ss].dG(j)-photocooling_multiplier * species[ss].dGdT(j)*species[si].prim[j].temperature)/ species[ss].u[j].u1 / species[ss].cv<<endl;
                         //cout<<" negative T after TiTj in s = "<<species[si].speciesname<<" j/s = "<<j<<"/"<<si<<" t/dt/steps = "<<globalTime<<"/"<<ddt<<"/"<<steps<<endl;
                         //Tswitch = 1;
                 }
@@ -496,11 +499,7 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
                 //species[s].prim[num_cells+2].temperature = 0.9*species[s].prim[num_cells].temperature;
                 
             }
-            
         }
-        
-        
-        
     } else {
         
             

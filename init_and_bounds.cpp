@@ -158,15 +158,20 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
         use_collisional_heating = read_parameter_from_file<int>(filename,"PARI_USE_COLL_HEAT", debug, 1).value;
         use_drag_predictor_step = read_parameter_from_file<int>(filename, "PARI_SECONDORDER_DRAG", debug, 0).value;
         init_wind         = read_parameter_from_file<int>(filename,"PARI_INIT_WIND", debug, 0).value;
-        alpha_collision   = read_parameter_from_file<double>(filename,"PARI_ALPHA_COLL", debug, 1.).value;
+        alpha_collision        = read_parameter_from_file<double>(filename,"PARI_ALPHA_COLL", debug, 1.).value;
+        alpha_collision_ions   = read_parameter_from_file<double>(filename,"PARI_ALPHA_IONS", debug, 1.).value;
         max_mdot              = read_parameter_from_file<double>(filename,"MAX_MDOT", debug, -1.).value;
         init_sonic_radius = read_parameter_from_file<double>(filename,"INIT_SONIC_RADIUS", debug, -1e10).value;
         rad_energy_multiplier=read_parameter_from_file<double>(filename,"PARI_RAD_MULTIPL", debug, 1.).value;
         collision_model   = read_parameter_from_file<char>(filename,"PARI_COLL_MODEL", debug, 'P').value;
         opacity_model     = read_parameter_from_file<char>(filename,"PARI_OPACITY_MODEL", debug, 'C').value;
+        
+        cout<<" CHOSEN OPACITY MODEL = "<<opacity_model<<endl;
         if(opacity_model == 'M')
             init_malygin_opacities();
-        cout<<" CHOSEN OPACITY MODEL = "<<opacity_model<<endl;
+        if(opacity_model == 'K') {
+                cout<<" Hybrid opacities selected. NOTE! that the input file expects in this mode two file names to be given for each species, one *aiopa for kR and kP, and *opa for kS."<<endl;
+        }
         
         no_rad_trans               = read_parameter_from_file<double>(filename,"NO_RAD_TRANS", debug, 1.).value;
         solve_for_j                = read_parameter_from_file<int>(filename,"SOLVE_FOR_J", debug, 1).value;
@@ -199,7 +204,8 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
         intermediate_chemfloor_check = read_parameter_from_file<int>(filename,"INTERMEDIATE_CHEM_CHECK", debug, 0).value;
         chem_momentum_correction     = read_parameter_from_file<int>(filename,"CHEM_MOMENTUM_CORR", debug, 1).value;
         chem_ekin_correction         = read_parameter_from_file<int>(filename,"CHEM_EKIN_CORR", debug, 0).value;
-        
+        dt_skip_ichem                = read_parameter_from_file<int>(filename,"CHEM_DT_SKIP", debug, 1).value;
+        dt_skip_dchem = 0.; //<double>dt_skip_ichem;
         //cout<<" ION_HEATING_PRECISION set to "<<ion_heating_precision<<" heating+maxiters = "<<ion_heating_maxiter<<endl;
         //cout<<" ION_PRECISION set to "<<ion_precision<<" ion_maxiter = "<<ion_maxiter<<endl;
         
@@ -606,21 +612,24 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
         }
         cout<<endl;
         
-        for(int cnt=0; cnt<50; cnt++) {
-            //cout<<"Before update mass and pot"<<endl;
-            update_mass_and_pot();
-            
-            //cout<<"Before second run in update dens"<<endl;
-            for(int s = 0; s < num_species; s++) {
-                //species[s].update_kzz_and_gravpot(s); 
+        if(use_self_gravity) {
+            for(int cnt=0; cnt<50; cnt++) {
+                //cout<<"Before update mass and pot"<<endl;
+                update_mass_and_pot();
                 
-                for(int i=0; i<num_cells+2; i++) {
-                    species[s].phi_s[i] = phi[i];
+                //cout<<"Before second run in update dens"<<endl;
+                for(int s = 0; s < num_species; s++) {
+                    //species[s].update_kzz_and_gravpot(s); 
+                    
+                    for(int i=0; i<num_cells+2; i++) {
+                        species[s].phi_s[i] = phi[i];
+                    }
+                    
+                    species[s].initialize_hydrostatic_atmosphere(filename);
                 }
-                
-                species[s].initialize_hydrostatic_atmosphere(filename);
             }
         }
+        
       
         ///////////////////////////////////////////////////////////////////////// 
         /////////////////////////////////////////////////////////////////////////
@@ -1485,8 +1494,9 @@ void c_Species::initialize_hydrostatic_atmosphere(string filename) {
             
             //////////////////////////////////////////////////////////////////////////////////////
             //double floor = base->density_floor / mass_amu * std::pow(base->x_i12[i]/base->x_i12[1], -4.);
+            
             double floor = base->density_floor * std::pow(base->x_i12[i]/base->x_i12[1], -4.) * initial_fraction;
-            if( (temp_rhofinal < floor) || ( base->x_i12[i] > 0.5*base->rhill  && base->use_tides == 1       ) ) {
+            if( (temp_rhofinal < floor) || ( base->x_i12[i] > 0.5*base->rhill  && base->use_tides == 2       ) ) {
                 
                 if(temp_rhofinal < 0.)
                     negdens = 1;
@@ -1574,16 +1584,16 @@ void c_Species::initialize_hydrostatic_atmosphere(string filename) {
                 
                 if(base->x_i12[i]>1.0e10) {
                     
-                    double temprho = u[i].u1;
+                    //double temprho = u[i].u1;
                 
-                    u[i] = AOS(temprho, 0., cv * temprho * base->init_T_temp) ;
+                    //u[i] = AOS(temprho, 0., cv * temprho * base->init_T_temp) ;
                 }
                 
                 //prim[i].temperature = base->init_T_temp;
             }
         }
-        else
-            cout<<" In INIT: Did NOT overwrite T, because init_T_temp < 2.7= = "<<base->init_T_temp;
+        //else
+        //    cout<<" In INIT: Did NOT overwrite T, because init_T_temp < 2.7= = "<<base->init_T_temp;
     
     
     if(u[2].u1 > 1e40) {
@@ -1628,11 +1638,12 @@ void c_Species::initialize_hydrostatic_atmosphere(string filename) {
         cout<<"......... Ended hydrostatic construction for species "<<speciesname<<", last density was "<<u[num_cells+1].u1<<" while  density_excess="<<density_excess<<" r_b="<<bondi_radius<<endl<<endl;
     }
     else
-        cout<<"@@@ Ended hydrostatic construction for species "<<speciesname<<endl<<endl;
+        if(debug > 0)
+            cout<<"@@@ Ended hydrostatic construction for species "<<speciesname<<endl<<endl;
     
     //TODO:Give some measure if hydrostatic construction was also successful, and give warning if not (e.g. when resolution too low and floors were reached).
 
-    cout<<"End of hydrostat"<<endl;
+    //cout<<"End of hydrostat"<<endl;
 }
 
 void c_Species::initialize_exponential_atmosphere() {
@@ -1832,14 +1843,13 @@ void c_Species::apply_boundary_right(std::vector<AOS>& u) {
                 
                 double dphi = (base->phi[i]*K_zzf[i] - base->phi[i-1]*K_zzf[i-1]) / (base->dx[i-1] + base->dx[i]) ;
                 dphi       *= (base->omegaplus[i]*base->dx[i] + base->omegaminus[i-1]*base->dx[i-1]) ;
-                //prim.pres = prim.pres - prim.density * dphi ;    
-                prim.pres = prim.pres * 2.5;    
+                prim.pres = prim.pres - prim.density * dphi ;    
                 
                 //Older variant, should be more precise but has weird pressure slope
-                double dphi2 = (phi_s[i] - phi_s[i-1]) / (base->dx[i-1] + base->dx[i]) ;
-                dphi2 *= (prim.density * base->omegaplus[i]*base->dx[i] + this->prim[i].density * base->omegaminus[i-1]*base->dx[i-1]) ;
+                //double dphi2 = (phi_s[i] - phi_s[i-1]) / (base->dx[i-1] + base->dx[i]) ;
+                //dphi2 *= (prim.density * base->omegaplus[i]*base->dx[i] + this->prim[i].density * base->omegaminus[i-1]*base->dx[i-1]) ;
                 //prim.pres = prim.pres - dphi2 ; 
-       
+                
                 prim.pres = std::max( prim.pres, 1e-1*prim.pres) ; //TODO: Replace 1e-3 with an estimate for the max pressure jump in a adiabatic shock
                 //prim.pres = std::max( prim.pres, 0.0) ;          //27.10.2021: Not in use anymore, due to this causing problems with negative temperatures. p=0 -> E = 0 -> T = 0  and negative after a bit of hydro
                 

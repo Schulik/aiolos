@@ -249,18 +249,30 @@ void c_Sim::execute() {
             //debug = 2;
             
             update_opacities();
-            reset_dS();
+            if(photochemistry_level == 0 && use_rad_fluxes > 0)
+                reset_dS();
             
             // Compute high-energy dS and ionization
             if(photochemistry_level == 1) {
+                reset_dS();
                 do_photochemistry();
                 
             }
             else if(photochemistry_level == 2) {
-                if(steps > 2)
-                    do_chemistry();
+                if(steps > 2) {
+                    
+                    if(steps % dt_skip_ichem == 0) {
+                        dt_skip_dchem += dt;
+                        reset_dS();
+                        //cout<<" Running chemistry with dt/dt_chem/dt_skip/steps = "<<dt<<" / "<<dt_skip_dchem<<" / "<<dt_skip_ichem<<" / "<<steps<<endl;
+                        do_chemistry(dt_skip_dchem);
+                        dt_skip_dchem = 0.;
+                    } else {
+                        dt_skip_dchem += dt;
+                    }
+                }
+                    
             }
-                
             
             update_dS();               //Compute low-energy dS
             

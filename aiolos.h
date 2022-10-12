@@ -663,7 +663,10 @@ public:
     int chem_momentum_correction;
     int chem_ekin_correction;
     void init_reactions(int cdebug);
-    void do_chemistry();
+    void do_chemistry(double timestep);
+    
+       int dt_skip_ichem;
+    double dt_skip_dchem;
     
     Vector_t solver_cchem_implicit_general(double dt, int num_spec, int cdebug, const Vector_t& n_normalized, double ntot);
     int solver_cchem_implicit_specialized_cochem(double dt, int num_spec, int cdebug);
@@ -683,6 +686,7 @@ public:
     double init_sonic_radius;
     double T_increment;
     double alpha_collision;
+    double alpha_collision_ions;
     double dust_to_gas_ratio;
     
     ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

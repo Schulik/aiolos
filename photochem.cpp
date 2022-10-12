@@ -33,6 +33,8 @@ primordial intergalactic clouds*/
 
 // Atomic data for Hydrogen:
 double H_radiative_recombination(double T_e) {
+    //return 2.753e-14;
+    
     using std::pow;
     if (T_e < 220) T_e = 220.;
     
@@ -84,7 +86,7 @@ double HOnly_cooling(const std::array<double, 3> nX, double Te) {
         //term = 3.435e-30 * Te * pow(x, 1.970) / pow(1 + pow(x / 2.250, 0.376), 3.720);
         term = 3.435e-30 * Te * x*x / pow(1 + pow(x / 2.250, 0.376), 3.720);
     else 
-        term = 7.562-27 * std::pow(Te, 0.42872) ;
+        term = 7.562e-27 * std::pow(Te, 0.42872) ;
     cooling += 1.* nX[1] * term;
     
     // Collisional ionization cooling:
@@ -93,7 +95,7 @@ double HOnly_cooling(const std::array<double, 3> nX, double Te) {
 
     // HI Line cooling (Lyman alpha):
     //term = 7.5e-19 * exp(-0.75 * T_HI / Te) / (1 + sqrt(Te / 1e5));
-        term = 7.5e-19 * exp(-0.75 * T_HI / Te); //MC2009
+     term = 7.5e-19 * exp(-0.75 * T_HI / Te); //MC2009
     //term = 7.5e-19 * exp(-0.75 * T_HI / 3000.); //MC2009
     cooling += 1. * nX[0] * term;
 
@@ -550,7 +552,7 @@ void c_Sim::do_photochemistry() {
                 mom[2] = (mom[2] + dn_I*mom[0]*fe)/(nX_new[2]+dn_R) ;
 
                 // Compute the change in kinetic energy:
-                double dEk = 0.5*(mom[0]*mom[0]*nX_new[0] / mX[0] - mX[0]*nX[0]*vX[0]*vX[0] +
+                double dEk = 0.0*0.5*(mom[0]*mom[0]*nX_new[0] / mX[0] - mX[0]*nX[0]*vX[0]*vX[0] +
                                   mom[1]*mom[1]*nX_new[1] / mX[1] - mX[1]*nX[1]*vX[1]*vX[1] +
                                   mom[2]*mom[2]*nX_new[2] / mX[2] - mX[2]*nX[2]*vX[2]*vX[2]) ;
                 

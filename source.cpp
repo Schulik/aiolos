@@ -549,7 +549,7 @@ void c_Sim::compute_alpha_matrix(int j) { //Called in compute_friction() and com
                                 }
                             }
                             else { //i-i collision
-                                alpha_local = 1.27 * species[si].static_charge * species[si].static_charge * species[sj].static_charge * species[sj].static_charge * std::sqrt(mumass_amu) * amu/mass_vector(si);
+                                alpha_local = alpha_collision_ions * 1.27 * species[si].static_charge * species[si].static_charge * species[sj].static_charge * species[sj].static_charge * std::sqrt(mumass_amu) * amu/mass_vector(si);
                                 alpha_local *= numdens_vector(sj) / std::sqrt(meanT*meanT*meanT);
                                 
                                 ccase = " i-i ";
