@@ -427,9 +427,9 @@ int c_Species::read_species_data(string filename, int species_index) {
                 opacity_avg_solar(10) = 1e-10;
         }
         
-        for(int b = 0; b < num_bands_in; b++) opacity_avg_solar(b)      *=  base->const_opacity_solar_factor;
-        for(int b = 0; b < num_bands_out; b++) opacity_avg_planck(b)    *=  base->const_opacity_planck_factor;
-        for(int b = 0; b < num_bands_out; b++) opacity_avg_rosseland(b) *=  base->const_opacity_rosseland_factor;
+        //for(int b = 0; b < num_bands_in; b++) opacity_avg_solar(b)      *=  base->const_opacity_solar_factor;
+        //for(int b = 0; b < num_bands_out; b++) opacity_avg_planck(b)    *=  base->const_opacity_planck_factor;
+        //for(int b = 0; b < num_bands_out; b++) opacity_avg_rosseland(b) *=  base->const_opacity_rosseland_factor;
         
         //Done! Now debug plot stuff
         cout<<"Done reading in data for species = "<<species_index<<". Wavelength grids in/out = ";
@@ -452,9 +452,9 @@ int c_Species::read_species_data(string filename, int species_index) {
         
     }
      else {
-        for(int b = 0; b < num_bands_in; b++) opacity_avg_solar(b)      =  base->const_opacity_solar_factor * const_opacity;
-        for(int b = 0; b < num_bands_out; b++) opacity_avg_planck(b)    =  base->const_opacity_planck_factor * const_opacity;
-        for(int b = 0; b < num_bands_out; b++) opacity_avg_rosseland(b) =  base->const_opacity_rosseland_factor * const_opacity;
+        //for(int b = 0; b < num_bands_in; b++) opacity_avg_solar(b)      =  base->const_opacity_solar_factor * const_opacity;
+        //for(int b = 0; b < num_bands_out; b++) opacity_avg_planck(b)    =  base->const_opacity_planck_factor * const_opacity;
+        //for(int b = 0; b < num_bands_out; b++) opacity_avg_rosseland(b) =  base->const_opacity_rosseland_factor * const_opacity;
     }
     
     //else if(base->opacity_model == 'T' || base->opacity_model == 'K') { 
@@ -787,7 +787,7 @@ void c_Species::print_AOS_component_tofile(int timestepnumber) {
         
         //Print the domain
         base->enclosed_mass_tmp[0] = 0.;
-        for(int i = 1; i <= num_cells; i++) {
+        for(int i = 2; i <= num_cells; i++) {
             base->enclosed_mass_tmp[i] = base->enclosed_mass_tmp[i-1] +  4. * 3.141592 * (pow(base->x_i[i],3.)-pow(base->x_i[i-1],3.) )/3. * u[i].u1;
         }
         
@@ -868,7 +868,7 @@ void c_Sim::print_diagnostic_file(int outputnumber) {
                     Stot += S_band(i,b);
                 }
                 for(int b=0; b<num_bands_out; b++) {
-                    Jtot += Jrad_FLD(i,b)/c_light*4.*pi;
+                    Jtot += Jrad_FLD(i,b)/c_light*4.*pi;  //This actually outputs the energy density E_rad from c E_rad = 4pi J
                 }
                 outfileDiagnostic<<x_i12[i]<<'\t'<<Jtot<<'\t'<<Stot; //Rows 1 2 3
                 
@@ -942,10 +942,10 @@ void c_Sim::print_diagnostic_file(int outputnumber) {
                     
                     double rhokr   = max(2.*(total_opacity(i,b)*total_opacity(i+1,b))/(total_opacity(i,b) + total_opacity(i+1,b)), 4./3./dx );
                            rhokr   = min( 0.5*( total_opacity(i,b) + total_opacity(i+1,b)) , rhokr);
-                    double tau_inv = 0.5 / (dx * rhokr) ;
+                    double tau_inv = 1. / (dx * rhokr) ;
                 
                     //double tau_inv = 0.5 / (dx * (total_opacity(i,b) + total_opacity(i+1,b))) ;
-                    double R       = 2 * tau_inv * std::abs(Jrad_FLD(i+1,b) - Jrad_FLD(i,b)) / (Jrad_FLD(i+1,b) + Jrad_FLD(i, b) + 1e-300) ;
+                    double R       = xi_rad * tau_inv * std::abs(Jrad_FLD(i+1,b) - Jrad_FLD(i,b)) / (Jrad_FLD(i, b) + 1e-300) ;
                     double flux_limiter = 0;
                     if (R <= 2)
                         flux_limiter = 2 / (3 + std::sqrt(9 + 10*R*R)) ;

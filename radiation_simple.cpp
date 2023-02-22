@@ -19,21 +19,21 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
     if(debug > 1)
         cout<<"Starting update_fluxes_FLD_simple.."<<endl;
    
-    /*auto flux_limiter = [](double R) {
+    auto flux_limiter = [](double R) {
         if (R <= 2)
             return 2 / (3 + std::sqrt(9 + 10*R*R)) ;
         else 
             return 10 / (10*R + 9 + std::sqrt(81 + 180*R));
-    };*/
+    };
 //    auto flux_limiter = [](double R) {
 //          
 //          return (2.+ R) / (6. + 3*R + R*R) ;
 //      } ;
 //      
-      auto flux_limiter = [](double R) {
+  /*    auto flux_limiter = [](double R) {
  
              return 1. / (3. + R) ;
-     } ; 
+     } ; */ 
 //     
     int num_vars = num_bands_out; // + num_species
     int stride = num_vars * num_vars ;
@@ -91,8 +91,8 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
                     //dJ = - 2. / (x_i[j] * x_i[j]);
                 //}
                     
-                double R       = 1.*xi_rad * tau_inv *  dJ ; // Put in 1.0 as prefactor to get correct rad shock
-                double D       = 1.* 1. * tau_inv * surf[j] * flux_limiter(R);
+                double R       = 1.* xi_rad * tau_inv *  dJ ; // Put in 1.0 as prefactor to get correct rad shock
+                double D       = 1.* tau_inv * surf[j] * flux_limiter(R);
                 
                 arr_rhokr[j] = rhokr;
                 arr_R[j]        = R;

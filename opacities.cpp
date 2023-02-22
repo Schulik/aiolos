@@ -263,7 +263,6 @@ void c_Species::update_opacities() {
     }
     else if (base->opacity_model == 'T'){ //Tabulated opacities, assuming data comes in cm^2/particle, hence divide by particle mass
         
-            
             for(int j=0; j< num_cells+2; j++) {
                 
                 for(int b=0; b<num_bands_in; b++) {
@@ -385,7 +384,7 @@ double c_Sim::freedman_opacity(double P, double T, double _Z)
         }
         else {
             d[0] =  82.241 ;
-            d[1] = -55.546 ;
+            d[1] = -55.456 ;
             d[2] =  8.753389704734504 ;
             d[3] =  0.7048 ;
             d[4] = -0.0414 ;  
@@ -811,7 +810,7 @@ void c_Sim::kappa_landscape()
     double opa_planck_twotemp[arraysize];
   	double temperature[arraysize];
 	//double density[21]={1e-18,1e-17,1e-16,1e-15,1e-14,1e-13,1e-12,3e-12,6e-12,1e-11,1e-10,1e-9,1e-8,1e-7,1e-6,1e-5,1e-4,1e-1,1e-0};
-    double pressure[12]={0.1,1e0,1e1,1e2,1e3,1e4,1e5,1e6,1e7,1e8,1e9,1e18};
+    double pressure[12]={1e-3,1e-2,1e-1,1e0,1e1,1e2,1e3,1e4,1e5,1e6,1e7,1e18};
 	
 	printf("In kappa landscape.\n");
 	fflush (stdout);
@@ -837,8 +836,8 @@ void c_Sim::kappa_landscape()
             double d_actual = pressure[j] / (kb * temperature[i] * inv_mass);
             //printf("Doing temperature %e and density %e resulting in pressure/bars = %e \n",temperature[i],d_actual, pressure[j]/1e6);
             opa_planck_twotemp[i] = 1.;
-            opa_planck_semenov[i] = opacity_semenov_malygin(0, temperature[i], d_actual, pressure[j], 0);
-            opa_ross_semenov[i]   = opacity_semenov_malygin(1, temperature[i], d_actual, pressure[j], 0);
+            opa_planck_semenov[i] = freedman_opacity(pressure[j] , temperature[i], 0.); //opacity_semenov_malygin(0, temperature[i], d_actual, pressure[j], 0);
+            opa_ross_semenov[i]   = freedman_opacity(pressure[j] , temperature[i], 0.); //opacity_semenov_malygin(1, temperature[i], d_actual, pressure[j], 0);
             //printf("Semenov planck done \n");
 			//fflush (stdout);
   		}
@@ -851,7 +850,7 @@ void c_Sim::kappa_landscape()
   
   		printf ("Writing opacity landscape for press %e...\n", recentpress);
   		fflush (stdout);
-  		sprintf (name, "kappa_landscape2_%e.dat", recentpress);
+  		sprintf (name, "kappa_freedman_landscape2_%e.dat", recentpress);
   		//output = fopenp (name, "a");
         output = fopen (name, "a");
  		for(i = 0; i < arraysize; i++) {

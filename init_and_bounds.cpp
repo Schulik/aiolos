@@ -210,7 +210,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
         //cout<<" ION_PRECISION set to "<<ion_precision<<" ion_maxiter = "<<ion_maxiter<<endl;
         
         rad_solver_max_iter = read_parameter_from_file<int>(filename,"MAX_RAD_ITER", debug, 1).value;
-        xi_rad              = read_parameter_from_file<double>(filename,"XI_RAD", debug, 1.).value; 
+        xi_rad              = read_parameter_from_file<double>(filename,"XI_RAD", debug, 2.).value; 
         bond_albedo       = read_parameter_from_file<double>(filename,"BOND_ALBEDO", debug, 0.).value; 
         planet_semimajor= read_parameter_from_file<double>(filename,"PARI_PLANET_DIST", debug, 1.).value; //in AU
         

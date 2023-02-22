@@ -106,18 +106,17 @@ void c_Sim::update_dS_jb(int j, int b) {
                         double dtau_tot = -(radial_optical_depth_twotemp(j+1,b) - radial_optical_depth_twotemp(j,b));
                         double dS_he_temp = dS_band(j,b);
                         
-                        if(const_opacity_solar_factor * dtau_tot > 1e-3)
-                            dS_band(j,b) *= (-expm1(-const_opacity_solar_factor * dtau_tot));
+                        if(dtau_tot > 1e-3)
+                            dS_band(j,b) *= (-expm1(-dtau_tot));
                         else
-                            dS_band(j,b) *= (-fastexpm1_2(-const_opacity_solar_factor * dtau_tot));
+                            dS_band(j,b) *= (-fastexpm1_2(- dtau_tot));
                             //dS_band(j,b) *= (-expm1(-const_opacity_solar_factor * dtau_tot));
                             
-                        if(const_opacity_solar_factor * cell_optical_depth_highenergy(j,b) > 1e-3)
-                            dS_he_temp *=  -expm1(-const_opacity_solar_factor * cell_optical_depth_highenergy(j,b)) ;
+                        if( cell_optical_depth_highenergy(j,b) > 1e-3)
+                            dS_he_temp *=  -expm1(-cell_optical_depth_highenergy(j,b)) ;
                         else 
-                            dS_he_temp *=  -fastexpm1_2(-const_opacity_solar_factor * cell_optical_depth_highenergy(j,b)) ;
+                            dS_he_temp *=  -fastexpm1_2(-cell_optical_depth_highenergy(j,b)) ;
                             //dS_he_temp *=  -expm1(-const_opacity_solar_factor * cell_optical_depth_highenergy(j,b)) ;
-                        
                         
                         //cout<<" j/b = "<<j<<"/"<<b<<" dS_band(j,b) "<<dS_band(j,b)<<" dS_he_temp "<<dS_he_temp<<endl;
                         dS_band(j,b) -= dS_he_temp;
@@ -147,11 +146,13 @@ void c_Sim::update_dS_jb(int j, int b) {
                     //
                     if(use_planetary_temperature == 1){
                         //double lum = 1./xi_rad * sigma_rad * T_core*T_core*T_core*T_core;
-                        double lum = 0.5 * sigma_rad * T_core*T_core*T_core*T_core;
+                        double lum = 1.0 * sigma_rad * T_core*T_core*T_core*T_core * 0.5;
                         //Spread the luminosity for fewer crashes
-                        dS_band(2,b) += 3./6. * lum / (dx[2]); 
-                        dS_band(3,b) += 2./6. * lum / (dx[3]); 
-                        dS_band(4,b) += 1./6. * lum / (dx[4]); 
+                        //dS_band(2,b) += 3./6. * lum / (dx[2]); 
+                        //dS_band(3,b) += 2./6. * lum / (dx[3]); 
+                        //dS_band(4,b) += 1./6. * lum / (dx[4]); 
+                        
+                        dS_band(20,b) += lum * surf[20]/ (vol[20]); 
                     }
                     
                 }// Irregular dS computation, in case we want to fix the solar heating function to its initial value
@@ -375,14 +376,14 @@ void c_Sim::update_fluxes_FLD() {
      auto flux_limiter = [](double R) {
          
          return (2.+ R) / (6. + 3*R + R*R) ;
-     } ;
-    */
+     } ;*/
+    
      /*
      auto flux_limiter = [](double R) {
          
          return 1. / (3.+ R) ;
-     } ;
-     */
+     } ;*/
+     
     int num_vars = num_bands_out + num_species;
     int stride = num_vars * num_vars ;
     int size_r = (num_cells + 2) * num_vars ;
@@ -405,10 +406,13 @@ void c_Sim::update_fluxes_FLD() {
             // Flux across right boundary
             if (j > 0 && j < num_cells + 1) {
                 double dx      = (x_i12[j+1]-x_i12[j]) ;                
-                double rhokr   = max(2.*(total_opacity(j,b)*total_opacity(j+1,b))/(total_opacity(j,b) + total_opacity(j+1,b)), 4./3./dx );
-                       rhokr   = min( 0.5*( total_opacity(j,b) + total_opacity(j+1,b)) , rhokr);
-                       //rhokr   = ( 0.5*( total_opacity(j,b) + total_opacity(j+1,b)) );
-                       //rhokr = std::sqrt(total_opacity(j,b)*total_opacity(j+1,b));
+                //double rhokr   = max(2.*(total_opacity(j,b)*total_opacity(j+1,b))/(total_opacity(j,b) + total_opacity(j+1,b)), 4./3./dx ); //From Ramsey Dullemond 2015
+                //double rhokr   = min( 0.5*( total_opacity(j,b) + total_opacity(j+1,b)) , rhokr);
+                //double dxl = x_i[j]-x_i12[j];
+                //double dxr = x_i12[j+1] - x_i[j];
+                //double rhokr   = ( total_opacity(j,b) * dxl  + total_opacity(j+1,b) * dxr)/(dxl + dxr);
+                //double rhokr     = total_opacity(j,b);
+                double rhokr = std::sqrt(total_opacity(j,b)*total_opacity(j+1,b));
 
                 double tau_inv = 1. / (dx * rhokr) ;
                 double R       = xi_rad * tau_inv * std::abs(Jrad_FLD(j+1,b) - Jrad_FLD(j,b)) / (Jrad_FLD(j, b) + 1e-300) ; // Put in 1.0 as prefactor to get correct rad shock

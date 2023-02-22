@@ -64,7 +64,9 @@ void c_Sim::execute() {
 //     init_malygin_opacities();
 //     cout<<" pressure_manual = "<<species[0].prim[3].density * species[0].prim[3].temperature * kb / (40.*amu)<<" pressure_true = "<<species[0].prim[3].pres <<endl;
 //     cout<<endl;
-//    kappa_landscape();
+    //kappa_landscape();
+    //char a;
+    //cin>>a;
 //     cout<<" test planck opacity = "<<opacity_semenov_malygin(0,    species[0].prim[3].temperature, species[0].prim[3].density, species[0].prim[3].pres);
 //     cout<<" test rosseland opacity = "<<opacity_semenov_malygin(1, species[0].prim[3].temperature, species[0].prim[3].density, species[0].prim[3].pres);
 //     
