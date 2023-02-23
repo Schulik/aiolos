@@ -70,8 +70,11 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
         d_other          = read_parameter_from_file<double>(filename,"D_OTHER", debug, 1.).value;
         
         T_int            = read_parameter_from_file<double>(filename,"PARI_TINT", debug, 0.).value;
+        // old notation.
+        if (T_int = 0)   = read_parameter_from_file<double>(filename,"PARI_TPLANET", debug, 0.).value;
+
         use_planetary_temperature = read_parameter_from_file<int>(filename,"USE_PLANET_TEMPERATURE", debug, 0).value;
-        core_cv          = read_parameter_from_file<double>(filename,"PARI_CORE_CV", debug, 1.e8).value;
+        core_cv          = read_parameter_from_file<double>(filename,"PARI_CORE_CV", debug, 0).value;
         T_planet         = read_parameter_from_file<double>(filename,"PARI_TPLANET_INIT", debug, 0).value;
         
         radiation_matter_equilibrium_test = read_parameter_from_file<int>(filename,"RAD_MATTER_EQUI_TEST", debug, 0).value;
