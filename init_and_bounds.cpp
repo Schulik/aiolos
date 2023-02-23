@@ -71,7 +71,8 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
         
         T_int            = read_parameter_from_file<double>(filename,"PARI_TINT", debug, 0.).value;
         // old notation.
-        if (T_int = 0)   = read_parameter_from_file<double>(filename,"PARI_TPLANET", debug, 0.).value;
+        if (T_int==0) 
+            T_int        = read_parameter_from_file<double>(filename,"PARI_TPLANET", debug, 0.).value;
 
         use_planetary_temperature = read_parameter_from_file<int>(filename,"USE_PLANET_TEMPERATURE", debug, 0).value;
         core_cv          = read_parameter_from_file<double>(filename,"PARI_CORE_CV", debug, 0).value;
