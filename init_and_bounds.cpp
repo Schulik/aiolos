@@ -1013,7 +1013,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
         // Set initial gradient for stability: FLD apparently doesn't like to be initialized in thermal equilibrium in the optically thin regions
         //
         if(j>10)
-            Jrad_FLD(j,0) = Jrad_FLD(10,0) / (x_i12[j]*x_i12[j]);  
+           Jrad_FLD(j,0) = Jrad_FLD(10,0) *  (x_i12[10]*x_i12[10]) / (x_i12[j]*x_i12[j]);  
     }
     cout<<"photochem level = "<<photochemistry_level<<endl;
     n_init = np_zeros(num_species);
