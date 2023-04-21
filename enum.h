@@ -1,3 +1,9 @@
+/**
+ * enum.h
+ * 
+ * This file contains declarations of enumerations and operators on them.
+ */
+
 #ifndef _AIOLOS_ENUM_H_
 #define _AIOLOS_ENUM_H_
 
@@ -17,13 +23,20 @@
         return os ; \
     }
 
+/* Class encapsulating geometry information. 
+ * 
+ * Names and usage self-explanatory. Influence this has on the code is the volume and cell surface computations in init_and_bounds.cpp, and the way differentials are implemented in various files.
+ */
 enum class Geometry {
     cartesian = 0, cylindrical = 1, spherical = 2
 } ;
 IOS_INPUT(Geometry);
 IOS_OUTPUT(Geometry);
 
-
+/* Class encapsulating boundary information
+ * 
+ * Names self-explanatory, implementation can be found at the end of init_and_bounds.cpp
+ */
 enum class BoundaryType {
     user = 0, open = 1, reflecting = 2, fixed = 3, periodic = 4, giantplanet = 5
 } ;

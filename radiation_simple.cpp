@@ -46,9 +46,10 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
      std::vector<double> arr_rhokr(size_r, 0.), arr_R(size_r, 0.), arr_D(size_r, 0.), arr_JDJ(size_r, 0.);
      std::vector<double> exchange_d_sums(num_cells+2, 0.), exchange_r_sums(num_cells+2, 0.);
     
+    int numcells_offset = 1; //Nominally 1
     // Step 1: setup transport terms (J)
     for(int b=0; b<num_bands_out; b++) {
-        for (int j=0; j < num_cells+1; j++) {
+        for (int j=0; j < num_cells + numcells_offset; j++) {
             int idx = j*stride + b*(num_vars + 1) ;
             int idx_r = j*num_vars + b ;
 
@@ -57,7 +58,7 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
             r[idx_r] += (vol[j] / (c_light * ddt)) * Jrad_FLD(j, b) ;
 
             // Flux across right boundary
-            if (j > 0 && j < num_cells + 1) {
+            if (j > 0 && j < num_cells + numcells_offset) {
                 double dx      = (x_i12[j+1]-x_i12[j]) ;                
                 double rhokr   = 0;
                 
@@ -233,7 +234,7 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
     
     if(radiation_matter_equilibrium_test <= 2) { //radtests 3 and 4 are delta-radiation peaks without energy-matter coupling
         
-        for (int j=0; j < num_cells+1; j++) {
+        for (int j=0; j < num_cells+numcells_offset; j++) {
             
             double exchange_d_sum = 0.;
             double exchange_r_sum = 0.;
@@ -363,7 +364,7 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
     if( globalTime > 1e15)
         Jswitch = 1;
     
-    for (int j=0; j <= num_cells+1; j++) {
+    for (int j=0; j <= num_cells+numcells_offset; j++) {
         for(int b=0; b<num_bands_out; b++) {
             if(solve_for_j)
                 Jrad_FLD(j, b) = r[j*num_vars + b] ;
@@ -412,7 +413,7 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
         //compute_collisional_heat_exchange();
         
     
-        for (int j=0; j < num_cells+1; j++){
+        for (int j=0; j < num_cells+numcells_offset; j++){
             
             Matrix_t coll_heat_matrix   = Matrix_t::Zero(num_species, num_species);
             Vector_t coll_heat_b        = Vector_t::Zero(num_species);
@@ -503,11 +504,14 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
     } else {
         
             
-        for (int j=0; j < num_cells+1; j++){
+        for (int j=0; j < num_cells + numcells_offset; j++){
             for(int s=0; s<num_species; s++) {
                 
                 int idx_s = j * (num_species) + s;
                 double tt = eta1[idx_s]/denoms[idx_s] + eta2[idx_s]/denoms[idx_s]*Jrad_FLD(j, 0);
+                
+                if( j>num_cells-10 && steps>10e99)
+                    cout<<"t = "<<steps<<" j ="<<j<<" T = "<<tt<<" num_cells = "<<num_cells<<endl;
                 
                 //if(j==140)
                 //    cout<<"t = "<<steps<<" T = "<<tt<<endl;
@@ -529,6 +533,16 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
                 //if(j==num_cells)
                 //    cout<<" num_cells = "<<num_cells<<" temp = "<<species[s].prim[j].temperature<<endl;
             }
+        }
+        
+        //Bugfix
+        for(int s=0; s<num_species; s++) {
+            //species[s].prim[num_cells-1].temperature = species[s].prim[num_cells-2].temperature;
+        }
+        
+        if( steps>10e99) {
+            char a;
+            cin>>a;
         }
         
         for(int s=0; s<num_species; s++) {
@@ -565,7 +579,7 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
         //double Tavg;
         //double Tdiff;
         
-        for (int j=0; j < num_cells+1; j++){
+        for (int j=0; j < num_cells+numcells_offset; j++){
             for(int s=0; s<num_species; s++) {
                 
                 double dx = (x_i12[j+1]-x_i12[j]) ;

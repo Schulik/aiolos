@@ -1,22 +1,21 @@
-///////////////////////////////////////////////////////////
-//
-//
-//  eos.cpp
-//
-// This file contains routines implementing different equations of state.
-//
-//
-//
-///////////////////////////////////////////////////////////
-
+/**
+ * eos.cpp
+ * 
+ * This file contains routines implementing different equations of state.
+ */
 #include <cmath>
 
 #include "aiolos.h"
 #include "eos.h"
 
-/////
-///// Adiabatic Equation of state
-/////
+
+/**
+ * Adiabatic Equation of state, takes conservatives, computes primitives
+ * 
+ * @param[in] cons pointer to an external conserved variable object
+ * @param[out] prim pointer to an external primitive variable object
+ * @param[in] num_cells number of cells on which to iterate on both the in&out object
+ */
 void IdealGas_EOS::compute_primitive(const AOS* cons, AOS_prim* prim, int num_cells) const {
     for (int i=0; i < num_cells; i++) {
         prim[i].density        = cons[i].u1;
@@ -29,6 +28,13 @@ void IdealGas_EOS::compute_primitive(const AOS* cons, AOS_prim* prim, int num_ce
     
 }
 
+/**
+ * Adiabatic Equation of state, takes primitives, computes conserved
+ * 
+ * @param[out] cons pointer to an external conserved variable object
+ * @param[in] prim pointer to an external primitive variable object
+ * @param[in] num_cells number of cells on which to iterate on both the in&out object
+ */
 void IdealGas_EOS::compute_conserved(const AOS_prim* prim, AOS* cons, int num_cells) const {
     for (int i=0; i < num_cells; i++) {
         cons[i].u1 = prim[i].density;
@@ -40,6 +46,12 @@ void IdealGas_EOS::compute_conserved(const AOS_prim* prim, AOS* cons, int num_ce
     }
 }
 
+/**
+ * Adiabatic Equation of state, takes primitives, computes auxiliaries on those same primitives and writes them into the same objects
+ * 
+ * @param[in] cons pointer to an external conserved variable object
+ * @param[in] num_cells number of cells on which to iterate on both the in&out object
+ */
 void IdealGas_EOS::compute_auxillary(AOS_prim* prim, int num_cells) const {
     for (int i=0; i < num_cells; i++) {
         prim[i].number_density  = prim[i].density / _mass ;
@@ -52,49 +64,49 @@ void IdealGas_EOS::compute_auxillary(AOS_prim* prim, int num_cells) const {
     }
 }
 
-void update_cons_prim_after_friction(AOS* cons, AOS_prim* prim, double dEkin, double newv, double mass, double gamma, double cv) {
-    double temp_u3 = cons->u3;
-    
-    cons->u3 += dEkin;
-    cons->u2 = newv*mass;
-    
-    prim->speed           = newv;
-    prim->pres            = (gamma-1) *(cons->u3 - 0.5*cons->u2*newv);
-    prim->internal_energy = prim->pres/(prim->density*(gamma-1)) ;
-    prim->sound_speed     = std::sqrt(gamma*(gamma-1)*prim->internal_energy) ;
-    prim->temperature     = prim->internal_energy / cv ;
-    
-    if(prim->pres<0) {
-        char a;
-        
-        cout<<"        Negative pressure in update_after_friction! initial u3 = "<<temp_u3<<" du3 = "<<dEkin<<endl;
-        cout<<"        -0.5*u2*speed = "<<(0.5*cons->u2*newv)<<endl;
-        cout<<"        newv = "<<newv<<" u1 = "<<cons->u1<<endl; 
-        cin>>a;
-        
-    }
-        
-    
-}
 
+/**
+ * Adiabatic Equation of state, assumes the internal energy has changed and updates pressure in the same object to be consistent
+ * 
+ * @param[in] cons pointer to an external primitive variable object which to update
+ * @param[in] num_cells number of cells on which to iterate on both the in&out object
+ */
 void IdealGas_EOS::update_p_from_eint(AOS_prim* prim, int num_cells) const {
     for (int i=0; i < num_cells; i++) {
         prim[i].pres = prim[i].internal_energy * prim[i].density * _gamma_m1;
     }
 }
 
+/**
+ * Adiabatic Equation of state, assumes the temperature has changed and updates internal energy in the same object to be consistent
+ * 
+ * @param[in] cons pointer to an external primitive variable object which to update
+ * @param[in] num_cells number of cells on which to iterate on both the in&out object
+ */
 void IdealGas_EOS::update_eint_from_T(AOS_prim* prim, int num_cells) const {
     for (int i=0; i < num_cells; i++) {
         prim[i].internal_energy = prim[i].temperature * _cv;
     }
 }
 
-
+/**
+ * Adiabatic Equation of state, compute pressure over rho using the equation of state-appropriate function of T (assuming there is no further dependency on rho in this EOS)
+ * 
+ * @param[in] temperature pointer to an external temperature object. Single value, arrays won't work.
+ * @param[out] returnval pointer to external resulting p/rho
+ */
 void IdealGas_EOS::get_p_over_rho_analytic(const double* temperature, double* returnval) const {
     
     *returnval = *temperature * _gamma_m1 * _cv ;
 }
 
+/**
+ * Adiabatic Equation of state, compute pressure using the equation of state-appropriate function of T and rho
+ * 
+ * @param[in] density pointer to an external density object. Single value, arrays won't work.
+ * @param[in] temperature pointer to an external temperature object. Single value, arrays won't work.
+ * @param[out] pressure pointer to external resulting p
+ */
 void IdealGas_EOS::get_p_from_rhoT(const double* density,const double* temperature, double* pressure) const {
     
     *pressure = *density * *temperature *  _gamma_m1 * _cv;

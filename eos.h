@@ -1,4 +1,9 @@
-
+/**
+ * eos.h
+ * 
+ * Declarations on the equation of state. Assumes a global equation of state. 
+ * Spatially changing EOS, or adiabatic EOS with spatially varying adiabatic index would require modifications.
+ */
 #ifndef _AIOLOS_EOS_H_
 #define _AIOLOS_EOS_H_
 

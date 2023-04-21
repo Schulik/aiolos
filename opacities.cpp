@@ -25,21 +25,10 @@
        __typeof__ (b) _b = (b); \
      _a < _b ? _a : _b; })
 
-   
-//float __int_as_float (int32_t a) { float r; memcpy (&r, &a, sizeof r); return r;}
-//int32_t __float_as_int (float a) { int32_t r; memcpy (&r, &a, sizeof r); return r;}
 
-/* natural log on [0x1.f7a5ecp-127, 0x1.fffffep127]. Maximum relative error 9.4529e-5 */
-//float my_faster_logf (float a)
-//float njuffas_logf (float a)
-
-
-
-
-//float njuffas_log10f(float a) 
-
-
-
+/**
+ * Linear interpolation
+ */
 double lint(double xa, int N, double* X, double* RI) {
     int i2=0, i1=0, i;
     if(xa < X[0])
@@ -58,6 +47,9 @@ double lint(double xa, int N, double* X, double* RI) {
     return (RI[i2] - RI[i1]) / (X[i2] - X[i1]) * (xa - X[i1]) + RI[i1];
 }
 
+/**
+ * Loglinear interpolation
+ */
 double logint(double xa, int N, double* X, double* RI) {
     int i2=0, i1=0, i;
     if(xa < X[0])
@@ -76,16 +68,9 @@ double logint(double xa, int N, double* X, double* RI) {
     return std::pow(10, (std::log10(RI[i2]) - std::log10(RI[i1])) / (std::log10(X[i2]) - std::log10(X[i1])) * (std::log10(xa) - std::log10(X[i1])) + std::log10(RI[i1]) );
 }
 
-///////////////////////////////////////////////////////////
-//
-//
-//
-// update_opacities(): The central source for all opacity information, for all in/out and high-energy bands
-//                     Values for opacity_avg_solar, opacity_avg_planck, opacity_avg_rosseland are read from file and initialized in io.cpp, c_Species::read_species_data(..    )
-//                     Values for optical depths are computed in update_dS(), after photochemistry, as this potentially changes densities
-//
-//
-///////////////////////////////////////////////////////////
+/**
+ * Wrapper for individual species opacity updates
+ */
 void c_Sim::update_opacities() {
  
     if(debug > 1)
@@ -98,6 +83,21 @@ void c_Sim::update_opacities() {
         species[s].update_opacities(); //now to be found in opacities.cpp
 }
 
+/**
+ * The central source for all opacity information, for all in/out and high-energy bands
+ * Values for opacity_avg_solar, opacity_avg_planck, opacity_avg_rosseland are read from file and initialized in io.cpp, c_Species::read_species_data(..    )
+ * Values for optical depths are computed in update_dS(), after photochemistry, as this potentially changes densities
+ * 
+ * Opacity models currently implemented, encoded via their corresponding chars:
+ * U: User defined opacity. Go into user_opacity() and specify your custom algorithm.
+ * C: Constant opacities. Modifiers for solar, planck and rosseland opas exist individually.
+ * P: 'Physical': Constant with simple pressure-dependent powerlaw above 0.1 bars
+ * F: Freedman model. Only the fit for Rosseland opacities is currently included.
+ * M: Malygin2014 (Planck Rosseland Gas opa)/Semenov2003 (Planck Rosseland Dust opa) combined opacities. Solar opas taken from *opa files.
+ * D: Dust only model, given a certain dust size.
+ * T: Tabulated opacities. Takes p-T dependent solar, planck and rosseland data from *aiopa files.
+ * K: 'Kombined' opacities. Planck and Rosseland is p-T dependent from *aiopa data and solar are p-T-constant, but spectrally resolved from *opa files.
+ */
 void c_Species::update_opacities() {
 
     if (base->opacity_model == 'U') {
@@ -112,16 +112,15 @@ void c_Species::update_opacities() {
             for(int j=0; j< num_cells+2; j++) {
                 
                 for(int b=0; b<num_bands_in; b++) {
-                    opacity_twotemp(j,b) = base->const_opacity_solar_factor * opacity_avg_solar(b); // * (1. + pressure_broadening_factor * pow(prim[j].pres/1e5, pressure_broadening_exponent)); 
+                    opacity_twotemp(j,b) = base->const_opacity_solar_factor * opacity_avg_solar(b) * (1. + pressure_broadening_factor * pow(prim[j].pres/1e5, pressure_broadening_exponent)); 
                     //cout<<base->l_i_in[b]<<"   "<<opacity_avg_solar(b)<<endl;
                 }
                 for(int b=0; b<num_bands_out; b++) {
-                    opacity(j,b)         = base->const_opacity_rosseland_factor * opacity_avg_rosseland(b);// * (1. + pressure_broadening_factor * pow(prim[j].pres/1e5, pressure_broadening_exponent)); 
-                    opacity_planck(j,b)  = base->const_opacity_planck_factor * opacity_avg_planck(b);// * (1. + pressure_broadening_factor * pow(prim[j].pres/1e5, pressure_broadening_exponent)); 
+                    opacity(j,b)         = base->const_opacity_rosseland_factor * opacity_avg_rosseland(b) * (1. + pressure_broadening_factor * pow(prim[j].pres/1e5, pressure_broadening_exponent)); 
+                    opacity_planck(j,b)  = base->const_opacity_planck_factor * opacity_avg_planck(b) * (1. + pressure_broadening_factor * pow(prim[j].pres/1e5, pressure_broadening_exponent)); 
                 }
             }
-        }
-        else { //is_dust_like
+        } else { //is_dust_like
             
             for(int j=0; j< num_cells+2; j++) {
                 
@@ -365,8 +364,14 @@ void c_Species::update_opacities() {
 }
 
 
-
-
+/**
+ * P-T-z dependent opacity fit from Freedman2014.
+ * 
+ * @param[in] P pressure in dyne/cm^2 i.e. 1e6 dyne/cm^2 = 1 bar
+ * @param[in] T temperature in K
+ * @param[in] Z metallicity in log(Fe/Fe_solar), i.e. Z=0 is solar
+ * @return Rosseland gas opacity (i.e. dust-free) in cm^2/g
+ */
 double c_Sim::freedman_opacity(double P, double T, double _Z) 
 {
         /* Setup the coefficients */
@@ -405,13 +410,13 @@ double c_Sim::freedman_opacity(double P, double T, double _Z)
 }
 
 
-//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-//This is essentially just a copy-paste of the ReadfromFile function, specialized for the needs of our opacity data
-// * It allocates the small double 5x6 arrays for Semenov Dust
-// * the double 126x100 for the Malygin Gas opacities
-// * And returns a pointer to the allocated memory on the local RAM
-//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
+/**
+ * Initializes the combined Semenov03/Malygin14 opacities from my phd
+ * 
+ * allocates the small double 5x6 arrays for Semenov Dust
+ * the double 126x100 for the Malygin Gas opacities
+ * And sets the pointers to the allocated memory on the local RAM
+ */
 void c_Sim::init_malygin_opacities()
 {
     int c, err=0;
@@ -473,10 +478,15 @@ void c_Sim::init_malygin_opacities()
 }
 
 
-//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-//This function uses the data for *opa_gas_tscale, *opa_gas_pscale, *opa_gas_ross, *opa_gas_planck
-// and interpolates them bilinearly on the given grid
-
+/**
+ * Gas opacities from Malygin+2014 tables
+ * This function uses the data for *opa_gas_tscale, *opa_gas_pscale, *opa_gas_ross, *opa_gas_planck and interpolates them bilinearly on the given grid
+ * 
+ * @param[in] rosseland 0 or 1, if 0 returns planck mean instead of rosseland mean
+ * @param[in] T_gas gas temperature in K
+ * @param[in] pressure gas pressure in dyne/cm^2
+ * @return Gas rosseland or planck mean in cm^2/g
+ */
 double c_Sim::get_gas_malygin(int rosseland, double T_gas, double pressure) {
 	
   	double tP, tT, denom, tempKappa;	//tempPressure and denominator
@@ -576,6 +586,19 @@ double c_Sim::get_gas_malygin(int rosseland, double T_gas, double pressure) {
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+
+/**
+ * Dust opacities from the Semenov+2003 mix. Calls routine to add the gas opacites from Malygin+2014 tables.
+ * This function uses the data for *opa_gas_tscale, *opa_gas_pscale, *opa_gas_ross, *opa_gas_planck and interpolates them bilinearly on the given grid
+ * 
+ * @param[in] rosseland 0 or 1, if 0 returns planck mean instead of rosseland mean
+ * @param[in] temperature gas temperature in K
+ * @param[in] rho gas density (assuming it dominates the gas/dust mixture) in g/cm^3
+ * @param[in] pressure gas pressure in dyne/cm^2
+ * @param[in] caller_is_dust if 1, gas opacity is ignored
+ * @return Combined rosseland or planck mean in cm^2/g
+ */
 double c_Sim::opacity_semenov_malygin(int rosseland, double temperature, double rho, double pressure, int caller_is_dust) 
 {
 	//The Malygin gas-opacities live as data on a grid, thus we create a grid
@@ -631,9 +654,7 @@ double c_Sim::opacity_semenov_malygin(int rosseland, double temperature, double 
         pressure = pressure * 1e-4/rho;
         rho      = 1e-4;
     }
-        
     
-
 //          printf("Initial conditions in Semenov %e %e \n", temperature, rho);
 		
       // Initialization of the output parameters:
@@ -648,16 +669,11 @@ double c_Sim::opacity_semenov_malygin(int rosseland, double temperature, double 
       //Choose what we want
     if(rosseland) 
         eD = opa_ross[0];
-            //eD = &opa_ross[0];
     else
         eD = opa_planck[0];
       
-		
-    // 		printf("After initials \n");
-    // 		fflush (stdout);
     //.............................................................................
     // Interpolation of a matrix of evaporation temperatures for a given density
-    // 'rho_in':
     //.............................................................................
       for(i = 0; i < 4 ; i++) {
          for(j = 0; j < 8 ; j++) {
@@ -666,11 +682,6 @@ double c_Sim::opacity_semenov_malygin(int rosseland, double temperature, double 
          T_ev[i] = lint(rho, 7, &ro[0], &temp[0]); //Binterpolation
       }
       
-    //        printf("Evaporation temperatures: %e %e %e %e \n", T_ev[0], T_ev[1], T_ev[2], T_ev[3]);
-    // 		 fflush (stdout);
-    //       
-    //       printf("in elin: %d %d", temp[0], temp[7]);
-
     //.............................................................................
     //  Set up the evaporation temperature array 'T(1:5)':
     //.............................................................................    
@@ -756,7 +767,7 @@ double c_Sim::opacity_semenov_malygin(int rosseland, double temperature, double 
         else {
             kappa_gas  = get_gas_malygin(rosseland, 700., pressure) * pow(temperature/700., 5.);
     
-     // double F = (log T - log T_L) / (log T_U - log T_L);       
+     // double F = (log T - log T_L) / (log T_U - log T_L);       //Volume mixing rule
      // double S = (1-cos(F*pi))/2.;
      // double kappa = S log kappa_U(R,T) - (1-S) log kappa_L(R,T)
             
@@ -772,8 +783,8 @@ double c_Sim::opacity_semenov_malygin(int rosseland, double temperature, double 
     }
     
     //
-    // For now I have switched off the dust opacities as their instantaneous evaporation leads to large oscillations in the opacities.
-    // Those didn't influence the temperatures very much, but its ugly and might lead to trouble in the outflow
+    // I have switched off the dust opacities as their instantaneous evaporation leads to large oscillations in the opacities.
+    // Those didn't influence the temperatures very much, but its ugly and might lead to numerical trouble in the outflow
     //
 	if(rosseland == 0) { //Planck opacities are additive
         
@@ -789,7 +800,7 @@ double c_Sim::opacity_semenov_malygin(int rosseland, double temperature, double 
         else
             //return c_max(kappa_gas, dust_to_gas_ratio * kappa_dust); 
             //return kappa_gas + dust_to_gas_ratio * kappa_dust;
-            return kappa_gas + 0.*kappa_dust;
+            return kappa_gas + 1.*kappa_dust;
         //return kappa_gas + dust_to_gas_ratio * kappa_dust;
         
     }
@@ -799,6 +810,10 @@ double c_Sim::opacity_semenov_malygin(int rosseland, double temperature, double 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 //This function produces a kappa-landscape
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/**
+ * This function produces kappa(T) at constant density or pressure, for any opacity function desired.
+ * Just needs to be called once, e.g. at the beginning of c_Sim.execute() in advection.cpp
+ */
 void c_Sim::kappa_landscape()
 {
   	int i,j;
@@ -865,11 +880,10 @@ void c_Sim::kappa_landscape()
 }
 
 
-//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-//This function uses the data for *opa_gas_tscale, *opa_gas_pscale, *opa_gas_ross, *opa_gas_planck
-// similar to c_Sim::get_gas_malygin()
-// and interpolates them bilinearly on the given grid
-
+/**
+ * This function uses the data for given on any 1-D array (pseudo 2-D) similar to c_Sim::get_gas_malygin() and interpolates them log-bilinearly on the given grid.
+ * Uses 1% higher and lower pressure values and averages them into the final product, to get more stability in regions of wildly oscillating opacities.
+ */
 double c_Species::interpol_tabulated_opacity(const Eigen::VectorXd& array, int band, double T_gas, double pressure) {
 	
   	double tT, denom;	//tempPressure and denominator
@@ -878,39 +892,10 @@ double c_Species::interpol_tabulated_opacity(const Eigen::VectorXd& array, int b
   	static int Plow=0, Phigh=0;
 	int Tlow=0, Thigh=0;
 	int i;
-	//Eigen::VectorXd *array;
-    
-    /*
-     * 
-     * int opa_pgrid_size;
-    int opa_tgrid_size;
-    Eigen::VectorXd opa_pgrid;
-    Eigen::VectorXd opa_tgrid;
-    Eigen::VectorXd opa_grid_rosseland;
-    Eigen::VectorXd opa_grid_planck;
-    Eigen::VectorXd opa_grid_solar;
-    
-     * 
-     * */
-	/*
-	if(whichone == 0) {
-        array = &opa_grid_solar;
-    } 
-		  
-	else if(whichone == 1) {
-        array = &opa_grid_planck;
-    }
-    else {
-        array = &opa_grid_rosseland;
-        
-    }*/
     
 	tP = pressure;
 	tT = T_gas;
-	/*
-	fprintf(stdout,"Input Dens = %e  temperture = %e    pressure = %e\n",rho, tT, tP);
-	fflush(stdout);
-	*/
+    
 	//Search for value in T grid
 	if(tT < opa_tgrid[0])
  	  		tT = opa_tgrid[0];
@@ -937,7 +922,6 @@ double c_Species::interpol_tabulated_opacity(const Eigen::VectorXd& array, int b
         Tlow  = opa_tgrid_size-2;
         tT    = opa_tgrid(Thigh);
     }
-        
     
     //for(i = 0; i < opa_pgrid_size; i++) {
     for(i = opa_pgrid_size-2; i >= 0; i--) {
@@ -948,7 +932,7 @@ double c_Species::interpol_tabulated_opacity(const Eigen::VectorXd& array, int b
 			}
         }
     //
-    // Detection when we left the grid
+    // Detection of grid boundaries
     //
     if(Phigh == opa_pgrid_size) {
         Phigh = opa_pgrid_size-1;
@@ -958,47 +942,14 @@ double c_Species::interpol_tabulated_opacity(const Eigen::VectorXd& array, int b
     
     //cout<<" in interpol, Plow/Phigh/Tlow/Thigh = "<<opa_pgrid[Plow]<<"/"<<opa_pgrid[Phigh]<<"/"<<opa_tgrid[Tlow]<<"/"<<opa_tgrid[Thigh]<<"  tT,tP = "<<tT<<"/"<<tP<<endl;
 	
-	
-	//Interpolate on pressure-temperature grid
-    /*
-	denom = 1.0/((opa_tgrid(Thigh) - opa_tgrid(Tlow)) * (opa_pgrid(Phigh) - opa_pgrid(Plow)));
-	mul1 = (opa_tgrid(Thigh) - tT) * (opa_pgrid(Phigh) - tP);
-	mul2 = (tT - opa_tgrid(Tlow))  * (opa_pgrid(Phigh) - tP);
-	mul3 = (opa_tgrid(Thigh) - tT) * (tP - opa_pgrid(Plow));
-	mul4 = (tT - opa_tgrid(Tlow))  * (tP - opa_pgrid(Plow));
-	kappa = denom *      (mul1 * array(Tlow + Plow * opa_tgrid_size + band * opa_tgrid_size * opa_pgrid_size)
-                        + mul2 * array(Thigh + Plow * opa_tgrid_size + band * opa_tgrid_size * opa_pgrid_size)
-						+ mul3 * array(Tlow + Phigh * opa_tgrid_size + band * opa_tgrid_size * opa_pgrid_size) 
-                        + mul4 * array(Thigh + Phigh * opa_tgrid_size + band * opa_tgrid_size * opa_pgrid_size));
-*/
-    
+	//Get corner values of opacity for interpolation
     //Floats for speed!
-    
-//     float k11 = array(Tlow + Plow * opa_tgrid_size + band * opa_tgrid_size * opa_pgrid_size);
-//     float k22 = array(Thigh + Plow * opa_tgrid_size + band * opa_tgrid_size * opa_pgrid_size);
-//     float k33 = array(Tlow + Phigh * opa_tgrid_size + band * opa_tgrid_size * opa_pgrid_size);
-//     float k44 = array(Thigh + Phigh * opa_tgrid_size + band * opa_tgrid_size * opa_pgrid_size);
-//     
-//     float k1 = njuffas_log10f(k11);// std::log10(k11);
-//     float k2 = njuffas_log10f(k22);
-//     float k3 = njuffas_log10f(k33);
-//     float k4 = njuffas_log10f(k44);
-
+ 
     float k1 = array(Tlow + Plow * opa_tgrid_size + band * opa_tgrid_size * opa_pgrid_size);
     float k2 = array(Thigh + Plow * opa_tgrid_size + band * opa_tgrid_size * opa_pgrid_size);
     float k3 = array(Tlow + Phigh * opa_tgrid_size + band * opa_tgrid_size * opa_pgrid_size);
     float k4 = array(Thigh + Phigh * opa_tgrid_size + band * opa_tgrid_size * opa_pgrid_size);
     
-    //cout<<" logs, njuffa = "<<njuffas_log10f(k11)<< " vs regular "<<std::log10(k11)<<endl;
-    //char a;
-    //cin>>a;
-    
-//     float fPhigh = opa_pgrid(Phigh);
-//     float fPlow  = opa_pgrid(Plow);
-//     
-//     float pmax = njuffas_log10f(fPhigh);
-// 	float pmin = njuffas_log10f(fPlow);
-//     
     float pmax = opa_pgrid_log(Phigh);
 	float pmin = opa_pgrid_log(Plow);
     
@@ -1023,37 +974,5 @@ double c_Species::interpol_tabulated_opacity(const Eigen::VectorXd& array, int b
                             + mul4 * k4 );
     }
     
-	/*
-    pmax = std::log10(opa_pgrid(Phigh));
-	pmin = std::log10(opa_pgrid(Plow));
-	pval = std::log10(tP*1.01);
-	
-	denom = 1.0/((opa_tgrid(Thigh) - opa_tgrid(Tlow)) * (pmax - pmin));
-	mul1 = (opa_tgrid(Thigh) - tT) * (pmax - pval);
-	mul2 = (tT - opa_tgrid(Tlow))  * (pmax - pval);
-	mul3 = (opa_tgrid(Thigh) - tT) * (pval - pmin);
-	mul4 = (tT - opa_tgrid(Tlow))  * (pval - pmin);
-    
-    double kappa2 = denom *      (mul1 * std::log10(array(Tlow + Plow * opa_tgrid_size + band * opa_tgrid_size * opa_pgrid_size))
-                        + mul2 * std::log10(array(Thigh + Plow * opa_tgrid_size + band * opa_tgrid_size * opa_pgrid_size))
-						+ mul3 * std::log10(array(Tlow + Phigh * opa_tgrid_size + band * opa_tgrid_size * opa_pgrid_size)) 
-                        + mul4 * std::log10(array(Thigh + Phigh * opa_tgrid_size + band * opa_tgrid_size * opa_pgrid_size)) );
-    
-    pmax = std::log10(opa_pgrid(Phigh));
-	pmin = std::log10(opa_pgrid(Plow));
-	pval = std::log10(tP*0.99);
-	
-	denom = 1.0/((opa_tgrid(Thigh) - opa_tgrid(Tlow)) * (pmax - pmin));
-	mul1 = (opa_tgrid(Thigh) - tT) * (pmax - pval);
-	mul2 = (tT - opa_tgrid(Tlow))  * (pmax - pval);
-	mul3 = (opa_tgrid(Thigh) - tT) * (pval - pmin);
-	mul4 = (tT - opa_tgrid(Tlow))  * (pval - pmin);
-    
-    double kappa3 = denom *      (mul1 * std::log10(array(Tlow + Plow * opa_tgrid_size + band * opa_tgrid_size * opa_pgrid_size))
-                        + mul2 * std::log10(array(Thigh + Plow * opa_tgrid_size + band * opa_tgrid_size * opa_pgrid_size))
-						+ mul3 * std::log10(array(Tlow + Phigh * opa_tgrid_size + band * opa_tgrid_size * opa_pgrid_size)) 
-                        + mul4 * std::log10(array(Thigh + Phigh * opa_tgrid_size + band * opa_tgrid_size * opa_pgrid_size)) );
-	
-    */
   	return std::pow(10., ktotal*0.33333333333333333);
 }

@@ -152,7 +152,7 @@ void c_Sim::update_dS_jb(int j, int b) {
                         //dS_band(3,b) += 2./6. * lum / (dx[3]); 
                         //dS_band(4,b) += 1./6. * lum / (dx[4]); 
                         
-                        dS_band(20,b) += lum * surf[20]/ (vol[20]); 
+                        dS_band(2,b) += lum * surf[2]/ (vol[2]); 
                     }
                     
                 }// Irregular dS computation, in case we want to fix the solar heating function to its initial value
@@ -790,6 +790,14 @@ void c_Sim::update_fluxes_FLD() {
         char stepstop;
         cin>>stepstop;
     }
+    if(debug >= 3 ) {
+        cout<<" i  l d  u"<<endl;
+        for(int i = 0; i < size_M; i++) {
+            cout<<i<<" "<<l.at(i)<<" "<<d.at(i)<<" "<<u.at(i)<<" "<<endl;
+        }
+        char stepstop;
+        cin>>stepstop;
+    }
     
     //
     // Solve!
@@ -806,7 +814,7 @@ void c_Sim::update_fluxes_FLD() {
                 Jrad_FLD(j, b) = Jrad_init(j,b);
             }
                     
-          //  std::cout << j << "\t" <<  Jrad_FLD(j, b) << "\n" ;
+            //std::cout << j << "\t" <<  Jrad_FLD(j, b) << "\n" ;
         }
 
         for(int s=0; s<num_species; s++) {
@@ -820,7 +828,7 @@ void c_Sim::update_fluxes_FLD() {
             
             species[s].prim[j].temperature = tt ;
             //if(j==num_cells)
-            //    cout<<" num_cells = "<<num_cells<<" temp = "<<species[s].prim[j].temperature<<endl;
+               // cout<<" j = "<<j<<" temp = "<<species[s].prim[j].temperature<<endl;
         }
     }
     

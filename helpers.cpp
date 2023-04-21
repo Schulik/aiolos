@@ -1,14 +1,8 @@
-///////////////////////////////////////////////////////////
-//
-//
-//  helpers.cpp
-//
-// This file contains routines doing small jobs.
-//
-//
-//
-///////////////////////////////////////////////////////////
-
+/**
+ * helpers.cpp
+ * 
+ * This file contains routines doing small jobs.
+ */
 
 #include <iomanip>
 #include <sstream>
@@ -21,7 +15,11 @@
 //
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-
+/**
+ * Computes the cfl timestep based on sound speed, velocity, and a custom internal energy-change criterion.
+ * 
+ * @return The stable cfl timestep dt in s
+ */
 double c_Sim::get_cfl_timestep() {
     
     //
@@ -146,6 +144,12 @@ vector<string> stringsplit(const string& str, const string& delim)
 //
 //
 
+/**
+ * Various ways to compute the Planck integral normalised to 0 and 1. 
+ * 
+ * Used in initialising the top-of-atmosphere fluxes in init_and_bounds.cpp, as well as in radiation.cpp for the self-radiation.
+ * The exact details of when and why four versions were implemented are lost to time, so better not touch this.
+ */
 double compute_planck_function_integral(double lmin, double lmax, double temperature) {
     
     //int num_steps=3;
@@ -244,7 +248,7 @@ double c_Sim::compute_planck_function_integral3(double lmin, double lmax, double
     }
     else {
         imin = std::log(lT_min/planck_matrix(0,0)) / std::log(lT_spacing);
-        m    = (planck_matrix(imin+1,1) - planck_matrix(imin,1)) / (planck_matrix(imin+1,0)-planck_matrix(imin,0)); //valgrind marks memory leak here
+        m    = (planck_matrix(imin+1,1) - planck_matrix(imin,1)) / (planck_matrix(imin+1,0)-planck_matrix(imin,0));
         
         power_min = planck_matrix(imin,1) + m * (lT_min - planck_matrix(imin,0));
     }
@@ -318,7 +322,7 @@ double c_Sim::compute_planck_function_integral4(double lmin, double lmax, double
     }
     else {
         imin = std::log(lT_min/planck_matrix(0,0)) / std::log(lT_spacing);
-        m    = (planck_matrix(imin+1,1) - planck_matrix(imin,1)) / (planck_matrix(imin+1,0)-planck_matrix(imin,0)); //valgrind marks memory leak here
+        m    = (planck_matrix(imin+1,1) - planck_matrix(imin,1)) / (planck_matrix(imin+1,0)-planck_matrix(imin,0));
         
         power_min = planck_matrix(imin,1) + m * (lT_min - planck_matrix(imin,0));
     }
@@ -350,7 +354,12 @@ double c_Sim::compute_planck_function_integral4(double lmin, double lmax, double
     
 }
 
-
+/**
+ * Look for a species name in the list of species and return its index.
+ * 
+ * @param[in] name species name string, as read in from the *.spc file
+ * @return Integer number between 0 and s-1
+ */
 int c_Sim::get_species_index(const string name) {
     
     for(int s = 0; s<num_species; s++) {
@@ -364,14 +373,12 @@ int c_Sim::get_species_index(const string name) {
 }
 
 
-//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-//
-// Compute analytic solution to the wind problem
-// Update: We do not use this function anymore as too many users have trouble getting the gsl lambert_W function. 
-//         If direct in-code comparison is required, comment gsl_lambertW back in and include the gsl library.
-//
-//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
+/**
+ * Compute analytic solution to the wind problem
+ * Update: We do not use this function anymore as too many users have trouble getting the gsl lambert_W function. 
+ *         If direct in-code comparison is required, comment gsl_lambertW back in and include the gsl library.
+ * 
+ */
 void c_Species::compute_analytic_solution() {
     
     /*

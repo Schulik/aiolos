@@ -1,28 +1,20 @@
-///////////////////////////////////////////////////////////
-//
-//
-//  advection.cpp
-//
-// This file contains the base routines to start and run a simulation, 
-// as well as hydrodynamics, i.e. the HLLC Riemann solver.
-//
-//
-//
-///////////////////////////////////////////////////////////
+/**
+ *  advection.cpp
+ *
+ * This file contains the base routines to start and run a simulation, 
+ * as well as hydrodynamics, i.e. the HLLC Riemann solver.
+ */
 
 #include "aiolos.h"
 
-
-////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-//
-//  CLASS SIMULATION
-//
-////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
+/**
+ * Main simulation loop
+ *  
+ * After successful simulation init, execute the main simulation from globalTime = [0.,t_max]
+ * Every loop iteration starts with an estimator for all species' mid-cell pressures, 
+ * to be able to determine the sound-speed and hence the CFL factor.
+ * Following are output checks and then the main code modules are executed in order.
+ */
 void c_Sim::execute() { 
     
     steps = 0;
@@ -58,19 +50,7 @@ void c_Sim::execute() {
     cout<<"    hill radius: " <<scale_rh << "cm = "<< scale_rh/au <<" au = "<<scale_rh/scale_rb<< " rb" << endl;
     cout<<"    velocities: vk = "<<scale_vk<<" cm/s, vk/cs = "<<scale_vk/scale_cs<<", cs = "<<scale_cs<< "cm/s" << endl;
     cout<<"    times, rb/cs/yr = "<<scale_time/year<<" rh/cs/yr"<<scale_rh/scale_cs/year<<endl;
-    //cout<<" FIrst species mass: "<<species[0].mass_amu<<endl;
-//     cout<<" "<<endl;
-//     cout<<" Initiating malygin opacities"<<endl;
-//     init_malygin_opacities();
-//     cout<<" pressure_manual = "<<species[0].prim[3].density * species[0].prim[3].temperature * kb / (40.*amu)<<" pressure_true = "<<species[0].prim[3].pres <<endl;
-//     cout<<endl;
-    //kappa_landscape();
-    //char a;
-    //cin>>a;
-//     cout<<" test planck opacity = "<<opacity_semenov_malygin(0,    species[0].prim[3].temperature, species[0].prim[3].density, species[0].prim[3].pres);
-//     cout<<" test rosseland opacity = "<<opacity_semenov_malygin(1, species[0].prim[3].temperature, species[0].prim[3].density, species[0].prim[3].pres);
-//     
-    
+  
     ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~////
     //                                                                         //
     // Simulation main loop                                                    //
@@ -78,18 +58,10 @@ void c_Sim::execute() {
     ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~////
     for (globalTime = 0; (globalTime < t_max) && (steps < maxsteps); ) {
         
-//          if(globalTime > 1e3) {
-//              do_hydrodynamics = 0;     
+//          if(globalTime > 1e3) {   //Comment in if a radiative equilibrium phase is desired before starting hydro
+//              do_hydrodynamics = 1;     
 //          }
-//             if(steps%1000==0){
-//                 
-//                 cout<<" Beginning step "<<steps<<" @ globalTime "<<globalTime<<" dt "<<dt;
-//                 cout<< ", CFL " << cfl_step << ", radiative dt " << timestep_rad2 << "\n";
-//             }
-//                 
-//         }
 
-        
         if(steps==0) {
             for(int s = 0; s < num_species; s++)
                 species[s].compute_pressure(species[s].u);
@@ -102,18 +74,12 @@ void c_Sim::execute() {
         if(steps == 0)
             dt = std::min(dt, dt_initial);
         
-//         if(steps == 1e6) 
-//             cout<<"Radiative equilibrium phase over."<<endl;
-        
         if( globalTime > next_print_time) {
             cout<<" Beginning step "<<steps<<" @ globalTime "<<globalTime<<" dt "<<dt;
             cout<< ", CFL " << cfl_step << ", radiative dt " << timestep_rad2 << "\n";
             next_print_time *= 10.;
         }
          
-         //if(steps > 154562 )
-            //cout<<" Beginning step "<<steps<<" @ globalTime "<<globalTime<<" dt "<< ", CFL " << cfl_step << ", radiative dt " << timestep_rad2 << "\n";
-//         
         //
         // Save internal energy before we update it
         //
@@ -125,11 +91,9 @@ void c_Sim::execute() {
         //
         // Step 0: Update gravity. Important for self-gravity and time-dependent smoothing length
         //
-        //init_grav_pot();
         if(debug >= 2)
             cout<<"Beginning timestep "<<steps<<endl;
         
-        //if(use_self_gravity==1)
         update_mass_and_pot();
         
         for(int s=0; s<num_species; s++)
@@ -143,13 +107,11 @@ void c_Sim::execute() {
         // zeroth output has the initialized conserved values, but already the first fluxes.
         //
         
-        //if(steps==0 || ((steps==221160) && debug > 0)) {
-        if(steps==0 || steps==221160) {
+        if(steps==0 || steps==99e99) {
             for(int s=0; s<num_species; s++) {
                 species[s].print_AOS_component_tofile((int) output_counter);
             }
             print_monitor((int)monitor_counter);
-            //if(steps==1 || steps==2)
             print_diagnostic_file((int)output_counter);
             
             monitor_counter+=1.;
@@ -182,8 +144,6 @@ void c_Sim::execute() {
         //
         // Step 0: Hydrodynamics, if so desired
         //
-        
-        
         if (do_hydrodynamics == 1) {
         
             for(int s = 0; s < num_species; s++)
@@ -239,28 +199,27 @@ void c_Sim::execute() {
             }
         }
         
-        
         for(int s = 0; s < num_species; s++) 
             species[s].compute_pressure(species[s].u);
         
-        if (do_hydrodynamics == 1)
+        //Computes the velocity drag update after the new hydrodynamic state is known for each species
+        if (do_hydrodynamics == 1) 
             compute_drag_update() ;
         
+        // If either switch is set we need to think more carefully about what should be done
         if( (photochemistry_level + use_rad_fluxes ) > 0 ) {
-            //cout<<"JUST BEFORE STARTING PHOTOCHEMISTRY!!!"<<endl;
-            //debug = 2;
             
             update_opacities();
             if(photochemistry_level == 0 && use_rad_fluxes > 0)
                 reset_dS();
             
             // Compute high-energy dS and ionization
-            if(photochemistry_level == 1) {
+            if(photochemistry_level == 1) {   //C2Ray scheme
                 reset_dS();
                 do_photochemistry();
                 
             }
-            else if(photochemistry_level == 2) {
+            else if(photochemistry_level == 2) { //Linearized time-dependent general chemistry scheme
                 if(steps > 2) {
                     
                     if(steps % dt_skip_ichem == 0) {
@@ -282,7 +241,7 @@ void c_Sim::execute() {
                 update_fluxes_FLD();   //FLD Radiation transport, updating Temperatures and photon band energies
             }
             else if (use_rad_fluxes == 2){
-                update_fluxes_FLD_simple(dt);
+                update_fluxes_FLD_simple(dt); //'Simple' FLD solver
                 
             }
         }
@@ -313,7 +272,6 @@ void c_Sim::execute() {
                         crash_T_imax = (i>crash_T_imax)? i : crash_T_imax;
                         crash_T_numcells++;
                         
-                        //cout<<" NEGATIVE TEMPERATURE at s/i = "<<s<<"/"<<i<<" in timestep="<<dt<<" stepnum "<<steps<<" totaltime "<<globalTime<<endl;
                         globalTime = 1.1*t_max; //This secures that the program exits smoothly after the crash and produces a -1 output file of the crashed state
                     }
             }
@@ -329,11 +287,7 @@ void c_Sim::execute() {
             for(int i=num_cells-1; i>=0; i--)  {
                     if(Jrad_FLD(i,b) < 0) {
                         
-//                         if(i>=num_cells-1) {
-//                             Jrad_FLD(i,b) *= -1.;
-//                         }
-                        
-                        if(Jrad_FLD(i,b) > -1e-10) {
+                        if(Jrad_FLD(i,b) > -1e-10) { //Ignore extremely small flux overshoots
                             Jrad_FLD(i,b) *= -1.; 
                         }
                         else {
@@ -342,7 +296,6 @@ void c_Sim::execute() {
                                 crashtime = globalTime;
                                 crashtime_already_assigned = 1;
                             }
-                            
                             
                             crashed_meanintensity = Jrad_FLD(i,b);
                             crashed_J = b+1;
@@ -372,9 +325,6 @@ void c_Sim::execute() {
                 checksum = (species[s].de_e[i] > checksum )?species[s].de_e[i]:checksum ;
         }
     }
-            
-    //checksum /= num_species;
-    //checksum /= (num_cells+2);
     
     cout<<"Finished at time="<<globalTime<<" after steps="<<steps<<" with num_cells="<<num_cells<<" and checksum = "<<checksum<<endl;
     
@@ -385,6 +335,9 @@ void c_Sim::execute() {
         
 }
 
+/**
+ * Compute the total left and right cell extrapolated cell-pressure of all species. Currently unused function.
+ */
 void c_Sim::compute_total_pressure() {
     
     for(int i=num_cells+1; i>=0; i--)  {
@@ -407,9 +360,6 @@ void c_Sim::compute_total_pressure() {
         //cout<<"total pressure, cell "<<i<<" pl/pr = "<<total_press_l[i]<<"/"<<total_press_r[i]<<endl;
             
     }
-    
-    //char a;
-    //cin>>a;
 }
     
 
@@ -424,11 +374,13 @@ void c_Sim::compute_total_pressure() {
 ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-
-//
-// Species::execute: This species very own riemann solution, before its modified globally by applying frictional forces
-//
-
+/**
+ * Compute first or second order time derivatives of conservative variables, i.e. flux gradients using intermediate primitives. Includes well-balanced gravity. 
+ * Called from c_Sim::execute()
+ * 
+ * @param[in] u_in  Vector of conservative variables over the entire grid.
+ * @param[out] dudt Vector of time derivatives of conservative variables over entire grid.
+ */
 void c_Species::execute(std::vector<AOS>& u_in, std::vector<AOS>& dudt) {
     
         
@@ -443,77 +395,45 @@ void c_Species::execute(std::vector<AOS>& u_in, std::vector<AOS>& dudt) {
         if(USE_WAVE==1) 
             add_wave(u_in, base->globalTime);
         
-        //if(steps==0)
-        //    cout<<" initial ghost momentum after start: "<<left_ghost.u2<<endl;
-        
         if(debug >= 2)
             cout<<"Done."<<endl<<" Before compute pressure in species "<<speciesname<<"... ";
         
-        if(base->debug > 0) {
-            
+        if(base->debug > 0) { //Can put in custom debug info here. We left some example code in just for referencing the code usage.
             
             if(prim[21].temperature < 0. ) {
-            
-            cout<<" T<0 in execute, steps ="<<base->steps<< " beforeP, T = "<<prim[20].temperature<<" "<<prim[21].temperature<<" "<<prim[22].temperature<<" p_nominal = "<<(u[21].u3 - 0.5*std::pow(u[21].u2,2.)/u[21].u1)<<endl;
-            cout<<" T<0 in execute, steps ="<<base->steps<< " beforeP, rho = "<<prim[20].density<<" "<<prim[21].density<<" "<<prim[22].density<<" p_nominal2 = "<<(u[21].u3 - 0.5*u[21].u2 * prim[21].speed)<<endl;
-            cout<<" opar = "<<opacity(20,0)<<" "<<opacity(21,0)<<" "<<opacity(22,0)<<" opas = "<<opacity(20,0)<<" "<<opacity_planck(21,0)<<" "<<opacity_planck(22,0)<<endl;
-            cout<<" t = "<<base->globalTime<<endl;
-        }
-        
-        if( (base->steps == 3205600) || (base->steps == 3206000) || (base->steps == 3205700) || (base->steps == 3205625) || (base->steps == 3205650) || (base->steps == 3205675) || (base->steps == 3205605) || (base->steps == 3205610) || (base->steps == 3205615) || (base->steps == 3205620) || (base->steps == 3205595) || (base->steps == 3205500) ) {
-            
-            cout<<" steps ="<<base->steps<< " beforeP, T = "<<prim[20].temperature<<" "<<prim[21].temperature<<" "<<prim[22].temperature<<" p_nominal = "<<(u[21].u3 - 0.5*std::pow(u[21].u2,2.)/u[21].u1)<<" u1/u2/u3/v = "<<u[21].u1<<"/"<<u[21].u2<<"/"<<u[21].u3<<"/"<<prim[21].speed<<endl;
-            cout<<" steps ="<<base->steps<< " beforeP, rho = "<<prim[20].density<<" "<<prim[21].density<<" "<<prim[22].density<<" Js = "<<base->Jrad_FLD(20, 0)<<"/"<<base->Jrad_FLD(21, 0)<<"/"<<base->Jrad_FLD(22, 0) <<endl;
-            cout<<" opar = "<<opacity(20,0)<<" "<<opacity(21,0)<<" "<<opacity(22,0)<<" opas = "<<opacity(20,0)<<" "<<opacity_planck(21,0)<<" "<<opacity_planck(22,0)<<endl;
-            cout<<" t = "<<base->globalTime<<endl;
-            
-            for(int j=19; j<=22; j++) {
-                
-                double dx      = (base->x_i12[j+1]-base->x_i12[j]) ;
-                double rhokr   = max(2.*(base->total_opacity(j,0)*base->total_opacity(j+1,0))/(base->total_opacity(j,0) + base->total_opacity(j+1,0)), 4./3./dx );
-                        rhokr   = min( 0.5*( base->total_opacity(j,0) + base->total_opacity(j+1,0)) , rhokr);
-                double tau_inv = 0.5 / (dx * rhokr) ;
-                double R       = 2 * tau_inv * std::abs(base->Jrad_FLD(j+1,0) - base->Jrad_FLD(j,0)) / (base->Jrad_FLD(j+1,0) + base->Jrad_FLD(j, 0) + 1e-300) ;
-                double flux_limiter;
-                    if (R <= 2)
-                        flux_limiter = 2 / (3 + std::sqrt(9 + 10*R*R)) ;
-                    else 
-                        flux_limiter = 10 / (10*R + 9 + std::sqrt(81 + 180*R)) ;
-                
-                double D       = base->surf[j] * flux_limiter * tau_inv;
-                double flux    = - 4. * pi * D * (base->Jrad_FLD(j+1,0) - base->Jrad_FLD(j,0));
-            
-                cout<<" i/i+1= "<<j<<"/"<<j+1<<" F = "<<flux<<" D = "<<D<<" limiter = "<<flux_limiter<<" R = "<<R<<" rhokr = "<<rhokr<<" J-B = "<<prim[j].density*opacity_planck(j,0)*(base->Jrad_FLD(j,0)-sigma_rad*pow(prim[j].temperature,4.) / pi )<<endl;
+                cout<<" T<0 in execute, steps ="<<base->steps<< " beforeP, T = "<<prim[20].temperature<<" "<<prim[21].temperature<<" "<<prim[22].temperature<<" p_nominal = "<<(u[21].u3 - 0.5*std::pow(u[21].u2,2.)/u[21].u1)<<endl;
             }
-                
-                
-            
-        }
         
-            if(base->steps >= 3209950 ) {
+            if( (base->steps == 3205600) || (base->steps == 3206000) ) { //Narrow down problematic time
                 
-                cout<<" steps ="<<base->steps<< " beforeP, T = "<<prim[20].temperature<<" "<<prim[21].temperature<<" "<<prim[22].temperature<<" p_nominal = "<<(u[21].u3 - 0.5*std::pow(u[21].u2,2.)/u[21].u1)<<" u1/u2/u3/v = "<<u[21].u1<<"/"<<u[21].u2<<"/"<<u[21].u3<<"/"<<prim[21].speed<<endl;
-                cout<<" steps ="<<base->steps<< " beforeP,rho = "<<prim[20].density<<" "<<prim[21].density<<" "<<prim[22].density<<" p_nominal2 = "<<(u[21].u3 - 0.5*u[21].u2 * prim[21].speed)<<endl;
-                cout<<" opar = "<<opacity(20,0)<<" "<<opacity(21,0)<<" "<<opacity(22,0)<<" opas = "<<opacity(20,0)<<" "<<opacity_planck(21,0)<<" "<<opacity_planck(22,0)<<endl;
-                cout<<" t = "<<base->globalTime<<endl;
+                for(int j=19; j<=22; j++) { //Narrow down problematic cells, in this case rad fluxes do something unexpected
+                    
+                    double dx      = (base->x_i12[j+1]-base->x_i12[j]) ;
+                    double rhokr   = max(2.*(base->total_opacity(j,0)*base->total_opacity(j+1,0))/(base->total_opacity(j,0) + base->total_opacity(j+1,0)), 4./3./dx );
+                            rhokr   = min( 0.5*( base->total_opacity(j,0) + base->total_opacity(j+1,0)) , rhokr);
+                    double tau_inv = 0.5 / (dx * rhokr) ;
+                    double R       = 2 * tau_inv * std::abs(base->Jrad_FLD(j+1,0) - base->Jrad_FLD(j,0)) / (base->Jrad_FLD(j+1,0) + base->Jrad_FLD(j, 0) + 1e-300) ;
+                    double flux_limiter;
+                        if (R <= 2)
+                            flux_limiter = 2 / (3 + std::sqrt(9 + 10*R*R)) ;
+                        else 
+                            flux_limiter = 10 / (10*R + 9 + std::sqrt(81 + 180*R)) ;
+                    
+                    double D       = base->surf[j] * flux_limiter * tau_inv;
+                    double flux    = - 4. * pi * D * (base->Jrad_FLD(j+1,0) - base->Jrad_FLD(j,0));
+                
+                    cout<<" i/i+1= "<<j<<"/"<<j+1<<" F = "<<flux<<" D = "<<D<<" limiter = "<<flux_limiter<<" R = "<<R<<" rhokr = "<<rhokr<<" J-B = "<<prim[j].density*opacity_planck(j,0)*(base->Jrad_FLD(j,0)-sigma_rad*pow(prim[j].temperature,4.) / pi )<<endl;
+                }
+                
+                //Narrow down why fluxes are problematic. Is it the density gradients?
+                cout<<"At steps ="<<base->steps<< " beforeP, dens = "<<prim[20].density<<" "<<prim[21].density<<" "<<prim[22].density<<" p_nominal = "<<(u[21].u3 - 0.5*std::pow(u[21].u2,2.)/u[21].u1)<<endl;
             }
-            
-            
-            
         }
         
-        //base->debug=0;
-        
+        //
+        // Start!
+        //
         compute_pressure(u_in);
-        /*
-        if(prim[21].temperature < 0. ) {
-            
-            cout<<" T<0 in execute, steps ="<<base->steps<< " afterP, T = "<<prim[20].temperature<<" "<<prim[21].temperature<<" "<<prim[22].temperature<<" p_nominal = "<<(u[21].u3 - 0.5*std::pow(u[21].u2,2.)/u[21].u1)<<" u1/u2/u3/v = "<<u[21].u1<<"/"<<u[21].u2<<"/"<<u[21].u3<<"/"<<prim[21].speed<<endl;
-            cout<<" T<0 in execute, steps ="<<base->steps<< " afterP, rho = "<<prim[20].density<<" "<<prim[21].density<<" "<<prim[22].density<<" p_nominal2 = "<<(u[21].u3 - 0.5*u[21].u2 * prim[21].speed)<<endl;
-            cout<<" opar = "<<opacity(20,0)<<" "<<opacity(21,0)<<" "<<opacity(22,0)<<" opas = "<<opacity(20,0)<<" "<<opacity_planck(21,0)<<" "<<opacity_planck(22,0)<<endl;
-            cout<<" t = "<<base->globalTime<<endl;
-        }
-        */
         
         if(debug >= 2)
             cout<<"Done. Starting edge-states."<<endl;
@@ -552,9 +472,7 @@ void c_Species::execute(std::vector<AOS>& u_in, std::vector<AOS>& dudt) {
         for(int j=1; j<=num_cells; j++) {
             dudt[j] = (flux[j-1] * base->surf[j-1] - flux[j] * base->surf[j]) / base->vol[j] + (source[j] + source_pressure[j]) ;
             
-            //if( (debug > 1) && ( j==1 || j==num_cells || j==(num_cells/2) )) {
-            if( (debug > 3) && ( j==5 || j==1 || j==2 || j==3 || j==4 || j==6 || j==7 || j==8 || j==9 ) && (base->steps==1 || base->steps==0)) {
-            //if( ( j==3 ) && (base->steps==1 || base->steps==0)) {
+            if( debug > 3) { //Or put in your own conditions
                 char alpha;
                 cout<<"Debuggin fluxes in cell i= "<<j<<" for species "<<speciesname<<" at time "<<base->steps<<endl; 
                 cout<<"     fl.u1 = "<<flux[j-1].u1<<": fr.u1 = "<<flux[j].u1<<endl;
@@ -587,6 +505,12 @@ void c_Species::execute(std::vector<AOS>& u_in, std::vector<AOS>& dudt) {
     
 } 
 
+/**
+ * The HLLC Riemann solver with pressure-based wave-speed estimate, according to Toro(2007) and references therein.
+ * 
+ * @param[in] j cell interface number at which to compute the flux. 
+ * @return flux at cell interface j
+ */
 AOS c_Species::hllc_flux(int j) 
 {
     int jleft = j, jright = j+1;
@@ -660,8 +584,12 @@ AOS c_Species::hllc_flux(int j)
     return flux;
 }
 
-
-// Riemann problem for (almost) pressure-less dust following Leveque (2004), Pelanti & Leveque (2006)
+/**
+ * Riemann problem for (almost) pressure-less dust following Leveque (2004), Pelanti & Leveque (2006)
+ * 
+ * @param[in] j cell interface number at which to compute the flux. 
+ * @return flux at cell interface j
+ */
 AOS c_Species::dust_flux(int j) 
 {
     AOS_prim Wl = prim_r[j] ;
@@ -691,52 +619,3 @@ AOS c_Species::dust_flux(int j)
     }
 }
 
-void c_Species::update_kzz_and_gravpot(int argument) {
-    
-    
-    
-    int homopause_boundary_i = 0;
-    double mu = base->species[0].mass_amu;
-    double mi = this->mass_amu;
-    
-    if(argument > 0 && mi > 1e-3) { //Do the kzz buildup for all other species except atomic hydrogen (assumed species[0]) and no electrons (mass = 5e-4).
-        
-        for(int i=0; i<num_cells+2; i++) {
-            double n   = base->species[0].prim[i].number_density;
-            //double ni  = this->prim[i].number_density;
-            double kzz = base->K_zz[i]; //This is a meta-parameter for k_zz/b 
-            double par = std::pow(n, 1./1.);
-            
-            K_zzf[i] = (1. + kzz*par*mu/mi) / (1. + kzz*par);
-            if(kzz*n < 1.)
-                K_zzf[i] = 1.;
-            else
-                K_zzf[i] = mu/mi;
-            
-            double one = 0.99999;
-            if(K_zzf[i] > one && K_zzf[i-1] < one) //found homopause
-                homopause_boundary_i = i;
-        }
-            
-    }
-    else {
-        for(int i=0; i<num_cells+2; i++) {
-            K_zzf[i] = 1.;
-        }
-    }
-    
-    
-    for(int i=0; i<num_cells+2; i++) {
-                phi_s[i] = base->phi[i] * K_zzf[i];
-    }
-    double phicorrection = base->phi[homopause_boundary_i]*(1.-mu/mi); //Correct for the jump in Phi at the homopause
-    if(homopause_boundary_i == 0)
-        phicorrection = 0;
-    
-    for(int i=0; i<homopause_boundary_i; i++) 
-        phi_s[i] += phicorrection;
-    
-    
-    //cout<<"s = "<<argument<<" phicorr = "<<phicorrection<<" homopause_i = "<<homopause_boundary_i<<endl;
-    //cout<<"Finished updating kzz in species "<<speciesname<<endl;
-}

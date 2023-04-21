@@ -1,4 +1,8 @@
-
+/**
+ *  block_tridiag_solve.h
+ * 
+ * Custom-written solver routines for block-tridiagonal matrices.
+ */
 #ifndef _BLOCK_TRIDIAG_SOLVE_H
 #define _BLOCK_TRIDIAG_SOLVE_H
 
@@ -6,6 +10,8 @@
 
 #include <Eigen/Dense>
 
+/* Container class
+ */
 class BlockTriDiagSolverBase
 {
 public:
@@ -17,8 +23,6 @@ public:
 
 /* Solver a tri-diagonal systems of equations where each
  * of the blocks have the same size (N x N).
- * 
- *
  */
 template <int fixed_block_size = Eigen::Dynamic>
 class BlockTriDiagSolver
