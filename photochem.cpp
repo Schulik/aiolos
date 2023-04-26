@@ -1,14 +1,8 @@
-///////////////////////////////////////////////////////////
-//
-//
-//  photochem.cpp
-//
-//
-//
-//
-//
-//
-///////////////////////////////////////////////////////////
+/*
+ * photochem.cpp
+ * 
+ * Implementation of the C2Ray scheme, to solve for the correct average simultaneous ionisation and heating rates, according to Mellema+2006 and Friedrich+2012
+ */
 
 #define EIGEN_RUNTIME_NO_MALLOC
 
@@ -19,15 +13,6 @@
 #include "brent.h"
 
 /*
-
-This requires 8-12 species that we track, besides neutral H/He.
-The couplings between high-energy radiation, ionization and heating happens in
-this routine.
-
-For this we assume a fixed ordering and numbering of species, as follows:
-0   1   2   3   4    5    6       7    8     9    10    11
-H0  H+  e-  He  He+  H++  He 23S  H2   H2+   H3+  HeH+  H-
-
 Heating and cooling rates according to Black (1981), the physical state of
 primordial intergalactic clouds*/
 
@@ -322,6 +307,11 @@ class C2Ray_HOnly_heating {
     Mat3 coll_mat;
 };
 
+/**
+ * Simple by-hand solver using a linearised implicit scheme. Solves for steady-state value by following the time evolution.
+ * 
+ * @return ion fraction
+ */
 double get_implicit_photochem() { //double dt, double n1_old, double n2_old, double F, double dx, double kappa, double alpha
 
     
@@ -382,9 +372,12 @@ double get_implicit_photochem() { //double dt, double n1_old, double n2_old, dou
     return n2_old/(n1_old+n2_old);
 }
 
-//
-// Implicit solver for two variables, ne and np.
-//
+
+/**
+ * Simple by-hand solver using a linearised implicit scheme. Only one timestep.
+ * 
+ * @return ion fraction.
+ */
 double get_implicit_photochem2(double dt, double n1_old, double n2_old, double F, double dx, double kappa, double alpha) {
 
 
@@ -408,9 +401,11 @@ double get_implicit_photochem2(double dt, double n1_old, double n2_old, double F
     return n2_old/(n1_old+n2_old);
 }
 
-//
-// Reduced, single equation implicit solver for the ion fraction, using ne+np=const.
-//
+/**
+ * Simple by-hand solver using a linearised implicit scheme. Only one timestep, using ne+np=const.
+ * 
+ * @return ion fraction.
+ */
 double get_implicit_photochem3(double dt, double n1_old, double n2_old, double F, double dx, double kappa, double alpha) {
     
     long double ntot = (n1_old + n2_old);
@@ -429,6 +424,9 @@ double get_implicit_photochem3(double dt, double n1_old, double n2_old, double F
     return xnew; //n2_old/(n1_old+n2_old);
 }
 
+/**
+ * The actual C2Ray scheme.
+ */
 void c_Sim::do_photochemistry() {
     // cout<<" Doing photochemistry "<<endl;
             
@@ -676,17 +674,13 @@ void c_Sim::do_photochemistry() {
                     species[s].dG(j) += cooling[s];
                     species[s].dS(j) += heating[s];
                     
-                    /*species[s].dS(num_cells+1) = 0;
-                    species[s].dS(num_cells) = 0;
-                    species[s].dS(num_cells-1) = 0; */
-                    //cout<<" added  heating[s] = "<< heating[s]<<" to species["<<s<<"]."<<endl;
                 }
                 
                 
                 //char a;
                 //cin>>a;
                 
-                int e_idx = get_species_index("S2");
+                int e_idx = get_species_index("S2"); //Equivalent of those calls for photochem_level==2 in chemistry.cpp lines ~910
                 int C_idx = get_species_index("S4");
                 int Cp_idx = get_species_index("S5");
                 int Cpp_idx = get_species_index("S6");

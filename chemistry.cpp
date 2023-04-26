@@ -333,7 +333,7 @@ void c_Sim::do_chemistry(double dt_chem) {
         //Correct species internal energy and momentum due to change in number density
         //Correct species internal energy due to total change in Gibbs energy dU = dG - PdV + TdS
         
-        //update_dS_jb_photochem(j);
+        update_dS_jb_photochem(j);
         do_highenergy_cooling(j);
         
         for(int s=0;s<num_species; s++) {
@@ -905,7 +905,7 @@ void c_Sim::update_dS_jb_photochem(int cell) {
 }
 
 /**
- * Prescribed non-thermal cooling functions. Called from do_chemistry() in chemistry.cpp line 335.
+ * Prescribed non-thermal cooling functions. Called from do_chemistry() in chemistry.cpp line 335. Equivalent functionality in photochem_level=1 in photochem.cpp lines ~700.
  * 
  * @param[in] cell Cell number in which to add cooling contributions.
  */

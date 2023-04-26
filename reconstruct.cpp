@@ -1,15 +1,13 @@
-///////////////////////////////////////////////////////////
-//
-//
-//  reconstruct.cpp
-//
-// 
-//
-//
-//
-///////////////////////////////////////////////////////////
+/**
+ * reconstruct.cpp
+ * 
+ * Contains routines for higher order reconstruction of hydrodynamic primitives.
+ */
 #include "aiolos.h"
 
+/**
+ *  General slope limiting function based on mid, left and right values.
+ */
 double MonotonizedCentralSlope(double ql, double qm, double qr, 
                                double cF=2, double cB=2, double dxF=1, double dxB=1) {
     // From Mignone's (2005) reconstruction paper
@@ -30,7 +28,9 @@ double MonotonizedCentralSlope(double ql, double qm, double qr,
     return min_mod(0.5*(dF + dB), min_mod(cF*dF, cB*dB)) ;
 }
 
-
+/**
+ * Reconstruct the primitive hydro states at the cell edges based on the cell centered value and a slope, which is interpreted from the neighbouring cells.
+ */
 void c_Species::reconstruct_edge_states() {
 
     const bool is_gas = !is_dust_like ;

@@ -91,7 +91,7 @@ void c_Sim::update_opacities() {
  * Opacity models currently implemented, encoded via their corresponding chars:
  * U: User defined opacity. Go into user_opacity() and specify your custom algorithm.
  * C: Constant opacities. Modifiers for solar, planck and rosseland opas exist individually.
- * P: 'Physical': Constant with simple pressure-dependent powerlaw above 0.1 bars
+ * P: 'Physical': Constant with simple pressure-broadening parameterization powerlaw above 0.1 bars
  * F: Freedman model. Only the fit for Rosseland opacities is currently included.
  * M: Malygin2014 (Planck Rosseland Gas opa)/Semenov2003 (Planck Rosseland Dust opa) combined opacities. Solar opas taken from *opa files.
  * D: Dust only model, given a certain dust size.

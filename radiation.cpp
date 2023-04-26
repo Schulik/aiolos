@@ -1,34 +1,17 @@
-///////////////////////////////////////////////////////////
-//
-//
-//  radiation.cpp
-//
-// This file contains routines computing the absorption of solar radiation, radiation transport and updating temperatures accordingly.
-//
-//
-//
-///////////////////////////////////////////////////////////
+/** 
+ * radiation.cpp
+ * 
+ * This file contains routines computing the absorption of solar radiation, radiation transport and updating temperatures accordingly.
+ */
 
 #define EIGEN_RUNTIME_NO_MALLOC
 
 #include <cassert>
 #include "aiolos.h"
 
-//////////////////////////////////////////////////////////////////
-//
-// void update_opacities():
-//      Computation of opacities based on material properties.
-//      Furthermore the attenuation of solar radiation is ray-traced,
-//      flux loss per cell per band is computed and assigned to individual species based on 
-//
-//
-//
-//
-//
-//
-//
-//
-//////////////////////////////////////////////////////////////////
+/**
+ * Resets the heating and cooling functions and applies a time-dependent ramp up to the top-of-the atmosphere radiation spectrum.
+ */
 void c_Sim::reset_dS() {
     for(int j = num_cells + 1; j>0; j--) {
         for(int s=0; s<num_species; s++) {
@@ -51,6 +34,9 @@ void c_Sim::reset_dS() {
                 
 }
 
+/**
+ * Integrate the opacity to stellar irradiation in band b over cell j for all contributions from species s. Update radial optical depth. Called before update_dS_jb().
+ */
 void c_Sim::update_tau_s_jb(int j, int b) {
     
     total_opacity_twotemp(j,b)        = 0 ;
@@ -68,6 +54,9 @@ void c_Sim::update_tau_s_jb(int j, int b) {
     
 }
 
+/**
+ * Update heating function. Keep track of highenergy- and thermal opacities.
+ */
 void c_Sim::update_dS_jb(int j, int b) {
     
                 //
@@ -91,12 +80,14 @@ void c_Sim::update_dS_jb(int j, int b) {
                 if(debug >= 1)
                     cout<<" in cell ["<<j<<"] band ["<<b<<"] top-of-the-atmosphere heating = "<<solar_heating(b)<<" tau_rad(j,b) = "<<radial_optical_depth(j,b)<<" exp(tau) = "<<std::exp(-radial_optical_depth(j,b))<<endl;
                 
-                /*S_band(num_cells+1,b) = 0.;
-                S_band(num_cells,b) = 0.;
-                S_band(num_cells-1,b) = 0.;
-                S_band(num_cells-2,b) = 0.;
-                */
-                // Regular dS computation
+                //
+                // Compute the heating dS as the difference between flux in and out of the cell
+                // Contains the geometric averaging factor 1/4 as well as a crude approximation of albedo effects, as we do not solve for scattering.
+                // Different approximations of exp and expm1 can improve speed in cases when many bands are integrated. The current setting is fast and accurate enough.
+                //
+                // Highenergy optical depths are computed separately in chemistry.cpp lines ~706 and used in line 336. This is because the heating rates need to be split onto the
+                // ionisation products, not the absorbing reactants, so there the heating rates need to be split.
+                //
                 if(steps > -1) {
                             
                     if(j<num_cells+1){
@@ -119,7 +110,7 @@ void c_Sim::update_dS_jb(int j, int b) {
                             //dS_he_temp *=  -expm1(-const_opacity_solar_factor * cell_optical_depth_highenergy(j,b)) ;
                         
                         //cout<<" j/b = "<<j<<"/"<<b<<" dS_band(j,b) "<<dS_band(j,b)<<" dS_he_temp "<<dS_he_temp<<endl;
-                        dS_band(j,b) -= dS_he_temp;
+                        dS_band(j,b) -= dS_he_temp; //Substract highenergy heating again, as this has already been added in update_dS_jb_photochem() around line 700 in chemistry.cpp
                         dS_band(j,b) = std::max(dS_band(j,b), 0.); //Safeguard against highenergy shenanigans
                         if(BAND_IS_HIGHENERGY[b] && photochemistry_level==1)
                             dS_band(j,b) = 0.;
@@ -145,8 +136,7 @@ void c_Sim::update_dS_jb(int j, int b) {
                     // Planetary heating 2
                     //
                     if(use_planetary_temperature == 1){
-                        //double lum = 1./xi_rad * sigma_rad * T_core*T_core*T_core*T_core;
-                        double lum = 1.0 * sigma_rad * T_core*T_core*T_core*T_core * 0.5;
+                        double lum = 1.0 * sigma_rad * T_core*T_core*T_core*T_core * 0.5; //Factor 0.5 is not understood. Use proper radiation boundary conditions for avoiding this.
                         //Spread the luminosity for fewer crashes
                         //dS_band(2,b) += 3./6. * lum / (dx[2]); 
                         //dS_band(3,b) += 2./6. * lum / (dx[3]); 
@@ -223,6 +213,11 @@ void c_Sim::update_dS_jb(int j, int b) {
     
 }
 
+/**
+ * Wrapper function for computing the heating function, without solving for the new temperatures just yet.
+ * By the time this is called from the main loop, photo/thermo chemistry is already done and the photoionisation rates 
+ * and photoheating rates (contributions of dS_band due to cell_optical_depth_highenergy(cell, b) are already added to dS_band.
+ */
 void c_Sim::update_dS() {
     
     if(debug > 1)
@@ -234,22 +229,15 @@ void c_Sim::update_dS() {
     for(int j = num_cells + 1; j>0; j--) {
         
         //////////////////////////////////////////////////////////////////
-        //////////////Solar bands
+        //////////////Stellar irradiation bands
         //////////////////////////////////////////////////////////////////
         for(int b=0; b<num_bands_in; b++) {
             
-            update_tau_s_jb(j, b);
-            
-            //if(!BAND_IS_HIGHENERGY[b]) {
-            
-            update_dS_jb(j, b);
-            
-            //}
+            update_tau_s_jb(j, b); //See above in this file
+            update_dS_jb(j, b);   //See above in this file
         }
         
-        //TODO: Add chemical energy to dS
-        
-        
+        //NOTE: update_dS_jb_photochem(j,b) is now moved into chemistry.cpp, due to algorithmic requirements.
         
         //////////////////////////////////////////////////////////////////
         ///////////////////Thermal bands
@@ -275,14 +263,7 @@ void c_Sim::update_dS() {
         
     }
     
-    //
-    //  bad boundaries
-    //
-    //for(int s=0; s<num_species; s++) {
-    //    species[s].dS(num_cells+2)  = species[s].dS(num_cells+1);   
-   // }
-    
-    //Initialize optically thin regions with low energy density
+    //For tests of the radiation solver when initialising the radiation field out of equilibrium.
     if((steps==0) && (init_J_factor > 1e10)) {
         
         cout<<" Setting J to custom values. init_J_factor = "<<init_J_factor<<" and init_T_temp ="<<init_T_temp<<" const_opacity_solar_factor = "<<const_opacity_solar_factor<<endl;
@@ -340,9 +321,12 @@ void c_Sim::update_dS() {
         
     }
     
+    //End of update_dS
 }
 
-
+/**
+ * Routine containing the actual radiation transport solver.
+ */
 void c_Sim::update_fluxes_FLD() {
     
     if(debug > 1)
@@ -364,7 +348,8 @@ void c_Sim::update_fluxes_FLD() {
         else 
             return 10 / (10*R + 9 + std::sqrt(81 + 180*R)) ;
     } ;
-    /*
+    //A few other possible flux limiters. Use with caution.
+    /* 
     auto flux_limiter = [](double R) {
         if (R <= 1.5)
             return 2 / (3 + std::sqrt(9 + 12*R*R)) ;
@@ -408,10 +393,6 @@ void c_Sim::update_fluxes_FLD() {
                 double dx      = (x_i12[j+1]-x_i12[j]) ;                
                 //double rhokr   = max(2.*(total_opacity(j,b)*total_opacity(j+1,b))/(total_opacity(j,b) + total_opacity(j+1,b)), 4./3./dx ); //From Ramsey Dullemond 2015
                 //double rhokr   = min( 0.5*( total_opacity(j,b) + total_opacity(j+1,b)) , rhokr);
-                //double dxl = x_i[j]-x_i12[j];
-                //double dxr = x_i12[j+1] - x_i[j];
-                //double rhokr   = ( total_opacity(j,b) * dxl  + total_opacity(j+1,b) * dxr)/(dxl + dxr);
-                //double rhokr     = total_opacity(j,b);
                 double rhokr = std::sqrt(total_opacity(j,b)*total_opacity(j+1,b));
 
                 double tau_inv = 1. / (dx * rhokr) ;
@@ -421,13 +402,6 @@ void c_Sim::update_fluxes_FLD() {
                 //if(1./tau_inv < 1.e-13)
                 //    D = 0.;
                 
-                // restarting iteration with 4 0.25 0.25 (everything was working)
-                //titan single species tables works with 4 0.5 0.25
-                
-                //correct static G10 model prefactors: 4/2/ 0.25.
-                //fake-correct supercritical shock prefactors: 4/4/ 3.141/8  or 16/2/ pi/16
-                //correct supercrit shock prefactors: 2 0.5 0.5
-                
                 // divergence terms
                 u[idx] = -D ;
                 d[idx] += D ;
@@ -436,16 +410,6 @@ void c_Sim::update_fluxes_FLD() {
                 
                 if(debug > 1)
                     cout<<" radiation part 0. t,j,b="<<steps<<","<<j<<","<<b<<" tau_inv/R/D = "<<tau_inv<<"/"<<R<<"/"<<D<<" J/J/dJ = "<<Jrad_FLD(j+1,b)<<"/"<<Jrad_FLD(j,b)<<"/"<<(Jrad_FLD(j+1,b)-Jrad_FLD(j,b))<<" flux = "<<D*(Jrad_FLD(j+1,b)-Jrad_FLD(j,b))<<endl;
-                
-                /*if(j==20 || j==21 || j==22) {
-                    if( (base->steps == 3205600) || (base->steps == 3206000) || (base->steps == 3205700) || (base->steps == 3205625) || (base->steps == 3205650) || (base->steps == 3205675) || (base->steps == 3205605) || (base->steps == 3205610) || (base->steps == 3205615) || (base->steps == 3205620) ) {
-                    
-                    
-                    //cout<<"Radiation 1,  R  "<<   
-                    
-                    
-                    }
-                }*/
                     
             }
         }
@@ -508,33 +472,6 @@ void c_Sim::update_fluxes_FLD() {
             u[idx] = 0;
             r[idx_r] = 0 ;
             
-//             int Ncell   = num_cells - 2*(num_ghosts - 1) ;
-//             for (int j=0; j < num_ghosts-1; j++) {
-//                 int i       = Ncell + num_ghosts + j;
-// 
-//                 int idx = i*stride + b*(num_vars + 1) ;
-//                 int idxim1 = (i-1)*stride + b*(num_vars + 1) ;
-//                 int idx_r = i*num_vars + b ;  
-// 
-//                 if (j == 0) // FLD flux at the edge of the last cell
-//                     l[idx] = -surf[i-1] / (x_i12[i]-x_i12[i-1]) ; //u[i-1] ;u[idxim1];//;
-//                 else // Free-stream 
-//                     l[idx] = -surf[i-1] / (x_i12[i]-x_i12[i-1]) ;
-//                 
-//                 //l[idx] = -surf[i-1] / (x_i12[i]-x_i12[i-1]);// (x_i12[i]-x_i12[i-1]) ;
-//                 
-//                 
-//                 d[idx] = -1.*l[idx] + surf[ i ] / (x_i12[i+1]-x_i12[i]); // (x_i12[i+1]-x_i12[i]) ;//;// 
-//                 u[idx] = 0 ;
-//                 r[idx_r] = 0 ;
-//             }
-// 
-//             int idx = (num_cells+1)*stride + b*(num_vars + 1) ;
-//             int idx_r = (num_cells+1)*num_vars + b ;  
-//             l[idx] = -1;
-//             d[idx] = 1;
-//             u[idx] = 0;
-//             r[idx_r] = 0 ;
         }
         
         if(debug >= 1) {
@@ -663,15 +600,10 @@ void c_Sim::update_fluxes_FLD() {
                     int idx_r    = j*num_vars + (s + num_bands_out) ;
                     
                     double dx = (x_i12[j+1]-x_i12[j]) ;
-                    //double rhoavg = (species[s].prim[j].density + species[s].prim[j+1].density) * 0.5;
-                    double rhoavg = std::sqrt(species[s].prim[j].density * species[s].prim[j+1].density) ;
-                    //double Pavg   = (species[s].prim[j].pres + species[s].prim[j+1].pres) * 0.5;
+                    double rhoavg = std::sqrt(species[s].prim[j].density * species[s].prim[j+1].density) ; //Averages as in Kutter&Sparks 1972  
                     double Pavg   = std::sqrt(species[s].prim[j].pres * species[s].prim[j+1].pres);
-                    //double Tavg   = (species[s].prim[j].temperature + species[s].prim[j+1].temperature) * 0.5;
                     double Tavg   = std::sqrt(species[s].prim[j].temperature * species[s].prim[j+1].temperature);
                     double dP     = (species[s].prim[j].pres - species[s].prim[j+1].pres)/Pavg;
-                    
-                    //double dTabs  = (species[s].prim[j].temperature - species[s].prim[j+1].temperature);
                     double glocal = -get_phi_grav(x_i[j], enclosed_mass[j])/x_i[j];
                     
                     double dT     = (species[s].prim[j].temperature - species[s].prim[j+1].temperature)/Tavg / dP;
@@ -783,9 +715,6 @@ void c_Sim::update_fluxes_FLD() {
             cout<<u.at(i)<<" ";
             
         }
-        //cout<<"L ="<<endl<<l<<endl;
-        //cout<<"D ="<<endl<<d<<endl;
-        //cout<<"U ="<<endl<<u<<endl;
         
         char stepstop;
         cin>>stepstop;
@@ -813,8 +742,7 @@ void c_Sim::update_fluxes_FLD() {
             if(radiation_matter_equilibrium_test == 1) {
                 Jrad_FLD(j, b) = Jrad_init(j,b);
             }
-                    
-            //std::cout << j << "\t" <<  Jrad_FLD(j, b) << "\n" ;
+                
         }
 
         for(int s=0; s<num_species; s++) {
@@ -827,24 +755,7 @@ void c_Sim::update_fluxes_FLD() {
                 tt=max_temperature;
             
             species[s].prim[j].temperature = tt ;
-            //if(j==num_cells)
-               // cout<<" j = "<<j<<" temp = "<<species[s].prim[j].temperature<<endl;
         }
-    }
-    
-    //
-    // Emergency BC
-    //
-    
-    for(int s=0; s<num_species; s++)  {
-        //species[s].prim[num_cells].temperature   = species[s].prim[num_cells-1].temperature; // species[s].const_T_space;
-        //species[s].prim[num_cells+1].temperature = species[s].prim[num_cells-1].temperature; //species[s].const_T_space;
-        //species[s].prim[num_cells+2].temperature = species[s].prim[num_cells-1].temperature; //species[s].const_T_space;
-    }
-    for(int b=0; b<num_bands_out; b++)  {
-        //Jrad_FLD(num_cells, b)   = 0.99*Jrad_FLD(num_cells-1, b);
-        //Jrad_FLD(num_cells+1,b)  = 0.98*Jrad_FLD(num_cells-1, b);
-        //Jrad_FLD(num_cells+2,b)  = 0.97*Jrad_FLD(num_cells-1, b);
     }
     
     
@@ -859,6 +770,9 @@ void c_Sim::update_fluxes_FLD() {
 }
 
 
+/**
+ *  Explicit temperature update. Used for tests only, as not very stable.
+ */
 void c_Sim::update_temperatures_simple() {
     
     //Compute change in energy
@@ -867,9 +781,6 @@ void c_Sim::update_temperatures_simple() {
             species[s].prim[j].temperature      += (species[s].dS(j) + species[s].dG(j) ) * dt / species[s].u[j].u1 / species[s].cv ;
             species[s].prim[j].internal_energy  += (species[s].dS(j) + species[s].dG(j) ) * dt / species[s].u[j].u1;
             
-            if(steps > 605 && j == 25 && s == 2)
-                cout<<" In Updte_T_simple, T, j, steps, s =  "<<species[s].prim[j].temperature<<", "<<j<<", "<<steps<<", "<<s<<" dS, dG = "<<species[s].dS(j)<<", "<<species[s].dG(j)<<" dT = "<<(species[s].dS(j) + species[s].dG(j) ) * dt  / species[s].u[j].u1 / species[s].cv<<endl;
-                
             if(species[s].prim[j].temperature < 0) {
                 
                 cout<<" In Updte_T_simple, T<0!!!, j, steps, s =  "<<j<<", "<<steps<<", "<<s<<" dS, dG = "<<species[s].dS(j)<<", "<<species[s].dG(j)<<" dT = "<<(species[s].dS(j) + species[s].dG(j) ) * dt  / species[s].u[j].u1 / species[s].cv<<endl;
