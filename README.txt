@@ -53,7 +53,9 @@ with the *.par (parameter) and the *.spc (species) file present into the command
 This is a simple hydrostatic test problem, i.e. the initial density profile that is constructed should be kept perfectly.
 They command line does not require the species file to be added to it, it can be added to the parameter file instead.
 Add into the parameter file
+
 PARAMETER_FILE mix3.spc
+
 then aiolos can be executed via 
 
    ./aiolos -par planet_spherical.par

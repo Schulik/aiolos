@@ -597,7 +597,8 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
         /////////////////////////////////////////////////////////////////////////
         num_species = read_parameter_from_file<int>(filename,"PARI_NUM_SPECIES", debug, 1).value; //Read the number of species
         if(num_species<1) {
-            cout<<" Number of species has to be >= 1!"<<endl;
+            std::stringstream err;
+            err<<" Number of species has to be >= 1!"<<endl;
             throw std::invalid_argument(err.str()) ;
         }
 

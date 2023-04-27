@@ -29,7 +29,8 @@ void c_Sim::execute() {
     int crash_J_imin = num_cells+2, crash_J_imax = 0, crash_J_numcells = 0;
     double crashtime, crashed_temperature, crashed_meanintensity;
     int crashtime_already_assigned = 0;
-        
+    
+    cout<<" VERSION 0.2"<<endl;
     cout<<endl<<"Beginning main loop with num_cells="<<num_cells<<" and timestep="<<dt<<" cflfactor="<<cflfactor<<" and num_species = "<<num_species<<endl;
     if(num_species == 0) 
         throw std::invalid_argument("WARNING: No species specified! I cannot work like that. Aborting program.") ;
