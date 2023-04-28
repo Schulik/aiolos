@@ -669,12 +669,14 @@ void c_Sim::do_photochemistry() {
                 // This loop documents quantities consistent with the ionization found, computes the highenergy heating residual that was not used to ionize and dumps it into
                 // the species that do not participate in the C2-ray scheme, proportional to their optical depth per cell
                 //
+                
                 for (int s = 0; s < 3; s++) {
                     //Even in cases when radiative transport is not used, we want to document those quanitites in the output
                     species[s].dG(j) += cooling[s];
                     species[s].dS(j) += heating[s];
-                    
+                    dS_band(j,0)     += heating[s];
                 }
+                
                 
                 
                 //char a;
@@ -778,6 +780,17 @@ void c_Sim::do_photochemistry() {
                     //dS_band(j,b) = 0.25 * solar_heating(b) * (1 - 13.6 * ev_to_K * kb / photon_energies[b]) * std::exp(-radial_optical_depth_twotemp(j+1,b)) * (-std::expm1(-dtaus[b])) / dx[j];
                                 
                 }
+                
+                //Previous loop was to take into account the difference between non-ionising and ionising highenergy absorption, but it will report 0 heating in the diagnostic file, as dS_band is zero for cases of no difference. The actual highenergy heating has been written directly into dS. So we now just reset dS_band so that its documentation is consistent with dS. 
+                for (int b = 0; b<num_he_bands;b++) {
+                        //if(BAND_IS_HIGHENERGY[b]) {
+                        dS_band(j,b) = 0.;
+                        for (int s = 0; s < 3; s++) {
+                            dS_band(j,b)     += heating[s];
+                            
+                        }
+                }
+                //cout<<"adding"<<dS_band(j,0)<<endl;
                 
             }
 

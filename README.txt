@@ -25,8 +25,9 @@ In order to install and run Aiolos, we recommend the following steps:
 *** 1. Compilation
 ************************************
 
-aiolos can be compiled with make and gcc, just type 'make'. If you wish to provide
-your own initial conditions or boundary conditions, add them to your own problem
+aiolos can be compiled with make and gcc, just type 'make'.
+
+If you wish to provide your own initial conditions or boundary conditions, add them to your own problem
 file, e.g. "problems/my_problem.cpp". These can then be compiled into aiolos
 via:
 
@@ -75,6 +76,17 @@ A simple isothermal wind solution (currently needs fixing):
    ./aiolos -dir test_files/ -par planet_wind.par -spc mix_wind.spc
    
    
+_________________________________
+# 2.1 Output files
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Output and Diagnotsic files give snapshots in time of the state of the simulation. Comparing subsequent outputs can inform about whether steady-state has been achieved.
+They are numbered by integer numbers, and output files are specific to each species, but with a set number of columns. 
+Diagnostic files contain summary as well as detailed information about the radiation transport, opacities for all species, optical cell depths per band, etc.  and they change their column numbers
+depending on how many bands and species are set per simulation.
+
+The cheat_sheet.ods contains information about what to find in individual columns.
+   
 ************************************
 ## 3. Execution parameters
 ************************************
@@ -89,7 +101,17 @@ _________________________________
 # 3.0 Basic execution
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The simulation starts at t=0 and runs until tmax. 
+The simulation starts at t=0 and runs until tmax, specified via
+PARI_TIME_TMAX   1e6 
+(where this simulation will run till 1e6 seconds)
+
+Output and diagnostic files are produced every 
+PARI_TIME_OUTPUT        1.e6
+simulated seconds.
+
+If very fine output (e.g. every 1e-2 seconds) just before an interesting time point is desired, then the time offset can be set via
+TIME_OUTPUT_OFFSET  0.9e6
+the outputs will then proceed every PARI_TIME_OUTPUT seconds after the offset time.
 
 _________________________________
 3.1 Hydrodynamics module
@@ -148,10 +170,15 @@ _________________________________
 3.5 Species files
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+Specify the number of species in the *par file via
+PARI_NUM_SPECIES   2
+
+and the species file via
+
 SPECIES_FILE  mix1.spc
 //options: Species filename
 
-In *spc files, column descriptions:
+In *spc files, columns are as follows:
 # 1:Number 2:Name 3:mass in amu 4:dof              5:electrostatic charge    6:relative amount 7:initial density excess 8: is_dust_like 9:opacity.opa
 @ 0        S0     1.0         3.                   0                         1.0                 -0.0                      0              highenergy_atomichydrogen.opa
 
