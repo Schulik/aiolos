@@ -11,9 +11,11 @@
 In order to install and run Aiolos, we recommend the following steps:
 
 1.) Clone this git repository (This presumably has just been done) via 'git clone https://github.com/Schulik/aiolos/'
-    The default version of the code, with which the tests in our documentation paper were performed (Schulik&Booth2023, hereafter SB23) is 'v0.2', 
+
+    The default version of the code, with which the tests in our documentation paper were performed (Schulik&Booth2023, hereafter SB23) is 'version0.2' (can also be found via the github tags), 
     as opposed to the main branch, on which active code development might be ongoing.
     We recommend switching to this branch.
+    
 2.) Install the EIGEN library via https://eigen.tuxfamily.org
 3.) Compile, details below
 4.) Run, details below
@@ -47,7 +49,7 @@ A few warnings might occur concerning unused temporary variables. Those can be i
 *** 2. In order to execute Aiolos, type:
 ************************************
 
-   ./aiolos -par planet_spherical.par -spc mix3.spc
+   ./aiolos -dir test_files/ -par planet_spherical.par -spc mix3.spc
 
 with the *.par (parameter) and the *.spc (species) file present into the command line.
 This is a simple hydrostatic test problem, i.e. the initial density profile that is constructed should be kept perfectly.
@@ -58,9 +60,17 @@ PARAMETER_FILE mix3.spc
 
 then aiolos can be executed via 
 
-   ./aiolos -par planet_spherical.par
+   ./aiolos -dir test_files/ -par planet_spherical.par
 
-A simple wind solution:
+A simple static, radiative solution can be obtained via
+
+   ./aiolos -dir  runs_mdot_vs_euv_plot/ -par dynamic3_euv1e3_C_1s2b_rerun.par
+
+And a simple hydrodynamic, radiative solution can be obtained (this will take longer to run) via
+
+   ./aiolos -dir  runs_mdot_vs_euv_plot/ -par dynamic3_euv1e3_C_1s2b_rerun.par
+
+A simple isothermal wind solution (currently needs fixing):
 
    ./aiolos -dir test_files/ -par planet_wind.par -spc mix_wind.spc
    
@@ -159,7 +169,7 @@ _________________________________
 3.6 Opacity files
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-See example files in inpufiles/
+See example files in inputdata/
 
 
 
