@@ -80,12 +80,20 @@ _________________________________
 # 2.1 Output files
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Output and Diagnotsic files give snapshots in time of the state of the simulation. Comparing subsequent outputs can inform about whether steady-state has been achieved.
+* Output and Diagnostic:
+Output and diagnostic files give snapshots in time of the state of the simulation. Comparing subsequent outputs can inform about whether steady-state has been achieved.
 They are numbered by integer numbers, and output files are specific to each species, but with a set number of columns. 
 Diagnostic files contain summary as well as detailed information about the radiation transport, opacities for all species, optical cell depths per band, etc.  and they change their column numbers
 depending on how many bands and species are set per simulation.
 
 The cheat_sheet.ods contains information about what to find in individual columns.
+
+* Monitor:
+The monitor file can be used to check global mass, energy conservation etc. but is currently switched off.
+
+* Execution log
+The execution_log.txt logs all aiolos executions with their command line and timestamps in the folder of the executable. 
+This helps to keep track of what one was doing a few days or weeks ago, but just can't quite remember in which running directory.
    
 ************************************
 ## 3. Execution parameters

@@ -586,7 +586,10 @@ void c_Sim::do_photochemistry() {
                 std::array<double, 3> cooling;
                 
                 for (int b = 0; b < num_he_bands; b++) {
-                    GammaH += 0.25 * solar_heating(b)  * std::exp(-radial_optical_depth_twotemp(j+1,b)) * (-std::expm1(-dtaus[b])) * (1 - 13.6 * ev_to_K * kb / photon_energies[b]) / dx[j] * dlognu;
+                    double heatingrate = 0.25 * solar_heating(b)  * std::exp(-radial_optical_depth_twotemp(j+1,b)) * (-std::expm1(-dtaus[b])) * (1 - 13.6 * ev_to_K * kb / photon_energies[b]) / dx[j] * dlognu; 
+                    GammaH += heatingrate; 
+                    dS_band(j,b) = heatingrate;
+                    dS_band_special(j,b) = heatingrate;
                 }
                 
                 if(use_rad_fluxes) {
@@ -597,7 +600,7 @@ void c_Sim::do_photochemistry() {
                     cooling = {0., 0., - nX[2]*HOnly_cooling(nX, Te) }; //
                     
                     //
-                    // We cannot cool more than what we got from highenergy photons
+                    // Enforce no cooling spikes in the boundary cell
                     //
                     if(std::abs(cooling[2]) > heating[2])
                         cooling[2] = -heating[2];
@@ -674,9 +677,12 @@ void c_Sim::do_photochemistry() {
                     //Even in cases when radiative transport is not used, we want to document those quanitites in the output
                     species[s].dG(j) += cooling[s];
                     species[s].dS(j) += heating[s];
-                    dS_band(j,0)     += heating[s];
+                    //dS_band(j,0)     += heating[s];
                 }
                 
+                if(j==num_cells-10e99) {
+                        cout<<"Pos 1.1 dS_UV = "<<dS_band(num_cells-10,0)<<endl;
+                }
                 
                 
                 //char a;
@@ -699,13 +705,14 @@ void c_Sim::do_photochemistry() {
                 if( Op_idx!=-1 && e_idx!=-1 ) { species[Op_idx].dG(j)   -=  Op_cooling(species[e_idx].prim[j].temperature)/red; }
                 if( Opp_idx!=-1 && e_idx!=-1 ) { species[Opp_idx].dG(j) -=  Opp_cooling(species[e_idx].prim[j].temperature)/red; }
                 
+                //Correction in heating function for non-ionising radiation. 
                 double adddS[3] = {0.,0.,0.};
                 for (int b = 0; b < num_he_bands; b++) {
                     
                     double temp_nonion_cell_optd = 0.;
                     double dtauplus = dtaus[b];
                     //double temp_total_cell_optd = 0.;
-                    double GammaT = 0.;
+                    double GammaTotal = 0.;
                     double GammaHnofactor = 0.;
                     
                     //
@@ -730,16 +737,18 @@ void c_Sim::do_photochemistry() {
                     }
                     
                     if(j < num_cells + 1) {
-                        GammaHnofactor = 0.25 * solar_heating(b) * std::exp(-radial_optical_depth_twotemp(j+1,b)) * (-std::expm1(-dtaus[b])) / dx[j];
-                        GammaT         = 0.25 * solar_heating(b) * std::exp(-radial_optical_depth_twotemp(j+1,b)) * (-std::expm1(-dtauplus)) / dx[j];
+                        GammaHnofactor = 0.25 * solar_heating(b) * std::exp(-radial_optical_depth_twotemp(j+1,b)) * (-std::expm1(-dtaus[b])) / dx[j]; //dtaus[b] contains only ionising opacities
+                        GammaTotal         = 0.25 * solar_heating(b) * std::exp(-radial_optical_depth_twotemp(j+1,b)) * (-std::expm1(-dtauplus)) / dx[j]; //dtauplus contains all opacities
                         radial_optical_depth_twotemp(j,b) = radial_optical_depth_twotemp(j+1,b) + dtauplus;
+                        cell_optical_depth_highenergy(j,b)= radial_optical_depth_twotemp(j+1,b) + dtauplus;
                         S_band(j,b)                       = solar_heating(b) * std::exp(-radial_optical_depth_twotemp(j+1,b)); 
                     }
                         
                     else {
                         GammaHnofactor = 0.25 * solar_heating(b) * dtaus[b];
-                        GammaT         = 0.25 * solar_heating(b) * dtauplus;
+                        GammaTotal         = 0.25 * solar_heating(b) * dtauplus;
                         radial_optical_depth_twotemp(j,b) = dtauplus;
+                        cell_optical_depth_highenergy(j,b)= dtauplus;
                         S_band(j,b)                       = solar_heating(b);
                     }
                     
@@ -748,7 +757,7 @@ void c_Sim::do_photochemistry() {
                     // Now recompute heating with higher optical depth, neglecting ionization and ionization potential
                     //
                     
-                    dS_band(j,b)  = (GammaT - GammaHnofactor);
+                    dS_band(j,b)  += 0.*(GammaTotal - 1.*GammaHnofactor);
                     
                     if(debug >= 2)
                         cout<<"PCHEM pos 6, dGamma  = "<<dS_band(j,b)<<endl;
@@ -763,7 +772,6 @@ void c_Sim::do_photochemistry() {
                     }
                     //char d;
                     //cin>>d;
-                    
                     
                     if(dS_band(j,b) > 1e15) {
                             for(int s=3; s<num_species; s++) {
@@ -781,12 +789,16 @@ void c_Sim::do_photochemistry() {
                                 
                 }
                 
+                if(j==num_cells-10e99) {
+                        cout<<"Pos 1.2 dS_UV = "<<dS_band(num_cells-10,0)<<endl;
+                }
+                
                 //Previous loop was to take into account the difference between non-ionising and ionising highenergy absorption, but it will report 0 heating in the diagnostic file, as dS_band is zero for cases of no difference. The actual highenergy heating has been written directly into dS. So we now just reset dS_band so that its documentation is consistent with dS. 
                 for (int b = 0; b<num_he_bands;b++) {
                         //if(BAND_IS_HIGHENERGY[b]) {
-                        dS_band(j,b) = 0.;
+                        //dS_band(j,b) = 0.;
                         for (int s = 0; s < 3; s++) {
-                            dS_band(j,b)     += heating[s];
+                            //dS_band(j,b)     += heating[s];
                             
                         }
                 }

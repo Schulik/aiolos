@@ -299,6 +299,9 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
             cout<<" In INIT RADIATION, invalid num_bands_out = "<<num_bands_out<<" changing to num_bands_out = 1."<<endl;
             num_bands_out = 1;
         }
+        if(use_rad_fluxes == 2 && use_convective_fluxes == 1 ) {
+            cout<<" Simple radiative solver used, but with convection. Note that convection in this case is not implemented yet!"<<endl;
+        }
         
         l_i_in        = np_zeros(num_bands_in+1);    // Wavelenght bin boundaries
         l_i12_in      = np_zeros(num_bands_in);      // Wavelength bin midpoints or averages
@@ -733,6 +736,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
     solar_heating_final = Eigen::VectorXd::Zero(num_bands_in,  1);
     S_band        = Eigen::MatrixXd::Zero(num_cells+2, num_bands_in);
     dS_band       = Eigen::MatrixXd::Zero(num_cells+2, num_bands_in);
+    dS_band_special=Eigen::MatrixXd::Zero(num_cells+2, num_bands_in);
     dS_band_zero  = Eigen::MatrixXd::Zero(num_cells+2, num_bands_in);
     planck_matrix = Eigen::MatrixXd::Zero(num_plancks, 2);
     
@@ -1000,6 +1004,9 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
         }
         
     }
+    
+    //c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, int debug, int debug_cell, int debug_steps) {
+    write_into_execution_log(workingdir, filename_solo, speciesfile_solo);
     
     cout<<" Finished init. Returning to main now."<<endl<<endl;
 }
@@ -1784,14 +1791,13 @@ void c_Species::apply_boundary_left(std::vector<AOS>& u) {
         case BoundaryType::fixed:
             for (int i=0; i < num_ghosts; i++) {
                 
-                double dens_wall;  
-                
+                /*double dens_wall;  
                 if(base->problem_number == 1)
-                    dens_wall = SHOCK_TUBE_UL.u1 *  mass_amu;
+                    dens_wall = SHOCK_TUBE_UL.u1 * mass_amu;
                 else {
                     dens_wall = BACKGROUND_U.u1 *  mass_amu;
-                }
-                eos->compute_primitive(&u[i],&prim[i], 1) ;
+                }*/
+                eos->compute_primitive(&u[i],&prim[i], 1) ; //Ghost cell u is fixed after init, only need to update p in prim
             }
             
             break;
@@ -1801,6 +1807,16 @@ void c_Species::apply_boundary_left(std::vector<AOS>& u) {
                 u[i] = u[iact];
                 base->phi[i]   = base->phi[iact] ;
             }
+            break;
+        case BoundaryType::giantplanet: //This is currently identical to the left reflecting boundaries, assuming the left boundary is a hard core
+            for (int i=0; i < num_ghosts; i++) {
+                int igh =  num_ghosts-1 -i;
+                int iact = num_ghosts   +i;
+                u[igh]     = u[iact]; 
+                u[igh].u2 *= -1;
+                base->phi[igh]   = base->phi[iact] ;
+            }
+            break;
             break;
     }
 }

@@ -758,7 +758,7 @@ void c_Sim::update_dS_jb_photochem(int cell) {
     //
     //
     
-    for(c_reaction& reaction : reactions) {
+    for(c_reaction& reaction : reactions) { 
         
         //
         // TODO: Spread dG onto reaction products
@@ -784,7 +784,7 @@ void c_Sim::update_dS_jb_photochem(int cell) {
             for(int& ej : reaction.educts) {
                 chem_momentum_matrix(pj, ej) -= 1.*dt * reaction.dndt_old * species[pj].mass_amu/reaction.products_total_mass;
                 //momentum_b(pj)               -= 1.*dt * reaction.dndt_old * species[pj].mass_amu/reaction.products_total_mass;
-                //species[ej].dG(cell)         -= dLambda/reaction.products_total_mass;  //This is reaction heating, but we add it to dG, in order to be able to split it from photon heating
+                //species[ej].dG(cell)         -= dLambda/reaction.products_total_mass;  //This is reaction heating, but we add it to dG, in order to be able to split it from thermal heating
             
                 //cout<<" from "<<species[ej].speciesname<<" to "<<species[pj].speciesname<<endl;
             }

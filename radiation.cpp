@@ -55,8 +55,8 @@ void c_Sim::update_dS() {
         //////////////////////////////////////////////////////////////////
         for(int b=0; b<num_bands_in; b++) {
             
-            update_tau_s_jb(j, b); //See above in this file
-            update_dS_jb(j, b);   //See above in this file
+            update_tau_s_jb(j, b); //See below in this file
+            update_dS_jb(j, b);   //See below in this file
         }
         
         //NOTE: update_dS_jb_photochem(j,b) is now moved into chemistry.cpp, due to algorithmic requirements.
@@ -172,6 +172,10 @@ void c_Sim::update_tau_s_jb(int j, int b) {
  */
 void c_Sim::update_dS_jb(int j, int b) {
     
+            if(j==num_cells-10e99) {
+                cout<<"Pos 2.1 dS_UV = "<<dS_band(num_cells-10,0)<<endl;
+            }
+    
                 //
                 // After the total optical depth per band is known, we assign the fractional optical depths
                 // Maybe merge with previous loop for optimization
@@ -210,6 +214,12 @@ void c_Sim::update_dS_jb(int j, int b) {
                         double dtau_tot = -(radial_optical_depth_twotemp(j+1,b) - radial_optical_depth_twotemp(j,b));
                         double dS_he_temp = dS_band(j,b);
                         
+                        //Gamma_He=0.25*solar_heating(b)*std::exp(-radial_optical_depth_twotemp(j+1,b)) * (-std::expm1(-dtaus[b])) * (1 - 13.6 * ev_to_K * kb / photon_energies[b]) / dx[j] * dlognu; 
+                        
+                        if(j==num_cells-10e99) {
+                            cout<<"Pos 2.2 dS_UV = "<<dS_band(num_cells-10,0)<<endl;
+                        }
+                        
                         if(dtau_tot > 1e-3)
                             dS_band(j,b) *= (-expm1(-dtau_tot));
                         else
@@ -222,11 +232,21 @@ void c_Sim::update_dS_jb(int j, int b) {
                             dS_he_temp *=  -fastexpm1_2(-cell_optical_depth_highenergy(j,b)) ;
                             //dS_he_temp *=  -expm1(-const_opacity_solar_factor * cell_optical_depth_highenergy(j,b)) ;
                         
+                        double heating3 = dS_he_temp * (1 - 13.6 * ev_to_K * kb / photon_energies[0]);
+                        
+                        if(j==num_cells-10e99) {
+                            cout<<"Pos 2.3 dS_UV = "<<dS_band(num_cells-10,0)<<" dS_bolo =  "<<dS_band(num_cells-10,1)<<" dS_he_temp "<<dS_he_temp<<" heating3 = "<<heating3<<endl;
+                        }
+                        
                         //cout<<" j/b = "<<j<<"/"<<b<<" dS_band(j,b) "<<dS_band(j,b)<<" dS_he_temp "<<dS_he_temp<<endl;
                         dS_band(j,b) -= dS_he_temp; //Substract highenergy heating again, as this has already been added in update_dS_jb_photochem() around line 700 in chemistry.cpp
                         dS_band(j,b) = std::max(dS_band(j,b), 0.); //Safeguard against highenergy shenanigans
                         if(BAND_IS_HIGHENERGY[b] && photochemistry_level==1)
                             dS_band(j,b) = 0.;
+                        
+                        if(j==num_cells-10e99) {
+                            cout<<"Pos 2.4 dS_UV = "<<dS_band(num_cells-10,0)<<" dS_bolo = "<<dS_band(num_cells-10,0)<<" for b = "<<b<<endl;
+                        }
                         
                         if(b==999) {
                             cout<<" in thermal heating: total heating ~ "<<dS_band(j,b)<<" of which highenergy is "<<dS_he_temp;
@@ -599,7 +619,7 @@ void c_Sim::update_fluxes_FLD() {
                 for (int s=0; s < num_species; s++) {
                     
                     int idx      = j*stride   + (s + num_bands_out) * (num_vars+1) ;
-                    int idx_r    = j*num_vars + (s + num_bands_out) ;
+                    //int idx_r    = j*num_vars + (s + num_bands_out) ;
                     
                     double dx = (x_i12[j+1]-x_i12[j]) ;
                     double rhoavg = std::sqrt(species[s].prim[j].density * species[s].prim[j+1].density) ; //Averages as in Kutter&Sparks 1972  

@@ -113,7 +113,7 @@ int main(int argc, char** argv)
     #endif
     
     try {
-
+        
         cout<<endl<<"In main, construction of simulation is about to start."<<endl;
        
         //Main simulation class object, is initialized with the simulation parameters from a file

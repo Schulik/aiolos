@@ -51,7 +51,7 @@ void c_Sim::execute() {
     cout<<"    hill radius: " <<scale_rh << "cm = "<< scale_rh/au <<" au = "<<scale_rh/scale_rb<< " rb" << endl;
     cout<<"    velocities: vk = "<<scale_vk<<" cm/s, vk/cs = "<<scale_vk/scale_cs<<", cs = "<<scale_cs<< "cm/s" << endl;
     cout<<"    times, rb/cs/yr = "<<scale_time/year<<" rh/cs/yr"<<scale_rh/scale_cs/year<<endl;
-  
+    
     ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~////
     //                                                                         //
     // Simulation main loop                                                    //
@@ -217,7 +217,15 @@ void c_Sim::execute() {
             // Compute high-energy dS and ionization
             if(photochemistry_level == 1) {   //C2Ray scheme
                 reset_dS();
+                
+                if(false) {
+                    cout<<"Pos 1 dS_UV = "<<dS_band(num_cells-10,0)<<endl;
+                }
                 do_photochemistry();
+                
+                if(false) {
+                    cout<<"Pos 2 dS_UV = "<<dS_band(num_cells-10,0)<<endl;
+                }
                 
             }
             else if(photochemistry_level == 2) { //Linearized time-dependent general chemistry scheme
@@ -237,6 +245,10 @@ void c_Sim::execute() {
             }
             
             update_dS();               //Compute low-energy dS
+            
+            if(false) {
+                cout<<"Pos 3 dS_UV = "<<dS_band(num_cells-10,0)<<endl;
+            }
             
             if(use_rad_fluxes==1) {
                 update_fluxes_FLD();   //FLD Radiation transport, updating Temperatures and photon band energies

@@ -848,7 +848,7 @@ void c_Sim::kappa_landscape()
 //             opa_ross_semenov[i]   = species[0].interpol_tabulated_opacity( species[0].opa_grid_rosseland, 0, temperature[i], pressure[j]) * inv_mass;
 // 			
             //double p_actual = temperature[i] * density[j] * kb * inv_mass;
-            double d_actual = pressure[j] / (kb * temperature[i] * inv_mass);
+            //double d_actual = pressure[j] / (kb * temperature[i] * inv_mass);
             //printf("Doing temperature %e and density %e resulting in pressure/bars = %e \n",temperature[i],d_actual, pressure[j]/1e6);
             opa_planck_twotemp[i] = 1.;
             opa_planck_semenov[i] = freedman_opacity(pressure[j] , temperature[i], 0.); //opacity_semenov_malygin(0, temperature[i], d_actual, pressure[j], 0);

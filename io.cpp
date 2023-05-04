@@ -822,7 +822,7 @@ void c_Sim::print_diagnostic_file(int outputnumber) {
                 
                 //Solar heating profile
                 for(int b=0; b<num_bands_in; b++) {
-                    outfileDiagnostic<<'\t'<<dS_band(i,b);
+                    outfileDiagnostic<<'\t'<<dS_band(i,b) + dS_band_special(i,b);
                 }
                 
                 //Total opacity from all species
@@ -1055,4 +1055,33 @@ void c_Sim::print_monitor(int num_steps) {
     if(num_steps == -1) 
         cout<<"Finished writing monitor_file "<<filename2<<endl;
     
+}
+
+/**
+ * Writing the execution directory and the parameter file with a timestap into the execution_log.txt
+ * 
+ * @param[in] dir directory string
+ * @param[in] par parameter string
+ */
+void c_Sim::write_into_execution_log(string dir, string par, string spcfile) {
+    
+    string exlog = "execution_log.txt";
+    ofstream exlogstream(exlog, std::ios_base::app);
+    
+    auto t = std::time(nullptr);
+    auto tm = *std::localtime(&t);
+
+    std::ostringstream oss;
+    oss << std::put_time(&tm, "%Y-%m-%d %H-%M-%S");
+    //oss << std::put_time(&tm, "%d-%m-%Y %H-%M-%S");
+    auto str = oss.str();
+    
+    exlogstream<<str<<": "<<dir<<par;
+    
+    if(spcfile.compare("default.spc")==0)
+        exlogstream<<endl;
+    else
+        exlogstream<<"   with "<<spcfile<<endl;
+    
+    exlogstream.close();
 }
