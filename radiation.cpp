@@ -268,14 +268,17 @@ void c_Sim::update_dS_jb(int j, int b) {
                     //
                     // Planetary heating 2
                     //
-                    if(use_planetary_temperature == 1){
-                        double lum = 1.0 * sigma_rad * T_core*T_core*T_core*T_core * 0.5; //Factor 0.5 is not understood. Use proper radiation boundary conditions for avoiding this.
+
+                    if(use_planetary_temperature == 1 && false){
+                        //double lum = 1./xi_rad * sigma_rad * T_int*T_int*T_int*T_int;
+                        double lum = 1.0 * sigma_rad * T_int*T_int*T_int*T_int * 0.5;
                         //Spread the luminosity for fewer crashes
-                        //dS_band(2,b) += 3./6. * lum / (dx[2]); 
-                        //dS_band(3,b) += 2./6. * lum / (dx[3]); 
-                        //dS_band(4,b) += 1./6. * lum / (dx[4]); 
+                        dS_band(2,b) += 3./6. * lum / (dx[2]); 
+                        dS_band(3,b) += 2./6. * lum / (dx[3]); 
+                        dS_band(4,b) += 1./6. * lum / (dx[4]); 
                         
-                        dS_band(2,b) += lum * surf[2]/ (vol[2]); 
+                        //dS_band(20,b) += lum * surf[20]/ (vol[20]); 
+
                     }
                     
                 }// Irregular dS computation, in case we want to fix the solar heating function to its initial value
@@ -391,6 +394,8 @@ void c_Sim::update_fluxes_FLD() {
          return 1. / (3.+ R) ;
      } ;*/
      
+    std::vector<double> D_core(num_bands_out, 0)  ;
+
     int num_vars = num_bands_out + num_species;
     int stride = num_vars * num_vars ;
     int size_r = (num_cells + 2) * num_vars ;
@@ -440,18 +445,37 @@ void c_Sim::update_fluxes_FLD() {
         // Boundaries:
         // Left boundary:
         //    Reflecting / no flux or planetary temperature
-        //if(use_planetary_temperature == 0) {
-            for (int j=0; j < num_ghosts; j++) {
-                int idx = j*stride + b*(num_vars + 1) ;
-                int idx_r = j*num_vars + b ;
+        for (int j=0; j < num_ghosts; j++) {
+            int idx = j*stride + b*(num_vars + 1) ;
+            int idx_r = j*num_vars + b ;
+
+            // Compute heating due to radiation reaching surface
+            if (j == num_ghosts-1 && use_planetary_temperature) {
+                double S ;
+                S = sigma_rad * pow(T_planet,4.) * compute_planck_function_integral3(l_i_out[b], l_i_out[b+1], std::abs(T_planet)) ;  
+                if (T_planet < 0) 
+                    S *= -1 ; 
+
+
+                double dx      = (x_i12[j+1]-x_i12[j]) ;
+                double rhokr   = max(2.*(total_opacity(j,b)*total_opacity(j+1,b))/(total_opacity(j,b) + total_opacity(j+1,b)), 4./3./dx );
+                       rhokr   = min( 0.5*( total_opacity(j,b) + total_opacity(j+1,b)) , rhokr);
+                double tau_inv = 1 / (dx * rhokr) ;
+                double R       = xi_rad * tau_inv * std::abs(Jrad_FLD(j+1,b) - Jrad_FLD(j,b)) / (Jrad_FLD(j+1, b) + 1e-300) ; 
+
+                D_core[b]    = flux_limiter(R) * tau_inv;
+                double Chi   = 0.25 ;// Chi = 0.125*(1 + 3*K/J(R)) where K/J = 1/3 is appropriate at a solid surface
                 
                 l[idx] = 0 ;
+                d[idx] =  0.5*(D_core[b] + Chi) * surf[j] ;
+                u[idx] = -0.5*(D_core[b] - Chi) * surf[j] ;
+                r[idx_r] = surf[j] * S / (4*pi) ;
+            } else {
+                l[idx] = 0 ;
                 u[idx] = -d[idx] ;
-                //u[idx] = 0. ;
-                //d[idx] =  ;
-                r[idx_r] = 0 ; 
+                r[idx_r] = 0 ;
             }
-        //}
+        }
         
         //   Right boundary: reflective?
         //if(geometry == Geometry::cartesian) {
@@ -493,7 +517,7 @@ void c_Sim::update_fluxes_FLD() {
             l[idx] = -f*d[idx] ;
             u[idx] = 0;
             r[idx_r] = 0 ;
-            
+
         }
         
         if(debug >= 1) {
@@ -779,6 +803,32 @@ void c_Sim::update_fluxes_FLD() {
             species[s].prim[j].temperature = tt ;
         }
     }
+    
+    // Update the planet's temperature
+    // Uses a slab model for the planet's temperature
+    //     C_V \Delta dT_planet/dt = F_down + S_surf + \sigma T_int^4 - \sigma T_planet^4.
+    // We solve this by using F = F_up - F_down = sigma T_planet^4 - F_down. Linearizing the
+    // T_planet^4 term and writing dT/dt = T_n - T_planet we have:
+    //     C_V \Delta (T_n - T_planet) / dt = 
+    //           S_surf + sigma T_int^4 - F + 4 \sigma T_planet^3 (T_planet - T_n)
+    if (use_planetary_temperature) {
+        double F = 0, S_surf = 0 ;
+        for(int b=0; b<num_bands_out; b++) {
+            F -= 4*pi * D_core[b] * (Jrad_FLD(num_ghosts, b) - Jrad_FLD(num_ghosts-1, b)) ;
+            S_surf += 0.25 * S_band(num_ghosts-1,b) ;
+        }
+        double S_tot = S_surf - F + sigma_rad*(T_int*T_int)*(T_int*T_int); 
+        //std::cout << T_planet <<" " << S_surf - F << " " << sigma_rad*(T_int*T_int)*(T_int*T_int) << " " << S_tot <<  "\n" ;
+
+        if (core_cv > 0) { 
+            double denom = 4*sigma_rad*T_planet*T_planet*T_planet + core_cv / dt ;  
+            T_planet += S_tot / denom ;
+        }
+        else { // No need to linearize when core_cv = 0.
+            T_planet = pow(pow(T_planet, 4) + S_tot/sigma_rad, 0.25) ;
+        }
+    }
+
     
     
     // Update energies. 

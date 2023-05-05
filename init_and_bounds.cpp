@@ -82,10 +82,15 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
         R_other          = read_parameter_from_file<double>(filename,"R_OTHER", debug, 0.).value;  //Second bolometric black-body source (i.e. second star or giant planet host) in stellar radii
         T_other          = read_parameter_from_file<double>(filename,"T_OTHER", debug, 0.).value;  //Temperature of other black-body in K
         d_other          = read_parameter_from_file<double>(filename,"D_OTHER", debug, 1.).value;  // Distance to other black-body in AU
-        
-        T_core           = read_parameter_from_file<double>(filename,"PARI_TPLANET", debug, 200.).value; //Internal planetary temperature at inner boundary. T_int in Guillot2010. in K.
-        use_planetary_temperature = read_parameter_from_file<int>(filename,"USE_PLANET_TEMPERATURE", debug, 0).value; //Add the T_int heating to the lower boundary cell?
-        core_cv           = read_parameter_from_file<double>(filename,"PARI_CORE_CV", debug, 1.e9).value;  //Unused currently
+       
+        T_int            = read_parameter_from_file<double>(filename,"PARI_TINT", debug, 0.).value; //Internal planetary temperature at inner boundary. T_int in Guillot2010. in K.
+        // old notation.
+        if (T_int==0) 
+            T_int        = read_parameter_from_file<double>(filename,"PARI_TPLANET", debug, 0.).value; //Internal planetary temperature at inner boundary. T_int in Guillot2010. in K.
+
+        use_planetary_temperature = read_parameter_from_file<int>(filename,"USE_PLANET_TEMPERATURE", debug, 0).value;//Add the T_int heating to the lower boundary cell?
+        core_cv          = read_parameter_from_file<double>(filename,"PARI_CORE_CV", debug, 0).value; //Heat capacity of the core 
+        T_planet         = read_parameter_from_file<double>(filename,"PARI_TPLANET_INIT", debug, 0).value; //To be unused?
         
         radiation_matter_equilibrium_test = read_parameter_from_file<int>(filename,"RAD_MATTER_EQUI_TEST", debug, 0).value; //Unused/only for tests
         radiation_diffusion_test_linear   = read_parameter_from_file<int>(filename,"RAD_DIFF_TEST_LIN", debug, 0).value;    //Unused/only for tests
@@ -878,6 +883,15 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
     }
     cout<<" 2nd Luminosity check, L / sigma T^4/pi is = "<<totallumi/compute_planck_function_integral4(l_i_in[0], l_i_in[num_bands_in-1], T_star)<<endl;
     
+
+    // Initialize the planet's temperature if it has not already been done:
+    if (T_planet == 0 && use_planetary_temperature) {
+        T_planet = sigma_rad * (T_int*T_int) * (T_int*T_int) ;
+        for (int b=0; b < num_bands_in; b++)
+            T_planet += 0.25*solar_heating(b) ;      
+        T_planet = pow(T_planet/sigma_rad, 0.25) ;
+    }
+
     total_opacity        = Eigen::MatrixXd::Zero(num_cells+2, num_bands_out);
     cell_optical_depth   = Eigen::MatrixXd::Zero(num_cells+2, num_bands_out);
     radial_optical_depth = Eigen::MatrixXd::Zero(num_cells+2, num_bands_out);
@@ -964,7 +978,8 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
         // Set initial gradient for stability: FLD apparently doesn't like to be initialized in thermal equilibrium in the optically thin regions
         //
         if(j>10)
-            Jrad_FLD(j,0) = Jrad_FLD(10,0) * (x_i12[10]*x_i12[10]) / (x_i12[j]*x_i12[j]);  
+           Jrad_FLD(j,0) = Jrad_FLD(10,0) *  (x_i12[10]*x_i12[10]) / (x_i12[j]*x_i12[j]);  
+
     }
     cout<<"photochem level = "<<photochemistry_level<<endl;
     n_init = np_zeros(num_species);

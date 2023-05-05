@@ -305,6 +305,12 @@ void c_Sim::execute() {
                         }
                         else {
                             
+                            // If we're computing the planet's surface temperature
+                            // allow J < 0 in the boundary.
+                            if (i < num_cells && use_planetary_temperature &&
+                                Jrad_FLD(num_cells,b) > 0)
+                                continue ;
+                            
                             if(crashtime_already_assigned == 0) {
                                 crashtime = globalTime;
                                 crashtime_already_assigned = 1;

@@ -573,8 +573,8 @@ public:
     double R_other;
     double d_other;
     
-    double T_core;  //Internal heat flux
-    double T_surface; //Radiation flux making it through the atmosphere
+    double T_int;  //Internal heat flux
+    double T_planet; //Radiation flux making it through the atmosphere
     double R_core;
     double core_cv; //Heat capacity of the surface layer
     double bond_albedo;
