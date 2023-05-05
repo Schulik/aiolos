@@ -91,6 +91,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
         use_planetary_temperature = read_parameter_from_file<int>(filename,"USE_PLANET_TEMPERATURE", debug, 0).value;//Add the T_int heating to the lower boundary cell?
         core_cv          = read_parameter_from_file<double>(filename,"PARI_CORE_CV", debug, 0).value; //Heat capacity of the core 
         T_planet         = read_parameter_from_file<double>(filename,"PARI_TPLANET_INIT", debug, 0).value; //To be unused?
+        //Note that using T_planet might require smaller timesteps (if they are not already restricted by CFL), in those cases use max_timestep_change to limit the dt increase
         
         radiation_matter_equilibrium_test = read_parameter_from_file<int>(filename,"RAD_MATTER_EQUI_TEST", debug, 0).value; //Unused/only for tests
         radiation_diffusion_test_linear   = read_parameter_from_file<int>(filename,"RAD_DIFF_TEST_LIN", debug, 0).value;    //Unused/only for tests

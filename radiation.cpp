@@ -269,16 +269,13 @@ void c_Sim::update_dS_jb(int j, int b) {
                     // Planetary heating 2
                     //
 
-                    if(use_planetary_temperature == 1 && false){
-                        //double lum = 1./xi_rad * sigma_rad * T_int*T_int*T_int*T_int;
+                    if(use_planetary_temperature == 1 && false){ //Discontinued use due to new radiative boundaries
+                        
                         double lum = 1.0 * sigma_rad * T_int*T_int*T_int*T_int * 0.5;
                         //Spread the luminosity for fewer crashes
                         dS_band(2,b) += 3./6. * lum / (dx[2]); 
                         dS_band(3,b) += 2./6. * lum / (dx[3]); 
-                        dS_band(4,b) += 1./6. * lum / (dx[4]); 
-                        
-                        //dS_band(20,b) += lum * surf[20]/ (vol[20]); 
-
+                        dS_band(4,b) += 1./6. * lum / (dx[4]);
                     }
                     
                 }// Irregular dS computation, in case we want to fix the solar heating function to its initial value

@@ -166,6 +166,12 @@ PARI_OPACITY_MODEL      P
  * T: Tabulated opacities. Takes p-T dependent solar, planck and rosseland data from *aiopa files.
  * K: 'Kombined' opacities. Planck and Rosseland is p-T dependent from *aiopa data and solar are p-T-constant, but spectrally resolved from *opa files.
  */
+ 
+Planetary core (internal) temperature boundary condition:
+USE_PLANET_TEMPERATURE 1
+T_INT 350.
+MAX_TIMESTEP_CHANGE   1.01  //Not required, but radiative boundaries will produce results off by 50% of timesteps are too large. 
+                            //If hydro is used, timesteps are small enough by default and this option is not required.
 
 _________________________________
 3.4 (Photo) chemistry module
