@@ -2,6 +2,7 @@
 #define _AIOLOS_MAIN_H_
 
 #include <iostream>
+#include <iomanip>
 #include <fstream>
 #include <sstream>
 #include <memory>
@@ -12,6 +13,7 @@
 #include <vector>
 #include <math.h>
 #include <cmath>
+#include <ctime>
 #include <type_traits>
 //#include <gsl/gsl_sf_lambert.h>
 #include <Eigen/Core>
@@ -348,17 +350,14 @@ public:
     void set_base_pointer(c_Sim *base_simulation);
 };
 
-////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-//
-//  CLASS SIMULATION
-//
-////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-
+/**
+ * CLASS SIMULATION
+ * 
+ * Container for all simulation data.
+ * Class Methods execute all physics modules, read input and write output data.
+ * 
+ */
 class c_Sim
 {
 public:   
@@ -474,6 +473,14 @@ public:
     
     ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     //
+    // Boundaries
+    //
+    ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    
+    double right_extrap_press_multiplier;
+    
+    ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    //
     // Physical, global
     //
     ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -520,6 +527,8 @@ public:
     //
     
     int friction_solver;
+    double init_coll_factor;
+    double coll_rampup_time;
     
     //using Matrix_t = Eigen::Matrix<double, NUM_SPECIES,NUM_SPECIES, Eigen::RowMajor>;
     //using Vector_t = Eigen::Matrix<double, NUM_SPECIES, 1>;
@@ -588,6 +597,7 @@ public:
 
     Eigen::MatrixXd S_band;
     Eigen::MatrixXd dS_band;
+    Eigen::MatrixXd dS_band_special; //Only used to document high-energy flux for C2ray solver case
     Eigen::MatrixXd dS_band_zero;
     Eigen::MatrixXd solar_heating;
     Eigen::MatrixXd solar_heating_final;
@@ -708,6 +718,7 @@ public:
     
     void print_monitor(int i);
     void print_diagnostic_file(int i);
+    void write_into_execution_log(string dir, string par, string spcfile);
     
     void compute_total_pressure();
     int get_species_index(const string name);

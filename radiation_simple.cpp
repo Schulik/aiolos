@@ -1,19 +1,22 @@
-///////////////////////////////////////////////////////////
-//
-//
-//  radiation_simple.cpp
-//
-// This file contains routines computing the transport of radiation in the one-band approximation, while keeping the multi-temperature aspect of the simulations.
-//
-//
-//
-////////////////////////////////////////////////////////////
+
+/**
+ * radiation_simple.cpp
+ * 
+ * This file contains routines computing the transport of radiation in the one outgoing-band approximation. 
+ * This allows to decouple solving for the radiation field and the species' temperatures. Great for debugging more complex problems involving thermal radiation.
+ */
 
 #define EIGEN_RUNTIME_NO_MALLOC
 
 #include <cassert>
 #include "aiolos.h"
 
+/**
+ * Solves first for J at the advanced timestep, i.e. J^{n+1} and then plugs that into the formula for all the T_s^{n+1}, which is solved independently in another timestep.
+ * Analoguous to Bitsch+2013, in their Appendix to the radiation solver.
+ * 
+ * @param[in] ddt timestep
+ */
 void c_Sim::update_fluxes_FLD_simple(double ddt) {
     
     if(debug > 1)
@@ -24,17 +27,7 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
             return 2 / (3 + std::sqrt(9 + 10*R*R)) ;
         else 
             return 10 / (10*R + 9 + std::sqrt(81 + 180*R));
-    };
-//    auto flux_limiter = [](double R) {
-//          
-//          return (2.+ R) / (6. + 3*R + R*R) ;
-//      } ;
-//      
-  /*    auto flux_limiter = [](double R) {
- 
-             return 1. / (3. + R) ;
-     } ; */ 
-//     
+    };     
     int num_vars = num_bands_out; // + num_species
     int stride = num_vars * num_vars ;
     int size_r = (num_cells + 2) * num_vars ;
@@ -46,9 +39,10 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
      std::vector<double> arr_rhokr(size_r, 0.), arr_R(size_r, 0.), arr_D(size_r, 0.), arr_JDJ(size_r, 0.);
      std::vector<double> exchange_d_sums(num_cells+2, 0.), exchange_r_sums(num_cells+2, 0.);
     
+    int numcells_offset = 1; //Nominally 1
     // Step 1: setup transport terms (J)
     for(int b=0; b<num_bands_out; b++) {
-        for (int j=0; j < num_cells+1; j++) {
+        for (int j=0; j < num_cells + numcells_offset; j++) {
             int idx = j*stride + b*(num_vars + 1) ;
             int idx_r = j*num_vars + b ;
 
@@ -57,39 +51,15 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
             r[idx_r] += (vol[j] / (c_light * ddt)) * Jrad_FLD(j, b) ;
 
             // Flux across right boundary
-            if (j > 0 && j < num_cells + 1) {
+            if (j > 0 && j < num_cells + numcells_offset) {
                 double dx      = (x_i12[j+1]-x_i12[j]) ;                
                 double rhokr   = 0;
                 
                 rhokr = max(2.*(total_opacity(j,b)*total_opacity(j+1,b))/(total_opacity(j,b) + total_opacity(j+1,b)), 4./3./dx );
                 rhokr   = min( 0.5*( total_opacity(j,b) + total_opacity(j+1,b)) , rhokr);
-                //rhokr   = ( 0.5*( total_opacity(j,b) + total_opacity(j+1,b)) );
-               /* if(j > num_cells-3) {
-                    
-                }
-                else*/ 
-                //rhokr = total_opacity(j,b);
-                       
-
-                //rhokr   = max(total_opacity(j,b), 4./3./dx );
                 
                 double tau_inv = 1. / (dx * rhokr) ;
-                //double dJ      = (std::abs(Jrad_FLD(j+1,b) - Jrad_FLD(j,b)) )/(Jrad_FLD(j+1,b) + Jrad_FLD(j, b) + 1e-100);
-                double dJ = 0;
-                /*if(Jrad_FLD(j+1,b) < Jrad_FLD(j,b) ) //Donor cell
-                    dJ      = std::abs(Jrad_FLD(j+1,b) - Jrad_FLD(j,b))/(Jrad_FLD(j, b) + 1e-300);
-                else
-                    dJ      = std::abs(Jrad_FLD(j+1,b) - Jrad_FLD(j,b))/(Jrad_FLD(j+1, b) + 1e-300);
-                */
-                dJ      = std::abs(Jrad_FLD(j+1,b) - Jrad_FLD(j,b))/(Jrad_FLD(j, b) + 1e-300);
-                //double dJ      = std::abs(Jrad_FLD(j+1,b) - Jrad_FLD(j,b))/(Jrad_FLD(j, b) + 1e-300);
-                //dJ      = (std::abs(Jrad_FLD(j+1,b) - Jrad_FLD(j,b)) )/(Jrad_FLD(j+1,b) + Jrad_FLD(j, b) + 1e-100);
-                
-                //if(dJ < 1e-10 && 1./tau_inv < 1e-10) {
-                    //double dJrel = - 2. * (Jrad_FLD(j+1,b) + Jrad_FLD(j, b)) / (x_i[j] * x_i[j]);
-                    //dJ = 1e-10;
-                    //dJ = - 2. / (x_i[j] * x_i[j]);
-                //}
+                double dJ = std::abs(Jrad_FLD(j+1,b) - Jrad_FLD(j,b))/(Jrad_FLD(j, b) + 1e-300);
                     
                 double R       = 1.* xi_rad * tau_inv *  dJ ; // Put in 1.0 as prefactor to get correct rad shock
                 double D       = 1.* tau_inv * surf[j] * flux_limiter(R);
@@ -107,17 +77,6 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
                 
                 if(debug > 1)
                     cout<<" radiation part 0. t,j,b="<<steps<<","<<j<<","<<b<<" tau_inv/R/D = "<<tau_inv<<"/"<<R<<"/"<<D<<" J/J/dJ = "<<Jrad_FLD(j+1,b)<<"/"<<Jrad_FLD(j,b)<<"/"<<(Jrad_FLD(j+1,b)-Jrad_FLD(j,b))<<" flux = "<<D*(Jrad_FLD(j+1,b)-Jrad_FLD(j,b))<<endl;
-                
-                /*if(j==20 || j==21 || j==22) {
-                    if( (base->steps == 3205600) || (base->steps == 3206000) || (base->steps == 3205700) || (base->steps == 3205625) || (base->steps == 3205650) || (base->steps == 3205675) || (base->steps == 3205605) || (base->steps == 3205610) || (base->steps == 3205615) || (base->steps == 3205620) ) {
-                    
-                    
-                    //cout<<"Radiation 1,  R  "<<   
-                    
-                    
-                    }
-                }*/
-                    
             }
         }
         
@@ -125,23 +84,18 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
         // Boundaries:
         // Left boundary:
         //    Reflecting / no flux or planetary temperature
-        //if(use_planetary_temperature == 0) {
             for (int j=0; j < num_ghosts; j++) {
                 int idx = j*stride + b*(num_vars + 1) ;
                 int idx_r = j*num_vars + b ;
                 
                 l[idx] = 0 ;
                 u[idx] = -d[idx] ;
-                //u[idx] = 0. ;
-                //d[idx] =  ;
                 r[idx_r] = 0 ; 
             }
-        //}
         
         //   Right boundary: reflective?
-        //if(geometry == Geometry::cartesian) {
         if(closed_radiative_boundaries) {
-        //if(true) {
+        
 
             int Ncell = num_cells - 2*(num_ghosts - 1);
             for (int j=0; j < num_ghosts; j++) {
@@ -150,7 +104,6 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
                 int idx = i*stride + b*(num_vars + 1) ;
                 int idx_r = i*num_vars + b ;    
                 
-                //d[idx] = D
                 l[idx] = -l[idx] ;
                 u[idx] = 0 ;
                 r[idx_r] = 0 ;
@@ -158,7 +111,6 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
         }
         else {//   Right boundary: free stream, no emission / absorbtion.
             
-            // Only need to set the very last cell.
             //  Assume F = J and \div(F) = const
 
             int idx = (num_cells)*stride ;
@@ -175,34 +127,7 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
                     f *= f;
                     break;
             }
-            //int i = num_cells+1;
-            /*
-            double dx      = (x_i12[idx+1]-x_i12[idx]) ;                
-            double rhokr   = max(2.*(total_opacity(idx,b)*total_opacity(idx+1,b))/(total_opacity(idx,b) + total_opacity(idx+1,b)), 4./3./dx );
-                 
-                    rhokr   = min( 0.5*( total_opacity(idx,b) + total_opacity(idx+1,b)) , rhokr);
-                       //rhokr = total_opacity(j,b);
-
-                //rhokr   = max(total_opacity(j,b), 4./3./dx );
-                
-            double tau_inv = 1. / (dx * rhokr) ;
-            double dJ      = std::abs(Jrad_FLD(idx+1,b) - Jrad_FLD(idx,b))/(Jrad_FLD(idx+1,b) + Jrad_FLD(idx, b) + 1e-300);
-            if(dJ < 1e-10 && 1./tau_inv < 1e-10) {
-                    //double dJrel = - 2. * (Jrad_FLD(j+1,b) + Jrad_FLD(j, b)) / (x_i[j] * x_i[j]);
-                    //dJ = 1e-10;
-                    //dJ = - 2. / (x_i[j] * x_i[j]);
-                }
-                    
-            double R       = 4. * tau_inv *  dJ ; // Put in 1.0 as prefactor to get correct rad shock
-            double D       = 1. * tau_inv * no_rad_trans * surf[idx] * flux_limiter(R);
-                
-            arr_rhokr[idx] = rhokr;
-            arr_R[idx]        = R;
-            arr_D[idx]        = D;
-            arr_JDJ[idx]      =  std::abs(Jrad_FLD(idx+1,b) - Jrad_FLD(idx,b));///(4.*pi*(Jrad_FLD(j+1,b) + Jrad_FLD(j, b) + 1e-300));
             
-            d[idx]  = D;
-            l[idx]  =-D;*/
             l[idx] = -f*d[idx] ;
             u[idx] = 0;
             r[idx_r] = 0 ;
@@ -233,7 +158,7 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
     
     if(radiation_matter_equilibrium_test <= 2) { //radtests 3 and 4 are delta-radiation peaks without energy-matter coupling
         
-        for (int j=0; j < num_cells+1; j++) {
+        for (int j=0; j < num_cells+numcells_offset; j++) {
             
             double exchange_d_sum = 0.;
             double exchange_r_sum = 0.;
@@ -244,7 +169,6 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
                 int idx_s = j * (num_species) + s;
                 double Ts = species[s].prim[j].temperature ;
                 double Ts3 = Ts*Ts*Ts;
-                //double Ts4 = Ts3*Ts;
                 double rhos = species[s].prim[j].density ;
                 double kappa = species[s].opacity_planck(j, 0);
                 
@@ -279,9 +203,7 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
                 
                 
                 if(j==48000) {
-                    
                     cout<<" eta1/eta2/tempeta1 = "<<eta1[idx_s]<<"/"<<eta2[idx_s]<<"/"<<tempeta<<endl;
-                    
                 }
                 
                 exchange_d_sum += no_rad_trans * rhos * kappa * (1 - 4.*sigma_rad*Ts3/pi * eta2[idx_s]/denoms[idx_s]);
@@ -309,41 +231,22 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
         cout<<"L ="<<endl;
         for(int i = 0; i < size_M; i++) {
             
-            /*if(i%num_vars == 0)
-                cout<<endl;
-            if(i%stride == 0)
-                cout<<endl;
-            */
             cout<<l.at(i)<<" ";
             
         }
         
         cout<<"D ="<<endl;
         for(int i = 0; i < size_M; i++) {
-            /*
-            if(i%num_vars == 0)
-                cout<<endl;
-            if(i%stride == 0)
-                cout<<endl;
-            */
             cout<<d.at(i)<<" ";
             
         }
         
         cout<<"u ="<<endl;
         for(int i = 0; i < size_M; i++) {
-            /*
-            if(i%num_vars == 0)
-                cout<<endl;
-            if(i%stride == 0)
-                cout<<endl;
-            */
+  
             cout<<u.at(i)<<" ";
             
         }
-        //cout<<"L ="<<endl<<l<<endl;
-        //cout<<"D ="<<endl<<d<<endl;
-        //cout<<"U ="<<endl<<u<<endl;
         
         char stepstop;
         cin>>stepstop;
@@ -363,14 +266,12 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
     if( globalTime > 1e15)
         Jswitch = 1;
     
-    for (int j=0; j <= num_cells+1; j++) {
+    for (int j=0; j <= num_cells+numcells_offset; j++) {
         for(int b=0; b<num_bands_out; b++) {
             if(solve_for_j)
                 Jrad_FLD(j, b) = r[j*num_vars + b] ;
-            
-            //cout<<"j/b = "<<j<<"/"<<b<<" J = "<<r[j*num_vars + b]<<endl;
-            
-            //if(Jswitch == 1) {
+                        
+            //Check for negative J
             if(Jrad_FLD(j, b) < 0.) {
                 cout<<" -J in j/steps "<<j<<"/"<<steps<<" rhokr = "<< arr_rhokr[j]<<" R = "<< arr_R[j]<<" D ="<< arr_D[j]<<" dJ = "<<arr_JDJ[j]<<" J = "<<Jrad_FLD(j, b)<<" Ji+Ji+1 = "<<Jrad_FLD(j+1, b)+Jrad_FLD(j, b)<<" exchange sums = "<<exchange_d_sums[j]<<"/"<<exchange_r_sums[j]<<endl;
                 
@@ -380,11 +281,10 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
             if(radiation_matter_equilibrium_test == 1) {
                 Jrad_FLD(j, b) = Jrad_init(j,b);
             }
-                    
-          //  std::cout << j << "\t" <<  Jrad_FLD(j, b) << "\n" ;
         }
     }
     
+    //Stop for a check with the user, if we find negative J?
      if(Jswitch == 1) {
         
         //char a;
@@ -396,7 +296,6 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
     //
     
     int Tswitch = 0;
-    
     
     if(Tswitch == 1) {
         
@@ -412,7 +311,7 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
         //compute_collisional_heat_exchange();
         
     
-        for (int j=0; j < num_cells+1; j++){
+        for (int j=0; j < num_cells+numcells_offset; j++){
             
             Matrix_t coll_heat_matrix   = Matrix_t::Zero(num_species, num_species);
             Vector_t coll_heat_b        = Vector_t::Zero(num_species);
@@ -487,27 +386,17 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
             }
         }
         
-        //misbehaving atoms get reset beyond the sonic point
-        for(int s=0; s<num_species; s++) {
-            if(s==4 || s==7) { 
-                
-                for (int j=num_cells-5; j < num_cells+2; j++){
-                    
-                    species[s].prim[j].temperature = species[s].prim[num_cells-6].temperature ;
-                }
-                
-                //species[s].prim[num_cells+2].temperature = 0.9*species[s].prim[num_cells].temperature;
-                
-            }
-        }
     } else {
         
             
-        for (int j=0; j < num_cells+1; j++){
+        for (int j=0; j < num_cells + numcells_offset; j++){
             for(int s=0; s<num_species; s++) {
                 
                 int idx_s = j * (num_species) + s;
                 double tt = eta1[idx_s]/denoms[idx_s] + eta2[idx_s]/denoms[idx_s]*Jrad_FLD(j, 0);
+                
+                if( j>num_cells-10 && steps>10e99)
+                    cout<<"t = "<<steps<<" j ="<<j<<" T = "<<tt<<" num_cells = "<<num_cells<<endl;
                 
                 //if(j==140)
                 //    cout<<"t = "<<steps<<" T = "<<tt<<endl;
@@ -521,30 +410,18 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
                 if(tt<temperature_floor)
                     tt=temperature_floor;
                 
-                //if(tt>max_temperature)
-                //    tt=max_temperature;
-                
                 if(Jswitch == 0)
                     species[s].prim[j].temperature = tt ;
-                //if(j==num_cells)
-                //    cout<<" num_cells = "<<num_cells<<" temp = "<<species[s].prim[j].temperature<<endl;
+                
             }
         }
         
-        for(int s=0; s<num_species; s++) {
-            if(s==4 || s==7) { //misbehaving atoms get reset beyond the sonic point
-                
-                for (int j=num_cells-5; j < num_cells+1; j++){
-                    
-                    species[s].prim[j].temperature = species[s].prim[num_cells-6].temperature ;
-                }
-                
-                //species[s].prim[num_cells+2].temperature = 0.9*species[s].prim[num_cells].temperature;
-                
-            }
-            
-        }
         
+        if( steps>10e99) {
+            char a;
+            cin>>a;
+        }
+       
     }
     
     
@@ -557,15 +434,9 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
     //
     
     if(use_convective_fluxes) {
-        
-        //double fl = 0;
-        //double fr = 0;
-        //double lam = 0;
         bool electrons = 0;
-        //double Tavg;
-        //double Tdiff;
         
-        for (int j=0; j < num_cells+1; j++){
+        for (int j=0; j < num_cells+numcells_offset; j++){
             for(int s=0; s<num_species; s++) {
                 
                 double dx = (x_i12[j+1]-x_i12[j]) ;
@@ -604,35 +475,15 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
                     
                 }
                 else {
-                    lam = 0. ;//For general expression need 5.167 with 4.130a and the collision integrals 4.114
-                    
+                    lam = 0.*alphaconv;//Placeholder code for the compiler to stfu//For general expression need 5.167 with 4.130a and the collision integrals 4.114
                 }
-                
-                //fr = fl;
-                //fl = lam * 
-                    
-                
+                //TODO: Couple with solution matrix once we have a good idea how to do the convection in the simple radiation solver
             }
-            
-            
             
         }
         
     }
         
-    
-    
-    
-    for(int s=0; s<num_species; s++)  {
-        //species[s].prim[num_cells].temperature   = species[s].prim[num_cells-1].temperature; // species[s].const_T_space;
-        //species[s].prim[num_cells+1].temperature = species[s].prim[num_cells-1].temperature; //species[s].const_T_space;
-        //species[s].prim[num_cells+2].temperature = species[s].prim[num_cells-1].temperature; //species[s].const_T_space;
-    }
-    for(int b=0; b<num_bands_out; b++)  {
-        //Jrad_FLD(num_cells, b)   = 0.99*Jrad_FLD(num_cells-1, b);
-        //Jrad_FLD(num_cells+1,b)  = 0.98*Jrad_FLD(num_cells-1, b);
-        //Jrad_FLD(num_cells+2,b)  = 0.97*Jrad_FLD(num_cells-1, b);
-    }
     
     
     // Update energies. 

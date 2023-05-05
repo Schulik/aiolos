@@ -1,13 +1,9 @@
-///////////////////////////////////////////////////////////
-//
-//
-//  io.cpp
-//
-// This file contains input/output routines.
-//
-//
-//
-///////////////////////////////////////////////////////////
+
+/**
+ * io.cpp
+ * 
+ * This file contains input/output routines.
+ */
 
 #include <iomanip>
 #include <sstream>
@@ -15,20 +11,17 @@
 #include "aiolos.h"
 
 
-//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-//
-// Read parameters: Looks for the value of one parameter in a file
-// 
-// Takes:
-//      string filename: The filename that should contain all parameters and their values
-//      string variablename: the name of one individual parameter
-//      int desired_vartype: what kind of value are we looking for, int, double or string?
-//
-// Returns:
-//      simulation_parameter structure containing the name, type and value of a parameter found in a file
-//
-//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
+/**
+ * Reads the species data such as name, mass, adiabatic index, charge, initial density in ghost cell, opacity files etc.
+ * 
+ * Does a number of convoluted operations to allow for different file formats. Contains also the code to interpolate opacities on-the-fly. 
+ * This happens assuming that the *.opa, or *.op2 or *.op3 files have an arbitrary wavelength spacing, and opacity points given at any wavelength are exact. 
+ * The mean opacities are then computed as integrals over the bands chosen by the user. Note that those means are not Planck-means, but purely data-driven averages with the 
+ * weighting function per wavelength being 1. If correct Planck, Solar and Rosseland means need to be used, then those have to be already contained in the opa files, or tables need to be specified.
+ * 
+ * @param[in] filename Species file to read from
+ * @param[in] species_index This species number
+ */
 int c_Species::read_species_data(string filename, int species_index) {
     
     //////////////////////////////////////////////////////////
@@ -46,21 +39,13 @@ int c_Species::read_species_data(string filename, int species_index) {
     opacity_avg_planck           = Eigen::VectorXd::Zero(num_bands_out); //num_cells * num_bands
     opacity_avg_rosseland        = Eigen::VectorXd::Zero(num_bands_out); //num_cells * num_bands
     
-    /*if (base->opacity_model == 'C')  {
-        for(int b = 0; b < num_bands_in; b++) opacity_avg_solar(b)      = const_opacity;
-        for(int b = 0; b < num_bands_out; b++) opacity_avg_planck(b)    = const_opacity;
-        for(int b = 0; b < num_bands_out; b++) opacity_avg_rosseland(b) = const_opacity;
-        
-        return 0;
-    }*/
-    
     ifstream file(filename);
     string line;
     if(!file) {
         cout<<"Couldnt open species file "<<filename<<"!!!!!!!!!!1111"<<endl;
         
     }
-    //simulation_parameter tmp_parameter = {"NaN",0,0.,0,"NaN"};
+    
     int found = 0;
     double temp_static_charge = 0.;
     this->num_opacity_datas = -1;
@@ -71,7 +56,6 @@ int c_Species::read_species_data(string filename, int species_index) {
     
         std::vector<string> stringlist = stringsplit(line," ");
 
-        //if(line.find(variablename) != string::npos) {
         if(stringlist[0].find("@") != string::npos) {
             
             if(std::stoi(stringlist[1]) == species_index) {
@@ -86,13 +70,10 @@ int c_Species::read_species_data(string filename, int species_index) {
                 this->density_excess   = std::stod(stringlist[7]);
                 this->is_dust_like     = std::stod(stringlist[8]);
                 
-                //if(opacity_model == 'P') {}
                 this->opacity_data_string = stringlist[9];
                 
                 if(stringlist.size() == 11) //Assume that additional to an opacity table in opacity_data_string a solar opacity wavelength file has been provided
                     this->opacity_corrk_string = stringlist[10];
-                    
-                //this->num_opacity_datas= std::stod(stringlist[10]);
                 
                 this->inv_mass = 1./(mass_amu*amu);
                 
@@ -105,7 +86,6 @@ int c_Species::read_species_data(string filename, int species_index) {
     
     }
     
-    //if(std::abs(temp_static_charge) > 1.1 || std::abs(temp_static_charge) < 0.1) {
     if(std::abs(temp_static_charge) < 0.1) {
         this->static_charge = 0;
     }
@@ -113,8 +93,6 @@ int c_Species::read_species_data(string filename, int species_index) {
         
         this->static_charge = std::floor(temp_static_charge);
     }
-    
-    //cout<<"    In read_parameter Pos2"<<endl;
     
     if(found == 0) {
             if(debug > 0)
@@ -136,13 +114,11 @@ int c_Species::read_species_data(string filename, int species_index) {
     //////////////////////////////////////////////////////////
     //////////////////////////////////////////////////////////
     
-    //if(num_opacity_datas > -1) 
-    
     if(base->opacity_model == 'T' || base->opacity_model == 'K') { 
         //
         // Tabulated data from opacit averages
         //
-        //opacity_data_string = "14N-1H3_T800_zeroes.aiopa";
+        
         string opacityinputfile = "inputdata/" + opacity_data_string;
         std::vector<string> stringending = stringsplit(opacityinputfile,".");
         
@@ -156,7 +132,7 @@ int c_Species::read_species_data(string filename, int species_index) {
     }
     
     if(base->opacity_model == 'P' || base->opacity_model == 'M' || base->opacity_model == 'C' || base->opacity_model == 'K' ) {
-        //opacity_data_string = "14N-1H3_T200.opa"; //TODO: REMEMBER TO DELETE THIS LINE AGAIN!
+        
         
         if( base->opacity_model == 'K' ) //Run the routine with one argument further on in the species list 
             opacity_data_string = opacity_corrk_string;
@@ -200,7 +176,6 @@ int c_Species::read_species_data(string filename, int species_index) {
         
         while(std::getline( file2, line2 )) {
             std::vector<string> stringlist = stringsplit(line2," ");
-            //std::vector<string> stringlist = split(line2," ");
             
             file_opacity_data(data_count, 0) = std::stod(stringlist[0]); // Wavelength
             file_opacity_data(data_count, 1) = std::stod(stringlist[1]); // Opacity solar
@@ -208,7 +183,6 @@ int c_Species::read_species_data(string filename, int species_index) {
             if(num_readin_columns >= 3) file_opacity_data(data_count, 3) = std::stod(stringlist[3]); // Opacity planck
             
             if(debug > 1) {
-                //cout<<"stringlist "<<stringlist<<" ";
                 cout<< "file_opacity_data = "<<file_opacity_data(data_count, 0)<<" "<<file_opacity_data(data_count, 1);
                 if(num_readin_columns >= 2) cout<<" "<<file_opacity_data(data_count, 2);
                 if(num_readin_columns >= 3) cout<<" "<<file_opacity_data(data_count, 3);
@@ -276,12 +250,6 @@ int c_Species::read_species_data(string filename, int species_index) {
                     opacity_data(i,col) = pow(10., std::log10(file_opacity_data(j,col)) + m * std::log10(wl/lmin) );
                 }
                 
-                    //else if (wl < file_opacity_data(0, 0))
-                    //    opacity_data(i,1) = file_opacity_data(0,1);
-                    //else if (wl > file_opacity_data(num_tmp_lambdas-1, 0))
-                    //    opacity_data(i,1) = file_opacity_data(num_tmp_lambdas-1,1);
-                //}
-                
             }
             
             //cout<<" ~~~~~~~~~~~~~~~ Read in opacities for col_num = "<<num_readin_columns<<endl;
@@ -333,17 +301,7 @@ int c_Species::read_species_data(string filename, int species_index) {
                     if( wl < lmax && wl > lmin) {
                         
                         (*opacity_avg)[b]+= opacity_data(i,col); 
-                            //opacity_avg(b) += opacity_data(i,col); 
                         wlcount++;
-                        /*
-                        if(opacity_data(i,col) > 1e10 || opacity_data(i,col) < 1.1e-20) {
-                            //cout<<"Band opacity_data("<<i<<",1) = "<<opacity_data(i,1)<<"is faulty! wlcount ="<<wlcount<<endl;
-                            //cout<<" Band b, lmax "<<lmax<<" opa_data(0,0) = "<<opacity_data(0,0)<<endl;
-                            //cout<<" Band b, lmin "<<lmin<<" opa_data(-1,0) = "<<opacity_data(num_tmp_lambdas,0)<<endl;
-                            
-                        } else {
-                            
-                        }*/
                     }
                     if(i==0) {
                         
@@ -398,21 +356,6 @@ int c_Species::read_species_data(string filename, int species_index) {
                     cout<<" DEBUG b_out = "<<b<<" avg_planck = "<<opacity_avg_rosseland(b)<<" const_opa = "<<const_opacity<<endl;
                 
             }
-        
-        //
-        // ONLY FOR METALS COOLING SCENARIO!
-        //
-        /*if(base->num_species == 4 && num_bands_in == 3) {
-            cout<<" INFORMATION: Metal cooling scenario started. Setting all solar XRay opacities except metals to low value."<<endl;
-            
-            if(species_index < 3) 
-                opacity_avg_solar(0) = 1e-10;
-            //else 
-            //    //opacity_avg_solar(0) = 1e28;
-            //}
-            
-        }*/
-        
             
         for(int b = 0; b < num_bands_in; b++)  if(std::isnan(opacity_avg_solar(b) )) opacity_avg_solar(b) = 1e-10;
         for(int b = 0; b < num_bands_out; b++) if(std::isnan(opacity_avg_planck(b) )) opacity_avg_planck(b) = 1e-10;
@@ -427,11 +370,7 @@ int c_Species::read_species_data(string filename, int species_index) {
                 opacity_avg_solar(10) = 1e-10;
         }
         
-        //for(int b = 0; b < num_bands_in; b++) opacity_avg_solar(b)      *=  base->const_opacity_solar_factor;
-        //for(int b = 0; b < num_bands_out; b++) opacity_avg_planck(b)    *=  base->const_opacity_planck_factor;
-        //for(int b = 0; b < num_bands_out; b++) opacity_avg_rosseland(b) *=  base->const_opacity_rosseland_factor;
-        
-        //Done! Now debug plot stuff
+        //Done! Now plot debug stuff so that we're sure the opacities do what they should.
         cout<<"Done reading in data for species = "<<species_index<<". Wavelength grids in/out = ";
         for(int b = 0; b <= num_bands_in; b++) cout<<base->l_i_in[b]<<"/";
         cout<<" ||| ";
@@ -452,39 +391,19 @@ int c_Species::read_species_data(string filename, int species_index) {
         
     }
      else {
-        //for(int b = 0; b < num_bands_in; b++) opacity_avg_solar(b)      =  base->const_opacity_solar_factor * const_opacity;
-        //for(int b = 0; b < num_bands_out; b++) opacity_avg_planck(b)    =  base->const_opacity_planck_factor * const_opacity;
-        //for(int b = 0; b < num_bands_out; b++) opacity_avg_rosseland(b) =  base->const_opacity_rosseland_factor * const_opacity;
-    }
-    
-    //else if(base->opacity_model == 'T' || base->opacity_model == 'K') { 
-    
-   
-    
-    
-    //cout<<" IN INIT SPECIES, OPACITY_DATA for file "<<opacity_data_string<<" is "<<endl<<opacity_data<<endl;
-    if(debug > 1) {
-        
-        char stopchar;
-        cin>>stopchar;
+         //No other opacity mode needed for now. Do nothing. Table reading mode has been moved to lines 120ff.
     }
     
     return 0;
 }
-
-
-///////////////////////////////////////////////////////////////////////////////////////////////
-//
-//
-//
-//
-//
-//
-//
-///////////////////////////////////////////////////////////////////////////////////////////////
-
-
-
+ 
+/**
+ * Read in pressure and temperature dependent opacity tables from *.aiopa files.
+ * 
+ * Aiopa files currently have the hardcoded format: Arbitrary number of P-T grids for Irradiation means, One P-T grid for Planck-mean, One P-T grid for outgoing Rosseland mean band value.
+ * 
+ * @param[in] tablename Filename of the table file.
+ */
 void c_Species::read_opacity_table(string tablename) {
     
     int num_bands_out = base->num_bands_out;
@@ -651,6 +570,14 @@ class ParameterError : public std::invalid_argument {
   int count ;
 } ;
 
+/**
+ * Read parameter: Looks for the value of one parameter in a file
+ * 
+ * @param[in] filename The filename that should contain all parameters and their values
+ * @param[in] variablename the name of one individual parameter in the file
+ * @param[in] debug Display debug information.
+ * @return The value of variablename in filename as given by the template type. User is responsible of type safety here.
+ */
 template<typename T>
 simulation_parameter<T> read_parameter_from_file(string filename, string variablename, int debug) {
     
@@ -703,6 +630,15 @@ simulation_parameter<T> read_parameter_from_file(string filename, string variabl
 }
 
 
+/**
+ * Read parameter: Looks for the value of one parameter in a file
+ * 
+ * @param[in] filename The filename that should contain all parameters and their values
+ * @param[in] variablename the name of one individual parameter in the file
+ * @param[in] debug Display debug information.
+ * @param[in] default_ Default value for variablename, which is returned if variablename is not found in filename.
+ * @return The value of variablename in filename as given by the template type. User is responsible of type safety here.
+ */
 template<typename T>
 simulation_parameter<T> read_parameter_from_file(string filename, string variablename, int debug, T default_) {
     simulation_parameter<T> parameter ;
@@ -723,9 +659,6 @@ simulation_parameter<T> read_parameter_from_file(string filename, string variabl
     return parameter ;
 }
 
-
-
-
 template simulation_parameter<bool>  read_parameter_from_file(string, string, int, bool);
 template simulation_parameter<bool>  read_parameter_from_file(string, string, int);
 template simulation_parameter<int>   read_parameter_from_file(string, string, int, int);
@@ -744,11 +677,16 @@ template simulation_parameter<BoundaryType> read_parameter_from_file(string, str
 template simulation_parameter<IntegrationType> read_parameter_from_file(string, string, int, IntegrationType);
 template simulation_parameter<IntegrationType> read_parameter_from_file(string, string, int);
 
-//
-//
-// Main output file
-//
-// 
+
+/**
+ * Write the main output file. Each species generates their own output file of a fixed column number (as opposed to diagnostic files, which change their column numbers depending on simulation setup, i.e. num species, bands in, bands out).
+ * 
+ * File contains mostly hydrodynamic and thermodynamic information, cfl timestep limitations, gravity, heating and cooling functions.
+ * Users can adjust whether they want ghost cell information in their files or not.
+ * More details in cheat_sheet.ods in the main aiolos github.
+ * 
+ * @param[in] timestepnumber Timestamp index on the file (e.g. 0, 1, 2... -1)
+ */
 void c_Species::print_AOS_component_tofile(int timestepnumber) {
                            
     //
@@ -822,22 +760,25 @@ void c_Species::print_AOS_component_tofile(int timestepnumber) {
     }
     else cout << "Unable to open file" << filename << endl; 
     outfile.close();
-    
-    
 
 }
 
+/**
+ * Write the diagnostic file. Has a setup-dependent column number  i.e. depends on num species, bands in, bands out, as opposed to the main output files which have a fixed number of columns.
+ * 
+ * File contains information about all radiative bands, incoming radiation, total heating function, emitted radiation, optical depths per cell, integrated optical depths, opacities, radiative temperatures per band, outgoing fluxes per band, convective fluxes. More details in cheat_sheet.ods in the main aiolos github.
+ * 
+ * @param[in] outputnumber Timestamp index on the file (e.g. 0, 1, 2... -1)
+ */
 void c_Sim::print_diagnostic_file(int outputnumber) {
     
     //
     //
-    // Step 2: Print radiation + species diagnostics file. Column numbers in this file will vary depending on setup
+    // Print radiation + species diagnostics file. Column numbers in this file will vary depending on setup
     //
     //
     
     //Only print this file once, as it contains all the info 
-    
-        
         string filenameDiagnostic ;
         {
             stringstream filenamedummy;
@@ -854,9 +795,6 @@ void c_Sim::print_diagnostic_file(int outputnumber) {
 
         if (outfileDiagnostic.is_open())
         {
-            
-            //outfileDiagnostic<<""<<endl;
-            
             for(int i=1; i<=num_cells; i++) {
                 
                 //
@@ -884,7 +822,7 @@ void c_Sim::print_diagnostic_file(int outputnumber) {
                 
                 //Solar heating profile
                 for(int b=0; b<num_bands_in; b++) {
-                    outfileDiagnostic<<'\t'<<dS_band(i,b);
+                    outfileDiagnostic<<'\t'<<dS_band(i,b) + dS_band_special(i,b);
                 }
                 
                 //Total opacity from all species
@@ -979,11 +917,13 @@ void c_Sim::print_diagnostic_file(int outputnumber) {
     
 }
 
-
+/**
+ * Print monitor file. Used to monitor, mass momentum and energy conservation in a cartesian box without any forces acting. Currently disabled output.
+ * 
+ * @param[in] num_steps Current step number in the main loop.
+ */
 void c_Sim::print_monitor(int num_steps) {
 
-    
-    
     //
     //
     // First compute the volumetric sum of all initial conserved quantities
@@ -1115,4 +1055,33 @@ void c_Sim::print_monitor(int num_steps) {
     if(num_steps == -1) 
         cout<<"Finished writing monitor_file "<<filename2<<endl;
     
+}
+
+/**
+ * Writing the execution directory and the parameter file with a timestap into the execution_log.txt
+ * 
+ * @param[in] dir directory string
+ * @param[in] par parameter string
+ */
+void c_Sim::write_into_execution_log(string dir, string par, string spcfile) {
+    
+    string exlog = "execution_log.txt";
+    ofstream exlogstream(exlog, std::ios_base::app);
+    
+    auto t = std::time(nullptr);
+    auto tm = *std::localtime(&t);
+
+    std::ostringstream oss;
+    oss << std::put_time(&tm, "%Y-%m-%d %H-%M-%S");
+    //oss << std::put_time(&tm, "%d-%m-%Y %H-%M-%S");
+    auto str = oss.str();
+    
+    exlogstream<<str<<": "<<dir<<par;
+    
+    if(spcfile.compare("default.spc")==0)
+        exlogstream<<endl;
+    else
+        exlogstream<<"   with "<<spcfile<<endl;
+    
+    exlogstream.close();
 }

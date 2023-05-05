@@ -1,14 +1,9 @@
-///////////////////////////////////////////////////////////
-//
-//
-//  chemistry.cpp
-//
-//  A module to solve for time-dependent chemistry and photochemistry
-//
-//
-//
-//
-///////////////////////////////////////////////////////////
+/**
+ * chemistry.cpp
+ * 
+ * A module to solve for time-dependent chemistry and photochemistry.
+ * Not documented in the aiolos paper, but a further development.
+ */
 
 #define EIGEN_RUNTIME_NO_MALLOC
 
@@ -28,32 +23,36 @@ extern double h3plus_cooling(double Te);
 
 std::vector<double> get_thermo_variables(double T,string species_string);
 
-//
-//
-// Define and push the wanted (photo)chemical reactions into the reaction arrays.
-// This is for now how the user 
-//
+
+/* Define and allocate the wanted (photo)chemical reactions into the reaction arrays.
+ * 
+ * This is for now the only way to generate a reaction list.
+ * As last step the method generates a reaction list as string to be displayed and put under scrutiny by the user at the start of the program.
+ * See documentation of reaction constructors at the end of init_and_bounds.cpp
+ *
+ *  @param[in] cdebug Chem Debug level, independent of global debug level 
+ */
 void c_Sim::init_reactions(int cdebug) {
     
-    //std::vector<c_reaction> reactions;
-    //std::vector<c_photochem_reaction> photoreactions;
-    
+    //Step 0: Construct reaction list
     if(cdebug)
         cout<<"Init photoreactions..."<<endl;
     
     double ns = num_species;
     
+    //photoreactions.push_back(c_photochem_reaction( ns, num_bands_in, 0, {0}, {1,2}, {1.}, {1.,1.}, 1., 7. )); //Approx. from Leiden database, 7ev threshold for H2O -> OH+H
+    //photoreactions.push_back(c_photochem_reaction( ns, num_bands_in, 0, {0}, {1,2}, {1.}, {2.,1.}, 1., 7. )); //Approx. from Leiden database, 7ev threshold for H2O -> 2H+O
+    
     //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     //Begin H3+ tests
     //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    
     
     //reactions.push_back(c_reaction(0, 1, ns, {3}, {0}, {1.}, {2.}, 1.5e-9,  0.0, 4.8e4 )); //R4 in Yelle+2004 
     //reactions.push_back(c_reaction(0, 1, ns, {0}, {3}, {2.}, {1.}, 2.45e-31, -0.6, 0. ));  //R5 in Yelle+2004 
     
     //photoreactions.push_back(c_photochem_reaction( ns, num_bands_in, 0, {3}, {4,2}, {1.}, {1.,1.}, 1., 15.425927 ));      //R1a H2 + gamma -> H2+ + e-
     //photoreactions.push_back(c_photochem_reaction( ns, num_bands_in, 0, {3}, {0,1,2}, {1.}, {1.,1.,1.}, 1., 15.425927 )); //R1b H2 + gamma -> H + H+ + e-
-    photoreactions.push_back(c_photochem_reaction( ns, num_bands_in, 0, {0}, {1,2}, {1.}, {1.,1.}, 1., 13.6 ));      //R2  H + gamma -> H+ + e-
+photoreactions.push_back(c_photochem_reaction( ns, num_bands_in, 0, {0}, {1,2}, {1.}, {1.,1.}, 1., 13.6 ));      //R2  H + gamma -> H+ + e-
     
     //reactions.push_back(c_reaction(0, 1, ns, {3,4}, {5,0}, {1.,1.}, {1.,1.}, 2e-9, -0.0, 0. )); //R6 in Yelle+2004 
     //reactions.push_back(c_reaction(0, 1, ns, {5,0}, {3,4}, {1.,1.}, {1.,1.}, 2e-9, -0.0, 0. )); //R7 in Yelle+2004 
@@ -61,7 +60,7 @@ void c_Sim::init_reactions(int cdebug) {
     //reactions.push_back(c_reaction(0, 1, ns, {4,0}, {1,3}, {1.,1.}, {1.,1.}, 6.4e-10, -0.0, 0. )); //R8 in Yelle+2004 
     //reactions.push_back(c_reaction(0, 1, ns, {1,3}, {4,0}, {1.,1.}, {1.,1.}, 1.0e-9, -0.0, 2.19e4 )); //R9 in Yelle+2004 
     
-    reactions.push_back(c_reaction(0, 0, ns, {1,2}, {0}, {1.,1.}, {1.}, 2.7e-13, 0.0, 0. )); //R13 in Y04, Electron-proton recombination
+reactions.push_back(c_reaction(0, 0, ns, {1,2}, {0}, {1.,1.}, {1.}, 2.7e-13, 0.0, 0. )); //R13 in Y04, Electron-proton recombination
     //reactions.push_back(c_reaction(0, 0, ns, {4,2}, {0}, {1.,1.}, {1.}, 2.25e-7, -0.4, 0. )); //R15 in Y04, H2+- recombination
     
     //reactions.push_back(c_reaction(0, 0, ns, {5,2}, {0,3}, {1.,1.}, {1.,1.}, 1.18e-6, -0.65, 0. )); //R16a in Y04, H3+- recombination, channel 1
@@ -77,6 +76,7 @@ void c_Sim::init_reactions(int cdebug) {
     //reactions.push_back(c_reaction(0, 0, ns, {3}, {0}, {1.}, {2.}, 1.0e-11,  0.0, 0. )); //R4 in Yelle+2004 
     //reactions.push_back(c_reaction(0, 0, ns, {0}, {3}, {2.}, {1.}, 1.0e-1, 0., 0. ));  //R5 in Yelle+2004
     
+    //Step 1: Compute reaction numbers for bookkeeping
     int cnt = 0;
     num_reactions = 0;
     num_photoreactions = 0;
@@ -93,8 +93,7 @@ void c_Sim::init_reactions(int cdebug) {
             num_photoreactions++;
     }
     
-    //if(cdebug > 0) {
-        
+    //Step 2.1: Output the thermochemical reaction list which the program thinks its using
     cout<<"In init chemistry, reporting thermochemical reactions: "<<endl;
     for(c_reaction& reaction : reactions) {
             cout<<"    Reaction #"<<reaction.reaction_number<<": ";
@@ -147,6 +146,7 @@ void c_Sim::init_reactions(int cdebug) {
             
             
     }
+    //Step 2.2:  Output the photochemical reaction list which the program thinks its using
     cout<<"Reporting photoreactions: "<<endl;
     for(c_photochem_reaction& reaction : photoreactions) {
             cout<<"    Reaction #"<<reaction.reaction_number<<": ";
@@ -181,11 +181,16 @@ void c_Sim::init_reactions(int cdebug) {
     
 }
 
+/* Computes the reaction rate r in the standard way to parameterize it as r = a * T^b * exp(-c/T)
+ * This is currently redone for every cell as the c_reaction objects only exist once. TODO: Maybe update this to a radial array.
+ * 
+ * @param[in] T single gas temperature in K
+ */
 void c_reaction::update_reaction_rate(double T) {
     
     this->r = reac_a * pow(T, reac_b) * std::exp(-reac_c/T);
     
-    //TODO: If (is_reverse_reaction) r *= gibbs energy stuff;
+    //TODO: If (is_reverse_reaction) r *= gibbs energy factor;
     if(is_reverse_reac) {
         
         std::vector<double> educt = {0.,0.,0.};
@@ -223,13 +228,12 @@ void c_reaction::update_reaction_rate(double T) {
      
 }
 
-//
-// Wrapper function to make it possible to call different chemistry solvers (such as specialized one-equation solvers, that might be much faster than the general solver)
-// and do sub-cycling in case negative densitites occur.
-//
-//
-//
-//
+
+/*Wrapper function to make it possible to call different chemistry solvers (such as specialized one-equation solvers, that might be much faster than the general solver)
+ * and do sub-cycling in case negative densitites occur.
+ * 
+ * @param[in] dt_chem the timescale put into the solver. Can be a fraction up to one times the timesteps timescale.
+ */
 void c_Sim::do_chemistry(double dt_chem) {
     
     #pragma omp parallel for schedule(static,5)
@@ -262,7 +266,7 @@ void c_Sim::do_chemistry(double dt_chem) {
             //
             // Individual repeats
             //
-            double dt_eff = dt/((double)i);
+            double dt_eff = dt_chem/((double)i);
             
             for(int k = 0; k < i; k++) {
                 
@@ -329,7 +333,7 @@ void c_Sim::do_chemistry(double dt_chem) {
         //Correct species internal energy and momentum due to change in number density
         //Correct species internal energy due to total change in Gibbs energy dU = dG - PdV + TdS
         
-        //update_dS_jb_photochem(j);
+        update_dS_jb_photochem(j);
         do_highenergy_cooling(j);
         
         for(int s=0;s<num_species; s++) {
@@ -360,14 +364,17 @@ void c_Sim::do_chemistry(double dt_chem) {
 }
 
 
-
-
+/* Wrapper for the reaction rate update.
+ * 
+ * @param[in] T the single gas temperature in K
+ */
 double c_reaction::get_reaction_rate(double T) {
     
     update_reaction_rate(T);
     
     return r;
 }
+
 
 //
 //
@@ -396,6 +403,17 @@ double c_reaction::get_reaction_rate(double T) {
 // Recombination reactions are regular chemical reactions which don't conserve particle number (by using the appropriate stochiometric coefficients).
 // Number densities reach this routine already normalized as n_{old, s} = N_{old, s}/n_tot. Nonetheless n_tot is needed to get the correct reaction rates
 //
+
+/* General (=thermochemical + photochemical) implicit reaction solver. Methodology explained in comment above.
+ * Works optionally in a shared memory parallelization version with OMP. (Performance is benchmarked, but needs debugging. Currently not working correctly in parallel mode.)
+ * 
+ * @param[in] dtt     timestep length
+ * @param[in] cell    cell number
+ * @param[in] cdebug  Chem debug level
+ * @param[in] n_olds  vector of all number densities in cell
+ * @param[in] n_tot   Total number density of all species in cell, used as normalization constant
+ * @return New number densities of all species in cm^-3
+ */
 Vector_t c_Sim::solver_cchem_implicit_general(double dtt, int cell, int cdebug, const Vector_t& n_olds, double n_tot) {
     
     int loc_thr = omp_get_thread_num();
@@ -626,11 +644,11 @@ Vector_t c_Sim::solver_cchem_implicit_general(double dtt, int cell, int cdebug, 
     return n_news;
 }
 
-//
-//
-// Take the already solved chemical and photochemical equations and update Energy, momentum and heating rates for each species according to the ionizing photons absorbed
-//
-//
+
+/* This uses the known rates of $\dot{n}$ which are assumed to be constant over the timestep, to compute energy, momentum and heating rates for each species.
+ * 
+ * @param[in] cell Cell number in which to update energy and momentum
+ */
 void c_Sim::update_dS_jb_photochem(int cell) {
     
     Vector_t n_olds          = Vector_t(num_species);
@@ -740,7 +758,7 @@ void c_Sim::update_dS_jb_photochem(int cell) {
     //
     //
     
-    for(c_reaction& reaction : reactions) {
+    for(c_reaction& reaction : reactions) { 
         
         //
         // TODO: Spread dG onto reaction products
@@ -766,12 +784,11 @@ void c_Sim::update_dS_jb_photochem(int cell) {
             for(int& ej : reaction.educts) {
                 chem_momentum_matrix(pj, ej) -= 1.*dt * reaction.dndt_old * species[pj].mass_amu/reaction.products_total_mass;
                 //momentum_b(pj)               -= 1.*dt * reaction.dndt_old * species[pj].mass_amu/reaction.products_total_mass;
-                //species[ej].dG(cell)         -= dLambda/reaction.products_total_mass;  //This is reaction heating, but we add it to dG, in order to be able to split it from photon heating
+                //species[ej].dG(cell)         -= dLambda/reaction.products_total_mass;  //This is reaction heating, but we add it to dG, in order to be able to split it from thermal heating
             
                 //cout<<" from "<<species[ej].speciesname<<" to "<<species[pj].speciesname<<endl;
             }
         }
-        
         
         /*
         for(int& ej : reaction.educts) {
@@ -887,6 +904,11 @@ void c_Sim::update_dS_jb_photochem(int cell) {
     }
 }
 
+/**
+ * Prescribed non-thermal cooling functions. Called from do_chemistry() in chemistry.cpp line 335. Equivalent functionality in photochem_level=1 in photochem.cpp lines ~700.
+ * 
+ * @param[in] cell Cell number in which to add cooling contributions.
+ */
 void  c_Sim::do_highenergy_cooling(int cell) {
     
     //
@@ -989,10 +1011,14 @@ void  c_Sim::do_highenergy_cooling(int cell) {
     }
 }
 
-//
-// Example specialized fast solver for one specific reaction (in this case: co + 3 h2 <-> h2o + ch4) with reaction coefficients kf (k_forward) and kr (k_reverse)
-// Edit: too lazy to translate python code, do if necessary
-//
+/* Specialied one- or few-reaction solver for a limited number of ndots.
+ * Previously used for (co + 3 h2 <-> h2o + ch4) with reaction coefficients kf (k_forward) and kr (k_reverse)
+ * 
+ * @param[in] dt timestep length
+ * @param[in] num_spec number of species
+ * @param[in] cdebug Chem debug level
+ * @return Success or fail
+ */
 int solver_cchem_implicit_specialized_cochem(double dt, int num_spec, int cdebug) {
     
     /*
@@ -1028,9 +1054,9 @@ int solver_cchem_implicit_specialized_cochem(double dt, int num_spec, int cdebug
     return 0.;
 }
 
-//
-// Returns H0/RT, s0/R and cp/R according to the NASA polynomials
-//
+/*
+ * Returns thermodynamic values according to standard parameterization, i.e. H0/RT, s0/R and cp/R according to the NASA polynomials
+ */
 std::vector<double> thermo_poly(double T,double a1,double a2,double a3,double a4,double a5,double a6,double a7,double a8,double a9){
     
     double H0 = -a1*std::pow(T,-2) + a2 *std::log(T)/T + a3 + 0.5*a4*T + a5/3*T*T + a6/4*T*T*T + a7/5*T*T*T*T + a8/T;
@@ -1042,7 +1068,8 @@ std::vector<double> thermo_poly(double T,double a1,double a2,double a3,double a4
     
 }
     
-
+/* Copy&pasted list of polynomial values for thermodynamic potentials
+ */
 std::vector<double> get_thermo_variables(double T,string species_string) {
     //double h = 0., s = 0., c = 0.;
     std::vector<double> temp = {0., 0., 0.};
@@ -1226,65 +1253,10 @@ std::vector<double> get_thermo_variables(double T,string species_string) {
             temp = thermo_poly(T, 6.95961270E+04, -1.16459440E+03, 9.45661626E+00, -2.33124063E-03, 5.16187360E-06, -3.52616997E-09, 8.59914323E-13, 2.53500399E+04, -2.72635535E+01);
         else
             temp = thermo_poly(T, 1.09392200E+06, -4.49822821E+03, 1.24644643E+01, -6.34331740E-04, 1.10854902E-07, -1.12548868E-11, 5.68915194E-16, 4.65228030E+04, -5.09907043E+01);
-            
+    
+    else
+        temp = thermo_poly(T, 0., 0., 0.,0., 0., 0., 0., 0., 0.);
+        
     return temp;
     
 }
-
-    //for (int j = num_cells+1; j >= 0; j--) {
-    
-    /*
-    #if defined (_OPENMP)
-        if(loc_thr == 1) {
-                cout<<" thr = "<<loc_thr<<" doing cells = ";
-                for (int j = local_maxrange; j >= local_minrange; j--) {
-                        cout<<j<<" ";
-                }
-                char bb;
-                cin>>bb;
-        }
-    #endif
-    */
-/*        
-#if defined (_OPENMP)
-        cout<<" id="<<omp_get_thread_num()<<" j="<<j<<" local_minrange/local_maxrange = "<<local_minrange<<"/"<<local_maxrange<<" num_cells+1 = "<<num_cells+1<<" chunksize = "<<chunksize<<" residual = "<<residual<<" local_chunk = "<<local_maxrange-local_minrange<<endl;
-#else
-        cout<<" id="<<omp_get_thread_num()<<" j="<<j<<" local_minrange/local_maxrange = "<<local_minrange<<"/"<<local_maxrange<<" num_cells+1 = "<<num_cells+1<<" chunksize = "<<chunksize<<endl;
-#endif */
-
-
-
-/*
-
-                    if(globalTime > 2.9e10 && cell == 280) {
-                        double nh = species[ei].prim[cell].number_density;
-                        double np = species[reaction.products[0]].prim[cell].number_density;
-                        double ne = species[reaction.products[1]].prim[cell].number_density;
-                        cout<<cell<<" F "<<F<<" dx = "<<ds<<" kappa "<<kappa<<" hnu/eV = "<<photon_energies[b]/(kb * ev_to_K)<<" F*kappa ="<<F*kappa<<endl;
-                        cout<<" F/hnu = "<<0.25 * solar_heating(b) / photon_energies[b]<<" F/hnu/dx = "<<0.25 * solar_heating(b) / photon_energies[b]/ds<<endl;
-                        cout<<" ntot = "<<(nh + np);
-                        cout<<" other ntot = "<<(nh + ne);
-                        cout<<" steady-steate fzero/fplus = "<<nh/(nh+np)<<"/"<<np/(nh+np)<<endl;
-                        
-                        double lhs = F*kappa;
-                        double a = 2.7e-13/lhs;
-                        double b = 1.;
-                        double c = -(nh+np);
-                        double nplus = (-1 + std::sqrt(1.-4.*a*c))/2./a;
-                        double fplus = -nplus / c;
-                        //double ac = 1./(a*c);
-                        //double fplus = 0.5*(+1.*ac - std::sqrt(ac*(ac-4.)));
-                        long double temp2 = 1.-4.*a*c;
-                        //double fzero = 1.-(+1 - std::sqrt(1.-4.*a*c))/(2.*a*c); //(1.-fplus);
-                        double fzero = 1.-(+1 - (double)sqrtl(temp2))/(2.*a*c); //(1.-fplus);
-                        
-                        double temp = -0.5 * (b + 1. * std::sqrt(b*b - 4*a*c));
-                        double x1 = temp / a;
-                        double x2 = - c / temp;
-                        fzero = 1.+1./temp;
-                        
-                        cout<<" 1-4ac = "<<1.-4*a*c<<" sqrt(...) = "<<std::sqrt(1.-4.*a*c)<<" -b + sqrt(...) = "<<-1 + std::sqrt(1.-4.*a*c)<<" a = "<<a<<" a*c = "<<a*c<<endl;
-                        cout<<" theory steady-steate fzero/fplus = "<<fzero<<"/"<<fplus<<" nplus = "<<nplus<<" other fzero = "<<(c+nplus)/c<<"/"<<1.+nplus/c<<endl;
-                        char aaa;
-                        cin>>aaa;
-                    }*/

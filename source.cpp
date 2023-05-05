@@ -1,13 +1,11 @@
-///////////////////////////////////////////////////////////
-//
-//
-//  source.cpp
-//
-// This file contains routines pertaining to the gravitational and friction sources.
-//
-//
-//
-///////////////////////////////////////////////////////////
+/**
+ * source.cpp
+ * 
+ * This file contains routines pertaining to the gravitation and friction sources.
+ * 
+ * 
+ */
+
 #define EIGEN_RUNTIME_NO_MALLOC
 
 
@@ -16,159 +14,198 @@
 
 ///////////////////////////////////////////////////////////
 //
-// Chapter on gravitation
+// Gravitation
 //
 //
 ///////////////////////////////////////////////////////////
 
-
-
-    //
-    // Initialize the gravity array with a non-self gravitating solution
-    //
-    // takes: r as array
-    //
-    void c_Sim::init_grav_pot() {
+/**
+ * Initialize the gravity array with a non-self gravitating solution and the tidal field.
+ * Computes rhill which is output in the beginning of the run.
+ */
+void c_Sim::init_grav_pot() {
         
-        for(int i = 1; i <= num_cells+1; i++) {
-            enclosed_mass[i] = planet_mass;      //No self-gravity
+    for(int i = 1; i <= num_cells+1; i++) {
+        enclosed_mass[i] = planet_mass;      //No self-gravity
+        phi[i]           = get_phi_grav(x_i12[i], enclosed_mass[i]);
+            
+        if(use_tides == 1)
+            phi[i] -=0.5* 3.*G*star_mass*x_i12[i]*x_i12[i]/pow(planet_semimajor*au,3.);
+            
+    }
+    phi[0]           = get_phi_grav(x_i12[1],         planet_mass);
+        
+    rhill = planet_semimajor*au * std::pow(planet_mass / 3. / star_mass, 0.333333333333333333333);
+}
+
+
+/**
+* Compute the integrated mass in shells and the gravity array as a self-gravitating solution
+*/
+void c_Sim::update_mass_and_pot() {
+    
+    double species_dens_sum;
+    
+    if(debug >= 1)
+        cout<<"In update mass. "<<endl;
+    
+    enclosed_mass[0] = planet_mass;
+    enclosed_mass[1] = planet_mass; //Ghosts
+    
+    for(int i = 2; i <= num_cells; i++) {
+        
+        //Loop over all species densities
+        species_dens_sum = 0.;
+        for(int s = 0; s < num_species; s++)
+            species_dens_sum += species[s].u[i].u1;
+        
+        double xn3 = x_i[i];
+        xn3 = xn3*xn3*xn3;
+        double xl3 = x_i[i-1];
+        xl3 = xl3*xl3*xl3;
+        
+        enclosed_mass[i] = enclosed_mass[i-1] +  4. * 3.141592 * (xn3 - xl3)/3. * species_dens_sum; //Straightfoward integration of the poisson eqn
+        
+        if (use_self_gravity == 1) 
             phi[i]           = get_phi_grav(x_i12[i], enclosed_mass[i]);
-            
-            if(use_tides == 1)
-                phi[i] -=0.5* 3.*G*star_mass*x_i12[i]*x_i12[i]/pow(planet_semimajor*au,3.);
-            
-        }
-        phi[0]           = get_phi_grav(x_i12[1],         planet_mass);
-        //phi[1]           = get_phi_grav(x_i12[2],         planet_mass);
-        
-        rhill = planet_semimajor*au * std::pow(planet_mass / 3. / star_mass, 0.333333333333333333333);
-    }
-
-    //
-    // Compute the gravity array as a self-gravitating solution
-    //
-    // takes: r as array
-    //    
-    void c_Sim::update_mass_and_pot() {
-        
-        double species_dens_sum;
-        
-        if(debug >= 1)
-            cout<<"In update mass. "<<endl;
-        
-        enclosed_mass[0] = planet_mass;
-        enclosed_mass[1] = planet_mass;
-        
-        for(int i = 2; i <= num_cells; i++) {
-            
-            if(debug >= 1) {
-                if(i>=0)
-                    cout<<"In update mass in "<<i<<"th element."<<endl;
-                if(i==num_cells-1)
-                    cout<<"In update mass, last element."<<endl;
-            }
-            
-            //Loop over all species densities
-            species_dens_sum = 0.;
-            for(int s = 0; s < num_species; s++)
-                species_dens_sum += species[s].u[i].u1;
-            
-            double xn3 = x_i[i];
-            xn3 = xn3*xn3*xn3;
-            double xl3 = x_i[i-1];
-            xl3 = xl3*xl3*xl3;
-            
-            enclosed_mass[i] = enclosed_mass[i-1] +  4. * 3.141592 * (xn3 - xl3)/3. * species_dens_sum; //Straightfoward integration of the poisson eqn
-            
-            if (use_self_gravity == 1) 
-                phi[i]           = get_phi_grav(x_i12[i], enclosed_mass[i]);
-            else
-                phi[i]           = get_phi_grav(x_i12[i], enclosed_mass[0]);
-            
-            //if use tidal gravity
-            if(use_tides == 1) {
-                double d3 = planet_semimajor*au;
-                d3 = d3*d3*d3;
-                phi[i] -= 0.5* 3.*G*star_mass*x_i12[i]*x_i12[i]/d3;
-            }
-                
-            //            -G*mass/abs(r-planet_position);
-        }
-        
-        if(debug >= 1)
-            cout<<"Done in update mass. "<<endl;
-    }
-    
-    //
-    // Initialize the gravity array with a non-self gravitating solution
-    //
-    // takes: r as single value
-    // Options: linear gravity and 1/r gravity with gravitational smoothing from Klahr&Kley 2006
-    //
-    double c_Sim::get_phi_grav(double &r, double &mass) {
-        
-        //
-        // Deepening the potential if needed
-        //
-        if(globalTime < rs_time) {
-                
-            rs_at_moment = 0.5 - (0.5 + rs) * (globalTime/rs_time) ;
-        }
         else
-            rs_at_moment = rs;
+            phi[i]           = get_phi_grav(x_i12[i], enclosed_mass[0]);
         
-        //
-        // Linear or 1/r gravity
-        //
-        if(use_linear_gravity)
-            return -G*mass*abs(domain_max - r);
-        else
-        {
-            if(abs(r-planet_position) > rs_at_moment )
-                return -G*mass/abs(r-planet_position);
-            else
-                return -G*mass * (pow(r-planet_position,3.)/pow(rs_at_moment,4.)  - 2.* pow(r-planet_position,2.)/pow(rs_at_moment,3.) + 2./rs_at_moment );
-            
+        //if use tidal gravity
+        if(use_tides == 1) {
+            double d3 = planet_semimajor*au;
+            d3 = d3*d3*d3;
+            phi[i] -= 0.5* 3.*G*star_mass*x_i12[i]*x_i12[i]/d3;
         }
             
-    }    
+    }
     
+    if(debug >= 1)
+        cout<<"Done in update mass and pot. "<<endl;
+}
+
+//
+/**
+ * Helper function implementing the actual gravity law used (i.e. $\phi \propto -1/r$ or $\phi \propto +z^2$). Works also in cartesian coordinates
+ * Options: linear gravity and 1/r gravity with gravitational smoothing from Klahr&Kley 2006
+ * 
+ * @param[in] r physical, intercell radii in cm
+ * @param[in] mass physical mass inside shells of radii r in g
+ * @return   grav potential in erg/g
+ */
+double c_Sim::get_phi_grav(double &r, double &mass) {
     
     //
-    // source_grav - numerical source function, after Eq. 11 in KM2016
-    //                        
-    // takes:   state vector of rho,rhou,E, (hence R^vars) position (\in R^1)  and makes gravity, coriolis force or whatever from it 
-    // returns: vector \in R^vars
+    // Deepening the potential if needed
     //
-    AOS c_Species::source_grav(AOS &u, int &j) {
-        
-        //if self.debug > 2:
-        //    print(" In SOURCE_GRAV: phileft, phiright = " + repr([phileft, phiright]))
+    if(globalTime < rs_time) {
+            
+        rs_at_moment = 0.5 - (0.5 + rs) * (globalTime/rs_time) ;
+    }
+    else
+        rs_at_moment = rs;
     
-        //
-        // The last regular cells get the uniform grid treatment
-        // because omegas cannot be defined in those cells, without defining spacing for the ghost cells, which I dont want to do
-        //
-        assert(j > 0 && j <= num_cells) ;
-
-        double dphidr_p = (phi_s[j] - phi_s[j-1]) / (base->dx[j] + base->dx[j-1]) ;
-        //double dphidr_p = (base->phi[j]*K_zzf[j] - base->phi[j-1]*K_zzf[j-1]) / (base->dx[j] + base->dx[j-1]) ;
-        double dphidr_m = (phi_s[j+1] - phi_s[j]) / (base->dx[j+1] + base->dx[j]) ;
-        //double dphidr_m = (base->phi[j+1]*K_zzf[j+1] - base->phi[j]*K_zzf[j]) / (base->dx[j+1] + base->dx[j]) ;
-
-        return AOS(0, u.u1, u.u2) * (-1.) * ( base->omegaplus[j] * dphidr_p  + base->omegaminus[j] * dphidr_m);
+    //
+    // Linear or 1/r gravity
+    //
+    if(use_linear_gravity)
+        return -G*mass*abs(domain_max - r);
+    else
+    {
+        if(abs(r-planet_position) > rs_at_moment )
+            return -G*mass/abs(r-planet_position);
+        else
+            return -G*mass * (pow(r-planet_position,3.)/pow(rs_at_moment,4.)  - 2.* pow(r-planet_position,2.)/pow(rs_at_moment,3.) + 2./rs_at_moment );
         
     }
+        
+}  
 
-    
+/**
+ * Compute the well-balanced source function via the lhs and rhs grav potential differences for any cell-centered index j. After Eq. 11 in KäppeliMishra2016
+ * This function uses phi_s, the species-dependent gravitational potential. If the turbulent mixing parameter is 0, then phi_s = phi. If it is non-zero then phi_s regulates
+ * how different species feel a weaker field in the lower atmopshere, to adjust their scale height to the dominant species, assumed to be species[0].
+ * 
+ * @param[in] u Conservative data in cell j
+ * @param[in] j Interface number
+ * @return    The well-balanced potential difference in cell j
+ */
+AOS c_Species::source_grav(AOS &u, int &j) {
+    assert(j > 0 && j <= num_cells) ;
 
-    ///////////////////////////////////////////////////////////
-    //
-    // Chapter on frictional momentum exchange
-    //
-    //
-    ///////////////////////////////////////////////////////////
+    double dphidr_p = (phi_s[j] - phi_s[j-1]) / (base->dx[j] + base->dx[j-1]) ;
+    double dphidr_m = (phi_s[j+1] - phi_s[j]) / (base->dx[j+1] + base->dx[j]) ;
+
+    return AOS(0, u.u1, u.u2) * (-1.) * ( base->omegaplus[j] * dphidr_p  + base->omegaminus[j] * dphidr_m);
+}
+
+
+/**
+ * For scenarios using a changed lower atmospheric gravity field to equalize all scale heights for all species.
+ * Switched on using 
+ * NOTE: Future applications might require modifying the loop to find homopause.
+ * 
+ * @param[in] argument Species number. In current use this is identical to this->this_species_index, but the option should be open to point to one dominant species.
+ */
+void c_Species::update_kzz_and_gravpot(int argument) {
     
+    
+    
+    int homopause_boundary_i = 0;
+    double mu = base->species[0].mass_amu;
+    double mi = this->mass_amu;
+    
+    if(argument > 0 && mi > 1e-3) { //Do the kzz buildup for all other species except atomic hydrogen (assumed species[0]) and no electrons (mass = 5e-4).
+        
+        for(int i=0; i<num_cells+2; i++) {
+            double n   = base->species[0].prim[i].number_density;
+            double kzz = base->K_zz[i]; //This is a meta-parameter for k_zz/b 
+            double par = std::pow(n, 1./1.);
+            
+            K_zzf[i] = (1. + kzz*par*mu/mi) / (1. + kzz*par);
+            if(kzz*n < 1.)
+                K_zzf[i] = 1.;
+            else
+                K_zzf[i] = mu/mi;
+            
+            double one = 0.99999;
+            if(K_zzf[i] > one && K_zzf[i-1] < one) //found homopause
+                homopause_boundary_i = i;
+        }
+            
+    }
+    else {
+        for(int i=0; i<num_cells+2; i++) {
+            K_zzf[i] = 1.;
+        }
+    }
+    
+    for(int i=0; i<num_cells+2; i++) {
+                phi_s[i] = base->phi[i] * K_zzf[i];
+    }
+    double phicorrection = base->phi[homopause_boundary_i]*(1.-mu/mi); //Correct for the jump in Phi at the homopause
+    if(homopause_boundary_i == 0)
+        phicorrection = 0;
+    
+    for(int i=0; i<homopause_boundary_i; i++) 
+        phi_s[i] += phicorrection;
+    
+    //cout<<"s = "<<argument<<" phicorr = "<<phicorrection<<" homopause_i = "<<homopause_boundary_i<<endl;
+    //cout<<"Finished updating kzz in species "<<speciesname<<endl;
+}
+
+
+
+///////////////////////////////////////////////////////////
+//
+// Friction
+//
+//
+///////////////////////////////////////////////////////////
+
+/**
+ * Wrapper function calling the appropriate analytical or numerical functions.
+ */
 void c_Sim::compute_drag_update() {
         if(alpha_collision > 0 && num_species > 1) {
             if(friction_solver == 0)
@@ -178,17 +215,17 @@ void c_Sim::compute_drag_update() {
         }
     }
     
-    //
-    // Friction solver 0
-    //
-    
+
+/**
+ *  Friction solver 0. Only works for two species properly. Three species solution was copied&converted from mathematica matrix inversion, but produces nonsense.
+ */
 void c_Sim::compute_friction_analytical() {
 
         if(debug > 0) cout<<"in analytic friction, num_species = "<<num_species<<endl;
         
         if(num_species == 2) {
         
-            //Apply analytic solutions ...
+            //Apply analytic solutions
             double alpha=0, eps=0, f1=0, f2=0;
             double v1b=0, v2b=0, v1a=0, v2a=0;
             double coll_b;
@@ -220,30 +257,16 @@ void c_Sim::compute_friction_analytical() {
                         double v_th = std::sqrt(8*kb*meanT/(M_PI * mumass)) ;
 
                         alpha = 4/3. * species[1].prim[j].density * v_th * A/(m0+m1) ;
-                    } else {
-                        // Gas-gas collisions. Used binary diffusion coefficient                        
-                        //ntot = species[0].prim[j].number_density + species[1].prim[j].number_density;
-                        //fi   = species[0].prim[j].number_density / ntot;
-                        //fj   = species[1].prim[j].number_density / ntot;
-                        //mtot = species[0].mass_amu*amu + species[1].mass_amu*amu;
-                        //mui  = species[0].mass_amu*amu / mtot;
-                        //muj  = species[1].mass_amu*amu / mtot;
-                        
+                    } else { // Gas-gas collisions
                         coll_b      = 5.0e17 * std::pow(meanT, 0.75) ;     // from Zahnle & Kasting 1986 Tab. 1
-
                         alpha = kb * meanT * species[1].prim[j].number_density / (m0 * coll_b) ; // From Burgers book, or Schunk & Nagy.
-                        //alpha_local = kb * meanT /(mumass * coll_b); 
-                            
-                        //alpha *= (fi + fj)/(fi * muj + fj * mui);
                         alpha *= alpha_collision;
                     }
                 }
                 
                 alphas_sample(j) = alpha;
-                
                 friction_sample(j) = alphas_sample(j) * (v2b - v1b);
                 
-                //alpha = alpha_collision * (1e-1/x_i12[j]); // (f[0]+f[1])/(mu0*f[0]+mu1*f[1]) * k_b T/(m_i * b_i)
                 eps   = species[0].u[j].u1 / species[1].u[j].u1;
                 f1    = (1. + dt*alpha)/(1. + dt*alpha*(1.+eps)) ;
                 f2    = dt*alpha*eps / (1. + dt * alpha);
@@ -254,15 +277,11 @@ void c_Sim::compute_friction_analytical() {
                 species[0].prim[j].speed = v1a;
                 species[1].prim[j].speed = v2a;
                 
-                //if(debug >= 1 && j==1200 && steps == 10) {
                 if(debug >= 1) {
                     //cout<<" v1b, v2b = "<<v1b<<" "<<v2b<<endl<<" v1a, v2a = "<<v1a<<" "<<v2a<<endl;
                     //cout<<" dv1, dv2 = "<<v1a-v1b<<" "<<v2a-v2b<<endl;
                     //cout<<" dp1, dp2 = "<<(v1a-v1b)*species[0].u[j].u1 + (v2a-v2b)*species[1].u[j].u1<<endl;
-                    cout<<"    dt*alpha = "<<dt*alpha<<" alpha = "<<alpha<<" eps = "<<species[1].u[j].u1/species[0].u[j].u1<<" dp/|p| = "<<((v1a-v1b)*species[0].u[j].u1 + (v2a-v2b)*species[1].u[j].u1)/(std::sqrt(species[0].u[j].u2*species[0].u[j].u2) + std::sqrt(species[1].u[j].u2*species[1].u[j].u2) )<<" meanT = "<<meanT<<" coll_b = "<<coll_b<<" cell = "<<j<<endl;
-                    
-                    //char a;
-                    //cin>>a;
+                    cout<<"    dt*alpha = "<<dt*alpha<<" alpha = "<<alpha<<" eps = "<<species[1].u[j].u1/species[0].u[j].u1<<" dmom/|mom| = "<<((v1a-v1b)*species[0].u[j].u1 + (v2a-v2b)*species[1].u[j].u1)/(std::sqrt(species[0].u[j].u2*species[0].u[j].u2) + std::sqrt(species[1].u[j].u2*species[1].u[j].u2) )<<" meanT = "<<meanT<<" coll_b = "<<coll_b<<" cell = "<<j<<endl;
                 }
                 
                 double v_half = 0.5*(v1a + v1b) - 0.5*(v2a + v2b) ;
@@ -273,16 +292,16 @@ void c_Sim::compute_friction_analytical() {
             }
             
             if(debug > 0) {
-                char a;
                 double dekin1 = 0.5*species[0].u[num_cells+1].u1 * (v1a - v1b) * (v1a - v1b) ; 
                 double dekin2 = 0.5*species[1].u[num_cells+1].u1 * (v2a - v2b) * (v2a - v2b) ;
                 double dvrel1 = (v1a - v1b)/v1b;
                 double dvrel2 = (v2a - v2b)/v2b;
                 cout<<"Relative differences in velocities 1/2 = "<<dvrel1<<" / "<<dvrel2<<" differences in Ekin = "<<dekin1<<" / "<<dekin2<<endl;
+                char a;
                 cin>>a;
             }
         }
-        if(num_species == 3) {
+        if(num_species == 3) { //Experimental 3-species solution
                 
             double det;
             double v1a=0, v2a=0, v3a=0, v1b=0, v2b=0, v3b=0;
@@ -356,7 +375,7 @@ void c_Sim::compute_friction_analytical() {
                                                                     * pow( v1a - v3a, 2.);
                 species[2].prim[j].internal_energy += dt * a(2,1) * (species[1].mass_amu/(species[2].mass_amu+species[1].mass_amu))  
                                                                     * pow( v2a - v3a, 2.);
-                ///TODO: Internal energy update
+                ///TODO: Internal energy update, if 3-species solver ever works.
                 
         }
     
@@ -386,9 +405,10 @@ void c_Sim::compute_friction_analytical() {
         
 }
 
-//
-// Friction solver 2
-//
+/**
+ * Friction solver 1: Compute collision coefficients, build collision matrix and solve in a fast way
+ * Collision coefficients are hard-coded in compute_alpha_matrix().
+ */
 void c_Sim::compute_friction_numerical() {
     
     Eigen::internal::set_is_malloc_allowed(false) ;
@@ -400,22 +420,20 @@ void c_Sim::compute_friction_numerical() {
         fill_alpha_basis_arrays(j);
         compute_alpha_matrix(j);
                 
-        if(debug >= 1 && j==1200 && steps == 10)  {
+        if(debug >= 2 && j==1200 && steps == 10)  {
             cout<<"    Computed coefficient matrix ="<<endl<<friction_coefficients<<endl;
             cout<<"    velocities ="<<endl<<friction_vec_input<<endl;
             cout<<"    velocities[0] = "<<friction_vec_input(0)<<endl;
             cout<<"    rho[0] = "<<species[0].u[j].u1<<endl;
         }
-            
-            
-                
+        
         friction_matrix_T = identity_matrix - friction_coefficients * dt;
         friction_matrix_T.diagonal().noalias() += dt * (friction_coefficients * unity_vector);
         
         LU.compute(friction_matrix_T) ;
         friction_vec_output.noalias() = LU.solve(friction_vec_input);
         
-        if(debug >= 1 && j==700 && steps == 10) {
+        if(debug >= 3 && j==700 && steps == 10) {
             
             cout<<"    T = "<<endl<<friction_matrix_T<<endl;
             cout<<" a10/a01 = "<<friction_matrix_T(0,1)/friction_matrix_T(1,0)<<" dens(0)/dens(1) = "<<dens_vector(1)/dens_vector(0)<<" dt*a*eps = "<<friction_coefficients(0,1) * dt * dens_vector(0)/dens_vector(1)<<endl;
@@ -457,7 +475,7 @@ void c_Sim::compute_friction_numerical() {
     }
     
     //
-    // Update scheme 1
+    // Update conserved
     //
     for(int si=0; si<num_species; si++) {
         species[si].eos->update_p_from_eint(&(species[si].prim[0]), num_cells+2);
@@ -466,7 +484,11 @@ void c_Sim::compute_friction_numerical() {
     
 }
 
-
+/**
+ *  Build all primitives that we need multiple times during the construciton of the alpha matrix
+ * 
+ * @param[in] j Cell number in which to compute the temp data
+ */
 void c_Sim::fill_alpha_basis_arrays(int j) { //Called in compute_friction() in source.cpp
     
     for(int si=0; si<num_species; si++) {
@@ -478,32 +500,33 @@ void c_Sim::fill_alpha_basis_arrays(int j) { //Called in compute_friction() in s
         temperature_vector_augment(si) = species[si].prim[j].temperature - dt * (species[si].dS(j) + species[si].dG(j)) / species[si].u[j].u1 / species[si].cv;
     }
 }
-    
+
+/**
+ * Build collision matrix. Here we also distinguish between gas/dust species and between charged/neutral species in terms of collission coefficients.
+ * 
+ * * @param[in] j Cell number in which to build the collision matrix
+ */
 void c_Sim::compute_alpha_matrix(int j) { //Called in compute_friction() and compute_radiation() in source.cpp
         
         double alpha_local;
         double coll_b;
-        //double ntot;
         double mtot;
         double mumass, mumass_amu, meanT;
         
         for(int si=0; si<num_species; si++) {
             for(int sj=0; sj<num_species; sj++) {
                     
-                    if(collision_model == 'C') {
+                    if(collision_model == 'C') { //Constant drag law
                         alpha_local = alpha_collision;
                         if (si > sj) alpha_local *= dens_vector(sj) / dens_vector(si) ;
                     }
-                    else {
-                        // Physical drag law
+                    else {                      // Physical drag laws
                         mtot = mass_vector(si) + mass_vector(sj);
-                        //mui  = mass_vector(si) / mtot;
-                        //muj  = mass_vector(sj) / mtot;
                         mumass = mass_vector(si) * mass_vector(sj) / (mass_vector(si) + mass_vector(sj));
                         mumass_amu = mumass/amu;
                         meanT  = (mass_vector(sj)*temperature_vector(si) + mass_vector(si)*temperature_vector(sj)) / (mass_vector(si) + mass_vector(sj)); //Mean collisional mu and T from Schunk 1980
                         
-                        if (species[si].is_dust_like || species[sj].is_dust_like) {
+                        if (species[si].is_dust_like || species[sj].is_dust_like) { //One of the collision partners is dust
                             // Use Epstein drag law (Hard sphere model)
                             double RHO_DUST = 1;
                             double s0=0, s1=0 ;
@@ -516,17 +539,12 @@ void c_Sim::compute_alpha_matrix(int j) { //Called in compute_friction() and com
                             double v_th = std::sqrt(8*kb*meanT/(M_PI * mumass)) ;
 
                             alpha_local = 4/3. * dens_vector(sj) * v_th * A / mtot ;
-                        } else {
-                            // Gas-gas collisions. Used binary diffusion coefficient                        
+                        } else { // Gas-gas collisions. Used binary diffusion coefficient                        
 
-                            //ntot = numdens_vector(si) + numdens_vector(sj);
-                            //fi   = numdens_vector(si) / ntot;
-                            //fj   = numdens_vector(sj) / ntot;
-                            
                             int ci = (int)(species[si].static_charge*1.01);
                             int cj = (int)(species[sj].static_charge*1.01);
                             double qn = (std::fabs(species[si].static_charge) + std::fabs(species[sj].static_charge));
-                            string ccase = "";
+                            string ccase = ""; //Debug string to make sure the cases are picked right
                             
                             if(std::abs(ci) + std::abs(cj) == 0) { //n-n collision
                                 coll_b      = 5.0e17 * std::sqrt(std::sqrt(meanT*meanT*meanT)) ;     //std::pow(meanT, 0.75) // from Zahnle & Kasting 1986 Tab. 1
@@ -555,16 +573,25 @@ void c_Sim::compute_alpha_matrix(int j) { //Called in compute_friction() and com
                                 ccase = " i-i ";
                             }
                             
-                            //if(si!=sj)
-                            //    cout<<"cell "<<j<<" colliding "<<species[si].speciesname<<" q="<<species[si].static_charge<<" with "<<species[sj].speciesname<<" q="<<species[sj].static_charge<<" case = "<<ccase<<" alpha/n = "<<alpha_local/ numdens_vector(sj)<<" n_sj = "<<numdens_vector(sj)<<endl;
+                            if(si!=sj && debug>3)
+                                cout<<"cell "<<j<<" colliding "<<species[si].speciesname<<" q="<<species[si].static_charge<<" with "<<species[sj].speciesname<<" q="<<species[sj].static_charge<<" case = "<<ccase<<" alpha/n = "<<alpha_local/ numdens_vector(sj)<<" n_sj = "<<numdens_vector(sj)<<endl;
                             
-                            //if(photochemistry_level == 1 && (si + sj) == 3)
-                            alpha_local *= alpha_collision;
+                            double alpha_temp = alpha_collision;
+                            if(globalTime < coll_rampup_time) { //Ramp up the friction factors linearly, if so desired
+                                
+                                    alpha_temp = alpha_collision * ( init_coll_factor + (1.-init_coll_factor) * globalTime/coll_rampup_time );
+                                
+                            } else {
+                                alpha_temp = alpha_collision;
+                            }
+                            
+                            //alpha_local *= alpha_collision;
+                            alpha_local *= alpha_temp;
                         }
                     }
                     
                     if(si==0 && sj == 1) {
-                        alphas_sample(j) = alpha_local;
+                        alphas_sample(j) = alpha_local; //alphas_sample is saving alpha values for later use outside of the friction function, e.g. to output it
                         //cout<<"    spec "<<species[si].name<<" j = "<<j<<" alpha_local = "<<alpha_local<<endl;
                         if(debug > 0 && steps == 1 && ((j==2) || (j==num_cells-2) || (j==num_cells/2)) )
                             cout<<"    spec "<<species[si].speciesname<<" j = "<<j<<" alpha_local = "<<alpha_local<<endl;
@@ -575,18 +602,20 @@ void c_Sim::compute_alpha_matrix(int j) { //Called in compute_friction() and com
                        friction_coefficients(si,sj) = 0.;
                     else
                        friction_coefficients(si,sj) = friction_coeff_mask(si,sj) * alpha_local;
-
-                   
-                   if(debug >= 1 && j==700 && steps == 10) {
-                        cout<<" debug alpha matrix(si="<<si<<",sj="<<sj<<") = "<<friction_coefficients(si,sj)<<" mask = "<<friction_coeff_mask(si,sj)<<" alpha_local = "<<alpha_local<<" 1/eps = "<<(dens_vector(si) / dens_vector(sj))<<" eps ="<<(dens_vector(sj) / dens_vector(si))<<endl;
-                   }
-              
+                
             }
         }
         //char a;
         //cin>>a;
 }
 
+
+/**
+ * Build collisional heat exchange matrix. Uses pre-computed values from momentum transfer.
+ * Called from compute_collisional_heat_exchange.
+ * 
+ * * @param[in] j Cell number in which to build the heat exchange matrix
+ */
 
 void c_Sim::compute_collisional_heat_exchange_matrix(int j) {
     
@@ -608,6 +637,10 @@ void c_Sim::compute_collisional_heat_exchange_matrix(int j) {
 
 }
 
+
+/**
+ * Solve for collisional heat exchange
+ */
 void c_Sim::compute_collisional_heat_exchange() {
     Eigen::internal::set_is_malloc_allowed(false) ;
     

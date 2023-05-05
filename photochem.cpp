@@ -1,14 +1,8 @@
-///////////////////////////////////////////////////////////
-//
-//
-//  photochem.cpp
-//
-//
-//
-//
-//
-//
-///////////////////////////////////////////////////////////
+/*
+ * photochem.cpp
+ * 
+ * Implementation of the C2Ray scheme, to solve for the correct average simultaneous ionisation and heating rates, according to Mellema+2006 and Friedrich+2012
+ */
 
 #define EIGEN_RUNTIME_NO_MALLOC
 
@@ -19,15 +13,6 @@
 #include "brent.h"
 
 /*
-
-This requires 8-12 species that we track, besides neutral H/He.
-The couplings between high-energy radiation, ionization and heating happens in
-this routine.
-
-For this we assume a fixed ordering and numbering of species, as follows:
-0   1   2   3   4    5    6       7    8     9    10    11
-H0  H+  e-  He  He+  H++  He 23S  H2   H2+   H3+  HeH+  H-
-
 Heating and cooling rates according to Black (1981), the physical state of
 primordial intergalactic clouds*/
 
@@ -322,6 +307,11 @@ class C2Ray_HOnly_heating {
     Mat3 coll_mat;
 };
 
+/**
+ * Simple by-hand solver using a linearised implicit scheme. Solves for steady-state value by following the time evolution.
+ * 
+ * @return ion fraction
+ */
 double get_implicit_photochem() { //double dt, double n1_old, double n2_old, double F, double dx, double kappa, double alpha
 
     
@@ -382,9 +372,12 @@ double get_implicit_photochem() { //double dt, double n1_old, double n2_old, dou
     return n2_old/(n1_old+n2_old);
 }
 
-//
-// Implicit solver for two variables, ne and np.
-//
+
+/**
+ * Simple by-hand solver using a linearised implicit scheme. Only one timestep.
+ * 
+ * @return ion fraction.
+ */
 double get_implicit_photochem2(double dt, double n1_old, double n2_old, double F, double dx, double kappa, double alpha) {
 
 
@@ -408,9 +401,11 @@ double get_implicit_photochem2(double dt, double n1_old, double n2_old, double F
     return n2_old/(n1_old+n2_old);
 }
 
-//
-// Reduced, single equation implicit solver for the ion fraction, using ne+np=const.
-//
+/**
+ * Simple by-hand solver using a linearised implicit scheme. Only one timestep, using ne+np=const.
+ * 
+ * @return ion fraction.
+ */
 double get_implicit_photochem3(double dt, double n1_old, double n2_old, double F, double dx, double kappa, double alpha) {
     
     long double ntot = (n1_old + n2_old);
@@ -429,6 +424,9 @@ double get_implicit_photochem3(double dt, double n1_old, double n2_old, double F
     return xnew; //n2_old/(n1_old+n2_old);
 }
 
+/**
+ * The actual C2Ray scheme.
+ */
 void c_Sim::do_photochemistry() {
     // cout<<" Doing photochemistry "<<endl;
             
@@ -588,7 +586,10 @@ void c_Sim::do_photochemistry() {
                 std::array<double, 3> cooling;
                 
                 for (int b = 0; b < num_he_bands; b++) {
-                    GammaH += 0.25 * solar_heating(b)  * std::exp(-radial_optical_depth_twotemp(j+1,b)) * (-std::expm1(-dtaus[b])) * (1 - 13.6 * ev_to_K * kb / photon_energies[b]) / dx[j] * dlognu;
+                    double heatingrate = 0.25 * solar_heating(b)  * std::exp(-radial_optical_depth_twotemp(j+1,b)) * (-std::expm1(-dtaus[b])) * (1 - 13.6 * ev_to_K * kb / photon_energies[b]) / dx[j] * dlognu; 
+                    GammaH += heatingrate; 
+                    dS_band(j,b) = heatingrate;
+                    dS_band_special(j,b) = heatingrate;
                 }
                 
                 if(use_rad_fluxes) {
@@ -599,7 +600,7 @@ void c_Sim::do_photochemistry() {
                     cooling = {0., 0., - nX[2]*HOnly_cooling(nX, Te) }; //
                     
                     //
-                    // We cannot cool more than what we got from highenergy photons
+                    // Enforce no cooling spikes in the boundary cell
                     //
                     if(std::abs(cooling[2]) > heating[2])
                         cooling[2] = -heating[2];
@@ -671,22 +672,23 @@ void c_Sim::do_photochemistry() {
                 // This loop documents quantities consistent with the ionization found, computes the highenergy heating residual that was not used to ionize and dumps it into
                 // the species that do not participate in the C2-ray scheme, proportional to their optical depth per cell
                 //
+                
                 for (int s = 0; s < 3; s++) {
                     //Even in cases when radiative transport is not used, we want to document those quanitites in the output
                     species[s].dG(j) += cooling[s];
                     species[s].dS(j) += heating[s];
-                    
-                    /*species[s].dS(num_cells+1) = 0;
-                    species[s].dS(num_cells) = 0;
-                    species[s].dS(num_cells-1) = 0; */
-                    //cout<<" added  heating[s] = "<< heating[s]<<" to species["<<s<<"]."<<endl;
+                    //dS_band(j,0)     += heating[s];
+                }
+                
+                if(j==num_cells-10e99) {
+                        cout<<"Pos 1.1 dS_UV = "<<dS_band(num_cells-10,0)<<endl;
                 }
                 
                 
                 //char a;
                 //cin>>a;
                 
-                int e_idx = get_species_index("S2");
+                int e_idx = get_species_index("S2"); //Equivalent of those calls for photochem_level==2 in chemistry.cpp lines ~910
                 int C_idx = get_species_index("S4");
                 int Cp_idx = get_species_index("S5");
                 int Cpp_idx = get_species_index("S6");
@@ -703,13 +705,14 @@ void c_Sim::do_photochemistry() {
                 if( Op_idx!=-1 && e_idx!=-1 ) { species[Op_idx].dG(j)   -=  Op_cooling(species[e_idx].prim[j].temperature)/red; }
                 if( Opp_idx!=-1 && e_idx!=-1 ) { species[Opp_idx].dG(j) -=  Opp_cooling(species[e_idx].prim[j].temperature)/red; }
                 
+                //Correction in heating function for non-ionising radiation. 
                 double adddS[3] = {0.,0.,0.};
                 for (int b = 0; b < num_he_bands; b++) {
                     
                     double temp_nonion_cell_optd = 0.;
                     double dtauplus = dtaus[b];
                     //double temp_total_cell_optd = 0.;
-                    double GammaT = 0.;
+                    double GammaTotal = 0.;
                     double GammaHnofactor = 0.;
                     
                     //
@@ -734,16 +737,18 @@ void c_Sim::do_photochemistry() {
                     }
                     
                     if(j < num_cells + 1) {
-                        GammaHnofactor = 0.25 * solar_heating(b) * std::exp(-radial_optical_depth_twotemp(j+1,b)) * (-std::expm1(-dtaus[b])) / dx[j];
-                        GammaT         = 0.25 * solar_heating(b) * std::exp(-radial_optical_depth_twotemp(j+1,b)) * (-std::expm1(-dtauplus)) / dx[j];
+                        GammaHnofactor = 0.25 * solar_heating(b) * std::exp(-radial_optical_depth_twotemp(j+1,b)) * (-std::expm1(-dtaus[b])) / dx[j]; //dtaus[b] contains only ionising opacities
+                        GammaTotal         = 0.25 * solar_heating(b) * std::exp(-radial_optical_depth_twotemp(j+1,b)) * (-std::expm1(-dtauplus)) / dx[j]; //dtauplus contains all opacities
                         radial_optical_depth_twotemp(j,b) = radial_optical_depth_twotemp(j+1,b) + dtauplus;
+                        cell_optical_depth_highenergy(j,b)= radial_optical_depth_twotemp(j+1,b) + dtauplus;
                         S_band(j,b)                       = solar_heating(b) * std::exp(-radial_optical_depth_twotemp(j+1,b)); 
                     }
                         
                     else {
                         GammaHnofactor = 0.25 * solar_heating(b) * dtaus[b];
-                        GammaT         = 0.25 * solar_heating(b) * dtauplus;
+                        GammaTotal         = 0.25 * solar_heating(b) * dtauplus;
                         radial_optical_depth_twotemp(j,b) = dtauplus;
+                        cell_optical_depth_highenergy(j,b)= dtauplus;
                         S_band(j,b)                       = solar_heating(b);
                     }
                     
@@ -752,7 +757,7 @@ void c_Sim::do_photochemistry() {
                     // Now recompute heating with higher optical depth, neglecting ionization and ionization potential
                     //
                     
-                    dS_band(j,b)  = (GammaT - GammaHnofactor);
+                    dS_band(j,b)  += 0.*(GammaTotal - 1.*GammaHnofactor);
                     
                     if(debug >= 2)
                         cout<<"PCHEM pos 6, dGamma  = "<<dS_band(j,b)<<endl;
@@ -767,7 +772,6 @@ void c_Sim::do_photochemistry() {
                     }
                     //char d;
                     //cin>>d;
-                    
                     
                     if(dS_band(j,b) > 1e15) {
                             for(int s=3; s<num_species; s++) {
@@ -784,6 +788,21 @@ void c_Sim::do_photochemistry() {
                     //dS_band(j,b) = 0.25 * solar_heating(b) * (1 - 13.6 * ev_to_K * kb / photon_energies[b]) * std::exp(-radial_optical_depth_twotemp(j+1,b)) * (-std::expm1(-dtaus[b])) / dx[j];
                                 
                 }
+                
+                if(j==num_cells-10e99) {
+                        cout<<"Pos 1.2 dS_UV = "<<dS_band(num_cells-10,0)<<endl;
+                }
+                
+                //Previous loop was to take into account the difference between non-ionising and ionising highenergy absorption, but it will report 0 heating in the diagnostic file, as dS_band is zero for cases of no difference. The actual highenergy heating has been written directly into dS. So we now just reset dS_band so that its documentation is consistent with dS. 
+                for (int b = 0; b<num_he_bands;b++) {
+                        //if(BAND_IS_HIGHENERGY[b]) {
+                        //dS_band(j,b) = 0.;
+                        for (int s = 0; s < 3; s++) {
+                            //dS_band(j,b)     += heating[s];
+                            
+                        }
+                }
+                //cout<<"adding"<<dS_band(j,0)<<endl;
                 
             }
 

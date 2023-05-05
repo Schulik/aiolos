@@ -1,3 +1,7 @@
+/**
+ * Brent's method from the Bible.
+ */
+
 #ifndef _BRENT_H_
 #define _BRENT_H_
 

@@ -1,23 +1,24 @@
 #include "aiolos.h"
 
-
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 //
 // Begin Main
 //
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-//
-// Important: Debug levels are ordered according to amount of information printed and depth into the algorithms
-//
-//  debug = 0: Only barebone info is printed, like "program started", "program ended."
-//  debug = 1: General info about initialization is provided, nothing that is output every step
-//  debug = 2: General info about every step is provided, like step number and determined dt. Also individual steps inside one timestep
-//  debug = 3: General info is given about results of functions that are visited every timestep, like hllc_flux
-//  debug = 4: Detailed info is given about every result of functions taht are visited every timestep. I.e. in hllc_flux all base data would now be provided how result was computed
-//
-//  
-
+/**
+ * Main routine.
+ * 
+ * Intent for debug levels (might not be consistent in the entire program)
+ *   debug = 0(default): Only barebone info is printed, like "program started", "program ended."
+ *   debug = 1: General info about initialization is provided, nothing that is output every step
+ *   debug = 2: General info about every step is provided, like step number and determined dt. Also individual steps inside one timestep
+ *   debug = 3: General info is given about results of functions that are visited every timestep, like hllc_flux
+ *   debug = 4: Detailed info is given about every result of functions taht are visited every timestep. I.e. in hllc_flux all base data would now be provided how result was computed
+ * 
+ * @param[in] argc Standard C++ argument counter
+ * @param[in] argv Standard C++ command line string list. Used to communicate key parameters like the *par and *spc files, as well as the debug level to the program.
+ */
 int main(int argc, char** argv)
 {
     string simulationname;
@@ -39,7 +40,6 @@ int main(int argc, char** argv)
     cout<<"Use -par name.par to let the program know the name of the required parameter file."<<endl;
     cout<<"Use -spc name.spc to let the program know the name of the required species file."<<endl;
     cout<<"Optional command line parametrs: -debug <int>, for debug level; -war <int>, for suppressing warnings."<<endl;
-    
     
     int parameterfile_found = 0;
     int speciesfile_found   = 0;
@@ -103,7 +103,7 @@ int main(int argc, char** argv)
             simulationname = "simulation.par";
     }
     if(!speciesfile_found) {
-            cout<<"No speciesfile found, chosing default speciesfile: default.spc"<<endl;
+            cout<<"No speciesfile found on command line, chosing default speciesfile until parameterfile tells us otherwise: default.spc"<<endl;
             speciesfile = "default.spc";
     }
         
@@ -113,7 +113,7 @@ int main(int argc, char** argv)
     #endif
     
     try {
-
+        
         cout<<endl<<"In main, construction of simulation is about to start."<<endl;
        
         //Main simulation class object, is initialized with the simulation parameters from a file

@@ -1,7 +1,5 @@
 #include "aiolos.h"
 
-//extern AOS* init_AOS(int num);
-
 ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -12,6 +10,19 @@
 ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+/**
+ * Simulation class constructor and initializer of all the physics. Reads all simulation parameters from the *.par file, constructs all species using data from the *spc and linked
+ * *opa files.
+ * 
+ * Computes the spatial grid, areas, volumes, wavelength grid. Initiates matrix solver objects,  species data (around line 580) and radiative quantities.
+ * 
+ * @param[in] filename_solo Parameter file without any other appendages, directory.
+ * @param[in] speciesfile_solo Species file without any other appendages, directory.
+ * @param[in] workingdir Working directory string
+ * @param[in] debug debug level from command line or param file
+ * @param[in] debug_cell Get detailed information for a specific cell (To be implemented by user..)
+ * @param[in] debug_steps Get detailed information for a specific timestep (To be implemented by user..)
+ */
 c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, int debug, int debug_cell, int debug_steps) {
 
         if(debug > 0) cout<<"Init position 0."<<endl;
@@ -26,7 +37,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
         
         
         if(speciesfile_solo.compare("default.spc")==0)
-            speciesfile_solo = read_parameter_from_file<string>(filename,"SPECIES_FILE", debug, "default.spc").value;
+            speciesfile_solo = read_parameter_from_file<string>(filename,"SPECIES_FILE", debug, "default.spc").value; //The program always needs to know some information about the species used.
         
         cout<<" Starting construction of simulation. Attempting to find required speciesfile = "<<speciesfile_solo<<endl;
         
@@ -40,47 +51,50 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
         //
         ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         double dx0;
-        type_of_grid     = read_parameter_from_file<int>(filename,"PARI_GRID_TYPE", debug, 0).value;
-        domain_min       = read_parameter_from_file<double>(filename,"PARI_DOMAIN_MIN", debug).value;
-        domain_max       = read_parameter_from_file<double>(filename,"PARI_DOMAIN_MAX", debug).value;
-        geometry         = read_parameter_from_file<Geometry>(filename, "PARI_GEOMETRY", debug, Geometry::cartesian).value;
-        order            = read_parameter_from_file<IntegrationType>(filename, "PARI_ORDER", debug, IntegrationType::second_order).value;
+        type_of_grid     = read_parameter_from_file<int>(filename,"PARI_GRID_TYPE", debug, 0).value; //Spacing type of grid. Linear, log, bi-log etc. More in enum.h
+        domain_min       = read_parameter_from_file<double>(filename,"PARI_DOMAIN_MIN", debug).value; //Smallest value of 1-D domain in cm 
+        domain_max       = read_parameter_from_file<double>(filename,"PARI_DOMAIN_MAX", debug).value; //Largest value of 1-D domain   in cm
+        geometry         = read_parameter_from_file<Geometry>(filename, "PARI_GEOMETRY", debug, Geometry::cartesian).value; //Cartesian, Polar, Spherical. Determines differentials. More in enum.h
+        order            = read_parameter_from_file<IntegrationType>(filename, "PARI_ORDER", debug, IntegrationType::second_order).value; //Spatial order of differentials.
         
-        num_bands_in     = read_parameter_from_file<int>(filename,"PARI_NUM_BANDS", debug, 1).value;
-        num_bands_out    = read_parameter_from_file<int>(filename,"NUM_BANDS_OUT", debug, num_bands_in).value;
-        lambda_min_in       = read_parameter_from_file<double>(filename,"PARI_LAM_MIN", debug, 1e-1).value;
-        lambda_max_in       = read_parameter_from_file<double>(filename,"PARI_LAM_MAX", debug, 10.).value;
-        lambda_per_decade_in= read_parameter_from_file<double>(filename,"PARI_LAM_PER_DECADE", debug, 10.).value;
+        num_bands_in     = read_parameter_from_file<int>(filename,"PARI_NUM_BANDS", debug, 1).value; //Number of instellation bands. Low performance impact.
+        num_bands_out    = read_parameter_from_file<int>(filename,"NUM_BANDS_OUT", debug, num_bands_in).value; //Number of outgoing radiation bands. Enormous performance impact.
+        lambda_min_in       = read_parameter_from_file<double>(filename,"PARI_LAM_MIN", debug, 1e-1).value; //Minimum ingoing, non-zero limit of the wavelength domain in microns.
+        lambda_max_in       = read_parameter_from_file<double>(filename,"PARI_LAM_MAX", debug, 10.).value;  //Maximum ingoing, non-inf limit of the wavelength domain in microns. 
+                             //Note how by default there is another band between 0 and lambda_min_in, and another band lamda_max_in and infty, if the band numbers are high enough
+        lambda_per_decade_in= read_parameter_from_file<double>(filename,"PARI_LAM_PER_DECADE", debug, 10.).value; //Log-equidistant spacing in wavelngth
         lambda_min_out       = read_parameter_from_file<double>(filename,"PARI_LAM_MIN_OUT", debug, lambda_min_in).value;
         lambda_max_out       = read_parameter_from_file<double>(filename,"PARI_LAM_MAX_OUT", debug, lambda_max_in).value;
+                            //Note how by default there is another band between 0 and lambda_min_out, and another band lamda_max_out and infty, if the band numbers are high enough
         lambda_per_decade_out= read_parameter_from_file<double>(filename,"PARI_LAM_PER_DECADE_OUT", debug, lambda_per_decade_in).value;
-        fluxfile             = read_parameter_from_file<string>(filename,"FLUX_FILE", debug, "---").value;
-        fluxmultiplier       = read_parameter_from_file<double>(filename,"FLUX_MULTIPLIER", debug, 1.).value;
+        fluxfile             = read_parameter_from_file<string>(filename,"FLUX_FILE", debug, "---").value;  //File to read in the wavelength-dependent data of the
+        fluxmultiplier       = read_parameter_from_file<double>(filename,"FLUX_MULTIPLIER", debug, 1.).value; //Wavelength-constant multiplier for all top-of-atmosphere band fluxes
         
-        star_mass        =  read_parameter_from_file<double>(filename,"PARI_MSTAR", debug, 1.).value;
+        star_mass        =  read_parameter_from_file<double>(filename,"PARI_MSTAR", debug, 1.).value; //Mass of the star in solar masses
         star_mass        *= msolar;
-        T_star           = read_parameter_from_file<double>(filename,"PARI_TSTAR", debug, 5777.).value;
-        R_star           = read_parameter_from_file<double>(filename,"PARI_RSTAR", debug, 0.).value;
-        UV_star          = read_parameter_from_file<double>(filename,"PARI_UVSTAR", debug, 0.).value;
-        X_star           = read_parameter_from_file<double>(filename,"PARI_XSTAR", debug, 0.).value;
-        Lyalpha_star     = read_parameter_from_file<double>(filename,"PARI_LYASTAR", debug, 0.).value;
+        T_star           = read_parameter_from_file<double>(filename,"PARI_TSTAR", debug, 5777.).value; //tau=2/3 temperature of the star, i.e. Teff in K
+        R_star           = read_parameter_from_file<double>(filename,"PARI_RSTAR", debug, 0.).value;    //radius of the star in solar radii
+        UV_star          = read_parameter_from_file<double>(filename,"PARI_UVSTAR", debug, 0.).value;   // UV luminosity of the star, used if no flux file is given, in erg/s
+        X_star           = read_parameter_from_file<double>(filename,"PARI_XSTAR", debug, 0.).value;    //X-ray luminosity of the star, not used currently
+        Lyalpha_star     = read_parameter_from_file<double>(filename,"PARI_LYASTAR", debug, 0.).value;  // Not used currently
+        planet_semimajor= read_parameter_from_file<double>(filename,"PARI_PLANET_DIST", debug, 1.).value; //Distance to primary black-body in AU
         
-        R_other          = read_parameter_from_file<double>(filename,"R_OTHER", debug, 0.).value;
-        T_other          = read_parameter_from_file<double>(filename,"T_OTHER", debug, 0.).value;
-        d_other          = read_parameter_from_file<double>(filename,"D_OTHER", debug, 1.).value;
-        
-        T_int            = read_parameter_from_file<double>(filename,"PARI_TINT", debug, 0.).value;
+        R_other          = read_parameter_from_file<double>(filename,"R_OTHER", debug, 0.).value;  //Second bolometric black-body source (i.e. second star or giant planet host) in stellar radii
+        T_other          = read_parameter_from_file<double>(filename,"T_OTHER", debug, 0.).value;  //Temperature of other black-body in K
+        d_other          = read_parameter_from_file<double>(filename,"D_OTHER", debug, 1.).value;  // Distance to other black-body in AU
+       
+        T_int            = read_parameter_from_file<double>(filename,"PARI_TINT", debug, 0.).value; //Internal planetary temperature at inner boundary. T_int in Guillot2010. in K.
         // old notation.
         if (T_int==0) 
-            T_int        = read_parameter_from_file<double>(filename,"PARI_TPLANET", debug, 0.).value;
+            T_int        = read_parameter_from_file<double>(filename,"PARI_TPLANET", debug, 0.).value; //Internal planetary temperature at inner boundary. T_int in Guillot2010. in K.
 
-        use_planetary_temperature = read_parameter_from_file<int>(filename,"USE_PLANET_TEMPERATURE", debug, 0).value;
-        core_cv          = read_parameter_from_file<double>(filename,"PARI_CORE_CV", debug, 0).value;
-        T_planet         = read_parameter_from_file<double>(filename,"PARI_TPLANET_INIT", debug, 0).value;
+        use_planetary_temperature = read_parameter_from_file<int>(filename,"USE_PLANET_TEMPERATURE", debug, 0).value;//Add the T_int heating to the lower boundary cell?
+        core_cv          = read_parameter_from_file<double>(filename,"PARI_CORE_CV", debug, 0).value; //Heat capacity of the core 
+        T_planet         = read_parameter_from_file<double>(filename,"PARI_TPLANET_INIT", debug, 0).value; //To be unused?
         
-        radiation_matter_equilibrium_test = read_parameter_from_file<int>(filename,"RAD_MATTER_EQUI_TEST", debug, 0).value;
-        radiation_diffusion_test_linear   = read_parameter_from_file<int>(filename,"RAD_DIFF_TEST_LIN", debug, 0).value;
-        radiation_diffusion_test_nonlinear= read_parameter_from_file<int>(filename,"RAD_DIFF_TEST_NLIN", debug, 0).value;
+        radiation_matter_equilibrium_test = read_parameter_from_file<int>(filename,"RAD_MATTER_EQUI_TEST", debug, 0).value; //Unused/only for tests
+        radiation_diffusion_test_linear   = read_parameter_from_file<int>(filename,"RAD_DIFF_TEST_LIN", debug, 0).value;    //Unused/only for tests
+        radiation_diffusion_test_nonlinear= read_parameter_from_file<int>(filename,"RAD_DIFF_TEST_NLIN", debug, 0).value;   //Unused/only for tests
         
         if(debug > 0) cout<<"Using integration order "<<order<<" while second order would be "<<IntegrationType::second_order<<endl;
         
@@ -90,18 +104,18 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
             num_ghosts = 2 ;
 
         if(type_of_grid == 0) {
-            dx0              = read_parameter_from_file<double>(filename,"PARI_DOMAIN_DX", debug).value;
+            dx0              = read_parameter_from_file<double>(filename,"PARI_DOMAIN_DX", debug).value; //For uniform grid, resolution element size
             num_cells        = (int)((domain_max - domain_min)/dx0);
             cout<<"Domain specifics:  "<<domain_min<<" | . . . "<<num_cells<<" uniform cells . . . | "<<domain_max<<endl;
         }
         else {
-            cells_per_decade = read_parameter_from_file<double>(filename,"PARI_CELLS_PER_DECADE", debug).value;
+            cells_per_decade = read_parameter_from_file<double>(filename,"PARI_CELLS_PER_DECADE", debug).value; //For logarithmic grid, number cells per decade in resolution
             num_cells        = (int) ( (log10f(domain_max) - log10f(domain_min)) * cells_per_decade );
             dx0              = domain_min;
             
             if(type_of_grid==2) {
-                    grid2_transition       = read_parameter_from_file<double>(filename,"GRID2_TRANSITION", debug, 99.e99).value;
-                    grid2_cells_per_decade = read_parameter_from_file<double>(filename,"GRID2_CELLS_PER_DECADE", debug, 10).value;
+                    grid2_transition       = read_parameter_from_file<double>(filename,"GRID2_TRANSITION", debug, 99.e99).value; //For bi-logarithmic grid (two different resolution regions), define transition boundary
+                    grid2_cells_per_decade = read_parameter_from_file<double>(filename,"GRID2_CELLS_PER_DECADE", debug, 10).value; // For bi-logarithmic grid, number cells per decade in resolution in second region at large r (first region sits at small r)
                     
                     num_cells          = (int) ( (log10f(grid2_transition) - log10f(domain_min)) * cells_per_decade );
                     grid2_transition_i = num_cells + num_ghosts;
@@ -110,7 +124,11 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
             }
             cout<<"Domain specifics:  "<<domain_min<<" | . .  .  "<<num_cells<<" nonuniform cells .       .             .     | "<<domain_max<<endl;
         }
-        reverse_hydrostat_constrution = read_parameter_from_file<int>(filename,"REVERSE_HYDROSTAT_CONSTRUCTION", debug, 0).value;
+        reverse_hydrostat_constrution = read_parameter_from_file<int>(filename,"REVERSE_HYDROSTAT_CONSTRUCTION", debug, 0).value; //If false, or zero, construct density from large r to small r.
+                                                                                                                   //Otherwise reversed. First density is the PARI_INIT_DATA_U1parameter.
+        init_wind         = read_parameter_from_file<int>(filename,"PARI_INIT_WIND", debug, 0).value; //Initialize a step in density at init_sonic_radius of variable magnitude. 
+        //Magnitude of density jump is set by species dependent parameter in *spc file in column 7 "initial density excess". If init_sonic_radius is negative, then do nothing. 
+        init_sonic_radius = read_parameter_from_file<double>(filename,"INIT_SONIC_RADIUS", debug, -1e10).value;
         
         //
         // Check that cell number looks fine. Shoutout if its not.
@@ -123,16 +141,16 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
             
         if(debug > 0) cout<<"Init: Finished reading grid parameters."<<endl;
         
-        cflfactor   = read_parameter_from_file<double>(filename,"PARI_CFLFACTOR", debug, 1.).value;
-        t_max       = read_parameter_from_file<double>(filename,"PARI_TIME_TMAX", debug, 1e0).value;
-        dt_max      = read_parameter_from_file<double>(filename,"PARI_DTMAX", debug, 1e99).value;
-        max_timestep_change = read_parameter_from_file<double>(filename,"MAX_TIMESTEP_CHANGE", debug, 1.1).value;
-        dt_min_init         = read_parameter_from_file<double>(filename,"DT_MIN_INIT", debug, 1e-20).value;
-        output_time = read_parameter_from_file<double>(filename,"PARI_TIME_OUTPUT", debug, 1e99).value; 
-        output_time_offset = read_parameter_from_file<double>(filename,"TIME_OUTPUT_OFFSET", debug, 0.).value; 
-        monitor_time = read_parameter_from_file<double>(filename,"PARI_TIME_DT", debug).value;
-        CFL_break_time = read_parameter_from_file<double>(filename,"CFL_BREAK_TIME", debug, std::numeric_limits<double>::max()).value ;
-        energy_epsilon = read_parameter_from_file<double>(filename,"ENERGY_EPSILON", debug, 0.01).value;
+        cflfactor   = read_parameter_from_file<double>(filename,"PARI_CFLFACTOR", debug, 0.9).value;  //Multiplier on the cfl timestep length
+        t_max       = read_parameter_from_file<double>(filename,"PARI_TIME_TMAX", debug, 1e0).value;  // Simulate until t=t_max in seconds.
+        dt_max      = read_parameter_from_file<double>(filename,"PARI_DTMAX", debug, 1e99).value;     // Limit the largest possible timestep size in seconds.
+        max_timestep_change = read_parameter_from_file<double>(filename,"MAX_TIMESTEP_CHANGE", debug, 1.1).value; //Max. change of timestep per following timestep in s.
+        dt_min_init         = read_parameter_from_file<double>(filename,"DT_MIN_INIT", debug, 1e-20).value;       //Initial dt in s
+        output_time = read_parameter_from_file<double>(filename,"PARI_TIME_OUTPUT", debug, 1e99).value;           //Create an output every xxx simulated seconds.
+        output_time_offset = read_parameter_from_file<double>(filename,"TIME_OUTPUT_OFFSET", debug, 0.).value;    //Create outputs every PARI_TIME_OUTPUT but only starting after offset, in s
+        monitor_time = read_parameter_from_file<double>(filename,"PARI_TIME_DT", debug).value;                    //Put measurements into the monitor file every xx s
+        CFL_break_time = read_parameter_from_file<double>(filename,"CFL_BREAK_TIME", debug, std::numeric_limits<double>::max()).value ; //Use PARI_CFLFACTOR if t<CLF_break_time. Otherwise, set cflfactor to 0.9
+        energy_epsilon = read_parameter_from_file<double>(filename,"ENERGY_EPSILON", debug, 0.01).value; //Relative allowed change of internal energy in any single grid cell. Limits timestep size additional to the CFL condition.
         
         globalTime = 0.0;    
         timecount = 0;
@@ -151,25 +169,24 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
         //
         ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         
-        problem_number    = read_parameter_from_file<int>(filename,"PARI_PROBLEM_NUMBER", debug).value;
-        use_self_gravity  = read_parameter_from_file<int>(filename,"PARI_SELF_GRAV_SWITCH", debug, 0).value;
-        use_tides         = read_parameter_from_file<int>(filename,"USE_TIDES", debug, 0).value;
-        use_linear_gravity= read_parameter_from_file<int>(filename,"PARI_LINEAR_GRAV", debug, 0).value;
-        use_rad_fluxes    = read_parameter_from_file<int>(filename,"PARI_USE_RADIATION", debug, 0).value;
-        use_convective_fluxes = read_parameter_from_file<int>(filename,"USE_CONVECTION", debug, 0).value;
-        K_zz_init = read_parameter_from_file<double>(filename,"KZZ_INIT", debug, 0.).value;
-        convect_boundary_strength = read_parameter_from_file<double>(filename,"CONVECT_BOUNDARY_STRENGTH", debug, 1.1).value;
+        problem_number    = read_parameter_from_file<int>(filename,"PARI_PROBLEM_NUMBER", debug).value;     //0==gas tube, 1==planet run
+        use_self_gravity  = read_parameter_from_file<int>(filename,"PARI_SELF_GRAV_SWITCH", debug, 0).value;//Gravitational field of gas in domain added to potential?
+        use_tides         = read_parameter_from_file<int>(filename,"USE_TIDES", debug, 0).value;            //Use the tidal field from the first central object (i.e. star_mass, R_star etc)?
+        use_linear_gravity= read_parameter_from_file<int>(filename,"PARI_LINEAR_GRAV", debug, 0).value;     //Linear acceleration ~r instead of 1/r^2
+        use_rad_fluxes    = read_parameter_from_file<int>(filename,"PARI_USE_RADIATION", debug, 0).value;   //Switch to turn on the radiation module
+        use_convective_fluxes = read_parameter_from_file<int>(filename,"USE_CONVECTION", debug, 0).value;   //Switch to turn on convective energy transport in the radiation module
+        K_zz_init = read_parameter_from_file<double>(filename,"KZZ_INIT", debug, 0.).value;                 //Initial atmospheric mixing parameter in cm^2/s
+        convect_boundary_strength = read_parameter_from_file<double>(filename,"CONVECT_BOUNDARY_STRENGTH", debug, 1.1).value; //Unused currently.
         
-        use_collisional_heating = read_parameter_from_file<int>(filename,"PARI_USE_COLL_HEAT", debug, 1).value;
-        use_drag_predictor_step = read_parameter_from_file<int>(filename, "PARI_SECONDORDER_DRAG", debug, 0).value;
-        init_wind         = read_parameter_from_file<int>(filename,"PARI_INIT_WIND", debug, 0).value;
-        alpha_collision        = read_parameter_from_file<double>(filename,"PARI_ALPHA_COLL", debug, 1.).value;
-        alpha_collision_ions   = read_parameter_from_file<double>(filename,"PARI_ALPHA_IONS", debug, 1.).value;
-        max_mdot              = read_parameter_from_file<double>(filename,"MAX_MDOT", debug, -1.).value;
-        init_sonic_radius = read_parameter_from_file<double>(filename,"INIT_SONIC_RADIUS", debug, -1e10).value;
-        rad_energy_multiplier=read_parameter_from_file<double>(filename,"PARI_RAD_MULTIPL", debug, 1.).value;
-        collision_model   = read_parameter_from_file<char>(filename,"PARI_COLL_MODEL", debug, 'P').value;
-        opacity_model     = read_parameter_from_file<char>(filename,"PARI_OPACITY_MODEL", debug, 'C').value;
+        use_collisional_heating = read_parameter_from_file<int>(filename,"PARI_USE_COLL_HEAT", debug, 1).value; //Switch on collisional energy exchange between species
+        use_drag_predictor_step = read_parameter_from_file<int>(filename, "PARI_SECONDORDER_DRAG", debug, 0).value; //Switch on drag predictor substep
+        alpha_collision        = read_parameter_from_file<double>(filename,"PARI_ALPHA_COLL", debug, 1.).value; //Multiplier for collision alphas 
+        alpha_collision_ions   = read_parameter_from_file<double>(filename,"PARI_ALPHA_IONS", debug, 1.).value; //Multiplier for collision alphas for ions
+        max_mdot              = read_parameter_from_file<double>(filename,"MAX_MDOT", debug, -1.).value;        //Max negative mdot through outer boundary in g/s
+        
+        rad_energy_multiplier=read_parameter_from_file<double>(filename,"PARI_RAD_MULTIPL", debug, 1.).value; //Only for tests. Unused currently.
+        collision_model   = read_parameter_from_file<char>(filename,"PARI_COLL_MODEL", debug, 'P').value;     //Collision model. P=physical collision rates (i.e. Schunk&Nagy). C=constant collision rate of value PARI_ALPHAS_COLL
+        opacity_model     = read_parameter_from_file<char>(filename,"PARI_OPACITY_MODEL", debug, 'C').value; //Opacity model. List in opacities.cpp line 90.
         
         cout<<" CHOSEN OPACITY MODEL = "<<opacity_model<<endl;
         if(opacity_model == 'M')
@@ -178,49 +195,51 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
                 cout<<" Hybrid opacities selected. NOTE! that the input file expects in this mode two file names to be given for each species, one *aiopa for kR and kP, and *opa for kS."<<endl;
         }
         
-        no_rad_trans               = read_parameter_from_file<double>(filename,"NO_RAD_TRANS", debug, 1.).value;
-        solve_for_j                = read_parameter_from_file<int>(filename,"SOLVE_FOR_J", debug, 1).value;
-        photocooling_multiplier    = read_parameter_from_file<double>(filename,"PHOTOCOOL_MULTIPLIER", debug, 1.).value;
-        radiation_rampup_time      = read_parameter_from_file<double>(filename,"RAD_RAMPUP_TIME", debug, 0.).value;
-        init_radiation_factor      = read_parameter_from_file<double>(filename,"INIT_RAD_FACTOR", debug, 0.).value;
-        //radiation_solver           = read_parameter_from_file<int>(filename,"RADIATION_SOLVER", debug, 0).value;
-        closed_radiative_boundaries = read_parameter_from_file<int>(filename,"PARI_CLOSED_RADIATIVE_BOUND", debug, 0).value;
-        const_opacity_solar_factor = read_parameter_from_file<double>(filename,"CONSTOPA_SOLAR_FACTOR", debug, 1.).value;
-        const_opacity_rosseland_factor = read_parameter_from_file<double>(filename,"CONSTOPA_ROSS_FACTOR", debug, 1.).value;
-        const_opacity_planck_factor = read_parameter_from_file<double>(filename,"CONSTOPA_PLANCK_FACTOR", debug, 1.).value;
-        temperature_model = read_parameter_from_file<char>(filename,"INIT_TEMPERATURE_MODEL", debug, 'P').value;
-        friction_solver   = read_parameter_from_file<int>(filename,"FRICTION_SOLVER", debug, 0).value;
-        do_hydrodynamics  = read_parameter_from_file<int>(filename,"DO_HYDRO", debug, 1).value;
-        photochemistry_level = read_parameter_from_file<int>(filename,"PHOTOCHEM_LEVEL", debug, 0).value;
-        dust_to_gas_ratio = read_parameter_from_file<double>(filename,"DUST_TO_GAS", debug, 0.).value;
-        temperature_floor = read_parameter_from_file<double>(filename,"TEMPERATURE_FLOOR", debug, 0.).value;  
-        max_temperature   = read_parameter_from_file<double>(filename,"TEMPERATURE_MAX", debug, 9e99).value;  
-        use_chemistry      = read_parameter_from_file<int>(filename,"DO_CHEM", debug, 0).value;
-        use_total_pressure = read_parameter_from_file<int>(filename,"USE_TOTAL_PRESSURE", debug, 0).value;
+        no_rad_trans               = read_parameter_from_file<double>(filename,"NO_RAD_TRANS", debug, 1.).value; //Multiplier for strength for thermal radiative losses in radiation transport. Set to 1e-100 to emulate perfect energy-limited escape.
+        solve_for_j                = read_parameter_from_file<int>(filename,"SOLVE_FOR_J", debug, 1).value; //Debugging parameter. Switch to zero for decoupling of T and J in simple rad transport
+        photocooling_multiplier    = read_parameter_from_file<double>(filename,"PHOTOCOOL_MULTIPLIER", debug, 1.).value; //Multiplier for non-thermal cooling rates
+        radiation_rampup_time      = read_parameter_from_file<double>(filename,"RAD_RAMPUP_TIME", debug, 0.).value; //Ramp up the irradiation in all bands smoothly over xxx seconds.
+        init_radiation_factor      = read_parameter_from_file<double>(filename,"INIT_RAD_FACTOR", debug, 0.).value; //Unused
+        //radiation_solver           = read_parameter_from_file<int>(filename,"RADIATION_SOLVER", debug, 0).value; //replaced by use_rad_fluxes
+        closed_radiative_boundaries = read_parameter_from_file<int>(filename,"PARI_CLOSED_RADIATIVE_BOUND", debug, 0).value; //Reflect thermal radiation at outer boundaries?
+        const_opacity_solar_factor = read_parameter_from_file<double>(filename,"CONSTOPA_SOLAR_FACTOR", debug, 1.).value;    //Multiplier for all stellar opacities (independent of opacity model)
+        const_opacity_rosseland_factor = read_parameter_from_file<double>(filename,"CONSTOPA_ROSS_FACTOR", debug, 1.).value; //Multiplier for all rosseland opacities (")
+        const_opacity_planck_factor = read_parameter_from_file<double>(filename,"CONSTOPA_PLANCK_FACTOR", debug, 1.).value;  //Multiplier for all planck opacities (")
+        temperature_model = read_parameter_from_file<char>(filename,"INIT_TEMPERATURE_MODEL", debug, 'P').value; //Initialize temperature as adiabatic+constant (P) or constant (C)
+        friction_solver   = read_parameter_from_file<int>(filename,"FRICTION_SOLVER", debug, 0).value; //0: no friction, 1: analytic (only for two species), 2: numerical
+        do_hydrodynamics  = read_parameter_from_file<int>(filename,"DO_HYDRO", debug, 1).value;  //Switch hydrodynamics, including its CFL condition on/off
+        photochemistry_level = read_parameter_from_file<int>(filename,"PHOTOCHEM_LEVEL", debug, 0).value; //1==C2Ray solver, 2==general photo and thermochemistry solver
+        dust_to_gas_ratio = read_parameter_from_file<double>(filename,"DUST_TO_GAS", debug, 0.).value;    //dust-to-gas ratio for Semenov/Malygin opacities
+        temperature_floor = read_parameter_from_file<double>(filename,"TEMPERATURE_FLOOR", debug, 0.).value;  //Limit the temperature to a minimum in radiation solver (negative T crashes can still occur due to negative pressures, whichever is found first)
+        max_temperature   = read_parameter_from_file<double>(filename,"TEMPERATURE_MAX", debug, 9e99).value;  //Limit the temperature to a maximum
+        use_chemistry      = read_parameter_from_file<int>(filename,"DO_CHEM", debug, 0).value;               //Unused currently.
+        use_total_pressure = read_parameter_from_file<int>(filename,"USE_TOTAL_PRESSURE", debug, 0).value;    //Compute total pressure of all species? Unused currently.
+        coll_rampup_time      = read_parameter_from_file<double>(filename,"COLL_RAMPUP_TIME", debug, 0.).value; //Ramp up collision rates gently from INIT_COLL_FACTOR to PARI_ALPHA_COLL in the rampup time
+        init_coll_factor      = read_parameter_from_file<double>(filename,"INIT_COLL_FACTOR", debug, 0.).value;
         
-        chemistry_precision         = read_parameter_from_file<double>(filename,"CHEM_PRECISION", debug, 1e-2).value;
-        chemistry_numberdens_floor         = read_parameter_from_file<double>(filename,"CHEM_FLOOR", debug, 1e-20).value;
-        chemistry_maxiter           = read_parameter_from_file<int>(filename,"CHEM_MAXITER", debug, 4).value;
-        chemistry_miniter           = read_parameter_from_file<int>(filename,"CHEM_MINITER", debug, 4).value;
-        ion_precision         = read_parameter_from_file<double>(filename,"ION_PRECISION", debug, 1e-12).value;
-        ion_heating_precision = read_parameter_from_file<double>(filename,"ION_HEATING_PRECISION", debug, 1e-12).value;
-        ion_maxiter                  = read_parameter_from_file<int>(filename,"ION_MAXITER", debug, 128).value;
-        ion_heating_maxiter          = read_parameter_from_file<int>(filename,"ION_HEATING_MAXITER", debug, 128).value;
-        intermediate_chemfloor_check = read_parameter_from_file<int>(filename,"INTERMEDIATE_CHEM_CHECK", debug, 0).value;
-        chem_momentum_correction     = read_parameter_from_file<int>(filename,"CHEM_MOMENTUM_CORR", debug, 1).value;
-        chem_ekin_correction         = read_parameter_from_file<int>(filename,"CHEM_EKIN_CORR", debug, 0).value;
-        dt_skip_ichem                = read_parameter_from_file<int>(filename,"CHEM_DT_SKIP", debug, 1).value;
-        dt_skip_dchem = 0.; //<double>dt_skip_ichem;
-        //cout<<" ION_HEATING_PRECISION set to "<<ion_heating_precision<<" heating+maxiters = "<<ion_heating_maxiter<<endl;
-        //cout<<" ION_PRECISION set to "<<ion_precision<<" ion_maxiter = "<<ion_maxiter<<endl;
+        chemistry_precision         = read_parameter_from_file<double>(filename,"CHEM_PRECISION", debug, 1e-2).value; //Relative preicion for the number densities to be accepted by solver
+        chemistry_numberdens_floor         = read_parameter_from_file<double>(filename,"CHEM_FLOOR", debug, 1e-20).value; //Lower number densities floor per cell, normalized to total cell dens
+        chemistry_maxiter           = read_parameter_from_file<int>(filename,"CHEM_MAXITER", debug, 4).value; //Number of max chem solver iterations per timestep. Increase as 2^int
+        chemistry_miniter           = read_parameter_from_file<int>(filename,"CHEM_MINITER", debug, 4).value; //Number of min chem solver iterations per timestep. 
+        ion_precision         = read_parameter_from_file<double>(filename,"ION_PRECISION", debug, 1e-12).value; //Precision of brent solver for C2Ray number densities
+        ion_heating_precision = read_parameter_from_file<double>(filename,"ION_HEATING_PRECISION", debug, 1e-12).value; //Precision of brent solver for C2Ray heating rates
+        ion_maxiter                  = read_parameter_from_file<int>(filename,"ION_MAXITER", debug, 128).value;         //Maxiter of brent solver for C2Ray number densities
+        ion_heating_maxiter          = read_parameter_from_file<int>(filename,"ION_HEATING_MAXITER", debug, 128).value;//Maxiter of brent solver for C2Ray heating rates
+        intermediate_chemfloor_check = read_parameter_from_file<int>(filename,"INTERMEDIATE_CHEM_CHECK", debug, 0).value; //Check chem_floor in between iterations?
+        chem_momentum_correction     = read_parameter_from_file<int>(filename,"CHEM_MOMENTUM_CORR", debug, 1).value;      //Compute momentum transport due to ndot
+        chem_ekin_correction         = read_parameter_from_file<int>(filename,"CHEM_EKIN_CORR", debug, 1).value;          //Compute energy transport due to ndot
+        dt_skip_ichem                = read_parameter_from_file<int>(filename,"CHEM_DT_SKIP", debug, 1).value;            //Skip chemistry update every xxx timesteps in main loop. Accumulate timesteps until next chem solver call. Currently buggy.
         
-        rad_solver_max_iter = read_parameter_from_file<int>(filename,"MAX_RAD_ITER", debug, 1).value;
-        xi_rad              = read_parameter_from_file<double>(filename,"XI_RAD", debug, 2.).value; 
-        bond_albedo       = read_parameter_from_file<double>(filename,"BOND_ALBEDO", debug, 0.).value; 
-        planet_semimajor= read_parameter_from_file<double>(filename,"PARI_PLANET_DIST", debug, 1.).value; //in AU
+        right_extrap_press_multiplier =read_parameter_from_file<double>(filename,"BOUND_EXTRAP_MUL", debug, 1.0).value; //Hydrodynamic pressure extrapolation into ghost cell multiplier
+        dt_skip_dchem = 0.; 
+        
+        rad_solver_max_iter = read_parameter_from_file<int>(filename,"MAX_RAD_ITER", debug, 1).value;  //Currently unused
+        xi_rad              = read_parameter_from_file<double>(filename,"XI_RAD", debug, 2.).value;    //Radiation Xi factor, see Fig. 5 in code paper.
+        bond_albedo       = read_parameter_from_file<double>(filename,"BOND_ALBEDO", debug, 0.).value; //Bond albedo, Number between 0. and 1.
+        
         
         if(problem_number == 2)
-            monitor_output_index = num_cells/2; //TODO: Replace with index of sonic radius for dominant species?
+            monitor_output_index = num_cells/2; 
         else
             monitor_output_index = 1;
         
@@ -229,9 +248,9 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
             planet_mass     = read_parameter_from_file<double>(filename,"PARI_PLANET_MASS", debug, 1).value; //in Earth masses
             planet_mass     *= mearth;
             
-            planet_position = read_parameter_from_file<double>(filename,"PARI_PLANET_POS", debug, 0.).value;  //inside the simulation domain
-            rs              = read_parameter_from_file<double>(filename,"PARI_SMOOTHING_LENGTH", debug, 0.).value; //Gravitational smoothing length in hill 
-            rs_time         = read_parameter_from_file<double>(filename,"PARI_SMOOTHING_TIME", debug, 0.).value; //Time until we reach rs starting at rs_at_moment
+            planet_position = read_parameter_from_file<double>(filename,"PARI_PLANET_POS", debug, 0.).value;  //In spatial coordinates. 
+            rs              = read_parameter_from_file<double>(filename,"PARI_SMOOTHING_LENGTH", debug, 0.).value; //Gravitational smoothing length in rhill 
+            rs_time         = read_parameter_from_file<double>(filename,"PARI_SMOOTHING_TIME", debug, 0.).value; //Ramp-up time for smoothing length from 0 till PARI_SMOOTHING_LENGTH
             rs_at_moment    = 0.2;
             
         } else {
@@ -284,6 +303,9 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
         if(num_bands_out < 1) {
             cout<<" In INIT RADIATION, invalid num_bands_out = "<<num_bands_out<<" changing to num_bands_out = 1."<<endl;
             num_bands_out = 1;
+        }
+        if(use_rad_fluxes == 2 && use_convective_fluxes == 1 ) {
+            cout<<" Simple radiative solver used, but with convection. Note that convection in this case is not implemented yet!"<<endl;
         }
         
         l_i_in        = np_zeros(num_bands_in+1);    // Wavelenght bin boundaries
@@ -362,10 +384,9 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
                 }
         }
         photon_energies = np_somevalue(num_bands_in, 20. * ev_to_K * kb);
-        //for(int b=0; b<num_he_bands; b++) {
+        
         for(int b=0; b<num_bands_in; b++) {
             photon_energies[b] = 1.24/( l_i_in[b + 1] ) * ev_to_K * kb ;
-            //photon_energies[b] = 20. * ev_to_K * kb ;
             cout<<"Assigned to highenergy band b = "<<b<<" a photon energy of "<<photon_energies[b]/ev_to_K/kb<<" eV "<<endl;
         }
 
@@ -405,14 +426,6 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
             //int grid2_transition_i = 0;
             
             x_i[0] = domain_min / std::pow(dlogx, (num_ghosts-1)) ;
-            /*for(int i=1; i<= num_cells; i++) {
-                
-                if(x_i[i] > grid2_transition) {
-                    grid2_transition_i = i;
-                    cout<<" found grid2_transition_i = "<<i<<endl;
-                    break;
-                }
-            }*/
             cout<<" grid_transition_i = "<<grid2_transition_i<<endl;
             
             for(int i=1; i<= num_cells; i++) {
@@ -424,7 +437,6 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
                     templogx = dlogx2;
                 } else {
                     templogx = dlogx + double(i-grid2_transition_i)/5. * (dlogx2 - dlogx);
-                    //cout<<" in grid2generation, i/dlogx = "<<i<<"/"<<templogx<<" dlogx/dlogx2 = "<<dlogx<<"/"<<dlogx2<<endl;
                 }
                     
                 x_i[i]   =  x_i[i-1] * templogx;
@@ -521,7 +533,6 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
         
         //
         // Grid generation done. Now do a few simple checks on the generated grid values
-        //TODO: Expand this with a few more sensible tests, NaN checks etc.
         
         int all_grid_ok = 1, broken_index;
         double broken_value;
@@ -531,8 +542,6 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
                 broken_index = i;
                 broken_value = dx[i];
             }
-         
-            //cout<<i<<" dx = "<<dx[i]/x_i12[i]<<endl;
         }
             
         
@@ -562,9 +571,6 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
         omegaplus[num_cells+1]  = 2*omegaplus[num_cells] - omegaplus[num_cells-1];
         
         for(int i=1; i<num_cells+1; i++) {
-            //source_pressure_prefactor_left[i]  = (surf[i-1]/vol[i] - 1./dx[i]); 
-            //source_pressure_prefactor_right[i] = (surf[i]  /vol[i] - 1./dx[i]); 
-            
             source_pressure_prefactor_left[i]  = (surf[i-1]/vol[i] - 1./dx[i]); 
             source_pressure_prefactor_right[i] = (surf[i]  /vol[i] - 1./dx[i]); 
         }
@@ -597,7 +603,12 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
         ///////////////////////////////////////////////////////////////////////// 
         /////////////////////////////////////////////////////////////////////////
         /////////////////////////////////////////////////////////////////////////
-        num_species = read_parameter_from_file<int>(filename,"PARI_NUM_SPECIES", debug, 1).value;
+        num_species = read_parameter_from_file<int>(filename,"PARI_NUM_SPECIES", debug, 1).value; //Read the number of species
+        if(num_species<1) {
+            std::stringstream err;
+            err<<" Number of species has to be >= 1!"<<endl;
+            throw std::invalid_argument(err.str()) ;
+        }
 
         if (NUM_SPECIES != Eigen::Dynamic && num_species != NUM_SPECIES) {
             std::stringstream err ;
@@ -607,8 +618,8 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
             throw std::invalid_argument(err.str()) ;
         }
 
-        init_T_temp   = read_parameter_from_file<double>(filename,"INIT_T_TEMP", debug, 1.).value;
-        if(debug > 0) cout<<"Init: About to setup species with num_species = "<<num_species<<endl;
+        init_T_temp   = read_parameter_from_file<double>(filename,"INIT_T_TEMP", debug, 1.).value; //Overwrite initial temperature with this value. Use discouraged. 
+        if(debug > 0) cout<<"Init: About to setup species with num_species = "<<num_species<<endl; 
         
         species.reserve(num_species);
         
@@ -635,7 +646,6 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
             }
         }
         
-      
         ///////////////////////////////////////////////////////////////////////// 
         /////////////////////////////////////////////////////////////////////////
         /////////////////////////////////////////////////////////////////////////
@@ -654,17 +664,13 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
         dt = t_max ; // Old value needed by get_cfl_timestep()
         dt = get_cfl_timestep();
         
-        //for(int j=num_cells-1;j<num_cells+1;j++)
-        //cout<<" POS4.1 dens["<<j<<"] = "<<species[0].u[j].u1<<" temp = "<<species[0].prim[j].temperature<<endl;
-        
         if(debug > 0) cout<<"Init: Finished Init. Got initial dt = "<<dt<<" This is only temporary dt_init, not used for the first timestep."<<endl;
         //
         // Matrix init via Eigen
         //
 
         if(debug > 0) cout<<"Init: Setting up friction workspace."<<endl;
-
-
+        
         alphas_sample   = Eigen::VectorXd::Zero(num_cells+2);
         friction_sample = Eigen::VectorXd::Zero(num_cells+2);
         
@@ -711,18 +717,12 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
         // Dust species dont feel each other: Punch holes in the coefficient mask for the dust species, so they don't feel each other
         // Ion species feel each other strongly: Multiply ionic friction strength by the 'canonical' value of 100.
         //
-        //
         for(int si=0; si < num_species; si++)
             for(int sj=0; sj < num_species; sj++) {
                 if(species[si].is_dust_like == 1 && species[sj].is_dust_like == 1) {
                     friction_coeff_mask(si,sj) = 0.;
                     friction_coeff_mask(sj,si) = 0.;
                 }
-//                 if(std::abs(species[si].static_charge) > 0 && std::abs(species[sj].static_charge) > 0 && (si != sj)) {
-//                     //cout<<" Setting friction mask to ionic value for species si/sj = "<<si<<"/"<<sj<<endl;
-//                     friction_coeff_mask(si,sj) = 1.e0;
-//                     friction_coeff_mask(sj,si) = 1.e0;
-//                 }
                 
             }
                 
@@ -741,6 +741,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
     solar_heating_final = Eigen::VectorXd::Zero(num_bands_in,  1);
     S_band        = Eigen::MatrixXd::Zero(num_cells+2, num_bands_in);
     dS_band       = Eigen::MatrixXd::Zero(num_cells+2, num_bands_in);
+    dS_band_special=Eigen::MatrixXd::Zero(num_cells+2, num_bands_in);
     dS_band_zero  = Eigen::MatrixXd::Zero(num_cells+2, num_bands_in);
     planck_matrix = Eigen::MatrixXd::Zero(num_plancks, 2);
     
@@ -766,28 +767,8 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
         planck_matrix(p,0) = lmax*100.;  // Wavelength
         planck_matrix(p,1) = sum_planck; // Planck integral until this matrix element
         
-        //if(debug > 2)
-        //   cout<<" in planck_matrix, lT = "<<planck_matrix(p,0)<<" percentile = "<<planck_matrix(p,1)<<endl;
     }
-    
-//     debug = 4;
-//     char inpit;
-//     cout<<" Attempting to debug extreme temperatures:"<<endl;
-//     cout<<compute_planck_function_integral3(l_i[0], l_i[1], 5777);
-//     cin>>inpit;
-//     double temp2 = 1e-40;
-//     for(int i = 0; i<80; i++) {
-//             cout<<"Energy fraction in global band at T = "<<temp2<<": "<<compute_planck_function_integral3(l_i[0], l_i[1], temp2)<<" planck2 "<<compute_planck_function_integral2(l_i[0], l_i[1], temp2)/(sigma_rad * pow(temp2,4.) / pi)<<endl;
-//             temp2 *= 10.;
-//     }
-    
-    //cout<<"Energy fraction in global band at T = 1e-40: "<<compute_planck_function_integral3(l_i[0], l_i[1], 1e-40)<<endl;
-    //cin>>inpit;
-    
-    
-    //for(int j=15;j<18;j++)
-     //   cout<<" POS4.2 dens["<<j<<"] = "<<species[0].u[j].u1<<" temp = "<<species[0].prim[j].temperature<<endl;
-    
+ 
     if(debug > 0) cout<<"Init: Assigning stellar luminosities 1."<<endl;
     for(int s=0; s<num_species; s++) {
         species[s].dS = Eigen::VectorXd::Zero(num_cells+2,  1);
@@ -870,8 +851,6 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
                 if(lam > l_i_in[b] && lam < l_i_in[b+1]) {
                     tempenergy += lam*flux;
                     cnt++;
-                    
-                    //cout<<" Found datapoint in band b = "<<b<<" as lam/flux = "<<lam<<"/"<<flux<<endl;
                 }
              }
              file.close();
@@ -884,26 +863,15 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
             } else {
                 solar_heating(b) = 0.;
             }
-                 
-             
-             
-             
+            
             cout<<"SOLAR HEATING read from file in bin "<<b;
             cout<<" from/to lmin/lmax"<<l_i_in[b];
             cout<<" is F = "<<solar_heating(b)<<endl;
         }
         
-        
-        
-        
     }
     
-    
-    
-    cout<<"TOTAL SOLAR HEATING / Flux = "<<templumi<<" Luminosity = "<<(templumi*4.*pi*rsolar*rsolar*pi)<<endl;
-    
-    //for(int j=15;j<18;j++)
-    //    cout<<" POS4.3 dens["<<j<<"] = "<<species[0].u[j].u1<<" temp = "<<species[0].prim[j].temperature<<endl;
+    cout<<"TOTAL SOLAR HEATING / Flux = "<<templumi<<" Luminosity = "<<(templumi*4.*pi*rsolar*rsolar*pi)<<" | T_irr  = "<<pow(templumi/sigma_rad,0.25) <<" T_eq = "<<pow(templumi/sigma_rad/4,0.25) <<" Teq/2**0.25 = "<<pow(templumi/sigma_rad/8,0.25)<<endl;
     
     double totallumi = 0;
     double totallumiincr = 0;
@@ -943,9 +911,9 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
     else if(use_rad_fluxes == 2)
         tridiag        = BlockTriDiagSolver<Eigen::Dynamic>(num_cells+2, num_bands_out) ;
         
-    double rade_l = read_parameter_from_file<double>(filename,"PARI_RADSHOCK_ERL", debug, 1.).value;
-    double rade_r = read_parameter_from_file<double>(filename,"PARI_RADSHOCK_ERR", debug, 1.).value;
-    init_J_factor = read_parameter_from_file<double>(filename,"INIT_J_FACTOR", debug, -1.).value;
+    double rade_l = read_parameter_from_file<double>(filename,"PARI_RADSHOCK_ERL", debug, 1.).value; //Erad_left for radiative shock test
+    double rade_r = read_parameter_from_file<double>(filename,"PARI_RADSHOCK_ERR", debug, 1.).value; //Erad_right for radiative shock test
+    init_J_factor = read_parameter_from_file<double>(filename,"INIT_J_FACTOR", debug, -1.).value; //Discontinued
     
     
     for(int j = 0; j <= num_cells+1; j++) {
@@ -953,8 +921,6 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
         if(num_bands_out == 1)  {
             for(int s = 0; s< num_species; s++){
                 
-                //Jrad_FLD(j,0) += rad_energy_multipier * sigma_rad*pow(species[s].prim[j].temperature,4) / pi;
-                //cout<<" Assigning value j = "<<j<<" species = "<<s<<" with rad_energy_multiplier = "<<rad_energy_multiplier<<" and T = "<<species[s].prim[j].temperature<<endl;
                 Jrad_init(j,0) = rad_energy_multiplier * c_light /4. /pi;
                 
                 if(radiation_matter_equilibrium_test == 0)
@@ -976,7 +942,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
                 
                 else if(radiation_matter_equilibrium_test >= 4) {//Nonlinear diffusion test, and proper RHD shock tests
                     
-                    double SHOCK_TUBE_MID = read_parameter_from_file<double>(filename,"PARI_INIT_SHOCK_MID", debug, 0.5).value;
+                    double SHOCK_TUBE_MID = read_parameter_from_file<double>(filename,"PARI_INIT_SHOCK_MID", debug, 0.5).value;//Location of discontinuity between left and right values in shock tube
                     
                     if(x_i12[j] < SHOCK_TUBE_MID) 
                         Jrad_FLD(j,0) = rade_l;
@@ -984,7 +950,6 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
                         Jrad_FLD(j,0) = rade_r;
                     
                 }
-                 
                 
                 if(debug > 3) {
                 //if(debug > 1 && j==5) {
@@ -1014,6 +979,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
         //
         if(j>10)
            Jrad_FLD(j,0) = Jrad_FLD(10,0) *  (x_i12[10]*x_i12[10]) / (x_i12[j]*x_i12[j]);  
+
     }
     cout<<"photochem level = "<<photochemistry_level<<endl;
     n_init = np_zeros(num_species);
@@ -1027,9 +993,6 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
     if(photochemistry_level == 2) {
         cout<<" Init chemistry."<<endl<<endl;
         
-        //std::vector<double> n_tmp = np_zeros(num_species);
-        
-    
         try {
             
                 init_reactions(1);
@@ -1055,16 +1018,10 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
             cout<<"Misc error caught in init_chemistry."<<endl;
         }
         
-        
-        
-        //Catch num_species < index error etc.
-        
-        
     }
     
-    
-    //for(int j=15;j<18;j++)
-    //    cout<<" POS5 dens["<<j<<"] = "<<species[0].u[j].u1<<" temp = "<<species[0].prim[j].temperature<<endl;
+    //c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, int debug, int debug_cell, int debug_steps) {
+    write_into_execution_log(workingdir, filename_solo, speciesfile_solo);
     
     cout<<" Finished init. Returning to main now."<<endl<<endl;
 }
@@ -1080,6 +1037,19 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
 ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+/**
+ * Species class constructor.
+ * 
+ * Sets up the boundaries to be used with this boundary, equation of state, initialises primitive and conservative arrays.
+ * Starts hydrostatic construction of temperature and density structures and initializes opacity data.
+ * Most of the base data for this needs to be setup in the *spc file and linked via the opacity files.
+ * 
+ * @param[in] base_simulation Pointer to the c_Sim object containing this species class. This way one can quickly access important numbers by using base->important_number
+ * @param[in] filename Parameter file string, including directory substrings
+ * @param[in] species_filename Species file string, including directory substrings
+ * @param[in] species_index Own species number to be saved within this object
+ * @param[in] debug Debug level set either on command line or in param file.
+ */
 c_Species::c_Species(c_Sim *base_simulation, string filename, string species_filename, int species_index, int debug) {
     
         base               = base_simulation;
@@ -1098,18 +1068,18 @@ c_Species::c_Species(c_Sim *base_simulation, string filename, string species_fil
         //
         ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         
-        boundary_left  = read_parameter_from_file<BoundaryType>(filename,"PARI_BOUND_TYPE_LEFT", debug, BoundaryType::fixed).value;
+        boundary_left  = read_parameter_from_file<BoundaryType>(filename,"PARI_BOUND_TYPE_LEFT", debug, BoundaryType::fixed).value; //Which boundaries to use. See enum.h or this file, lines 1800
         boundary_right = read_parameter_from_file<BoundaryType>(filename,"PARI_BOUND_TYPE_RIGHT", debug, BoundaryType::fixed).value;
 
-        const_T_space  = read_parameter_from_file<double>(filename,"PARI_CONST_TEMP", debug, 1.).value;
-        TEMPERATURE_BUMP_STRENGTH    = read_parameter_from_file<double>(filename,"TEMPERATURE_BUMP_STRENGTH", debug, 0.).value; 
-        pressure_broadening_factor   = read_parameter_from_file<double>(filename,"PRESSURE_BROADENING", debug, 0.).value; 
-        pressure_broadening_exponent = read_parameter_from_file<double>(filename,"BROADENING_EXP", debug, 1.).value; 
+        const_T_space  = read_parameter_from_file<double>(filename,"PARI_CONST_TEMP", debug, 1.).value; //Temperature at boundary. Use depending on INIT_TEMPERATURE_MODEL
+        TEMPERATURE_BUMP_STRENGTH    = read_parameter_from_file<double>(filename,"TEMPERATURE_BUMP_STRENGTH", debug, 0.).value; //Discontinued
+        pressure_broadening_factor   = read_parameter_from_file<double>(filename,"PRESSURE_BROADENING", debug, 0.).value;  //For opacity model==P, weaken/strengthen pressure broadening
+        pressure_broadening_exponent = read_parameter_from_file<double>(filename,"BROADENING_EXP", debug, 1.).value;       //For opacity model==P, opacity = (1+broad_factor * (p/1e5)^exponent)
         
         if(debug > 0) cout<<"        Species["<<species_index<<"] Init: Finished reading boundaries."<<endl;
         if(debug > 0) cout<<"         Boundaries used in species["<<speciesname<<"]: "<<boundary_left<<" / "<<boundary_right<<endl;
 
-        const_opacity   = read_parameter_from_file<double>(filename,"PARI_CONST_OPAC", debug, 1.).value;
+        const_opacity   = read_parameter_from_file<double>(filename,"PARI_CONST_OPAC", debug, 1.).value; //Value of constant opacity, modified by individual multipliers for const opa model
         
         ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         //
@@ -1179,15 +1149,15 @@ c_Species::c_Species(c_Sim *base_simulation, string filename, string species_fil
         //
         if(base->problem_number == 1) {
             
-            double u1l = read_parameter_from_file<double>(filename,"PARI_INIT_DATA_U1L", debug, 1.).value;
-            double u2l = read_parameter_from_file<double>(filename,"PARI_INIT_DATA_U2L", debug, 0.).value;
-            double u3l = read_parameter_from_file<double>(filename,"PARI_INIT_DATA_U3L", debug, 1.).value;
+            double u1l = read_parameter_from_file<double>(filename,"PARI_INIT_DATA_U1L", debug, 1.).value; //density left
+            double u2l = read_parameter_from_file<double>(filename,"PARI_INIT_DATA_U2L", debug, 0.).value; //momentum left
+            double u3l = read_parameter_from_file<double>(filename,"PARI_INIT_DATA_U3L", debug, 1.).value; //total energy left
             
-            double u1r = read_parameter_from_file<double>(filename,"PARI_INIT_DATA_U1R", debug, 1.).value;
+            double u1r = read_parameter_from_file<double>(filename,"PARI_INIT_DATA_U1R", debug, 1.).value; 
             double u2r = read_parameter_from_file<double>(filename,"PARI_INIT_DATA_U2R", debug, 0.).value;
             double u3r = read_parameter_from_file<double>(filename,"PARI_INIT_DATA_U3R", debug, 1.).value;
             
-            SHOCK_TUBE_MID = read_parameter_from_file<double>(filename,"PARI_INIT_SHOCK_MID", debug, 0.5).value;
+            SHOCK_TUBE_MID = read_parameter_from_file<double>(filename,"PARI_INIT_SHOCK_MID", debug, 0.5).value; //Position of discontinuity
             
             u1l *= initial_fraction;
             u1r *= initial_fraction;
@@ -1222,11 +1192,11 @@ c_Species::c_Species(c_Sim *base_simulation, string filename, string species_fil
         //
         else if(base->problem_number == 2) {
             
-            double u1 = read_parameter_from_file<double>(filename,"PARI_INIT_DATA_U1", debug, 1.).value;
-            double u2 = read_parameter_from_file<double>(filename,"PARI_INIT_DATA_U2", debug, 0.).value;
-            double u3 = read_parameter_from_file<double>(filename,"PARI_INIT_DATA_U3", debug, 1.).value;
+            double u1 = read_parameter_from_file<double>(filename,"PARI_INIT_DATA_U1", debug, 1.).value; //Starting value for density construction.
+            double u2 = read_parameter_from_file<double>(filename,"PARI_INIT_DATA_U2", debug, 0.).value; //initial momentum. Should be 0, hence mostly irrelevant parameter.
+            double u3 = read_parameter_from_file<double>(filename,"PARI_INIT_DATA_U3", debug, 1.).value; //Initial total energy. With 0 momentum and T given by construction, essentialy irrelevant parameter
             
-            init_static_atmosphere = read_parameter_from_file<int>(filename,"PARI_INIT_STATIC", debug, 1).value; //Yesno, isothermal at the moment
+            init_static_atmosphere = read_parameter_from_file<int>(filename,"PARI_INIT_STATIC", debug, 1).value; //Yesno, if yes, densities are constructed in hydrostatic manner.
             
             if(debug > 0) cout<<"        Species["<<species_index<<"] problem 2 init, pos 1."<<endl;
             
@@ -1245,7 +1215,7 @@ c_Species::c_Species(c_Sim *base_simulation, string filename, string species_fil
                 //TODO: PUTIN short Phi- (T,rho)-iteration to allow hydrostatic starts with significant self-garvit
             }
             else if (init_static_atmosphere == 2) {
-                const_rho_scale = read_parameter_from_file<double>(filename,"CONST_RHO_SCALE", debug, 550.e5).value;
+                const_rho_scale = read_parameter_from_file<double>(filename,"CONST_RHO_SCALE", debug, 550.e5).value; //Const scale height if exponential atmosphere is constructed
                 initialize_exponential_atmosphere();
             }
             
@@ -1267,14 +1237,11 @@ c_Species::c_Species(c_Sim *base_simulation, string filename, string species_fil
             initialize_default_test();
         
         
-        USE_WAVE = read_parameter_from_file<int>(filename,"WAVE_USE", debug, 0).value; 
+        USE_WAVE = read_parameter_from_file<int>(filename,"WAVE_USE", debug, 0).value; //Wave test
         if(USE_WAVE==1) {
             WAVE_AMPLITUDE = read_parameter_from_file<double>(filename,"WAVE_AMPLITUDE", debug).value; 
             WAVE_PERIOD    = read_parameter_from_file<double>(filename,"WAVE_PERIOD", debug).value; 
         }
-        
-        //for(int j=num_cells-1;j<num_cells+1;j++)
-        //    cout<<" POS3.5 dens["<<j<<"] = "<<u[j].u1<<" temp = "<<prim[j].temperature<<" E/e/p = "<<u[j].u3<<"/"<<prim[j].internal_energy<<"/"<<prim[j].pres<<" rho*cv*T = "<<cv*u[j].u1*prim[j].temperature<<endl;
         
         mass_reservoir = 0.;
         t_evap = 50.;
@@ -1284,9 +1251,6 @@ c_Species::c_Species(c_Sim *base_simulation, string filename, string species_fil
         // Apply boundary conditions
         apply_boundary_left(u) ;
         apply_boundary_right(u) ;
-        
-        //for(int j=num_cells=1;j<num_cells+1;j++)
-        //    cout<<" POS4 dens["<<j<<"] = "<<u[j].u1<<" temp = "<<prim[j].temperature<<" E/e/p = "<<u[j].u3<<"/"<<prim[j].internal_energy<<"/"<<prim[j].pres<<" rho*cv*T = "<<cv*u[j].u1*prim[j].temperature<<endl;
         
         if(debug > 0) cout<<"        Species["<<species_index<<"]: Init done."<<endl;
         
@@ -1300,7 +1264,19 @@ c_Species::c_Species(c_Sim *base_simulation, string filename, string species_fil
 }
 
 
-
+/**
+ * Initializer of a well-balanced hydrostatic density profile.
+ * 
+ * Starts with a guess of the temperature profile, either isothermal, adiabatic, or a combination thereof. With this, we compute the density structure, such that
+ * it fulfills the hydrostatic pressure gradient, given the species' EOS. Integration happens either from outside in or inside out.
+ * After the initial density profile is solved for, we apply a number of density cuts: For quasi-isothermal EOS we need a density jump to initialize a wind, 
+ * for adiabatic+radiative EOS we need to cut the density to above ~1e-20, so that the rad solver doesn't crash. For simulations with ionisation/chemistry we 
+ * initialize the setups as neutral and then have to force the electrons to follow the proton distribution, etc.
+ * Another cut is applied to prevent heavy shocks in the case of multi-species simulations with ionisation: Beyond the sonic point, assume density drops off with sensible powerlaw
+ * such that the tau=1 radius does not sit in the outer simulation domain (which would have a different density profile in a self-consistent solution).
+ * 
+ * @param[in] filename Parameter file filename, including the folder substrings.
+ */
 void c_Species::initialize_hydrostatic_atmosphere(string filename) {
     
     if(debug > 0) cout<<"            ATTENTION: Initializing hydrostatic construction for species "<<speciesname<<" and overwriting prior initial values."<<endl;
@@ -1313,12 +1289,12 @@ void c_Species::initialize_hydrostatic_atmosphere(string filename) {
     //double residual;
     double metric_outer;
     
-    double dphi_factor = read_parameter_from_file<double>(filename,"PARI_DPHI_FACTOR", debug, 1.).value;
+    double dphi_factor = read_parameter_from_file<double>(filename,"PARI_DPHI_FACTOR", debug, 1.).value; //Modifier on initial entropy
         
     if(base->photochemistry_level > 0 && std::abs(static_charge) > 0 )
-        base->density_floor = read_parameter_from_file<double>(filename,"ION_FLOOR", debug, 1.e-20).value;
+        base->density_floor = read_parameter_from_file<double>(filename,"ION_FLOOR", debug, 1.e-20).value; 
     else
-        base->density_floor = read_parameter_from_file<double>(filename,"DENSITY_FLOOR", debug, 1.e-20).value;
+        base->density_floor = read_parameter_from_file<double>(filename,"DENSITY_FLOOR", debug, 1.e-20).value; //Caps minimum density at construction. Thermal radiation transport likes to crash at densities < 1e-20
     //
     // Start with the outermost cell and build up a hydrostatic atmosphere
     // Fulfilling KKM16, Eqn. 17
@@ -1339,11 +1315,13 @@ void c_Species::initialize_hydrostatic_atmosphere(string filename) {
             } else {
                 mode = 11;
                 
-                if(base->x_i12[i] < 1.e9) {
-                    prim[i].temperature = - dphi_factor * base->phi[i] / (cv * gamma_adiabat) + const_T_space; //get_phi_grav(x_i12[i], enclosed_mass[0]);
+                if(base->x_i12[i] < 1.2e9) {
+                    prim[i].temperature = - dphi_factor * base->phi[i] / (cv * gamma_adiabat) + const_T_space; 
+                    //prim[i].temperature = const_T_space; 
                 } else {
                     prim[i].temperature = - dphi_factor * base->get_phi_grav(base->x_i12[i], base->planet_mass) / (cv * gamma_adiabat) + const_T_space;
-                    //prim[i].temperature = - dphi_factor * base->phi[i] / (cv * gamma_adiabat) + const_T_space; get_phi_grav(x_i12[i], enclosed_mass[0]);
+                    //prim[i].temperature = - dphi_factor * base->phi[i] / (cv * gamma_adiabat);
+                    
                 }
                     
             }
@@ -1487,7 +1465,7 @@ void c_Species::initialize_hydrostatic_atmosphere(string filename) {
             //cout<<" s/i = "<<speciesname<<"/"<<i<<"   metric_inner debug: dPhi = "<<dphi<<" rhonew/rhoold = "<<temp_rhofinal<<"/"<<u[i].u1<<endl;
             
             //if(speciesname.compare("S2")==0) { //Force light electrons to be the same number as protons
-            if(mass_amu < 1.e-3) {    
+            if(mass_amu < 0.90) {    
             //if(speciesname.compare("e-")==0 ) { //Force light electrons to be the same number as protons
                 
                 //int p_index = base->get_species_index("H+");
@@ -1660,24 +1638,19 @@ void c_Species::initialize_hydrostatic_atmosphere(string filename) {
     //cout<<"End of hydrostat"<<endl;
 }
 
+/**
+ * Historical initialiser for analytic isothermal density profiles, unused now.
+ */
 void c_Species::initialize_exponential_atmosphere() {
-    
-    //cout<<" temperatures : ";
     
     for(int i=num_cells+1; i>=0; i--) {
             prim[i].temperature = const_T_space;
-            //cout<<prim[i].temperature<<" ";
     }
-    
-    //cout<<endl<<" scale_H : "<<const_rho_scale<<endl;
-    //cout<<" densities : ";
     
     for(int i=num_cells; i>=0; i--)  {
         double temp_rhofinal = u[i].u1*std::exp(-1./const_rho_scale*(base->x_i[i] - base->x_i[num_cells]));
         
         u[i] = AOS(temp_rhofinal, 0., cv * temp_rhofinal * prim[i].temperature) ;
-        
-        //cout<<temp_rhofinal<<" ";
     }
     cout<<endl<<endl;
     cout<<"            Ended expoenential density construction for species "<<speciesname<<endl;
@@ -1685,15 +1658,20 @@ void c_Species::initialize_exponential_atmosphere() {
 }
 
 
-
+/**
+ * Iterator skelleton for self-consistent density-temperature profiles. For users who wish to use fully self-consistent 
+ * initial conditions as given by e.g. the Guillot2010 model.
+ * 
+ * @param[in] filename Parameter file filename, including the folder substrings.
+ */
 void c_Species::initialize_hydrostatic_atmosphere_iter(string filename) {
     cout<<" Initializing hydrostatic atmosphere based on filename = "<<filename<<endl;
 }
 
 
-//
-// Initial conditions for shock tubes, dividing the domain into a left constant value and another right constant value
-//
+/**
+ * Initial conditions for shock tubes, dividing the domain into a left constant value and another right constant value
+ */
 void c_Species::initialize_default_test() {
     
     if(debug > 0) cout<<"            Initialized default simulation."<<endl;
@@ -1702,10 +1680,12 @@ void c_Species::initialize_default_test() {
         u[i] = AOS(1,1,1);
 }
 
-
-//
-// Initial conditions for shock tubes, dividing the domain into a left constant value and another right constant value
-//
+/**
+ * Initial conditions for shock tubes, dividing the domain into a left constant value and another right constant value
+ * 
+ * @param[in] leftval Left hydrodynamic state (rho_L, mom_L, Energy_L)
+ * @param[in] rightval Right hydrodynamic state (rho_R, mom_R, Energy_R)
+ */
 void c_Species::initialize_shock_tube_test(const AOS &leftval,const AOS &rightval) {
     
     if(debug > 0) cout<<"            Initialized shock tube test."<<endl;
@@ -1719,9 +1699,11 @@ void c_Species::initialize_shock_tube_test(const AOS &leftval,const AOS &rightva
     }
 }
 
-//
-// Initial conditions for one constant background state
-//
+/**
+ * Initial conditions for one constant background state
+ * 
+ * @param[in] background Hydrodynamic state to be initialized in the entire domain (rho, mom, Energy)
+ */
 void c_Species::initialize_background(const AOS &background) {
     
     if(debug > 0) cout<<"            Initialized constant background state. state = "<<background.u1<<" "<<background.u2<<" "<<background.u3<<endl;
@@ -1730,7 +1712,9 @@ void c_Species::initialize_background(const AOS &background) {
         u[i] = background;
 }
 
-//
+/**
+ * Sound wave propagation test, to be compared against analytic model.
+ */
 void c_Species::initialize_sound_wave() {
 
     double amp = 1e-6 ;
@@ -1751,7 +1735,12 @@ void c_Species::initialize_sound_wave() {
     }
 }
 
-
+/**
+ * Build first order hydrodynamic boundary conditions
+ * user = 0, open = 1, reflecting = 2, fixed = 3, periodic = 4, giantplanet = 5
+ * 
+ * @param[in] u Hydrodynamic state in last ghost cell before active domain begins
+ */
 void c_Species::apply_boundary_left(std::vector<AOS>& u) {
     int num_ghosts = base->num_ghosts;
     int Ncell = num_cells - 2*(num_ghosts-1) ; // Correct for fact we increased num_cells
@@ -1811,24 +1800,19 @@ void c_Species::apply_boundary_left(std::vector<AOS>& u) {
                 int iact = num_ghosts   +i;
                 u[igh]     = u[iact]; 
                 u[igh].u2 *= -1;
-                //if(base->steps>=0) //Avoid adjusting the potential in the multi-species hydrostatic construction phase
-                    base->phi[igh]   = base->phi[iact] ;
+                base->phi[igh]   = base->phi[iact] ;
             }
             break;
         case BoundaryType::fixed:
             for (int i=0; i < num_ghosts; i++) {
                 
-                double dens_wall;  
-                
+                /*double dens_wall;  
                 if(base->problem_number == 1)
-                    dens_wall = SHOCK_TUBE_UL.u1 *  mass_amu;
+                    dens_wall = SHOCK_TUBE_UL.u1 * mass_amu;
                 else {
-                    //cout<<" in fixed boundaries for s = "<<this_species_index<<", u1 = "<<BACKGROUND_U.u1<<" dens = "<<BACKGROUND_U.u1 *  mass_amu<<endl;
                     dens_wall = BACKGROUND_U.u1 *  mass_amu;
-                }
-                //AOS cons_fixed = AOS(dens_wall, 0., cv * dens_wall * prim[i].temperature);
-                eos->compute_primitive(&u[i],&prim[i], 1) ;
-                //cout<<" found p = "<<prim[i].pres<<endl;
+                }*/
+                eos->compute_primitive(&u[i],&prim[i], 1) ; //Ghost cell u is fixed after init, only need to update p in prim
             }
             
             break;
@@ -1839,9 +1823,25 @@ void c_Species::apply_boundary_left(std::vector<AOS>& u) {
                 base->phi[i]   = base->phi[iact] ;
             }
             break;
+        case BoundaryType::giantplanet: //This is currently identical to the left reflecting boundaries, assuming the left boundary is a hard core
+            for (int i=0; i < num_ghosts; i++) {
+                int igh =  num_ghosts-1 -i;
+                int iact = num_ghosts   +i;
+                u[igh]     = u[iact]; 
+                u[igh].u2 *= -1;
+                base->phi[igh]   = base->phi[iact] ;
+            }
+            break;
+            break;
     }
 }
 
+/**
+ * Build first order hydrodynamic boundary conditions
+ * user = 0, open = 1, reflecting = 2, fixed = 3, periodic = 4, giantplanet = 5
+ * 
+ * @param[in] u Hydrodynamic state in last ghost cell after active domain ends
+ */
 void c_Species::apply_boundary_right(std::vector<AOS>& u) {
     int num_ghosts = base->num_ghosts;
     int Ncell = num_cells - 2*(num_ghosts-1) ;
@@ -1857,7 +1857,7 @@ void c_Species::apply_boundary_right(std::vector<AOS>& u) {
                 
                 double dphi = (base->phi[i]*K_zzf[i] - base->phi[i-1]*K_zzf[i-1]) / (base->dx[i-1] + base->dx[i]) ;
                 dphi       *= (base->omegaplus[i]*base->dx[i] + base->omegaminus[i-1]*base->dx[i-1]) ;
-                prim.pres = prim.pres - prim.density * dphi ;    
+                prim.pres = prim.pres - base->right_extrap_press_multiplier * prim.density * dphi ;    
                 
                 //Older variant, should be more precise but has weird pressure slope
                 //double dphi2 = (phi_s[i] - phi_s[i-1]) / (base->dx[i-1] + base->dx[i]) ;
@@ -1897,11 +1897,7 @@ void c_Species::apply_boundary_right(std::vector<AOS>& u) {
                 AOS_prim prim ;
                 eos->compute_primitive(&u[i-1],&prim, 1) ;
                 
-                double dphi = (phi_s[i] - phi_s[i-1]) / (base->dx[i-1] + base->dx[i]) ;
-                //dphi *= (base->omegaplus[i]*base->dx[i] + base->omegaminus[i-1]*base->dx[i-1]) ;
-                //dphi *= (prim.density * base->omegaplus[i]*base->dx[i] + this->prim[i].density * base->omegaminus[i-1]*base->dx[i-1]) ;
-                      //dphi *= (this->prim[i].density* base->omegaplus[i]*base->dx[i] +  prim.density  * base->omegaminus[i-1]*base->dx[i-1]) ;
-                    
+                //double dphi = (phi_s[i] - phi_s[i-1]) / (base->dx[i-1] + base->dx[i]) ;
                 double r =base->x_i12[i];
                 double mdot      = 4.*3.141592*prim.density*prim.speed*r*r;
                 double freefallv = -std::sqrt(2.*G*base->planet_mass/r);
@@ -1920,9 +1916,6 @@ void c_Species::apply_boundary_right(std::vector<AOS>& u) {
                     prim.pres = std::min(prim.pres * 2., 1.);// - prim.density * dphi ; //Forcing inflow
                 }
                 
-                //prim.density = -mdotlimit/freefallv/r/r;
-                //cout<<" in boundaries, rhoi rho+1 = "<<prim.density<<"/"<<this->prim[i].density<<" p,p2 = "<<prim.pres;
-                
                 eos->compute_conserved(&prim, &u[i], 1) ;
                 eos->compute_auxillary(&prim, 1);
             }
@@ -1930,10 +1923,12 @@ void c_Species::apply_boundary_right(std::vector<AOS>& u) {
     }
 }
 
-
-//
-// Creates a wave at the inner boundary supposedly propagating upwards in the gravity well
-//
+/**
+ * Creates a wave at the inner boundary supposedly propagating upwards in the gravity well
+ * 
+ * @param[out] u Hydrodynamic state in boundary
+ * @param[in] globalTime Time
+ */
 void c_Species::add_wave(std::vector<AOS>& u, double globalTime)  {
     
     u[0].u2 = u[0].u1 * WAVE_AMPLITUDE * std::sin(12.*M_PI*globalTime/WAVE_PERIOD);
@@ -1950,7 +1945,9 @@ c_Species::~c_Species() {
     //Empty
 }
 
-
+/**
+ * Setting the base pointer for reaction objects and computing the total product masses
+ */
 void c_reaction::set_base_pointer(c_Sim *base_simulation) {
     base = base_simulation;
     
@@ -1959,6 +1956,9 @@ void c_reaction::set_base_pointer(c_Sim *base_simulation) {
     }
 }
 
+/**
+ * Setting the base pointer for reaction objects and computing the total product masses as well as the photoenergy split factors.
+ */
 void c_photochem_reaction::set_base_pointer(c_Sim *base_simulation) {
     base = base_simulation;
     
@@ -1987,14 +1987,16 @@ void c_photochem_reaction::set_base_pointer(c_Sim *base_simulation) {
 }
 
 
-
+/**
+ * Constructor wrapper for the reaction class. If reaction rates are given via a,b,c, we ignore b and c and just pass a on as first guess of the reaction rate to the actual constructor.
+ * Switches arguments in real constructor in a safe way in case this is the reverse reaction of another reaction.
+ */
 c_reaction::c_reaction(bool is_reverse, bool mtype_reaction, int num_species, std::vector<int> e_indices,std::vector<int> p_indices,std::vector<double> e_stoch, std::vector<double> p_stoch, double a, double b, double c) {
     this->is_reverse_reac = is_reverse;
     this->mtype_reaction  = mtype_reaction;
     this->reac_a = a;
     this->reac_b = b;
     this->reac_c = c;
-    //double reaction_rate = get_reaction_rate(300.);
     
     if(!is_reverse_reac)
         c_reaction_real(num_species, e_indices, p_indices, e_stoch, p_stoch, reac_a);
@@ -2003,7 +2005,10 @@ c_reaction::c_reaction(bool is_reverse, bool mtype_reaction, int num_species, st
     
 } 
 
-
+/**
+ * Constructor wrapper for the reaction class. 
+ * Switches arguments in real constructor in a safe way in case this is the reverse reaction of another reaction.
+ */
 c_reaction::c_reaction(bool is_reverse, bool mtype_reaction, int num_species, std::vector<int> e_indices,std::vector<int> p_indices,std::vector<double> e_stoch, std::vector<double> p_stoch, double reaction_rate) 
 {
     this->is_reverse_reac = is_reverse;
@@ -2016,9 +2021,19 @@ c_reaction::c_reaction(bool is_reverse, bool mtype_reaction, int num_species, st
             
 }
 
+/**
+ * Constructor for the reaction class, which takes care of thermochemistry. Writes all data about the reaction so that the reaction matrix can later be built via iteration over all reactions.
+ * 
+ * @param[in] num_species Needs to know the global number of species
+ * @param[in] e_indices list of global species indices participating as reactants (educts)
+ * @param[in] p_indices list of global species indices participating as products
+ * @param[in] e_stoch list of educt stochiometric factors
+ * @param[in] p_stoch list of product stochiometric factors 
+ * @param[in] reaction_rate initial guess for the reaction rate (exact value doesn't matter as long as its not NaN or -inf), it's recomputed via update_reaction_rate(temperature) at every timestep.
+ */
 void c_reaction::c_reaction_real(int num_species, std::vector<int> e_indices,std::vector<int> p_indices,std::vector<double> e_stoch, std::vector<double> p_stoch, double reaction_rate) {
     
-    for(int e=0; e<e_indices.size(); e++) {
+    for(long unsigned int e=0; e<e_indices.size(); e++) {
         if(e_indices[e] >= num_species) {
             
             cout<<" FATAL ERROR caught in init_chemistry: Target reactant index exceeds num_species! num_species = "<<num_species<<endl;
@@ -2028,7 +2043,7 @@ void c_reaction::c_reaction_real(int num_species, std::vector<int> e_indices,std
         }
             
     }
-    for(int p=0; p<p_indices.size(); p++) {
+    for(long unsigned int p=0; p<p_indices.size(); p++) {
         if(p_indices[p] >= num_species) {
             
             cout<<" FATAL ERROR caught in init_chemistry: Target product index exceeds num_species! num_species = "<<num_species<<endl;
@@ -2075,11 +2090,23 @@ void c_reaction::c_reaction_real(int num_species, std::vector<int> e_indices,std
     }
 }
 
-
+/**
+ * Constructor for the photochem_reaction class which takes care of photochemistry. Writes all data about the reaction so that the reaction matrix can later be built via iteration over all reactions.
+ * 
+ * @param[in] num_species Needs to know the global number of species
+ * @param[in] num_bands Global number of bands
+ * @param[in] band      Band number at which this reaction starts to be active, i.e. it's active for all b<= num_bands (this is the implementation of the ionisation threshold!)
+ * @param[in] e_indices list of global species indices participating as reactants (educts)
+ * @param[in] p_indices list of global species indices participating as products
+ * @param[in] e_stoch list of educt stochiometric factors
+ * @param[in] p_stoch list of product stochiometric factors 
+ * @param[in] branching Branching ratio. A number <= 1, multiplier on the photoionisation rate
+ * @param[in] threshold This is the ionisation threshold energy, user needs to make sure that this is consistent with the wavelength limit l_i_in[band + 1].
+ */
 c_photochem_reaction::c_photochem_reaction(int num_species, int num_bands, int band, std::vector<int> e_indices, std::vector<int> p_indices, std::vector<double> e_stoch, std::vector<double> p_stoch, double branching, double threshold)
 {
         //cout<<"in init photochem reaction "<<endl;
-        for(int e=0; e<e_indices.size(); e++) {
+        for(long unsigned int e=0; e<e_indices.size(); e++) {
             //cout<<" e = "<<e_indices[e]<<endl;
             if(e_indices[e] >= num_species) {
                 cout<<" FATAL ERROR caught in init_chemistry: Target photochem reactant index exceeds num_species! "<<endl;
@@ -2087,9 +2114,8 @@ c_photochem_reaction::c_photochem_reaction(int num_species, int num_bands, int b
                 cin>>wait;
                 throw 2;
             }
-                
         }
-        for(int p=0; p<p_indices.size(); p++) {
+        for(long unsigned int p=0; p<p_indices.size(); p++) {
             //cout<<" p ="<<p_indices[p]<<endl;
             if(p_indices[p] >= num_species) {
                 cout<<" FATAL ERROR caught in init_chemistry: Target photochem product index exceeds num_species! "<<endl;
@@ -2099,7 +2125,6 @@ c_photochem_reaction::c_photochem_reaction(int num_species, int num_bands, int b
             }
                 
         }
-        
         //cout<<"e_indices = "<<e_indices<<" p_indices = "<<p_indices<<endl;
         //cout<<"pos1"<<endl;
         //this->reaction_number = reacnum;

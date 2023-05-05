@@ -1,34 +1,17 @@
-///////////////////////////////////////////////////////////
-//
-//
-//  radiation.cpp
-//
-// This file contains routines computing the absorption of solar radiation, radiation transport and updating temperatures accordingly.
-//
-//
-//
-///////////////////////////////////////////////////////////
+/** 
+ * radiation.cpp
+ * 
+ * This file contains routines computing the absorption of solar radiation, radiation transport and updating temperatures accordingly.
+ */
 
 #define EIGEN_RUNTIME_NO_MALLOC
 
 #include <cassert>
 #include "aiolos.h"
 
-//////////////////////////////////////////////////////////////////
-//
-// void update_opacities():
-//      Computation of opacities based on material properties.
-//      Furthermore the attenuation of solar radiation is ray-traced,
-//      flux loss per cell per band is computed and assigned to individual species based on 
-//
-//
-//
-//
-//
-//
-//
-//
-//////////////////////////////////////////////////////////////////
+/**
+ * Resets the heating and cooling functions and applies a time-dependent ramp up to the top-of-the atmosphere radiation spectrum.
+ */
 void c_Sim::reset_dS() {
     for(int j = num_cells + 1; j>0; j--) {
         for(int s=0; s<num_species; s++) {
@@ -51,6 +34,122 @@ void c_Sim::reset_dS() {
                 
 }
 
+
+/**
+ * Wrapper function for computing the heating function, without solving for the new temperatures just yet.
+ * By the time this is called from the main loop, photo/thermo chemistry is already done and the photoionisation rates 
+ * and photoheating rates (contributions of dS_band due to cell_optical_depth_highenergy(cell, b) are already added to dS_band.
+ */
+void c_Sim::update_dS() {
+    
+    if(debug > 1)
+        cout<<"Updating dS..."<<endl;
+    
+    //
+    // Compute optical depths, solar radiation attenuation and heating function for low-energy bands
+    //
+    for(int j = num_cells + 1; j>0; j--) {
+        
+        //////////////////////////////////////////////////////////////////
+        //////////////Stellar irradiation bands
+        //////////////////////////////////////////////////////////////////
+        for(int b=0; b<num_bands_in; b++) {
+            
+            update_tau_s_jb(j, b); //See below in this file
+            update_dS_jb(j, b);   //See below in this file
+        }
+        
+        //NOTE: update_dS_jb_photochem(j,b) is now moved into chemistry.cpp, due to algorithmic requirements.
+        
+        //////////////////////////////////////////////////////////////////
+        ///////////////////Thermal bands
+        //////////////////////////////////////////////////////////////////
+        
+        for(int b=0; b<num_bands_out; b++) {
+            
+                cell_optical_depth(j,b)           = 0.;
+                total_opacity(j,b)                = 0 ;
+                radial_optical_depth(j,b)         = 0.;
+                
+                for(int s=0; s<num_species; s++) {
+                    //total_opacity(j,b)          += species[s].opacity(j,b)         * species[s].u[j].u1 ; //TODO: Replace this with sensible addition rule for Rosseland opacities!
+                    total_opacity(j,b)          = std::fmax(species[s].opacity(j,b) * species[s].u[j].u1, total_opacity(j,b)) ; //TODO: Replace this with sensible addition rule for Rosseland opacities!
+                }
+                cell_optical_depth(j,b)         = total_opacity(j, b)         * dx[j] ;
+                
+                if(j==num_cells+1) 
+                    radial_optical_depth(j,b)         = 0.;
+                else
+                    radial_optical_depth(j,b)         = radial_optical_depth(j+1,b)         + cell_optical_depth(j,b);
+        }
+        
+    }
+    
+    //For tests of the radiation solver when initialising the radiation field out of equilibrium.
+    if((steps==0) && (init_J_factor > 1e10)) {
+        
+        cout<<" Setting J to custom values. init_J_factor = "<<init_J_factor<<" and init_T_temp ="<<init_T_temp<<" const_opacity_solar_factor = "<<const_opacity_solar_factor<<endl;
+        
+        for(int j = num_cells + 1; j>0; j--) {
+            for(int b=0; b<num_bands_out; b++) {
+                
+                if(radial_optical_depth(j,b) < 1.) 
+                    Jrad_FLD(j,b) *= init_J_factor; //*std::pow(x_i[j]/x_i[34] , -2.);
+                
+                for(int s=0; s<num_species; s++)
+                    species[s].prim[j].temperature = init_T_temp;
+                
+            }
+        }
+    }
+    
+    if(debug >= 1) {
+        
+        for(int b=0; b<num_bands_in;b++) {
+           cout<<" in band_in ["<<b<<"] top-of-the-atmosphere heating = "<<solar_heating(b)<<endl;
+        }
+        cout<<"    in update opa "<<endl;
+        for(int j=num_cells+1; j>=0; j--) {
+            
+            for(int b=0; b<num_bands_in; b++) {
+                cout<<"    band ["<<b<<"][j="<<j<<"] = "<<S_band(j,b)<<" dS = "<<dS_band(j,b)<<" tau_s = "<<radial_optical_depth_twotemp(j,b);
+                for(int s=0; s<num_species; s++) {
+                     cout<<" dS_fract["<<species[s].speciesname<<"] = "<<(species[s].fraction_total_solar_opacity(j,b))<<" opas = "<<species[s].opacity_twotemp(j,b)<<" rho = "<<species[s].prim[j].density;
+                     
+                     //cout<<" dS_fract["<<species[s].speciesname<<"] = "<<(species[s].fraction_total_solar_opacity(j,b))<<" rho/T/Etot-Ekin = "<<species[s].prim[j].density<<"/"<<species[s].prim[j].temperature<<"/"<<(species[s].u[j].u3 - 0.5*std::pow(species[s].u[j].u2,2.)/species[s].u[j].u1)<<" x = "<<x_i12[j];
+                    //" opa = "<<species[s].opacity(j,b)<<" total opa(j+1)"<<total_opacity(j+1,b)<<
+                }
+                //cout<<endl;
+            }
+            cout<<endl;
+        }
+        
+        for(int j=num_cells+1; j>=0; j--) {
+            
+            for(int b=0; b<num_bands_out; b++) {
+                cout<<"    band ["<<b<<"][j="<<j<<"] = "<<S_band(j,b)<<" dS = "<<dS_band(j,b)<<" tau_s = "<<radial_optical_depth_twotemp(j,b);
+                for(int s=0; s<num_species; s++) {
+                     cout<<" opap["<<species[s].speciesname<<"] = "<<(species[s].opacity_planck(j,b))<<" opa = "<<species[s].opacity(j,b);
+                     
+                }
+            }
+            cout<<endl;
+        }
+        
+        if(debug > 3) {
+            char stop;
+            cin>>stop;    
+        }
+        
+    }
+    
+    //End of update_dS
+}
+
+
+/**
+ * Integrate the opacity to stellar irradiation in band b over cell j for all contributions from species s. Update radial optical depth. Called before update_dS_jb().
+ */
 void c_Sim::update_tau_s_jb(int j, int b) {
     
     total_opacity_twotemp(j,b)        = 0 ;
@@ -68,7 +167,14 @@ void c_Sim::update_tau_s_jb(int j, int b) {
     
 }
 
+/**
+ * Update heating function. Keep track of highenergy- and thermal opacities.
+ */
 void c_Sim::update_dS_jb(int j, int b) {
+    
+            if(j==num_cells-10e99) {
+                cout<<"Pos 2.1 dS_UV = "<<dS_band(num_cells-10,0)<<endl;
+            }
     
                 //
                 // After the total optical depth per band is known, we assign the fractional optical depths
@@ -91,12 +197,14 @@ void c_Sim::update_dS_jb(int j, int b) {
                 if(debug >= 1)
                     cout<<" in cell ["<<j<<"] band ["<<b<<"] top-of-the-atmosphere heating = "<<solar_heating(b)<<" tau_rad(j,b) = "<<radial_optical_depth(j,b)<<" exp(tau) = "<<std::exp(-radial_optical_depth(j,b))<<endl;
                 
-                /*S_band(num_cells+1,b) = 0.;
-                S_band(num_cells,b) = 0.;
-                S_band(num_cells-1,b) = 0.;
-                S_band(num_cells-2,b) = 0.;
-                */
-                // Regular dS computation
+                //
+                // Compute the heating dS as the difference between flux in and out of the cell
+                // Contains the geometric averaging factor 1/4 as well as a crude approximation of albedo effects, as we do not solve for scattering.
+                // Different approximations of exp and expm1 can improve speed in cases when many bands are integrated. The current setting is fast and accurate enough.
+                //
+                // Highenergy optical depths are computed separately in chemistry.cpp lines ~706 and used in line 336. This is because the heating rates need to be split onto the
+                // ionisation products, not the absorbing reactants, so there the heating rates need to be split.
+                //
                 if(steps > -1) {
                             
                     if(j<num_cells+1){
@@ -105,6 +213,12 @@ void c_Sim::update_dS_jb(int j, int b) {
                         dS_band(j,b) = 0.25 * S_band(j,b)  /dx[j] * (1.-bond_albedo);
                         double dtau_tot = -(radial_optical_depth_twotemp(j+1,b) - radial_optical_depth_twotemp(j,b));
                         double dS_he_temp = dS_band(j,b);
+                        
+                        //Gamma_He=0.25*solar_heating(b)*std::exp(-radial_optical_depth_twotemp(j+1,b)) * (-std::expm1(-dtaus[b])) * (1 - 13.6 * ev_to_K * kb / photon_energies[b]) / dx[j] * dlognu; 
+                        
+                        if(j==num_cells-10e99) {
+                            cout<<"Pos 2.2 dS_UV = "<<dS_band(num_cells-10,0)<<endl;
+                        }
                         
                         if(dtau_tot > 1e-3)
                             dS_band(j,b) *= (-expm1(-dtau_tot));
@@ -118,11 +232,21 @@ void c_Sim::update_dS_jb(int j, int b) {
                             dS_he_temp *=  -fastexpm1_2(-cell_optical_depth_highenergy(j,b)) ;
                             //dS_he_temp *=  -expm1(-const_opacity_solar_factor * cell_optical_depth_highenergy(j,b)) ;
                         
+                        double heating3 = dS_he_temp * (1 - 13.6 * ev_to_K * kb / photon_energies[0]);
+                        
+                        if(j==num_cells-10e99) {
+                            cout<<"Pos 2.3 dS_UV = "<<dS_band(num_cells-10,0)<<" dS_bolo =  "<<dS_band(num_cells-10,1)<<" dS_he_temp "<<dS_he_temp<<" heating3 = "<<heating3<<endl;
+                        }
+                        
                         //cout<<" j/b = "<<j<<"/"<<b<<" dS_band(j,b) "<<dS_band(j,b)<<" dS_he_temp "<<dS_he_temp<<endl;
-                        dS_band(j,b) -= dS_he_temp;
+                        dS_band(j,b) -= dS_he_temp; //Substract highenergy heating again, as this has already been added in update_dS_jb_photochem() around line 700 in chemistry.cpp
                         dS_band(j,b) = std::max(dS_band(j,b), 0.); //Safeguard against highenergy shenanigans
                         if(BAND_IS_HIGHENERGY[b] && photochemistry_level==1)
                             dS_band(j,b) = 0.;
+                        
+                        if(j==num_cells-10e99) {
+                            cout<<"Pos 2.4 dS_UV = "<<dS_band(num_cells-10,0)<<" dS_bolo = "<<dS_band(num_cells-10,0)<<" for b = "<<b<<endl;
+                        }
                         
                         if(b==999) {
                             cout<<" in thermal heating: total heating ~ "<<dS_band(j,b)<<" of which highenergy is "<<dS_he_temp;
@@ -144,6 +268,7 @@ void c_Sim::update_dS_jb(int j, int b) {
                     //
                     // Planetary heating 2
                     //
+
                     if(use_planetary_temperature == 1 && false){
                         //double lum = 1./xi_rad * sigma_rad * T_int*T_int*T_int*T_int;
                         double lum = 1.0 * sigma_rad * T_int*T_int*T_int*T_int * 0.5;
@@ -153,6 +278,7 @@ void c_Sim::update_dS_jb(int j, int b) {
                         dS_band(4,b) += 1./6. * lum / (dx[4]); 
                         
                         //dS_band(20,b) += lum * surf[20]/ (vol[20]); 
+
                     }
                     
                 }// Irregular dS computation, in case we want to fix the solar heating function to its initial value
@@ -223,126 +349,9 @@ void c_Sim::update_dS_jb(int j, int b) {
     
 }
 
-void c_Sim::update_dS() {
-    
-    if(debug > 1)
-        cout<<"Updating dS..."<<endl;
-    
-    //
-    // Compute optical depths, solar radiation attenuation and heating function for low-energy bands
-    //
-    for(int j = num_cells + 1; j>0; j--) {
-        
-        //////////////////////////////////////////////////////////////////
-        //////////////Solar bands
-        //////////////////////////////////////////////////////////////////
-        for(int b=0; b<num_bands_in; b++) {
-            
-            update_tau_s_jb(j, b);
-            
-            //if(!BAND_IS_HIGHENERGY[b]) {
-            
-            update_dS_jb(j, b);
-            
-            //}
-        }
-        
-        //TODO: Add chemical energy to dS
-        
-        
-        
-        //////////////////////////////////////////////////////////////////
-        ///////////////////Thermal bands
-        //////////////////////////////////////////////////////////////////
-        
-        for(int b=0; b<num_bands_out; b++) {
-            
-                cell_optical_depth(j,b)           = 0.;
-                total_opacity(j,b)                = 0 ;
-                radial_optical_depth(j,b)         = 0.;
-                
-                for(int s=0; s<num_species; s++) {
-                    //total_opacity(j,b)          += species[s].opacity(j,b)         * species[s].u[j].u1 ; //TODO: Replace this with sensible addition rule for Rosseland opacities!
-                    total_opacity(j,b)          = std::fmax(species[s].opacity(j,b) * species[s].u[j].u1, total_opacity(j,b)) ; //TODO: Replace this with sensible addition rule for Rosseland opacities!
-                }
-                cell_optical_depth(j,b)         = total_opacity(j, b)         * dx[j] ;
-                
-                if(j==num_cells+1) 
-                    radial_optical_depth(j,b)         = 0.;
-                else
-                    radial_optical_depth(j,b)         = radial_optical_depth(j+1,b)         + cell_optical_depth(j,b);
-        }
-        
-    }
-    
-    //
-    //  bad boundaries
-    //
-    //for(int s=0; s<num_species; s++) {
-    //    species[s].dS(num_cells+2)  = species[s].dS(num_cells+1);   
-   // }
-    
-    //Initialize optically thin regions with low energy density
-    if((steps==0) && (init_J_factor > 1e10)) {
-        
-        cout<<" Setting J to custom values. init_J_factor = "<<init_J_factor<<" and init_T_temp ="<<init_T_temp<<" const_opacity_solar_factor = "<<const_opacity_solar_factor<<endl;
-        
-        for(int j = num_cells + 1; j>0; j--) {
-            for(int b=0; b<num_bands_out; b++) {
-                
-                if(radial_optical_depth(j,b) < 1.) 
-                    Jrad_FLD(j,b) *= init_J_factor; //*std::pow(x_i[j]/x_i[34] , -2.);
-                
-                for(int s=0; s<num_species; s++)
-                    species[s].prim[j].temperature = init_T_temp;
-                
-            }
-        }
-    }
-    
-    if(debug >= 1) {
-        
-        for(int b=0; b<num_bands_in;b++) {
-           cout<<" in band_in ["<<b<<"] top-of-the-atmosphere heating = "<<solar_heating(b)<<endl;
-        }
-        cout<<"    in update opa "<<endl;
-        for(int j=num_cells+1; j>=0; j--) {
-            
-            for(int b=0; b<num_bands_in; b++) {
-                cout<<"    band ["<<b<<"][j="<<j<<"] = "<<S_band(j,b)<<" dS = "<<dS_band(j,b)<<" tau_s = "<<radial_optical_depth_twotemp(j,b);
-                for(int s=0; s<num_species; s++) {
-                     cout<<" dS_fract["<<species[s].speciesname<<"] = "<<(species[s].fraction_total_solar_opacity(j,b))<<" opas = "<<species[s].opacity_twotemp(j,b)<<" rho = "<<species[s].prim[j].density;
-                     
-                     //cout<<" dS_fract["<<species[s].speciesname<<"] = "<<(species[s].fraction_total_solar_opacity(j,b))<<" rho/T/Etot-Ekin = "<<species[s].prim[j].density<<"/"<<species[s].prim[j].temperature<<"/"<<(species[s].u[j].u3 - 0.5*std::pow(species[s].u[j].u2,2.)/species[s].u[j].u1)<<" x = "<<x_i12[j];
-                    //" opa = "<<species[s].opacity(j,b)<<" total opa(j+1)"<<total_opacity(j+1,b)<<
-                }
-                //cout<<endl;
-            }
-            cout<<endl;
-        }
-        
-        for(int j=num_cells+1; j>=0; j--) {
-            
-            for(int b=0; b<num_bands_out; b++) {
-                cout<<"    band ["<<b<<"][j="<<j<<"] = "<<S_band(j,b)<<" dS = "<<dS_band(j,b)<<" tau_s = "<<radial_optical_depth_twotemp(j,b);
-                for(int s=0; s<num_species; s++) {
-                     cout<<" opap["<<species[s].speciesname<<"] = "<<(species[s].opacity_planck(j,b))<<" opa = "<<species[s].opacity(j,b);
-                     
-                }
-            }
-            cout<<endl;
-        }
-        
-        if(debug > 3) {
-            char stop;
-            cin>>stop;    
-        }
-        
-    }
-    
-}
-
-
+/**
+ * Routine containing the actual radiation transport solver.
+ */
 void c_Sim::update_fluxes_FLD() {
     
     if(debug > 1)
@@ -364,7 +373,8 @@ void c_Sim::update_fluxes_FLD() {
         else 
             return 10 / (10*R + 9 + std::sqrt(81 + 180*R)) ;
     } ;
-    /*
+    //A few other possible flux limiters. Use with caution.
+    /* 
     auto flux_limiter = [](double R) {
         if (R <= 1.5)
             return 2 / (3 + std::sqrt(9 + 12*R*R)) ;
@@ -410,10 +420,6 @@ void c_Sim::update_fluxes_FLD() {
                 double dx      = (x_i12[j+1]-x_i12[j]) ;                
                 //double rhokr   = max(2.*(total_opacity(j,b)*total_opacity(j+1,b))/(total_opacity(j,b) + total_opacity(j+1,b)), 4./3./dx ); //From Ramsey Dullemond 2015
                 //double rhokr   = min( 0.5*( total_opacity(j,b) + total_opacity(j+1,b)) , rhokr);
-                //double dxl = x_i[j]-x_i12[j];
-                //double dxr = x_i12[j+1] - x_i[j];
-                //double rhokr   = ( total_opacity(j,b) * dxl  + total_opacity(j+1,b) * dxr)/(dxl + dxr);
-                //double rhokr     = total_opacity(j,b);
                 double rhokr = std::sqrt(total_opacity(j,b)*total_opacity(j+1,b));
 
                 double tau_inv = 1. / (dx * rhokr) ;
@@ -423,13 +429,6 @@ void c_Sim::update_fluxes_FLD() {
                 //if(1./tau_inv < 1.e-13)
                 //    D = 0.;
                 
-                // restarting iteration with 4 0.25 0.25 (everything was working)
-                //titan single species tables works with 4 0.5 0.25
-                
-                //correct static G10 model prefactors: 4/2/ 0.25.
-                //fake-correct supercritical shock prefactors: 4/4/ 3.141/8  or 16/2/ pi/16
-                //correct supercrit shock prefactors: 2 0.5 0.5
-                
                 // divergence terms
                 u[idx] = -D ;
                 d[idx] += D ;
@@ -438,16 +437,6 @@ void c_Sim::update_fluxes_FLD() {
                 
                 if(debug > 1)
                     cout<<" radiation part 0. t,j,b="<<steps<<","<<j<<","<<b<<" tau_inv/R/D = "<<tau_inv<<"/"<<R<<"/"<<D<<" J/J/dJ = "<<Jrad_FLD(j+1,b)<<"/"<<Jrad_FLD(j,b)<<"/"<<(Jrad_FLD(j+1,b)-Jrad_FLD(j,b))<<" flux = "<<D*(Jrad_FLD(j+1,b)-Jrad_FLD(j,b))<<endl;
-                
-                /*if(j==20 || j==21 || j==22) {
-                    if( (base->steps == 3205600) || (base->steps == 3206000) || (base->steps == 3205700) || (base->steps == 3205625) || (base->steps == 3205650) || (base->steps == 3205675) || (base->steps == 3205605) || (base->steps == 3205610) || (base->steps == 3205615) || (base->steps == 3205620) ) {
-                    
-                    
-                    //cout<<"Radiation 1,  R  "<<   
-                    
-                    
-                    }
-                }*/
                     
             }
         }
@@ -528,6 +517,7 @@ void c_Sim::update_fluxes_FLD() {
             l[idx] = -f*d[idx] ;
             u[idx] = 0;
             r[idx_r] = 0 ;
+
         }
         
         if(debug >= 1) {
@@ -653,18 +643,13 @@ void c_Sim::update_fluxes_FLD() {
                 for (int s=0; s < num_species; s++) {
                     
                     int idx      = j*stride   + (s + num_bands_out) * (num_vars+1) ;
-                    int idx_r    = j*num_vars + (s + num_bands_out) ;
+                    //int idx_r    = j*num_vars + (s + num_bands_out) ;
                     
                     double dx = (x_i12[j+1]-x_i12[j]) ;
-                    //double rhoavg = (species[s].prim[j].density + species[s].prim[j+1].density) * 0.5;
-                    double rhoavg = std::sqrt(species[s].prim[j].density * species[s].prim[j+1].density) ;
-                    //double Pavg   = (species[s].prim[j].pres + species[s].prim[j+1].pres) * 0.5;
+                    double rhoavg = std::sqrt(species[s].prim[j].density * species[s].prim[j+1].density) ; //Averages as in Kutter&Sparks 1972  
                     double Pavg   = std::sqrt(species[s].prim[j].pres * species[s].prim[j+1].pres);
-                    //double Tavg   = (species[s].prim[j].temperature + species[s].prim[j+1].temperature) * 0.5;
                     double Tavg   = std::sqrt(species[s].prim[j].temperature * species[s].prim[j+1].temperature);
                     double dP     = (species[s].prim[j].pres - species[s].prim[j+1].pres)/Pavg;
-                    
-                    //double dTabs  = (species[s].prim[j].temperature - species[s].prim[j+1].temperature);
                     double glocal = -get_phi_grav(x_i[j], enclosed_mass[j])/x_i[j];
                     
                     double dT     = (species[s].prim[j].temperature - species[s].prim[j+1].temperature)/Tavg / dP;
@@ -776,10 +761,15 @@ void c_Sim::update_fluxes_FLD() {
             cout<<u.at(i)<<" ";
             
         }
-        //cout<<"L ="<<endl<<l<<endl;
-        //cout<<"D ="<<endl<<d<<endl;
-        //cout<<"U ="<<endl<<u<<endl;
         
+        char stepstop;
+        cin>>stepstop;
+    }
+    if(debug >= 3 ) {
+        cout<<" i  l d  u"<<endl;
+        for(int i = 0; i < size_M; i++) {
+            cout<<i<<" "<<l.at(i)<<" "<<d.at(i)<<" "<<u.at(i)<<" "<<endl;
+        }
         char stepstop;
         cin>>stepstop;
     }
@@ -798,8 +788,7 @@ void c_Sim::update_fluxes_FLD() {
             if(radiation_matter_equilibrium_test == 1) {
                 Jrad_FLD(j, b) = Jrad_init(j,b);
             }
-                    
-          //  std::cout << j << "\t" <<  Jrad_FLD(j, b) << "\n" ;
+                
         }
 
         for(int s=0; s<num_species; s++) {
@@ -812,8 +801,6 @@ void c_Sim::update_fluxes_FLD() {
                 tt=max_temperature;
             
             species[s].prim[j].temperature = tt ;
-            //if(j==num_cells)
-            //    cout<<" num_cells = "<<num_cells<<" temp = "<<species[s].prim[j].temperature<<endl;
         }
     }
     
@@ -855,6 +842,9 @@ void c_Sim::update_fluxes_FLD() {
 }
 
 
+/**
+ *  Explicit temperature update. Used for tests only, as not very stable.
+ */
 void c_Sim::update_temperatures_simple() {
     
     //Compute change in energy
@@ -863,9 +853,6 @@ void c_Sim::update_temperatures_simple() {
             species[s].prim[j].temperature      += (species[s].dS(j) + species[s].dG(j) ) * dt / species[s].u[j].u1 / species[s].cv ;
             species[s].prim[j].internal_energy  += (species[s].dS(j) + species[s].dG(j) ) * dt / species[s].u[j].u1;
             
-            if(steps > 605 && j == 25 && s == 2)
-                cout<<" In Updte_T_simple, T, j, steps, s =  "<<species[s].prim[j].temperature<<", "<<j<<", "<<steps<<", "<<s<<" dS, dG = "<<species[s].dS(j)<<", "<<species[s].dG(j)<<" dT = "<<(species[s].dS(j) + species[s].dG(j) ) * dt  / species[s].u[j].u1 / species[s].cv<<endl;
-                
             if(species[s].prim[j].temperature < 0) {
                 
                 cout<<" In Updte_T_simple, T<0!!!, j, steps, s =  "<<j<<", "<<steps<<", "<<s<<" dS, dG = "<<species[s].dS(j)<<", "<<species[s].dG(j)<<" dT = "<<(species[s].dS(j) + species[s].dG(j) ) * dt  / species[s].u[j].u1 / species[s].cv<<endl;
