@@ -841,7 +841,7 @@ void c_Sim::kappa_landscape()
 			
 			fflush (stdout);
             
-            double inv_mass = species[0].inv_mass;
+            //double inv_mass = species[0].inv_mass;
             //opa_freedman[i] = freedman_opacity(pressure , temperature[i], 0.);
 //             opa_planck_twotemp[i] = species[0].interpol_tabulated_opacity( species[0].opa_grid_solar , 0, temperature[i], pressure[j]) * inv_mass;
 //             opa_planck_semenov[i] = species[0].interpol_tabulated_opacity( species[0].opa_grid_planck , 0, temperature[i], pressure[j]) * inv_mass;

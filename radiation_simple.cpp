@@ -476,10 +476,8 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
                 }
                 else {
                     lam = 0.*alphaconv;//Placeholder code for the compiler to stfu//For general expression need 5.167 with 4.130a and the collision integrals 4.114
-                    
                 }
-                
-                //TODO: Couple with solution matrix...
+                //TODO: Couple with solution matrix once we have a good idea how to do the convection in the simple radiation solver
             }
             
         }

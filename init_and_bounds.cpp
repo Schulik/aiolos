@@ -1882,7 +1882,7 @@ void c_Species::apply_boundary_right(std::vector<AOS>& u) {
                 AOS_prim prim ;
                 eos->compute_primitive(&u[i-1],&prim, 1) ;
                 
-                double dphi = (phi_s[i] - phi_s[i-1]) / (base->dx[i-1] + base->dx[i]) ;
+                //double dphi = (phi_s[i] - phi_s[i-1]) / (base->dx[i-1] + base->dx[i]) ;
                 double r =base->x_i12[i];
                 double mdot      = 4.*3.141592*prim.density*prim.speed*r*r;
                 double freefallv = -std::sqrt(2.*G*base->planet_mass/r);
@@ -2018,7 +2018,7 @@ c_reaction::c_reaction(bool is_reverse, bool mtype_reaction, int num_species, st
  */
 void c_reaction::c_reaction_real(int num_species, std::vector<int> e_indices,std::vector<int> p_indices,std::vector<double> e_stoch, std::vector<double> p_stoch, double reaction_rate) {
     
-    for(int e=0; e<e_indices.size(); e++) {
+    for(long unsigned int e=0; e<e_indices.size(); e++) {
         if(e_indices[e] >= num_species) {
             
             cout<<" FATAL ERROR caught in init_chemistry: Target reactant index exceeds num_species! num_species = "<<num_species<<endl;
@@ -2028,7 +2028,7 @@ void c_reaction::c_reaction_real(int num_species, std::vector<int> e_indices,std
         }
             
     }
-    for(int p=0; p<p_indices.size(); p++) {
+    for(long unsigned int p=0; p<p_indices.size(); p++) {
         if(p_indices[p] >= num_species) {
             
             cout<<" FATAL ERROR caught in init_chemistry: Target product index exceeds num_species! num_species = "<<num_species<<endl;
@@ -2091,7 +2091,7 @@ void c_reaction::c_reaction_real(int num_species, std::vector<int> e_indices,std
 c_photochem_reaction::c_photochem_reaction(int num_species, int num_bands, int band, std::vector<int> e_indices, std::vector<int> p_indices, std::vector<double> e_stoch, std::vector<double> p_stoch, double branching, double threshold)
 {
         //cout<<"in init photochem reaction "<<endl;
-        for(int e=0; e<e_indices.size(); e++) {
+        for(long unsigned int e=0; e<e_indices.size(); e++) {
             //cout<<" e = "<<e_indices[e]<<endl;
             if(e_indices[e] >= num_species) {
                 cout<<" FATAL ERROR caught in init_chemistry: Target photochem reactant index exceeds num_species! "<<endl;
@@ -2099,9 +2099,8 @@ c_photochem_reaction::c_photochem_reaction(int num_species, int num_bands, int b
                 cin>>wait;
                 throw 2;
             }
-                
         }
-        for(int p=0; p<p_indices.size(); p++) {
+        for(long unsigned int p=0; p<p_indices.size(); p++) {
             //cout<<" p ="<<p_indices[p]<<endl;
             if(p_indices[p] >= num_species) {
                 cout<<" FATAL ERROR caught in init_chemistry: Target photochem product index exceeds num_species! "<<endl;

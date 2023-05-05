@@ -157,11 +157,11 @@ void Polytropic_EOS::update_eint_from_T(AOS_prim* prim, int num_cells) const {
 
 void Polytropic_EOS::get_p_over_rho_analytic(const double* temperature, double* returnval) const {
     
-    *returnval = 0. ;
+    *returnval = 0.*(*temperature) ; //dummy calculation to suppress compiler warnings
 }
 
 void Polytropic_EOS::get_p_from_rhoT(const double* density,const double* temperature, double* pressure) const {
     
-    *pressure = 0.;
+    *pressure = 0.*(*density)*(*temperature);
     
 }

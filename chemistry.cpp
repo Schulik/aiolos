@@ -266,7 +266,7 @@ void c_Sim::do_chemistry(double dt_chem) {
             //
             // Individual repeats
             //
-            double dt_eff = dt/((double)i);
+            double dt_eff = dt_chem/((double)i);
             
             for(int k = 0; k < i; k++) {
                 
@@ -1253,7 +1253,10 @@ std::vector<double> get_thermo_variables(double T,string species_string) {
             temp = thermo_poly(T, 6.95961270E+04, -1.16459440E+03, 9.45661626E+00, -2.33124063E-03, 5.16187360E-06, -3.52616997E-09, 8.59914323E-13, 2.53500399E+04, -2.72635535E+01);
         else
             temp = thermo_poly(T, 1.09392200E+06, -4.49822821E+03, 1.24644643E+01, -6.34331740E-04, 1.10854902E-07, -1.12548868E-11, 5.68915194E-16, 4.65228030E+04, -5.09907043E+01);
-            
+    
+    else
+        temp = thermo_poly(T, 0., 0., 0.,0., 0., 0., 0., 0., 0.);
+        
     return temp;
     
 }
