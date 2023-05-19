@@ -53,6 +53,7 @@ void c_Sim::update_dS() {
         //////////////////////////////////////////////////////////////////
         //////////////Stellar irradiation bands
         //////////////////////////////////////////////////////////////////
+          
         for(int b=0; b<num_bands_in; b++) {
             
             update_tau_s_jb(j, b); //See below in this file

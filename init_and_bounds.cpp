@@ -96,6 +96,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
         radiation_matter_equilibrium_test = read_parameter_from_file<int>(filename,"RAD_MATTER_EQUI_TEST", debug, 0).value; //Unused/only for tests
         radiation_diffusion_test_linear   = read_parameter_from_file<int>(filename,"RAD_DIFF_TEST_LIN", debug, 0).value;    //Unused/only for tests
         radiation_diffusion_test_nonlinear= read_parameter_from_file<int>(filename,"RAD_DIFF_TEST_NLIN", debug, 0).value;   //Unused/only for tests
+        couple_J_into_T = read_parameter_from_file<int>(filename,"COUPLE_J_INTO_T", debug, 1).value;   //Unused/only for tests
         
         if(debug > 0) cout<<"Using integration order "<<order<<" while second order would be "<<IntegrationType::second_order<<endl;
         
@@ -209,6 +210,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
         temperature_model = read_parameter_from_file<char>(filename,"INIT_TEMPERATURE_MODEL", debug, 'P').value; //Initialize temperature as adiabatic+constant (P) or constant (C)
         friction_solver   = read_parameter_from_file<int>(filename,"FRICTION_SOLVER", debug, 0).value; //0: no friction, 1: analytic (only for two species), 2: numerical
         do_hydrodynamics  = read_parameter_from_file<int>(filename,"DO_HYDRO", debug, 1).value;  //Switch hydrodynamics, including its CFL condition on/off
+        start_hydro_time  = read_parameter_from_file<double>(filename,"START_HYDRO_TIME", debug, -1.).value; //Hydro is started once globalTime > start_hydro_time and do_hydro == 1
         photochemistry_level = read_parameter_from_file<int>(filename,"PHOTOCHEM_LEVEL", debug, 0).value; //1==C2Ray solver, 2==general photo and thermochemistry solver
         dust_to_gas_ratio = read_parameter_from_file<double>(filename,"DUST_TO_GAS", debug, 0.).value;    //dust-to-gas ratio for Semenov/Malygin opacities
         temperature_floor = read_parameter_from_file<double>(filename,"TEMPERATURE_FLOOR", debug, 0.).value;  //Limit the temperature to a minimum in radiation solver (negative T crashes can still occur due to negative pressures, whichever is found first)
@@ -237,7 +239,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
         rad_solver_max_iter = read_parameter_from_file<int>(filename,"MAX_RAD_ITER", debug, 1).value;  //Currently unused
         xi_rad              = read_parameter_from_file<double>(filename,"XI_RAD", debug, 2.).value;    //Radiation Xi factor, see Fig. 5 in code paper.
         bond_albedo       = read_parameter_from_file<double>(filename,"BOND_ALBEDO", debug, 0.).value; //Bond albedo, Number between 0. and 1.
-        
+        use_init_discont_smoothing = read_parameter_from_file<int>(filename,"INIT_DISCONT_SMOOTHING", debug, 0).value;  //Smooths out discontinuities in the initial density profiles with a powerlaw. Applied before init_wind discontinuity is put in.
         
         if(problem_number == 2)
             monitor_output_index = num_cells/2; 
@@ -647,6 +649,9 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
             }
         }
         
+        //Finally, look for the species indices for some important species. Stored in the utility integers e_idx, hnull_idx, hplus_idx etc.
+        init_highenergy_cooling_indices();
+        
         ///////////////////////////////////////////////////////////////////////// 
         /////////////////////////////////////////////////////////////////////////
         /////////////////////////////////////////////////////////////////////////
@@ -781,7 +786,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
     
     double templumi = 0;
     
-    if(fluxfile.compare("---")==0) {
+    if(true) {
         
             for(int b=0; b<num_bands_in; b++) {
                 if(debug > 0) cout<<"Init: Assigning stellar luminosities. b ="<<b<<endl;
@@ -826,7 +831,9 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
                 
         }
         
-    } else {
+    } 
+    
+    if(fluxfile.compare("---")!=0) {//else {
         
         for(int b = 0; b<num_bands_in; b++) {
             
@@ -858,9 +865,9 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
              
              if(cnt > 0) {
                  tempenergy /= (double)cnt;
-                 solar_heating(b) = tempenergy * fluxmultiplier;
+                 solar_heating(b) += tempenergy * fluxmultiplier;
                  templumi += solar_heating(b);
-                 solar_heating_final(b) = solar_heating(b);
+                 solar_heating_final(b) += solar_heating(b);
             } else {
                 solar_heating(b) = 0.;
             }
@@ -1470,14 +1477,7 @@ void c_Species::initialize_hydrostatic_atmosphere(string filename) {
             //if(speciesname.compare("e-")==0 ) { //Force light electrons to be the same number as protons
                 
                 //int p_index = base->get_species_index("H+");
-                int p_index = base->get_species_index("S1");
-                if(p_index == -1)
-                    p_index = base->get_species_index("H+");
-                if(p_index == -1)
-                    p_index = base->get_species_index("p+");
-                if(p_index == -1)
-                    p_index = base->get_species_index("p");
-                
+                int p_index = base->get_species_index("S1 H+ p+ p", 0);
                 if(p_index < 0) {
                     cout<<" IN HYDROSTAT CONSTRUCTION for e-: Protons (H+) species not found! "<<endl;
                 }
@@ -1488,14 +1488,33 @@ void c_Species::initialize_hydrostatic_atmosphere(string filename) {
             //////////////////////////////////////////////////////////////////////////////////////
             //double floor = base->density_floor / mass_amu * std::pow(base->x_i12[i]/base->x_i12[1], -4.);
             
-            double floor = base->density_floor * std::pow(base->x_i12[i]/base->x_i12[1], -4.) * initial_fraction;
-            if( (temp_rhofinal < floor) || ( base->x_i12[i] > 0.5*base->rhill  && base->use_tides == 2       ) ) {
+            double floor          = base->density_floor * std::pow(base->x_i12[i]/base->x_i12[1], -4.) * initial_fraction;
+            //double lastval_scaled = u[i].u1 * std::pow(base->x_i12[i]/base->x_i12[i+1], 8.);
+            double lastval_scaled = u[i].u1 * u[i].u1/u[i-1].u1;
+            
+            if(temp_rhofinal < 0.) {
+                
+                if(lastval_scaled > floor && base->use_init_discont_smoothing)
+                    temp_rhofinal = lastval_scaled;
+                else
+                    temp_rhofinal = lastval_scaled; //this was formerly triggered when  //if( (temp_rhofinal < floor) || ( base->x_i12[i] > 0.5*base->rhill  && base->use_tides == 2       ) ) {
+                
+                negdens = 1;
+            }
+            /*
+            if(base->use_init_discont_smoothing && temp_rhofinal < 0. && temp_rhofinal > floor) {
+                //if(temp_rhofinal < lastval_scaled)
+                    temp_rhofinal = lastval_scaled;
+            }
+            
+            //if( (temp_rhofinal < floor) || ( base->x_i12[i] > 0.5*base->rhill  && base->use_tides == 2       ) ) {
+            if(false){
                 
                 if(temp_rhofinal < 0.)
                     negdens = 1;
                 
                 temp_rhofinal = floor;
-            }
+            }*/
             //////////////////////////////////////////////////////////////////////////////////////
             
             //if(this_species_index == 2) {
@@ -1813,7 +1832,19 @@ void c_Species::apply_boundary_left(std::vector<AOS>& u) {
                 else {
                     dens_wall = BACKGROUND_U.u1 *  mass_amu;
                 }*/
-                eos->compute_primitive(&u[i],&prim[i], 1) ; //Ghost cell u is fixed after init, only need to update p in prim
+                double dens_wall;
+                AOS_prim prim;
+                if(base->problem_number == 1)
+                    dens_wall = SHOCK_TUBE_UL.u1;
+                else {
+                    prim.density = BACKGROUND_U.u1;
+                    prim.speed   = this->prim[2].speed;
+                    prim.temperature = const_T_space;
+                }
+                
+                eos->update_eint_from_T(&(prim), 1);
+                eos->update_p_from_eint(&(prim), 1);
+                eos->compute_conserved(&(prim), &(u[i]), 1) ; //Ghost cell u is fixed after init, only need to update p in prim
             }
             
             break;

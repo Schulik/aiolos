@@ -40,6 +40,35 @@ void c_Sim::init_reactions(int cdebug) {
     
     double ns = num_species;
     
+    photoreactions.push_back(c_photochem_reaction( ns, num_bands_in, num_bands_in-3, {0}, {1,2}, {1.}, {1.,1.}, 1., 13.6 )); //H + gamma -> H+ + e-
+    photoreactions.push_back(c_photochem_reaction( ns, num_bands_in, num_bands_in-2, {4}, {5,2}, {1.}, {1.,1.}, 1., 11.26 )); //C + gamma -> C+ + e-
+    photoreactions.push_back(c_photochem_reaction( ns, num_bands_in, num_bands_in-3, {7}, {8,2}, {1.}, {1.,1.}, 1., 13.6181 )); //O + gamma -> O+ + e-
+    photoreactions.push_back(c_photochem_reaction( ns, num_bands_in, num_bands_in-3, {3}, {10,2}, {1.}, {1.,1.}, 1., 24.6 )); //He + gamma -> He+ + e-
+
+    
+ // Hydrogen I recombination
+    reactions.push_back(c_reaction(0, 0, ns, {1,2}, {0}, {1.,1.}, {1.}, 1.074889e-9, -0.9, 0. )); //Electron-proton recombination
+    //He I
+    reactions.push_back(c_reaction(0, 0, ns, {10,2}, {3}, {1.,1.}, {1.}, 1.074889e-9, -0.9, 0. )); //Electron-He+ recombination
+    
+    //
+    // Oxygen I recombination: OII + e- -> OI, powerlaw and resonance bump - fit to data from Sultana N. Nahar APJS (in press, 1998) deviates from data for T > 4e7 K
+    reactions.push_back(c_reaction(0, 0, ns, {8,2}, {7}, {1.,1.}, {1.}, 1.357e-10, -0.658, 0. )); 
+    reactions.push_back(c_reaction(0, 0, ns, {8,2}, {7}, {1.,1.}, {1.}, 7.5e-4, -1.5, 180000. )); 
+    //
+    // Carbon I recombination: CII + e- -> CI, powerlaw and resonance bump - fit to data from Sultana N. Nahar APJS (in press, 1998) deviates around the bump by up to 20%
+    reactions.push_back(c_reaction(0, 0, ns, {5,2}, {4}, {1.,1.}, {1.}, 1.457e-10, -0.608, 0. )); //e- + C+ -> C recombination for at logT=3.5   https://iopscience.iop.org/article/10.1086/313013/pdf
+    reactions.push_back(c_reaction(0, 0, ns, {5,2}, {4}, {1.,1.}, {1.}, 2.05e-4, -1.35, 117500. )); //e- + C+ -> C recombination for at logT=3.5   https://iopscience.iop.org/article/10.1086/313013/pdf
+    
+    
+    
+    //photoreactions.push_back(c_photochem_reaction( ns, num_bands_in, 1, {0}, {1,2}, {1.}, {1.,1.}, 1., 13.6 )); //H + gamma -> H+ + e-
+    
+    // Oxygen II recombination: OIII + e- -> OII, powerlaw and resonance bump - fit to data from Sultana N. Nahar APJS (in press, 1998) deviates from data for T > 4e7 K
+    //reactions.push_back(c_reaction(0, ns, {9,2}, {8}, {1.,1.}, {1.}, 5.75e-10, -0.595, 0. )); 
+    //reactions.push_back(c_reaction(0, ns, {9,2}, {8}, {1.,1.}, {1.}, 6.55e-3, -1.55, 220000. )); 
+    
+
     //photoreactions.push_back(c_photochem_reaction( ns, num_bands_in, 0, {0}, {1,2}, {1.}, {1.,1.}, 1., 7. )); //Approx. from Leiden database, 7ev threshold for H2O -> OH+H
     //photoreactions.push_back(c_photochem_reaction( ns, num_bands_in, 0, {0}, {1,2}, {1.}, {2.,1.}, 1., 7. )); //Approx. from Leiden database, 7ev threshold for H2O -> 2H+O
     
@@ -52,7 +81,7 @@ void c_Sim::init_reactions(int cdebug) {
     
     //photoreactions.push_back(c_photochem_reaction( ns, num_bands_in, 0, {3}, {4,2}, {1.}, {1.,1.}, 1., 15.425927 ));      //R1a H2 + gamma -> H2+ + e-
     //photoreactions.push_back(c_photochem_reaction( ns, num_bands_in, 0, {3}, {0,1,2}, {1.}, {1.,1.,1.}, 1., 15.425927 )); //R1b H2 + gamma -> H + H+ + e-
-photoreactions.push_back(c_photochem_reaction( ns, num_bands_in, 0, {0}, {1,2}, {1.}, {1.,1.}, 1., 13.6 ));      //R2  H + gamma -> H+ + e-
+//photoreactions.push_back(c_photochem_reaction( ns, num_bands_in, 0, {0}, {1,2}, {1.}, {1.,1.}, 1., 13.6 ));      //R2  H + gamma -> H+ + e-
     
     //reactions.push_back(c_reaction(0, 1, ns, {3,4}, {5,0}, {1.,1.}, {1.,1.}, 2e-9, -0.0, 0. )); //R6 in Yelle+2004 
     //reactions.push_back(c_reaction(0, 1, ns, {5,0}, {3,4}, {1.,1.}, {1.,1.}, 2e-9, -0.0, 0. )); //R7 in Yelle+2004 
@@ -60,7 +89,7 @@ photoreactions.push_back(c_photochem_reaction( ns, num_bands_in, 0, {0}, {1,2}, 
     //reactions.push_back(c_reaction(0, 1, ns, {4,0}, {1,3}, {1.,1.}, {1.,1.}, 6.4e-10, -0.0, 0. )); //R8 in Yelle+2004 
     //reactions.push_back(c_reaction(0, 1, ns, {1,3}, {4,0}, {1.,1.}, {1.,1.}, 1.0e-9, -0.0, 2.19e4 )); //R9 in Yelle+2004 
     
-reactions.push_back(c_reaction(0, 0, ns, {1,2}, {0}, {1.,1.}, {1.}, 2.7e-13, 0.0, 0. )); //R13 in Y04, Electron-proton recombination
+//reactions.push_back(c_reaction(0, 0, ns, {1,2}, {0}, {1.,1.}, {1.}, 2.7e-13, 0.0, 0. )); //R13 in Y04, Electron-proton recombination
     //reactions.push_back(c_reaction(0, 0, ns, {4,2}, {0}, {1.,1.}, {1.}, 2.25e-7, -0.4, 0. )); //R15 in Y04, H2+- recombination
     
     //reactions.push_back(c_reaction(0, 0, ns, {5,2}, {0,3}, {1.,1.}, {1.,1.}, 1.18e-6, -0.65, 0. )); //R16a in Y04, H3+- recombination, channel 1
@@ -238,6 +267,8 @@ void c_Sim::do_chemistry(double dt_chem) {
     
     #pragma omp parallel for schedule(static,5)
     for (int j = num_cells+1; j >= 0; j--) {
+        
+       
 
         //std::vector<double> n_init = np_zeros(num_species);
         //std::vector<double> n_tmp  = np_zeros(num_species);
@@ -252,7 +283,7 @@ void c_Sim::do_chemistry(double dt_chem) {
         for(int s=0;s<num_species; s++) {
             n_init(s)     = species[s].prim[j].number_density / n_tot;
         }
-        
+       
         //
         // Repeat levels
         //
@@ -261,6 +292,7 @@ void c_Sim::do_chemistry(double dt_chem) {
             for(int s=0;s<num_species; s++) {
                 n_tmp(s)      = n_init(s);
             }
+            //{ cout<<" "<<n_tmp(0) * n_tot * species[0].mass_amu*amu; }
             
             int check_chem = 1;
             //
@@ -311,6 +343,11 @@ void c_Sim::do_chemistry(double dt_chem) {
         // We accept the new, normalized number densities and convert them back to non-normalized values
         //
         //if(switch1 + switch2 == 0) {
+         //{ cout<<" "<<n_tmp(0) * n_tot * species[0].mass_amu*amu; }
+        
+        
+            
+        
         for(int s=0;s<num_species; s++) {
             
             if(n_tmp(s) < chemistry_numberdens_floor)
@@ -329,16 +366,23 @@ void c_Sim::do_chemistry(double dt_chem) {
             species[s].eos->compute_auxillary(&species[s].prim[j], 1);
             species[s].eos->compute_conserved(&species[s].prim[j], &species[s].u[j], 1);
         }
-        
+       
         //Correct species internal energy and momentum due to change in number density
         //Correct species internal energy due to total change in Gibbs energy dU = dG - PdV + TdS
         
         update_dS_jb_photochem(j);
-        do_highenergy_cooling(j);
+        if(j>10)
+            do_highenergy_cooling(j);
+        
+        if(steps==3113 && j==100) {
+            cout<<"in do_chemistry, cooling j = "<<j<<" for spec 2 = "<< species[2].dG(j)<<" + " << species[2].dGdT(j)<<endl;
+            cout<<"in do_chemistry, cooling j = "<<j<<" for spec "<<e_idx<<" = "<< species[e_idx].dG(j)<<" + " << species[e_idx].dGdT(j)<<endl;
+        }
+            
         
         for(int s=0;s<num_species; s++) {
                 
-                if(n_tmp(s)/n_tot < chemistry_numberdens_floor)
+                if(n_tmp(s) < chemistry_numberdens_floor)
                     n_tmp(s) = chemistry_numberdens_floor;
                     
                 species[s].prim[j].number_density = n_tmp(s) * n_tot;
@@ -354,6 +398,7 @@ void c_Sim::do_chemistry(double dt_chem) {
                 species[s].eos->compute_auxillary(&species[s].prim[j], 1);
                 species[s].eos->compute_conserved(&species[s].prim[j], &species[s].u[j], 1);
         }
+    
     }//END PARALLEL REGION
     
     for (int j = num_cells+1; j >= 0; j--) {
@@ -361,6 +406,7 @@ void c_Sim::do_chemistry(double dt_chem) {
             update_tau_s_jb(j, b);
         }
     }
+
 }
 
 
@@ -636,7 +682,7 @@ Vector_t c_Sim::solver_cchem_implicit_general(double dtt, int cell, int cdebug, 
         for(int s=0;s<num_species; s++) {
             cout<<" species["<<s<<"] = "<<n_olds[s]<<" "<<n_olds[s]-1.<<endl;
         }
-        cout<<" cell= "<<cell<<" thread_id = "<<omp_get_thread_num()<<" matrix[0] = "<<endl<<reaction_matrix_ptr[loc_thr]<<endl<<" 1+matrix[0].T = "<<endl<<identity_matrix + reaction_matrix_ptr[loc_thr].transpose()<<endl<<" b = "<<reaction_b_ptr[loc_thr]<<endl<<" n_news = "<<n_news<<endl;
+        cout<<" cell= "<<cell<<" thread_id = "<<omp_get_thread_num()<<" n_tot = "<<n_tot<<" matrix[0] = "<<endl<<reaction_matrix_ptr[loc_thr]<<endl<<" 1+matrix[0].T = "<<endl<<identity_matrix + reaction_matrix_ptr[loc_thr].transpose()<<endl<<" b = "<<reaction_b_ptr[loc_thr]<<endl<<" n_news = "<<n_news<<endl;
         char bb;
         cin>>bb;
     }
@@ -645,7 +691,7 @@ Vector_t c_Sim::solver_cchem_implicit_general(double dtt, int cell, int cdebug, 
 }
 
 
-/* This uses the known rates of $\dot{n}$ which are assumed to be constant over the timestep, to compute energy, momentum and heating rates for each species.
+/* This uses the known rates of $\dot{n}$ which are assumed to be constant over the timestep, to compute energy, momentum and heating transfer rates between species due to the reactions.
  * 
  * @param[in] cell Cell number in which to update energy and momentum
  */
@@ -905,6 +951,23 @@ void c_Sim::update_dS_jb_photochem(int cell) {
 }
 
 /**
+ * Finds the indices for all species that do highenergy cooling. A non-found species will have index -1 and raise an error message. Called init_and_bounds after init all species. 
+ */
+void c_Sim::init_highenergy_cooling_indices()
+{
+    hnull_idx = get_species_index("S0 H0 H ",1); 
+    hplus_idx = get_species_index("S1 H+ p p+",1);
+    e_idx     = get_species_index("S2 e e- eh eh2",1);
+    C_idx     = get_species_index("S4 C0 C",1);
+    Cp_idx    = get_species_index("S5 C+ Cp",1);
+    Cpp_idx   = get_species_index("S6 C++ Cpp",1);
+    O_idx     = get_species_index("S7 O O0",1);
+    Op_idx    = get_species_index("S8 O+ Op",1);
+    Opp_idx   = get_species_index("S9 Opp C++",1);
+    h3plus_idx = get_species_index("H3+",1);
+}
+
+/**
  * Prescribed non-thermal cooling functions. Called from do_chemistry() in chemistry.cpp line 335. Equivalent functionality in photochem_level=1 in photochem.cpp lines ~700.
  * 
  * @param[in] cell Cell number in which to add cooling contributions.
@@ -913,30 +976,8 @@ void  c_Sim::do_highenergy_cooling(int cell) {
     
     //
     // Do highenergy-cooling
-    //
+    // Indices now found in init routine for indices
     
-    int hnull_idx = get_species_index("S0"); 
-    if(hnull_idx == -1)
-        hnull_idx = get_species_index("H0"); 
-    if(hnull_idx == -1)
-        hnull_idx = get_species_index("H"); 
-    int hplus_idx = get_species_index("S1");
-    if(hplus_idx == -1)
-        hplus_idx = get_species_index("H+"); 
-    if(hplus_idx == -1)
-        hplus_idx = get_species_index("p+");
-    int e_idx     = get_species_index("S2");
-    if(e_idx == -1)
-        e_idx = get_species_index("e-"); 
-    
-    //e_idx = get_species_index("S2");
-    int C_idx = get_species_index("S4");
-    int Cp_idx = get_species_index("S5");
-    int Cpp_idx = get_species_index("S6");
-    int O_idx = get_species_index("S7");
-    int Op_idx = get_species_index("S8");
-    int Opp_idx = get_species_index("S9");
-    int h3plus_idx = get_species_index("H3+");
     double tau = total_opacity(cell,0)*(x_i12[cell+1]-x_i12[cell])*1e8;
     double beta = 0.;
     if(tau < 7.) 
@@ -946,13 +987,16 @@ void  c_Sim::do_highenergy_cooling(int cell) {
     if(cell==0)
         beta = 0.;
     //cout<<cell<<" = j, tau ="<<tau<<" beta = "<<beta<<endl;
-    double red = beta;
+    double mul = photocooling_multiplier;
+    double red = beta * mul;
     
     if (e_idx > -1) {
         
         double ne = species[e_idx].prim[cell].number_density;
         double Te = species[e_idx].prim[cell].temperature;
         double dT = 1e-5;
+        species[e_idx].dG(cell) = 0;
+        
         
         if( e_idx!=-1 && hnull_idx!=-1 && hplus_idx!=-1  ) { //If all species are there - H0, H+ and e-
             std::array<double, 3> nX = {
@@ -960,47 +1004,75 @@ void  c_Sim::do_highenergy_cooling(int cell) {
                         species[hplus_idx].prim[cell].number_density,
                         species[e_idx].prim[cell].number_density};
             
-            species[e_idx].dG(cell)   -= nX[2] * red * HOnly_cooling(nX, species[e_idx].prim[cell].temperature);
-            species[e_idx].dGdT(cell) -= nX[2] * red * (HOnly_cooling(nX, species[e_idx].prim[cell].temperature+dT)-HOnly_cooling(nX, species[e_idx].prim[cell].temperature-dT))/(dT+dT);  ;
+            species[e_idx].dG(cell)   -= nX[2] * red * HOnly_cooling(nX, Te);
+            species[e_idx].dGdT(cell) -= nX[2] * red * (HOnly_cooling(nX, Te+dT)-HOnly_cooling(nX, Te-dT))/(dT+dT);  ;
         }
         
         if( C_idx!=-1 && e_idx!=-1 ) { 
             double nc   = species[C_idx].prim[cell].number_density;
-            species[e_idx].dG(cell)   -=  nc * ne * red * C_cooling(Te); 
+            
+            species[e_idx].dG(cell)   =  nc * ne * red * C_cooling(Te); 
             species[e_idx].dGdT(cell) -=  nc * ne * red * dfdx(C_cooling, Te, dT);
         }
         if( Cp_idx!=-1 && e_idx!=-1 ) { 
             double ncp  = species[Cp_idx].prim[cell].number_density;
+            //species[Cp_idx].dG(cell) = 0;
             species[e_idx].dG(cell) -= ncp * ne * red * Cp_cooling(Te); 
-            species[e_idx].dG(cell) -= ncp * ne * 1.426e-27 * 1.3 * sqrt(Te)  ;
+            species[e_idx].dG(cell) -= ncp * ne * 1.426e-27 * 1.3 * sqrt(Te) * mul  ;
             species[e_idx].dGdT(cell) -= ncp * ne * red * dfdx(Cp_cooling, Te, dT);
-            species[e_idx].dGdT(cell) -= ncp * ne * 1.426e-27 * 1.3 * 0.5 /std::sqrt(Te);
+            species[e_idx].dGdT(cell) -= ncp * ne * 1.426e-27 * 1.3 * 0.5 /std::sqrt(Te) * mul;
         }
         if( Cpp_idx!=-1 && e_idx!=-1 ) { 
             double ncpp = species[Cpp_idx].prim[cell].number_density;
+            //species[Cpp_idx].dG(cell) = 0;
             species[e_idx].dG(cell) -= ncpp * ne * red * Cpp_cooling(Te); 
-            species[e_idx].dG(cell) -= ncpp * ne * 4 * 1.426e-27 * 1.3 * sqrt(Te);
+            species[e_idx].dG(cell) -= ncpp * ne * 4 * 1.426e-27 * 1.3 * sqrt(Te) * mul;
             species[e_idx].dGdT(cell) -= ncpp * ne * red * dfdx(Cpp_cooling, Te, dT);
-            species[e_idx].dGdT(cell) -= ncpp * ne * 4 * 1.426e-27 * 1.3 * 0.5 /std::sqrt(Te);
+            species[e_idx].dGdT(cell) -= ncpp * ne * 4 * 1.426e-27 * 1.3 * 0.5 /std::sqrt(Te) * mul;
         }
         if( O_idx!=-1 && e_idx!=-1 ) { 
+            if(steps == 3113 && cell==100) {
+                cout<<"species[O_idx].dG(cell) before assignment = "<<species[O_idx].dG(cell);
+            }
+            
             double no   = species[O_idx].prim[cell].number_density;
+            //species[O_idx].dG(cell) = 0;
             species[e_idx].dG(cell)   -=  no * ne * red * O_cooling(Te); 
             species[e_idx].dGdT(cell) -=  no * ne * red * dfdx(O_cooling, Te, dT);
+            
+            if(steps == 3113 && cell==100) {
+                    cout<<"species[O_idx].dG(cell) = "<<species[O_idx].dG(cell)<<" parts = "<< no<<"/"<<ne<<"/"<<red<<"/"<<O_cooling(Te)<<"/"<<Te<<" product = "<< no * ne * red * O_cooling(Te)<<endl;
+            }
         }
         if( Op_idx!=-1 && e_idx!=-1 ) { 
+            if(steps == 3113 && cell==100) {
+                cout<<"species[Op_idx].dG(cell) before assignment = "<<species[Op_idx].dG(cell);
+            }
+            
             double nop  = species[Op_idx].prim[cell].number_density;
+            //species[Op_idx].dG(cell) = 0;
             species[e_idx].dG(cell) -= nop * ne * red * Op_cooling(Te); 
-            species[e_idx].dG(cell) -= nop * ne * 1.426e-27 * 1.3 * sqrt(Te);
+            species[e_idx].dG(cell) -= nop * ne * 1.426e-27 * 1.3 * sqrt(Te) * mul;
             species[e_idx].dGdT(cell) -= nop * ne * red * dfdx(Op_cooling, Te, dT);
-            species[e_idx].dGdT(cell) -= nop * ne * 1.426e-27 * 1.3 * 0.5 /std::sqrt(Te);
+            species[e_idx].dGdT(cell) -= nop * ne * 1.426e-27 * 1.3 * 0.5 /std::sqrt(Te) * mul;
+            
+            if(steps == 3113 && cell==100) {
+                    cout<<"species[Op_idx].dG(cell) = "<<species[Op_idx].dG(cell)<<" parts = "<< nop<<"/"<<ne<<"/"<<red<<"/"<<Op_cooling(Te)<<"/"<<Te<<" product = "<< nop * ne * red * Op_cooling(Te)<<endl;
+                    cout<<"species[Op_idx].dG(cell) = "<<species[Op_idx].dG(cell)<<" parts = "<< nop<<"/"<<ne<<"/"<<sqrt(Te)<<"/"<<mul<< " product = "<<nop * ne * 1.426e-27 * 1.3 * sqrt(Te) * mul<<endl;
+            }
         }
         if( Opp_idx!=-1 && e_idx!=-1 ) { 
             double nopp = species[Opp_idx].prim[cell].number_density;
+            //species[Opp_idx].dG(cell) = 0;
             species[e_idx].dG(cell) -= nopp * ne * red * Opp_cooling(Te);
-            species[e_idx].dG(cell) -= nopp * ne * 4 * 1.426e-27 * 1.3 * sqrt(Te);
+            species[e_idx].dG(cell) -= nopp * ne * 4 * 1.426e-27 * 1.3 * sqrt(Te) * mul;
             species[e_idx].dGdT(cell) -= nopp * ne * red * dfdx(Opp_cooling, Te, dT);
-            species[e_idx].dGdT(cell) -= nopp * ne * 4 * 1.426e-27 * 1.3 * 0.5 /std::sqrt(Te);
+            species[e_idx].dGdT(cell) -= nopp * ne * 4 * 1.426e-27 * 1.3 * 0.5 /std::sqrt(Te) * mul;
+            
+            if(steps == 3113 && cell==100) {
+                    cout<<"species[Opp_idx].dG(cell) = "<<species[Opp_idx].dG(cell)<<" parts = "<< nopp<<"/"<<ne<<"/"<<red<<"/"<<Opp_cooling(Te)<<"/"<<Te<<endl;
+                    cout<<"species[Opp_idx].dG(cell) = "<<species[Opp_idx].dG(cell)<<" parts = "<< nopp<<"/"<<ne<<"/"<<sqrt(Te)<<"/"<<mul<<endl;
+            }
         }
         
         if( h3plus_idx!=-1 && e_idx!=-1 ) { 
@@ -1009,6 +1081,26 @@ void  c_Sim::do_highenergy_cooling(int cell) {
             species[e_idx].dGdT(cell) -=  n3p * ne * red * dfdx(h3plus_cooling, Te, dT);
         }
     }
+    if(steps == 3113 && cell==100) {
+        for(int s=0; s<num_species; s++)
+            cout<<"in highenergy cooling, cooling s = "<<species[s].speciesname<<" = "<< species[s].dG(cell)<<" + " << species[s].dGdT(cell)<<endl;
+        
+        std::array<double, 3> nX = {
+                        species[hnull_idx].prim[cell].number_density,
+                        species[hplus_idx].prim[cell].number_density,
+                        species[e_idx].prim[cell].number_density};
+            
+        double Te = species[e_idx].prim[100].temperature;
+        cout<<"cool funcs: "<<endl;
+        cout<<" H0 "<<HOnly_cooling(nX, Te)<<endl;
+        cout<<" C0 "<<C_cooling(Te)<<endl;
+        cout<<" Cp "<<Cp_cooling(Te)<<endl;
+        cout<<" Cpp "<<Cpp_cooling(Te)<<endl;
+        cout<<" O0 "<<O_cooling(Te)<<endl;
+        cout<<" Op "<<Op_cooling(Te)<<endl;
+        cout<<" Opp "<<Opp_cooling(Te)<<endl;
+    }
+        
 }
 
 /* Specialied one- or few-reaction solver for a limited number of ndots.

@@ -59,9 +59,10 @@ void c_Sim::execute() {
     ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~////
     for (globalTime = 0; (globalTime < t_max) && (steps < maxsteps); ) {
         
-//          if(globalTime > 1e3) {   //Comment in if a radiative equilibrium phase is desired before starting hydro
-//              do_hydrodynamics = 1;     
-//          }
+    
+          if(start_hydro_time > 0. && globalTime > start_hydro_time) {   //Comment in if a radiative equilibrium phase is desired before starting hydro
+              do_hydrodynamics = 1;     
+          }
 
         if(steps==0) {
             for(int s = 0; s < num_species; s++)
@@ -234,8 +235,10 @@ void c_Sim::execute() {
                     if(steps % dt_skip_ichem == 0) {
                         dt_skip_dchem += dt;
                         reset_dS();
+                        
                         //cout<<" Running chemistry with dt/dt_chem/dt_skip/steps = "<<dt<<" / "<<dt_skip_dchem<<" / "<<dt_skip_ichem<<" / "<<steps<<endl;
                         do_chemistry(dt_skip_dchem);
+                        
                         dt_skip_dchem = 0.;
                     } else {
                         dt_skip_dchem += dt;
@@ -244,7 +247,9 @@ void c_Sim::execute() {
                     
             }
             
+             
             update_dS();               //Compute low-energy dS
+        
             
             if(false) {
                 cout<<"Pos 3 dS_UV = "<<dS_band(num_cells-10,0)<<endl;
@@ -254,6 +259,7 @@ void c_Sim::execute() {
                 update_fluxes_FLD();   //FLD Radiation transport, updating Temperatures and photon band energies
             }
             else if (use_rad_fluxes == 2){
+                   
                 update_fluxes_FLD_simple(dt); //'Simple' FLD solver
                 
             }

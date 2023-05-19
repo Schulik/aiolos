@@ -688,13 +688,6 @@ void c_Sim::do_photochemistry() {
                 //char a;
                 //cin>>a;
                 
-                int e_idx = get_species_index("S2"); //Equivalent of those calls for photochem_level==2 in chemistry.cpp lines ~910
-                int C_idx = get_species_index("S4");
-                int Cp_idx = get_species_index("S5");
-                int Cpp_idx = get_species_index("S6");
-                int O_idx = get_species_index("S7");
-                int Op_idx = get_species_index("S8");
-                int Opp_idx = get_species_index("S9");
                 double tau = total_opacity(j,0)*(x_i12[j+1]-x_i12[j])*1e2;
                 double red = (1.+tau*tau);
                 

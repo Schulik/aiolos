@@ -385,6 +385,7 @@ public:
     int use_drag_predictor_step;
     int use_convective_fluxes;
     double convect_boundary_strength;
+    double start_hydro_time;
     
     ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     //
@@ -478,6 +479,14 @@ public:
     ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     
     double right_extrap_press_multiplier;
+    
+    ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    //
+    // Initial conditions
+    //
+    ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    
+    int use_init_discont_smoothing;
     
     ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     //
@@ -582,12 +591,25 @@ public:
     double init_radiation_factor;
     double radiation_rampup_time;
     
+    //Indices for highenergy cooling
+    int hnull_idx; 
+    int hplus_idx;
+    int e_idx;
+    int C_idx;
+    int Cp_idx;
+    int Cpp_idx;
+    int O_idx;
+    int Op_idx;
+    int Opp_idx;
+    int h3plus_idx;
+    
     //int radiation_solver;
     int use_planetary_temperature;
     int closed_radiative_boundaries ;
     int radiation_matter_equilibrium_test; //If set to 1, sets J = J_init in update_radiation()
     int radiation_diffusion_test_linear;
     int radiation_diffusion_test_nonlinear;
+    int couple_J_into_T;
     double no_rad_trans;      // Multiplier for the div F radiation transport in the radiation solver to compare to models which don't cool thermally
     double CFL_break_time; //Numerical time after which cflfactor=0.9. Used in get_cfl_timestep()
     double photocooling_multiplier;
@@ -721,7 +743,7 @@ public:
     void write_into_execution_log(string dir, string par, string spcfile);
     
     void compute_total_pressure();
-    int get_species_index(const string name);
+    int get_species_index(const string name, const int verbose);
     
     //
     // Friction
@@ -760,6 +782,7 @@ public:
     void update_opacities();
     
     void do_photochemistry();
+    void init_highenergy_cooling_indices();
     
     void update_fluxes(double timestep);           //  Called from transport_radiation#   
     void update_fluxes_FLD();           //  Called from transport_radiation#

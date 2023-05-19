@@ -188,11 +188,11 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
                 eta1[idx_s] += 1. * ddt * (species[s].dS(j) + species[s].dG(j) - photocooling_multiplier * species[s].dGdT(j)*Ts     ) / species[s].u[j].u1 / species[s].cv;
                 
                 if(false) {
-                //if(j == 100 && steps > 1000) {
-                    cout<<"reporting cooling terms: dG / dGdT * Ts "<<species[s].dG(j)<<" / "<< - photocooling_multiplier * species[s].dGdT(j)*Ts <<endl;
-                    cout<<"reporting denom cooling terms : 16*fac / "<<16.*fac<<" / "<<moredenom<<endl;
-                    char a;
-                    cin>>a;
+                //if(steps == 3115 && s==2) {
+                    cout<<"reporting cooling terms["<<s<<"]: dG / dGdT * Ts "<<species[s].dG(j)<<" / "<< - photocooling_multiplier * species[s].dGdT(j)*Ts <<endl;
+                    //cout<<"reporting denom cooling terms : 16*fac / "<<16.*fac<<" / "<<moredenom<<endl;
+                    //char a;
+                   // cin>>a;
                     
                 }
                 
@@ -320,26 +320,37 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
             double security_multiplier = tau<1e3?1.:1.e-4;
             
             fill_alpha_basis_arrays(j);
-            compute_collisional_heat_exchange_matrix(j);
+            //compute_collisional_heat_exchange_matrix(j);
+            compute_alpha_matrix(j);
             
             for(int si=0; si<num_species; si++) {
                 
                 int idx_s = j * (num_species) + si;
                 
-                coll_heat_matrix(si,si) += 1./ddt ;
+                //coll_heat_matrix(si,si) += 1./ddt ;
                 //coll_heat_b(si)         += species[si].prim[j].temperature / ddt;
                 
                 //
                 // Rad equilibrium terms
                 //
-                coll_heat_matrix(si,si) += (denoms[idx_s]-1.)/ddt;
-                coll_heat_b(si)         += eta2[idx_s]/ddt*Jrad_FLD(j,0);
-                coll_heat_b(si)         += eta1[idx_s]/ddt;
+                coll_heat_matrix(si,si) += denoms[idx_s];
+                if(couple_J_into_T)
+                    coll_heat_b(si)         += eta2[idx_s]*Jrad_FLD(j,0);
+                coll_heat_b(si)         += eta1[idx_s];
+                
+                //for(int sj=0; sj<num_species; sj++) {
+                //   coll_heat_matrix(si,sj) -= security_multiplier * friction_coefficients(si,sj);
+                //}
+                double diag_sum = 0;
+                double temp = 0;
                 
                 for(int sj=0; sj<num_species; sj++) {
-                    coll_heat_matrix(si,sj) -= security_multiplier * friction_coefficients(si,sj);
+                    temp = ddt * friction_coefficients(si,sj) * 3 * kb / (species[si].cv * (mass_vector(si) + mass_vector(sj)) );
+                    
+                    diag_sum += temp;
+                    coll_heat_matrix(si,sj) -= temp;
                 }
-                
+                coll_heat_matrix(si,si) += diag_sum;
             }
             
             LU.compute(coll_heat_matrix) ;
@@ -371,6 +382,9 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
                         cout<<" +heating/+cooling/-dGdT = "<<species[ss].dS(j)<<"/"<<species[ss].dG(j)<<"/"<<photocooling_multiplier * species[ss].dGdT(j)*species[si].prim[j].temperature<<" sum = "<<(species[ss].dS(j)+species[ss].dG(j)-photocooling_multiplier * species[ss].dGdT(j)*species[si].prim[j].temperature)/ species[ss].u[j].u1 / species[ss].cv<<endl;
                         //cout<<" negative T after TiTj in s = "<<species[si].speciesname<<" j/s = "<<j<<"/"<<si<<" t/dt/steps = "<<globalTime<<"/"<<ddt<<"/"<<steps<<endl;
                         //Tswitch = 1;
+                    
+                    if(si==1)
+                        cout<<"Matrix / b was "<<endl<<coll_heat_matrix<<endl<<coll_heat_b<<endl;
                 }
                     
                 if(tt<temperature_floor)

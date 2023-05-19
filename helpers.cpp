@@ -360,15 +360,26 @@ double c_Sim::compute_planck_function_integral4(double lmin, double lmax, double
  * @param[in] name species name string, as read in from the *.spc file
  * @return Integer number between 0 and s-1
  */
-int c_Sim::get_species_index(const string name) {
+int c_Sim::get_species_index(const string name, const int verbose=1) {
     
-    for(int s = 0; s<num_species; s++) {
-        //cout<<" checking speciesname ="<<species[s].speciesname<<" while looking for "<<name;
-        //cout<<" resulting in "<<species[s].speciesname.compare(name)<<endl;
-        if(species[s].speciesname.compare(name)==0)
-            return s;
+    std::vector<string> stringlist = stringsplit(name," ");
+    
+    for(int i=0; i<stringlist.size(); i++) {
+        for(int s = 0; s<num_species; s++) {
+            //cout<<" checking speciesname ="<<species[s].speciesname<<" while looking for "<<stringlist[i]<<endl;
+            //cout<<" resulting in "<<species[s].speciesname.compare(name)<<endl;
+            if(species[s].speciesname.compare(stringlist[i])==0) {
+                if(verbose)
+                    cout<<" Found species index for "<<stringlist[i]<<" = "<<s<<endl;
+                return s;
+            }
+                
+        }
+        
     }
     
+    if(verbose)
+        cout<<" Couldn't find species index for searchlist = "<<name<<endl;
     return -1;
 }
 
