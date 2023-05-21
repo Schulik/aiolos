@@ -42,7 +42,7 @@ int c_Species::read_species_data(string filename, int species_index) {
     ifstream file(filename);
     string line;
     if(!file) {
-        cout<<"Couldnt open species file "<<filename<<"!!!!!!!!!!1111"<<endl;
+        cout<<"Couldnt open species file "<<filename<<"!"<<endl;
         
     }
     
@@ -214,6 +214,7 @@ int c_Species::read_species_data(string filename, int species_index) {
         
         // Create grid with resolution as smallest distance (artificial high-res grid, that is later used for averaging)
         int num_tmp_lambdas = (file_opacity_data(num_opacity_datas-1,0) - file_opacity_data(0,0))/minDeltaL + 2;    
+        if(debug>1)
         opacity_data = Eigen::MatrixXd::Zero(num_tmp_lambdas, num_readin_columns + 1);   
     
         // Find high-res opacity in read-in opacity 
@@ -261,7 +262,8 @@ int c_Species::read_species_data(string filename, int species_index) {
         //
         if(debug > 1) {
             cout<<" minDeltaL = "<<minDeltaL<<" num_tmp_lambdas = "<<num_tmp_lambdas<<endl;
-            cout<<"tmp_opacity_data = "<<endl<<file_opacity_data<<endl;
+            if(debug > 2)
+                cout<<"tmp_opacity_data = "<<endl<<file_opacity_data<<endl;
             //cout<<"opacity_data = "<<endl<<opacity_data<<endl;
         }
         
@@ -340,6 +342,10 @@ int c_Species::read_species_data(string filename, int species_index) {
             }
         }
         
+        if(debug > 1) {
+            cout<<"Pos before additional columns."<<endl;
+        }
+        
         if(num_readin_columns < 3) 
             for(int b = 0; b < num_bands_out; b++)  {
                 
@@ -356,6 +362,10 @@ int c_Species::read_species_data(string filename, int species_index) {
                     cout<<" DEBUG b_out = "<<b<<" avg_planck = "<<opacity_avg_rosseland(b)<<" const_opa = "<<const_opacity<<endl;
                 
             }
+            
+        if(debug > 1) {
+            cout<<"Pos after additional columns."<<endl;
+        }
             
         for(int b = 0; b < num_bands_in; b++)  if(std::isnan(opacity_avg_solar(b) )) opacity_avg_solar(b) = 1e-10;
         for(int b = 0; b < num_bands_out; b++) if(std::isnan(opacity_avg_planck(b) )) opacity_avg_planck(b) = 1e-10;
@@ -1084,4 +1094,229 @@ void c_Sim::write_into_execution_log(string dir, string par, string spcfile) {
         exlogstream<<"   with "<<spcfile<<endl;
     
     exlogstream.close();
+}
+
+/**
+ * Reads string lines from files and interprets them as photoreactions if they start with '$' or as thermoreactions if they start with '%'
+ * 
+ * @param[in] dir directory string
+ * @param[in] filename the file containing the list of photoreactions and thermoreactions. Can be the species file.
+ */
+void c_Sim::interpret_chem_reaction_list(string dir, string filename) {
+    
+    ifstream file(filename);
+    string line;
+    if(!file) {
+        cout<<"Couldnt open reaction file "<<filename<<"!"<<endl;
+    }
+    
+    int found = 0;
+    double temp_static_charge = 0.;
+    double ns = num_species;
+    
+    if(debug > 0) cout<<"          In read reactions Pos1"<<endl;
+    
+    while(std::getline( file, line )) {
+    
+        std::vector<string> stringlist = stringsplit(line," ");
+
+        if(stringlist[0].find("$") != string::npos) { //Photoreactions
+            
+            if(debug>=2)
+                cout<<"Starting to interpret a photoreaction with string = "<<line<<endl;
+            
+            //int starting_band;
+            std::vector<int> e_stoch_i; //Reactant/educt species indices
+            std::vector<int> p_stoch_i; //Product species indices
+            std::vector<double> p_stoch;
+            double branching;
+            double energy_threshold;
+            int band_number;
+            
+            std::vector<string> stringlist2 = stringsplit(line,"|");
+            std::vector<string> reactionstring = stringsplit(stringlist2[0],"->");
+            std::vector<string> eductstring    = stringsplit(reactionstring[0]," +");
+            std::vector<string> productstring  = stringsplit(reactionstring[1]," +");
+            
+            eductstring[0].erase(eductstring[0].begin()); //Remove $ from reactant list
+            //cout<<" searching in "<<eductstring[0]<<" for "<<stringsplit(eductstring[0]," ")[1]<<endl;
+            
+            e_stoch_i.push_back(get_species_index( stringsplit(eductstring[0]," ")[1], 1) );
+            energy_threshold = std::stod(stringsplit(eductstring[1]," ")[0] ); 
+            //cout<<"energy_threshold = "<<energy_threshold<<endl;
+            
+            for(string elm : productstring) {
+                //cout<<" checking product elm = "<<elm<<endl;
+                
+                std::vector<string> element = stringsplit(elm," ");
+                double stoch = std::stod(element[0]);
+                int    prod  = get_species_index( element[1], 1);
+                
+                //cout<<"    adding for stoch/prod "<<stoch<<"/"<<prod<<endl;
+                
+                p_stoch.push_back(stoch);
+                p_stoch_i.push_back(prod);
+            }
+            
+            for(string elm : stringlist2)
+                cout<<" "<<elm<<endl;
+            cout<<endl;
+            
+            branching = std::stod(stringlist2[1]);
+            //cout<<" branching = "<<branching<<endl;
+            
+            if(stringlist2[2].find("A") != string::npos) {
+                //cout<<" starting search for band numbers..."<<endl;
+                band_number = find_closest_band(energy_threshold);
+            }
+            else {
+                //cout<<" converted bandnumber = "<<std::stod(stringlist2[2])<<endl;
+                band_number = std::stod(stringlist2[2]);
+            }
+            
+            //
+            //TODO: Check the data we found before passing it on.
+            //
+            int checkspassed = 1;
+            
+            for(int elm : e_stoch_i)
+                if(elm==-1) {
+                    cout<<"REACTANT NOT FOUND!"<<endl;
+                    checkspassed = 0;
+                }
+            for(int elm : p_stoch_i)
+                if(elm==-1) {
+                    cout<<"REACTANT NOT FOUND!"<<endl;
+                    checkspassed = 0;
+                }        
+            
+            /*cout<<" Photo: "<<band_number<<"/"<<energy_threshold<<"/"<<"/"<<branching;
+            for(int elm : e_stoch_i)
+                cout<<" "<<elm;
+            for(int elm : p_stoch_i)
+                cout<<" "<<elm;
+            cout<<endl; */
+            
+            if(checkspassed) {
+                //cout<<" Passing data to a photoreaction constructor..."<<endl;
+                photoreactions.push_back(c_photochem_reaction( ns, num_bands_in, band_number, e_stoch_i, p_stoch_i, {1.}, p_stoch, branching, energy_threshold )); 
+            }
+                
+            else
+                cout<<"Erroneous reaction. Reaction ignored. Reaction string ="<<line<<endl;
+
+            //photoreactions.push_back(c_photochem_reaction( ns, num_bands_in, num_bands_in-3, {3}, {10,2}, {1.}, {1.,1.}, 1., 24.6 )); 
+        }
+        
+        if(stringlist[0].find("%") != string::npos) { //Thermoreactions
+            
+            if(debug>2)
+                cout<<"Starting to interpret a thermoreaction with string = "<<line<<endl;
+            
+            std::vector<int> e_stoch_i;
+            std::vector<int> p_stoch_i;
+            std::vector<double> e_stoch;
+            std::vector<double> p_stoch;
+            int is_mtype = 0;
+            int is_reverse;
+            double a; 
+            double b; 
+            double c;
+            
+            std::vector<string> stringlist2 = stringsplit(line,"|");
+            std::vector<string> reactionstring;
+            
+            if(stringlist2[0].find("->") != string::npos) {
+                is_reverse = 0;
+                reactionstring = stringsplit(stringlist2[0],"->");
+            } 
+            else if(stringlist2[0].find("<-") != string::npos) {
+                is_reverse = 1;
+                reactionstring = stringsplit(stringlist2[0],"<-");
+            }
+            
+            if(stringlist2[0].find(" M ") != string::npos)
+                is_mtype = 1;
+            
+            std::vector<string> eductstring    = stringsplit(reactionstring[0]," +");
+            std::vector<string> productstring  = stringsplit(reactionstring[1]," +");
+            
+            eductstring[0].erase(eductstring[0].begin()); //Remove % from reactant list
+            
+            //cout<<" searching in "<<eductstring[0]<<" for "<<stringsplit(eductstring[0]," ")[0]<<endl;
+            
+            for(string elm : eductstring) {
+                //cout<<" checking educt elm = "<<elm<<endl;
+                
+                if(elm.find(" M ") == string::npos) { //If its not an M, then we add it to the regular list
+                    
+                    //cout<<"in elm .. "<<endl;
+                    std::vector<string> element = stringsplit(elm," ");
+                    double stoch = std::stod(element[0]);
+                    int    prod  =  get_species_index( element[1], 1);
+                    
+                    //cout<<"    adding for stoch/prod "<<stoch<<"/"<<prod<<endl;
+                    
+                    e_stoch.push_back(stoch);
+                    e_stoch_i.push_back(prod);
+                }
+            }
+            for(string elm : productstring) {
+                //cout<<" checking product elm = "<<elm<<endl;
+                
+                if(elm.find(" M ") == string::npos) { //If its not an M, then we add it to the regular list
+                    
+                    //cout<<"in elm .. "<<endl;
+                    std::vector<string> element = stringsplit(elm," ");
+                    double stoch = std::stod(element[0]);
+                    int    prod  =  get_species_index( element[1], 1);
+                    
+                    //cout<<"    adding stoch/prod "<<stoch<<"/"<<prod<<endl;
+                    
+                    p_stoch.push_back(stoch);
+                    p_stoch_i.push_back(prod);
+                }
+            }
+            
+            a = std::stod(stringsplit(stringlist2[1]," ")[0]);
+            b = std::stod(stringsplit(stringlist2[1]," ")[1]);
+            c = std::stod(stringsplit(stringlist2[1]," ")[2]);
+            
+            //
+            // TODO: More checks
+            //
+            int checkspassed = 1;
+            
+            for(int elm : e_stoch_i)
+                if(elm==-1) {
+                    cout<<"REACTANT NOT FOUND!"<<endl;
+                    checkspassed = 0;
+                }
+            for(int elm : p_stoch_i)
+                if(elm==-1) {
+                    cout<<"REACTANT NOT FOUND!"<<endl;
+                    checkspassed = 0;
+                }   
+            
+            /*
+            cout<<" Thermo: "<<is_reverse<<"/"<<is_mtype<<"/"<<"/"<<a<<"/"<<b<<"/"<<c;
+            for(int elm : e_stoch_i)
+                cout<<" "<<elm;
+            for(int elm : p_stoch_i)
+                cout<<" "<<elm;
+            cout<<endl;*/
+            
+            if(checkspassed) {
+                //cout<<" Passing data to a thermoreaction constructor..."<<endl;
+                reactions.push_back(c_reaction(is_reverse, is_mtype, ns, e_stoch_i, p_stoch_i, e_stoch, p_stoch, a, b, c ));
+            }
+            else
+                cout<<"Erroneous reaction. Reaction ignored. Reaction string = "<<line<<endl;
+        }
+    
+    }
+    
+    file.close();
+    
+    
 }

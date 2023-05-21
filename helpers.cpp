@@ -137,6 +137,24 @@ vector<string> stringsplit(const string& str, const string& delim)
     while (pos < str.length() && prev < str.length());
     return tokens;
 }
+
+/**
+ * Loops through the waveband limits and finds the closest low-energy-band limit to energy_threshold
+ * 
+ * @param[in] energy_threshold the photon energy
+ * @return band number 
+ */
+int c_Sim::find_closest_band(double energy_threshold) {
+    
+    for(int b=0; b<num_bands_in; b++) {
+       double photon_energy = 1.24/( l_i_in[b + 1] ) * ev_to_K * kb ; 
+       
+       if(photon_energy < energy_threshold)
+           return b+1;
+    }
+    
+    return num_bands_in-1;    
+}
     
 //
 //

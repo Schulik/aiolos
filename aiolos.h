@@ -396,6 +396,12 @@ public:
     int num_species;
     std::vector<c_Species> species;
     
+    string speciesfile;
+    string speciesfile_solo;
+    string parfile;
+    string fluxfile;
+    string reactionfile;
+    
     int num_bands_in;
     int num_bands_out;
     int num_he_bands;
@@ -406,7 +412,6 @@ public:
     char temperature_model;
     double T_crit_min;
     double T_crit_max; //Critical min/max temperatures beyond which one should extend the wavelength grid
-    string fluxfile;
     double fluxmultiplier; //In case one forgot a unit conversion...
     
     int num_cells;
@@ -665,6 +670,7 @@ public:
     int use_chemistry;
     int num_reactions;
     int num_photoreactions;
+    int read_reactions_from_species_file;
     std::vector<c_reaction> reactions;
     std::vector<c_photochem_reaction> photoreactions;
     
@@ -694,6 +700,7 @@ public:
     int chem_momentum_correction;
     int chem_ekin_correction;
     void init_reactions(int cdebug);
+    void interpret_chem_reaction_list(string dir, string filename);
     void do_chemistry(double timestep);
     
        int dt_skip_ichem;
@@ -744,6 +751,7 @@ public:
     
     void compute_total_pressure();
     int get_species_index(const string name, const int verbose);
+    int find_closest_band(double energy_threshold);
     
     //
     // Friction
