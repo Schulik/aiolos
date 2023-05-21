@@ -34,6 +34,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
         simname          = filename_solo;
         this->workingdir = workingdir;
         string filename    = workingdir + filename_solo;
+        parfile            = workingdir + filename_solo;
         
         
         if(speciesfile_solo.compare("default.spc")==0)
@@ -41,7 +42,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
         
         cout<<" Starting construction of simulation. Attempting to find required speciesfile = "<<speciesfile_solo<<endl;
         
-        string speciesfile = workingdir + speciesfile_solo;
+        speciesfile = workingdir + speciesfile_solo;
         
         cout<<" Opening parameter file "<<filename<<endl;
         
@@ -1999,7 +2000,7 @@ void c_photochem_reaction::set_base_pointer(c_Sim *base_simulation) {
     for(int& pj : products) {
             this->products_total_mass += p_stoch[pj] * base->species[pj].mass_amu;
             
-            cout<<"In photochem setup, added species number pj = "<<pj<<" mass = "<<base->species[pj].mass_amu<<" and stoch = "<<p_stoch[pj]<<endl;
+            //cout<<"In photochem setup, added species number pj = "<<pj<<" mass = "<<base->species[pj].mass_amu<<" and stoch = "<<p_stoch[pj]<<endl;
             
             energy_split_factor *= base->species[pj].mass_amu;
             double temp = 1.;
@@ -2007,13 +2008,13 @@ void c_photochem_reaction::set_base_pointer(c_Sim *base_simulation) {
                     if(pk != pj)
                         temp *= base->species[pk].mass_amu;
             }
-            cout<<" energy split denom sum "<<temp<<endl;
+            //cout<<" energy split denom sum "<<temp<<endl;
             denom += temp;
     }
-    cout<<" nom = "<<energy_split_factor<<endl;
+    //cout<<" nom = "<<energy_split_factor<<endl;
     energy_split_factor /= denom;
     
-    cout<<" energy split factor = "<<energy_split_factor<<" / 1/energy_split_factor = "<<1./energy_split_factor<<" denom = "<<denom<<endl;
+    //cout<<" energy split factor = "<<energy_split_factor<<" / 1/energy_split_factor = "<<1./energy_split_factor<<" denom = "<<denom<<endl;
     
     base->highenergy_switch(educts[0], this->band) = 0.;
 }

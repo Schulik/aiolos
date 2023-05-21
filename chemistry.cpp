@@ -34,10 +34,34 @@ std::vector<double> get_thermo_variables(double T,string species_string);
  */
 void c_Sim::init_reactions(int cdebug) {
     
+    if(debug>=2)
+        cout<<" Init reactions pos0, reading parfile = "<<parfile<<endl;
+    
+    read_reactions_from_species_file = read_parameter_from_file<int>(parfile,"READ_REACTIONS_FROM_SPECIESFILE", debug, 0).value; 
+    
+    if(read_reactions_from_species_file)
+        reactionfile = speciesfile;
+    else
+        reactionfile = workingdir + read_parameter_from_file<string>(parfile,"REACTION_FILE", debug, "---").value;
+    
+    if(debug>=2)
+        cout<<" Init reactions pos1 "<<endl;
+    
     //Step 0: Construct reaction list
     if(cdebug)
         cout<<"Init photoreactions..."<<endl;
     
+    if(reactionfile.compare("---")!=0) {
+        cout<<" Reading reactions from file..."<<reactionfile<<endl;
+        interpret_chem_reaction_list(workingdir, reactionfile);
+    }
+    else {
+        cout<<"Reaction file "<<reactionfile<<" not recognized. No reactions added."<<endl;
+    }
+    
+    if(debug>=2)
+        cout<<" Init reactions pos2 "<<endl;
+    /*
     double ns = num_species;
     
     photoreactions.push_back(c_photochem_reaction( ns, num_bands_in, num_bands_in-3, {0}, {1,2}, {1.}, {1.,1.}, 1., 13.6 )); //H + gamma -> H+ + e-
@@ -45,8 +69,7 @@ void c_Sim::init_reactions(int cdebug) {
     photoreactions.push_back(c_photochem_reaction( ns, num_bands_in, num_bands_in-3, {7}, {8,2}, {1.}, {1.,1.}, 1., 13.6181 )); //O + gamma -> O+ + e-
     photoreactions.push_back(c_photochem_reaction( ns, num_bands_in, num_bands_in-3, {3}, {10,2}, {1.}, {1.,1.}, 1., 24.6 )); //He + gamma -> He+ + e-
 
-    
- // Hydrogen I recombination
+    //Hydrogen I recombination
     reactions.push_back(c_reaction(0, 0, ns, {1,2}, {0}, {1.,1.}, {1.}, 1.074889e-9, -0.9, 0. )); //Electron-proton recombination
     //He I
     reactions.push_back(c_reaction(0, 0, ns, {10,2}, {3}, {1.,1.}, {1.}, 1.074889e-9, -0.9, 0. )); //Electron-He+ recombination
@@ -59,7 +82,7 @@ void c_Sim::init_reactions(int cdebug) {
     // Carbon I recombination: CII + e- -> CI, powerlaw and resonance bump - fit to data from Sultana N. Nahar APJS (in press, 1998) deviates around the bump by up to 20%
     reactions.push_back(c_reaction(0, 0, ns, {5,2}, {4}, {1.,1.}, {1.}, 1.457e-10, -0.608, 0. )); //e- + C+ -> C recombination for at logT=3.5   https://iopscience.iop.org/article/10.1086/313013/pdf
     reactions.push_back(c_reaction(0, 0, ns, {5,2}, {4}, {1.,1.}, {1.}, 2.05e-4, -1.35, 117500. )); //e- + C+ -> C recombination for at logT=3.5   https://iopscience.iop.org/article/10.1086/313013/pdf
-    
+    */
     
     
     //photoreactions.push_back(c_photochem_reaction( ns, num_bands_in, 1, {0}, {1,2}, {1.}, {1.,1.}, 1., 13.6 )); //H + gamma -> H+ + e-
