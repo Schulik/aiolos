@@ -1045,7 +1045,7 @@ void  c_Sim::do_highenergy_cooling(int cell) {
             species[e_idx].dGdT(cell) -= ncp * ne * red * dfdx(Cp_cooling, Te, dT);
             species[e_idx].dGdT(cell) -= ncp * ne * 1.426e-27 * 1.3 * 0.5 /std::sqrt(Te) * mul;
         }
-        if( Cpp_idx!=-1 && e_idx!=-1 ) { 
+        if( Cpp_idx!=-1 && e_idx!=-1 && false) { 
             double ncpp = species[Cpp_idx].prim[cell].number_density;
             //species[Cpp_idx].dG(cell) = 0;
             species[e_idx].dG(cell) -= ncpp * ne * red * Cpp_cooling(Te); 
@@ -1084,7 +1084,7 @@ void  c_Sim::do_highenergy_cooling(int cell) {
                     cout<<"species[Op_idx].dG(cell) = "<<species[Op_idx].dG(cell)<<" parts = "<< nop<<"/"<<ne<<"/"<<sqrt(Te)<<"/"<<mul<< " product = "<<nop * ne * 1.426e-27 * 1.3 * sqrt(Te) * mul<<endl;
             }
         }
-        if( Opp_idx!=-1 && e_idx!=-1 ) { 
+        if( Opp_idx!=-1 && e_idx!=-1 && false) { 
             double nopp = species[Opp_idx].prim[cell].number_density;
             //species[Opp_idx].dG(cell) = 0;
             species[e_idx].dG(cell) -= nopp * ne * red * Opp_cooling(Te);
