@@ -186,17 +186,19 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
                 denoms[idx_s] = denom;
                 eta1[idx_s] += Ts * ( 1. + 12. * fac);
                 eta1[idx_s] += 1. * ddt * (species[s].dS(j) + species[s].dG(j) - photocooling_multiplier * species[s].dGdT(j)*Ts     ) / species[s].u[j].u1 / species[s].cv;
+
+                eta2[idx_s] += 4.* pi * ddt * kappa * no_rad_trans / species[s].cv;
                 
-                if(false) {
-                //if(steps == 3115 && s==2) {
-                    cout<<"reporting cooling terms["<<s<<"]: dG / dGdT * Ts "<<species[s].dG(j)<<" / "<< - photocooling_multiplier * species[s].dGdT(j)*Ts <<endl;
+                //if(false) {
+                if(steps == 3363 && j==2) {
+                    //cout<<"reporting cooling terms["<<s<<"]: dG / dGdT * Ts "<<species[s].dG(j)<<" / "<< - photocooling_multiplier * species[s].dGdT(j)*Ts <<endl;
+		    cout<<steps<<" etas = "<<eta1[idx_s]<<"/"<<eta2[idx_s]<<" Ts = "<<Ts<<endl;
                     //cout<<"reporting denom cooling terms : 16*fac / "<<16.*fac<<" / "<<moredenom<<endl;
                     //char a;
                    // cin>>a;
                     
                 }
                 
-                eta2[idx_s] += 4.* pi * ddt * kappa * no_rad_trans / species[s].cv;
                 //if(j == 90 && steps > 41800)
                 if(false)
                     cout<<"j ="<<j<<" denoms = "<<denom<<" eta1 = "<<eta1[idx_s]<<" eta1 parts = Ts/dS "<<Ts * ( 1. + 12. * fac)<<"/"<<1. * ddt * (species[s].dS(j) + species[s].dG(j)) / species[s].u[j].u1 / species[s].cv<<" Ts parts = Ts/(1+12fac)/facp1/facp2 = "<<Ts<<"/"<<(1.+12.*fac)<<"/"<<ddt * kappa / species[s].cv * sigma_rad<<"/"<<Ts3<<endl; 
@@ -356,14 +358,14 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
             LU.compute(coll_heat_matrix) ;
             coll_heat_output.noalias() = LU.solve(coll_heat_b);
             
-            if(false) {
+            if(steps == 3362 && j==2) {
+                cout<<"Matrix / b was "<<endl<<coll_heat_matrix<<endl<<coll_heat_b<<endl;
+
                 for(int si=0; si<num_species; si++) {
                     cout<<" After coll, species = "<<si<<" Tbefore/Tafter = "<<species[si].prim[j].temperature<<"/"<<coll_heat_output(si)<<" rel. difference = "<<1-coll_heat_output(si)/species[si].prim[j].temperature<<endl;
                     
-                    cout<<"Matrix / b was "<<endl<<coll_heat_matrix<<endl<<coll_heat_b<<endl;
-                    
-                    char a;
-                    cin>>a;
+                    //char a;
+                    //cin>>a;
                 }
                 
             }
@@ -409,7 +411,7 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
                 int idx_s = j * (num_species) + s;
                 double tt = eta1[idx_s]/denoms[idx_s] + eta2[idx_s]/denoms[idx_s]*Jrad_FLD(j, 0);
                 
-                if( j>num_cells-10 && steps>10e99)
+                if( j==2 && steps>3364 && false)
                     cout<<"t = "<<steps<<" j ="<<j<<" T = "<<tt<<" num_cells = "<<num_cells<<endl;
                 
                 //if(j==140)
