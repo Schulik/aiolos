@@ -78,7 +78,7 @@ int c_Species::read_species_data(string filename, int species_index) {
                 this->inv_mass = 1./(mass_amu*amu);
                 
                 if(debug > 0)
-                    cout<<"Found species called "<<speciesname<<" with a mass of "<<mass_amu<<" dof "<<degrees_of_freedom<<" gamma "<<gamma_adiabat<<" and zeta_0 = "<<initial_fraction<<endl;
+                    cout<<"Found species called "<<speciesname<<" with a mass of "<<mass_amu<<" dof "<<degrees_of_freedom<<" gamma "<<gamma_adiabat<<" and initial_fraction = "<<initial_fraction<<endl;
                 
             }
 
@@ -104,7 +104,7 @@ int c_Species::read_species_data(string filename, int species_index) {
     
     file.close();
     
-    if(debug > 0) cout<<"         Leaving species readin now. Bye!"<<endl;
+    if(debug > 0) cout<<"         Species readin finished."<<endl;
     
     //////////////////////////////////////////////////////////
     //////////////////////////////////////////////////////////
@@ -149,7 +149,7 @@ int c_Species::read_species_data(string filename, int species_index) {
         int num_readin_columns = 1;
         std::vector<string> stringending = stringsplit(opacityinputfile,".");
         
-        if(debug > 1)
+        if(debug > 0)
             cout<<" DEBUG LV2, namepart1 = "<<stringending[0]<<" namepart2 = "<<stringending[1]<<endl;
         
         if(stringending[1].compare("op2") == 0)
@@ -167,8 +167,8 @@ int c_Species::read_species_data(string filename, int species_index) {
         file2.clear();
         file2.seekg(0, ios::beg);
         
-        if(debug > 1)
-            cout<<" num_readin_columns = "<<num_readin_columns<<endl;
+        if(debug > 0)
+            cout<<" num_readin_columns = "<<num_readin_columns<<" data_count = "<<data_count<<endl;
         
         Eigen::MatrixXd file_opacity_data = Eigen::MatrixXd::Zero(num_opacity_datas, num_readin_columns + 1);   //Saves the data in format wl,opa,opa,opa as it is in the file
         
@@ -191,12 +191,12 @@ int c_Species::read_species_data(string filename, int species_index) {
             data_count++;
         }
         
-         if(debug > 1)
+         if(debug > 0)
             cout<<"Before fileclose"<<endl;
         
         file2.close();
         
-        if(debug > 1)
+        if(debug > 0)
             cout<<"After fileclose"<<endl;
         //
         // Interpolate the possibly non-uniformely binned opacity data on a uniform grid for fast interpolation later
@@ -212,9 +212,13 @@ int c_Species::read_species_data(string filename, int species_index) {
                 cout<<" found deltaL = "<<deltaL<<" at j = "<<j<<endl;
         }
         
+        
         // Create grid with resolution as smallest distance (artificial high-res grid, that is later used for averaging)
         int num_tmp_lambdas = (file_opacity_data(num_opacity_datas-1,0) - file_opacity_data(0,0))/minDeltaL + 2;    
-        if(debug>1)
+        
+        if(debug>0)
+            cout<<" found mindeltaL = "<<minDeltaL<<" num_tmp_lambdas "<<num_tmp_lambdas<<endl;
+        //if(debug>1)
         opacity_data = Eigen::MatrixXd::Zero(num_tmp_lambdas, num_readin_columns + 1);   
     
         // Find high-res opacity in read-in opacity 
@@ -1158,9 +1162,9 @@ void c_Sim::interpret_chem_reaction_list(string dir, string filename) {
                 p_stoch_i.push_back(prod);
             }
             
-            for(string elm : stringlist2)
-                cout<<" "<<elm<<endl;
-            cout<<endl;
+            //for(string elm : stringlist2)
+            //    cout<<" "<<elm<<endl;
+            //cout<<endl;
             
             branching = std::stod(stringlist2[1]);
             //cout<<" branching = "<<branching<<endl;

@@ -78,7 +78,7 @@ void c_Sim::execute() {
         
         if( globalTime > next_print_time) {
             cout<<" Beginning step "<<steps<<" @ globalTime "<<globalTime<<" dt "<<dt;
-            cout<< ", CFL " << cfl_step << ", radiative dt " << timestep_rad2 << "\n";
+            cout<< ", CFL " << cfl_step << ", energy dt " << timestep_rad2 << "\n";
             next_print_time *= 10.;
         }
          
