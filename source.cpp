@@ -514,7 +514,7 @@ void c_Sim::compute_alpha_matrix(int j) { //Called in compute_friction() and com
         double mumass, mumass_amu, meanT;
         
         for(int si=0; si<num_species; si++) {
-            for(int sj=0; sj<num_species; sj++) {
+            for(int sj=si; sj<num_species; sj++) {
                     
                     if(collision_model == 'C') { //Constant drag law
                         alpha_local = alpha_collision;
@@ -606,7 +606,7 @@ void c_Sim::compute_alpha_matrix(int j) { //Called in compute_friction() and com
                    //    friction_coefficients(si,sj) = 0.;
                     //else
                     friction_coefficients(si,sj) = friction_coeff_mask(si,sj) * alpha_local;
-                    //friction_coefficients(sj,si) = friction_coeff_mask(sj,si) * alpha_local * numdens_vector(si) / numdens_vector(sj);
+                    friction_coefficients(sj,si) = friction_coeff_mask(sj,si) * alpha_local * dens_vector(si) / dens_vector(sj);
                     //alpha_local *=  ;
                 
             }

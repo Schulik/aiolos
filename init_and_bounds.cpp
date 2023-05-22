@@ -201,6 +201,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
         no_rad_trans               = read_parameter_from_file<double>(filename,"NO_RAD_TRANS", debug, 1.).value; //Multiplier for strength for thermal radiative losses in radiation transport. Set to 1e-100 to emulate perfect energy-limited escape.
         solve_for_j                = read_parameter_from_file<int>(filename,"SOLVE_FOR_J", debug, 1).value; //Debugging parameter. Switch to zero for decoupling of T and J in simple rad transport
         photocooling_multiplier    = read_parameter_from_file<double>(filename,"PHOTOCOOL_MULTIPLIER", debug, 1.).value; //Multiplier for non-thermal cooling rates
+        photocooling_expansion     = read_parameter_from_file<double>(filename,"PHOTOCOOL_EXPANSION", debug, 1.).value; //Multiplier for non-thermal second order cooling rates
         radiation_rampup_time      = read_parameter_from_file<double>(filename,"RAD_RAMPUP_TIME", debug, 0.).value; //Ramp up the irradiation in all bands smoothly over xxx seconds.
         init_radiation_factor      = read_parameter_from_file<double>(filename,"INIT_RAD_FACTOR", debug, 0.).value; //Unused
         //radiation_solver           = read_parameter_from_file<int>(filename,"RADIATION_SOLVER", debug, 0).value; //replaced by use_rad_fluxes
@@ -617,7 +618,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
 
         if (NUM_SPECIES != Eigen::Dynamic && num_species != NUM_SPECIES) {
             std::stringstream err ;
-            err << "Error: You compiled aiolois with a different number of species requested"
+            err << "Error: You compiled aiolos with a different number of species requested"
                 << " to that requested in the parameter file.\n You must recompile with either: "
                 << " 1) a dynamic number of species (default) or 2) the correct number of species";
             throw std::invalid_argument(err.str()) ;
