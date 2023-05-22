@@ -321,9 +321,13 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
             double   tau = total_opacity(j,0) * (x_i12[j+1]-x_i12[j]);
             double security_multiplier = tau<1e3?1.:1.e-4;
             
-            fill_alpha_basis_arrays(j);
-            //compute_collisional_heat_exchange_matrix(j);
-            compute_alpha_matrix(j);
+            if(update_coll_frequently) {
+                fill_alpha_basis_arrays(j);
+                compute_alpha_matrix(j);
+            }
+            
+            ////compute_collisional_heat_exchange_matrix(j);
+            
             
             for(int si=0; si<num_species; si++) {
                 

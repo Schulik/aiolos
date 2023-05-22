@@ -59,6 +59,8 @@ void c_Sim::init_reactions(int cdebug) {
         cout<<"Reaction file "<<reactionfile<<" not recognized. No reactions added."<<endl;
     }
     
+    find_resonant_pairs(workingdir, reactionfile);
+    
     if(debug>=2)
         cout<<" Init reactions pos2 "<<endl;
     /*

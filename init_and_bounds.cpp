@@ -210,6 +210,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
         const_opacity_planck_factor = read_parameter_from_file<double>(filename,"CONSTOPA_PLANCK_FACTOR", debug, 1.).value;  //Multiplier for all planck opacities (")
         temperature_model = read_parameter_from_file<char>(filename,"INIT_TEMPERATURE_MODEL", debug, 'P').value; //Initialize temperature as adiabatic+constant (P) or constant (C)
         friction_solver   = read_parameter_from_file<int>(filename,"FRICTION_SOLVER", debug, 0).value; //0: no friction, 1: analytic (only for two species), 2: numerical
+        update_coll_frequently = read_parameter_from_file<int>(filename,"UPDATE_COLL_FREQUENTLY", debug, 1).value; //Switches on or off another update of collision rates after temperature and before temperature exchange update for rad solver==2. Important for code performance with many species
         do_hydrodynamics  = read_parameter_from_file<int>(filename,"DO_HYDRO", debug, 1).value;  //Switch hydrodynamics, including its CFL condition on/off
         start_hydro_time  = read_parameter_from_file<double>(filename,"START_HYDRO_TIME", debug, -1.).value; //Hydro is started once globalTime > start_hydro_time and do_hydro == 1
         photochemistry_level = read_parameter_from_file<int>(filename,"PHOTOCHEM_LEVEL", debug, 0).value; //1==C2Ray solver, 2==general photo and thermochemistry solver
@@ -703,6 +704,8 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
             friction_matrix_T     = Matrix_t::Zero(num_species, num_species);
             friction_coefficients = Matrix_t::Zero(num_species, num_species);
             friction_coeff_mask   = Matrix_t::Ones(num_species, num_species);
+            inv_totmasses         = Matrix_t::Zero(num_species, num_species);
+            resonant_pair_matrix  = Matrix_t::Ones(num_species, num_species);
             friction_vec_input    = Vector_t(num_species);
             friction_vec_output   = Vector_t(num_species);
             friction_dEkin        = Vector_t(num_species);
@@ -722,10 +725,12 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
         
         //
         // Dust species dont feel each other: Punch holes in the coefficient mask for the dust species, so they don't feel each other
-        // Ion species feel each other strongly: Multiply ionic friction strength by the 'canonical' value of 100.
+        // Also set the total inv mass matrix values
         //
         for(int si=0; si < num_species; si++)
             for(int sj=0; sj < num_species; sj++) {
+                inv_totmasses(si,sj) = 1./(species[si].mass_amu*amu + species[sj].mass_amu*amu);
+                
                 if(species[si].is_dust_like == 1 && species[sj].is_dust_like == 1) {
                     friction_coeff_mask(si,sj) = 0.;
                     friction_coeff_mask(sj,si) = 0.;

@@ -510,7 +510,7 @@ void c_Sim::compute_alpha_matrix(int j) { //Called in compute_friction() and com
         
         double alpha_local;
         double coll_b;
-        double mtot;
+        //double mtot;
         double mumass, mumass_amu, meanT;
         
         for(int si=0; si<num_species; si++) {
@@ -519,74 +519,78 @@ void c_Sim::compute_alpha_matrix(int j) { //Called in compute_friction() and com
                     if(collision_model == 'C') { //Constant drag law
                         alpha_local = alpha_collision;
                         if (si > sj) alpha_local *= dens_vector(sj) / dens_vector(si) ;
-                    }
-                    else {                      // Physical drag laws
-                        mtot = mass_vector(si) + mass_vector(sj);
-                        mumass = mass_vector(si) * mass_vector(sj) / (mass_vector(si) + mass_vector(sj));
-                        mumass_amu = mumass/amu;
-                        meanT  = (mass_vector(sj)*temperature_vector(si) + mass_vector(si)*temperature_vector(sj)) / (mass_vector(si) + mass_vector(sj)); //Mean collisional mu and T from Schunk 1980
-                        
-                        if (species[si].is_dust_like || species[sj].is_dust_like) { //One of the collision partners is dust
-                            // Use Epstein drag law (Hard sphere model)
-                            double RHO_DUST = 1;
-                            double s0=0, s1=0 ;
-                            if (species[si].is_dust_like)
-                                s0 = std::pow(3*mass_vector(si)/(4*M_PI*RHO_DUST), 1/3.) ;
-                            if (species[sj].is_dust_like)
-                                s1 = std::pow(3*mass_vector(sj)/(4*M_PI*RHO_DUST), 1/3.) ;
+                    } else {
+                        if(si==sj) {
+                        alpha_local = 0.; 
+                        } else {                      // Physical drag laws
+                            //mtot = mass_vector(si) + mass_vector(sj);
+                            mumass = mass_vector(si) * mass_vector(sj) * inv_totmasses(si,sj); /// (mass_vector(si) + mass_vector(sj));
+                            mumass_amu = mumass/amu;
+                            meanT  = (mass_vector(sj)*temperature_vector(si) + mass_vector(si)*temperature_vector(sj)) * inv_totmasses(si,sj); // / (mass_vector(si) + mass_vector(sj)); //Mean collisional mu and T from Schunk 1980
                             
-                            double A = M_PI*(s0+s1)*(s0+s1) ;
-                            double v_th = std::sqrt(8*kb*meanT/(M_PI * mumass)) ;
-
-                            alpha_local = 4/3. * dens_vector(sj) * v_th * A / mtot ;
-                        } else { // Gas-gas collisions. Used binary diffusion coefficient                        
-
-                            int ci = (int)(species[si].static_charge*1.01);
-                            int cj = (int)(species[sj].static_charge*1.01);
-                            double qn = (std::fabs(species[si].static_charge) + std::fabs(species[sj].static_charge));
-                            string ccase = ""; //Debug string to make sure the cases are picked right
-                            
-                            if(std::abs(ci) + std::abs(cj) == 0) { //n-n collision
-                                coll_b      = 5.0e17 * std::sqrt(std::sqrt(meanT*meanT*meanT)) ;     //std::pow(meanT, 0.75) // from Zahnle & Kasting 1986 Tab. 1
-                                alpha_local = kb * meanT * numdens_vector(sj) / (mass_vector(si) * coll_b) ; // From Burgers book, or Schunk & Nagy.
-                                ccase = " n-n ";
-                            }
-                            else if(std::abs(ci) == 0 || std::abs(cj) == 0) {//i-n collision
+                            if (species[si].is_dust_like || species[sj].is_dust_like) { //One of the collision partners is dust
+                                // Use Epstein drag law (Hard sphere model)
+                                double RHO_DUST = 1;
+                                double s0=0, s1=0 ;
+                                if (species[si].is_dust_like)
+                                    s0 = std::pow(3*mass_vector(si)/(4*M_PI*RHO_DUST), 1/3.) ;
+                                if (species[sj].is_dust_like)
+                                    s1 = std::pow(3*mass_vector(sj)/(4*M_PI*RHO_DUST), 1/3.) ;
                                 
-                                if(species[si].mass_amu < 1.1 && species[sj].mass_amu < 1.1) {  //Resonant H,H+ collisions
-                                    alpha_local = 2.65e-10 * numdens_vector(sj) * std::sqrt(meanT) * std::pow((1. - 0.083 * std::log10(meanT)), 2.);
+                                double A = M_PI*(s0+s1)*(s0+s1) ;
+                                double v_th = std::sqrt(8*kb*meanT/(M_PI * mumass)) ;
+
+                                alpha_local = 4/3. * dens_vector(sj) * v_th * A * inv_totmasses(si,sj) ;
+                            } else { // Gas-gas collisions. Used binary diffusion coefficient                        
+
+                                int ci = (int)(species[si].static_charge*1.01);
+                                int cj = (int)(species[sj].static_charge*1.01);
+                                double qn = (std::fabs(species[si].static_charge) + std::fabs(species[sj].static_charge));
+                                //string ccase = ""; //Debug string to make sure the cases are picked right
+                                
+                                if(std::abs(ci) + std::abs(cj) == 0) { //n-n collision
+                                    coll_b      = 5.0e17 * std::sqrt(std::sqrt(meanT*meanT*meanT)) ;     //std::pow(meanT, 0.75) // from Zahnle & Kasting 1986 Tab. 1
+                                    alpha_local = kb * meanT * numdens_vector(sj) * species[si].inv_mass / coll_b ; // From Burgers book, or Schunk & Nagy.
+                                    //ccase = " n-n ";
+                                }
+                                else if(std::abs(ci) == 0 || std::abs(cj) == 0) {//i-n collision
                                     
-                                    ccase = "resonant i-n ";
+                                    if(species[si].mass_amu < 1.1 && species[sj].mass_amu < 1.1) {  //Resonant H,H+ collisions
+                                        alpha_local = 2.65e-10 * numdens_vector(sj) * std::sqrt(meanT) * std::pow((1. - 0.083 * std::log10(meanT)), 2.);
+                                        
+                                        //ccase = "resonant H-p+ ";
+                                        
+                                    } else {
+
+                                        alpha_local = 1*2.21 * 3.141592 * numdens_vector(sj) * mass_vector(sj) * inv_totmasses(si,sj); //   /(mass_vector(sj)+mass_vector(si));
+                                        alpha_local *= std::sqrt(0.66 / mumass ) * 1e-12 * qn * elm_charge; //0.66 is the polarizability of neutral atomic H                                        
+                                        alpha_local *= resonant_pair_matrix(si,sj); //Crude way to emulate resonant collision cross-sections: pairs are multiplied by 10, everything else by 1
+                                        
+                                        //ccase = "resonant or nonresonant i-n ";
+                                    }
+                                }
+                                else { //i-i collision
+                                    alpha_local = alpha_collision_ions * 1.27 * species[si].static_charge * species[si].static_charge * species[sj].static_charge * species[sj].static_charge * std::sqrt(mumass_amu) * amu * species[si].inv_mass; //  / mass_vector(si);
+                                    alpha_local *= numdens_vector(sj) / std::sqrt(meanT*meanT*meanT);
+                                    
+                                    //ccase = " i-i ";
+                                }
+                                
+                                if(si!=sj && debug>3)
+                                    cout<<"cell "<<j<<" colliding "<<species[si].speciesname<<" q="<<species[si].static_charge<<" with "<<species[sj].speciesname<<" q="<<species[sj].static_charge<<" ccase = "<<" alpha/n = "<<alpha_local/ numdens_vector(sj)<<" n_sj = "<<numdens_vector(sj)<<endl;
+                                
+                                double alpha_temp = alpha_collision;
+                                if(globalTime < coll_rampup_time) { //Ramp up the friction factors linearly, if so desired
+                                    
+                                        alpha_temp = alpha_collision * ( init_coll_factor + (1.-init_coll_factor) * globalTime/coll_rampup_time );
                                     
                                 } else {
-
-                                    alpha_local = 1*2.21 * 3.141592 * numdens_vector(sj) * mass_vector(sj)/(mass_vector(sj)+mass_vector(si));
-                                    alpha_local *= std::sqrt(0.66 / mumass ) * 1e-12 * qn * elm_charge; //0.66 is the polarizability of neutral atomic H                                        
-                                    
-                                    ccase = "nonresonant i-n ";
+                                    alpha_temp = alpha_collision;
                                 }
-                            }
-                            else { //i-i collision
-                                alpha_local = alpha_collision_ions * 1.27 * species[si].static_charge * species[si].static_charge * species[sj].static_charge * species[sj].static_charge * std::sqrt(mumass_amu) * amu/mass_vector(si);
-                                alpha_local *= numdens_vector(sj) / std::sqrt(meanT*meanT*meanT);
                                 
-                                ccase = " i-i ";
+                                //alpha_local *= alpha_collision;
+                                alpha_local *= alpha_temp;
                             }
-                            
-                            if(si!=sj && debug>3)
-                                cout<<"cell "<<j<<" colliding "<<species[si].speciesname<<" q="<<species[si].static_charge<<" with "<<species[sj].speciesname<<" q="<<species[sj].static_charge<<" case = "<<ccase<<" alpha/n = "<<alpha_local/ numdens_vector(sj)<<" n_sj = "<<numdens_vector(sj)<<endl;
-                            
-                            double alpha_temp = alpha_collision;
-                            if(globalTime < coll_rampup_time) { //Ramp up the friction factors linearly, if so desired
-                                
-                                    alpha_temp = alpha_collision * ( init_coll_factor + (1.-init_coll_factor) * globalTime/coll_rampup_time );
-                                
-                            } else {
-                                alpha_temp = alpha_collision;
-                            }
-                            
-                            //alpha_local *= alpha_collision;
-                            alpha_local *= alpha_temp;
                         }
                     }
                     
@@ -598,10 +602,12 @@ void c_Sim::compute_alpha_matrix(int j) { //Called in compute_friction() and com
                     }
                     
                     // Fill alpha_ij and alpha_ji
-                    if(si==sj)
-                       friction_coefficients(si,sj) = 0.;
-                    else
-                       friction_coefficients(si,sj) = friction_coeff_mask(si,sj) * alpha_local;
+                    //if(si==sj)
+                   //    friction_coefficients(si,sj) = 0.;
+                    //else
+                    friction_coefficients(si,sj) = friction_coeff_mask(si,sj) * alpha_local;
+                    //friction_coefficients(sj,si) = friction_coeff_mask(sj,si) * alpha_local * numdens_vector(si) / numdens_vector(sj);
+                    //alpha_local *=  ;
                 
             }
         }
@@ -613,6 +619,7 @@ void c_Sim::compute_alpha_matrix(int j) { //Called in compute_friction() and com
 /**
  * Build collisional heat exchange matrix. Uses pre-computed values from momentum transfer.
  * Called from compute_collisional_heat_exchange.
+ * 21 May 2023: This function has been disabled in radiation_simple, the coefficients are computed in place there now
  * 
  * * @param[in] j Cell number in which to build the heat exchange matrix
  */
