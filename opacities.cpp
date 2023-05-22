@@ -112,12 +112,12 @@ void c_Species::update_opacities() {
             for(int j=0; j< num_cells+2; j++) {
                 
                 for(int b=0; b<num_bands_in; b++) {
-                    opacity_twotemp(j,b) = base->const_opacity_solar_factor * opacity_avg_solar(b) * (1. + pressure_broadening_factor * pow(prim[j].pres/1e5, pressure_broadening_exponent)); 
+                    opacity_twotemp(j,b) = base->const_opacity_solar_factor * opacity_avg_solar(b);// * (1. + pressure_broadening_factor * pow(prim[j].pres/1e5, pressure_broadening_exponent)); 
                     //cout<<base->l_i_in[b]<<"   "<<opacity_avg_solar(b)<<endl;
                 }
                 for(int b=0; b<num_bands_out; b++) {
-                    opacity(j,b)         = base->const_opacity_rosseland_factor * opacity_avg_rosseland(b) * (1. + pressure_broadening_factor * pow(prim[j].pres/1e5, pressure_broadening_exponent)); 
-                    opacity_planck(j,b)  = base->const_opacity_planck_factor * opacity_avg_planck(b) * (1. + pressure_broadening_factor * pow(prim[j].pres/1e5, pressure_broadening_exponent)); 
+                    opacity(j,b)         = base->const_opacity_rosseland_factor * opacity_avg_rosseland(b);// * (1. + pressure_broadening_factor * pow(prim[j].pres/1e5, pressure_broadening_exponent)); 
+                    opacity_planck(j,b)  = base->const_opacity_planck_factor * opacity_avg_planck(b);// * (1. + pressure_broadening_factor * pow(prim[j].pres/1e5, pressure_broadening_exponent)); 
                 }
             }
         } else { //is_dust_like
