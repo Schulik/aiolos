@@ -541,6 +541,7 @@ public:
     //
     
     int friction_solver;
+    int update_coll_frequently;
     double init_coll_factor;
     double coll_rampup_time;
     
@@ -550,6 +551,8 @@ public:
     Matrix_t identity_matrix;
     Matrix_t friction_coefficients;
     Matrix_t friction_coeff_mask;
+    Matrix_t inv_totmasses;
+    Matrix_t resonant_pair_matrix;
     Vector_t friction_vec_input;
     Vector_t friction_vec_output;
     Vector_t friction_dEkin;
@@ -701,6 +704,7 @@ public:
     int chem_ekin_correction;
     void init_reactions(int cdebug);
     void interpret_chem_reaction_list(string dir, string filename);
+    void find_resonant_pairs(string dir, string filename);
     void do_chemistry(double timestep);
     
        int dt_skip_ichem;

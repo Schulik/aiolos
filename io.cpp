@@ -1324,3 +1324,44 @@ void c_Sim::interpret_chem_reaction_list(string dir, string filename) {
     
     
 }
+
+/**
+ * Reads string lines from files and looks for mentions of resonant pairs. Successful finds are put into the resonant_pair_matrix as constant multiplier
+ * 
+ * @param[in] dir directory string
+ * @param[in] filename the file containing the list of photoreactions and thermoreactions. Can be the species file.
+ */
+void c_Sim::find_resonant_pairs(string dir, string filename) {
+
+    ifstream file(filename);
+    string line;
+    if(!file) {
+        cout<<"Couldnt open reaction file "<<filename<<"!"<<endl;
+    }
+    
+    int found = 0;
+    double temp_static_charge = 0.;
+    double ns = num_species;
+    
+    if(debug > 0) cout<<"          In read reactions Pos1"<<endl;
+    
+    while(std::getline( file, line )) {
+    
+        std::vector<string> stringlist = stringsplit(line," ");
+
+        if(stringlist[0].find("&") != string::npos) {
+            
+            int    a  =  get_species_index( stringlist[1], 0);
+            int    b  =  get_species_index( stringlist[2], 0);
+            
+            if(a != -1 && b != -1) {
+                cout<<"Found resonant pair with species "<<a<<" and "<<b<<endl;
+                resonant_pair_matrix(a,b) = 10.;
+            }
+                
+        }
+        
+    }
+    
+    file.close();
+}
