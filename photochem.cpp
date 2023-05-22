@@ -243,7 +243,7 @@ class C2Ray_HOnly_heating {
 
    public:
     using Matrix_t =
-        Eigen::Matrix<double, NUM_SPECIES, NUM_SPECIES, Eigen::RowMajor>;
+        Eigen::Matrix<double, 3, 3, Eigen::RowMajor>;
 
     C2Ray_HOnly_heating(double GammaH_, double dt_,
                         const std::array<double, 3>& nX,
