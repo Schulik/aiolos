@@ -242,14 +242,14 @@ class C2Ray_HOnly_heating {
     using Vec3 = Eigen::Matrix<double, 3, 1>;
 
    public:
-    using Matrix_t =
-        Eigen::Matrix<double, 3, 3, Eigen::RowMajor>;
+    //using Matrix_t =
+     //   Eigen::Matrix<double, 3, 3, Eigen::RowMajor>;
 
     C2Ray_HOnly_heating(double GammaH_, double dt_,
                         const std::array<double, 3>& nX,
                         const std::array<double, 3>& TX,
                         double ion_rate, double recomb_rate,
-                        const Matrix_t& collisions)
+                        const Mat3& collisions)
      : GammaH(GammaH_),
        dt(dt_),
        ion(ion_rate), recomb(recomb_rate),
@@ -614,10 +614,18 @@ void c_Sim::do_photochemistry() {
                     //}
                     
                     // Solve for radiative cooling implicitly
+                    //Comment back in for 3 species used
+                    /*
                     C2Ray_HOnly_heating heat(GammaH - dEk/(dt+1e-300), dt, nX_new, TX,
                            (ion.R + ion.B*ne)*ne*ne, (ion.C*ne + ion.photoionization_rate(x_bar))*nH,
                            friction_coefficients);
-
+                    */
+                    Eigen::Matrix<double, 3, 3, Eigen::RowMajor> dummy;
+                    C2Ray_HOnly_heating heat(GammaH - dEk/(dt+1e-300), dt, nX_new, TX,
+                           (ion.R + ion.B*ne)*ne*ne, (ion.C*ne + ion.photoionization_rate(x_bar))*nH,
+                           dummy );
+                    
+                    
                     // Bracket the temperature:
                     double Te1 = TX[2], Te2;
                     if (heat(Te1) < 0) {
