@@ -2,6 +2,13 @@
 *.dat
 *~
 *.log
+*.par
+*.spc
+*.reac
+*.opa
+*.op2
+*.op3
+*.aiopa
 test_files/*.o
 test_files/*.dat
 test_files/*.png
