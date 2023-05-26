@@ -1,6 +1,7 @@
 *.o
 *.dat
 *~
+*.log
 test_files/*.o
 test_files/*.dat
 test_files/*.png
