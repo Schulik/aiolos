@@ -173,7 +173,7 @@ void c_Sim::init_reactions(int cdebug) {
                         cout<<"+ ";
                 }
                 
-                cout<<" ...... dStoch = "<<reaction.delta_stoch<<" initial rrate(100.K, 3000.K) = "<<reaction.get_reaction_rate(100.)<<"/"<<reaction.get_reaction_rate(3000.)<<" dG = "<<reaction.current_dG<<endl;
+                cout<<" ...... dStoch = "<<reaction.delta_stoch<<" initial rrate(300.K, 3000.K, 10kK) = "<<reaction.get_reaction_rate(300.)<<"/"<<reaction.get_reaction_rate(3000.)<<"/"<<reaction.get_reaction_rate(10000.)<<" dG = "<<reaction.current_dG<<endl;
                 
                 
             }
@@ -194,7 +194,7 @@ void c_Sim::init_reactions(int cdebug) {
                     if(reaction.products.back() != pi) 
                         cout<<"+ ";
                 }
-                cout<<" ...... dStoch = "<<reaction.delta_stoch<<" initial rrate(100.K, 3000.K) = "<<reaction.get_reaction_rate(100.)<<"/"<<reaction.get_reaction_rate(3000.)<<endl;
+                cout<<" ...... dStoch = "<<reaction.delta_stoch<<" initial rrate(300.K, 3000.K, 10kK) = "<<reaction.get_reaction_rate(300.)<<"/"<<reaction.get_reaction_rate(3000.)<<"/"<<reaction.get_reaction_rate(10000.)<<" dG = "<<reaction.current_dG<<endl;
                 
             }
             
@@ -980,15 +980,15 @@ void c_Sim::update_dS_jb_photochem(int cell) {
  */
 void c_Sim::init_highenergy_cooling_indices()
 {
-    hnull_idx = get_species_index("S0 H0 H ",1); 
-    hplus_idx = get_species_index("S1 H+ p p+",1);
-    e_idx     = get_species_index("S2 e e- eh eh2",1);
-    C_idx     = get_species_index("S4 C0 C",1);
-    Cp_idx    = get_species_index("S5 C+ Cp",1);
-    Cpp_idx   = get_species_index("S6 C++ Cpp",1);
-    O_idx     = get_species_index("S7 O O0",1);
-    Op_idx    = get_species_index("S8 O+ Op",1);
-    Opp_idx   = get_species_index("S9 Opp C++",1);
+    hnull_idx = -1; //get_species_index("S0 H0 H ",1); 
+    hplus_idx = -1;//get_species_index("S1 H+ p p+",1);
+    e_idx     = -1;//get_species_index("S2 e e- eh eh2",1);
+    C_idx     = -1;//get_species_index("S4 C0 C",1);
+    Cp_idx    = -1;//get_species_index("S5 C+ Cp",1);
+    Cpp_idx   = -1;//get_species_index("S6 C++ Cpp",1);
+    O_idx     = -1;//get_species_index("S7 O O0",1);
+    Op_idx    = -1;//get_species_index("S8 O+ Op",1);
+    Opp_idx   = -1;//get_species_index("S9 Opp C++",1);
     h3plus_idx = get_species_index("H3+",1);
 }
 

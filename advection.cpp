@@ -207,6 +207,9 @@ void c_Sim::execute() {
         //Computes the velocity drag update after the new hydrodynamic state is known for each species
         if (do_hydrodynamics == 1) 
             compute_drag_update() ;
+
+	if (do_hydrodynamics == 0 && friction_solver > 0) 
+            compute_drag_update() ;
         
         // If either switch is set we need to think more carefully about what should be done
         if( (photochemistry_level + use_rad_fluxes ) > 0 ) {
@@ -302,6 +305,7 @@ void c_Sim::execute() {
             } 
                     
         }
+        if(couple_J_into_T) {
         for(int b = 0; b < num_bands_out; b++) {
             for(int i=num_cells-1; i>=0; i--)  {
                     if(Jrad_FLD(i,b) < 0) {
@@ -333,11 +337,12 @@ void c_Sim::execute() {
                     }
             }
             
-            if(crashed_J > 0) {
+            if(crashed_J > 0 && couple_J_into_T) {
                 cout<<endl<<">>> CRASH <<< DUE TO NEGATIVE J, crash_imin/imax = "<<crash_J_imin<<"/"<<crash_J_imax<<" sample J = "<<crashed_meanintensity<<" num of crashed cells/total cells = "<<crash_J_numcells<<"/"<<num_cells<<"  crashed band number = "<<crashed_J-1<<endl; 
                 cout<<" @t/dt = "<<crashtime<<"/"<<dt<<" stepnum "<<steps<<endl;
                 cout<<"Writing crash dump into last output and exiting program."<<endl;
             }
+        }
         }
         
     }
