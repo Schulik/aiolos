@@ -24,13 +24,18 @@
  * Computes rhill which is output in the beginning of the run.
  */
 void c_Sim::init_grav_pot() {
-        
+
+    double rh = planet_semimajor * au * pow(planet_mass / (3.* star_mass ),0.333333333333333333);        
+
     for(int i = 1; i <= num_cells+1; i++) {
         enclosed_mass[i] = planet_mass;      //No self-gravity
         phi[i]           = get_phi_grav(x_i12[i], enclosed_mass[i]);
             
-        if(use_tides == 1)
-            phi[i] -=0.5* 3.*G*star_mass*x_i12[i]*x_i12[i]/pow(planet_semimajor*au,3.);
+        if(use_tides == 1) {
+        	//if(x_i[i]>0.2*rh)
+            		phi[i] -=0.5* 3.*G*init_star_mass*x_i12[i]*x_i12[i]/pow(planet_semimajor*au,3.);
+	}
+            //phi[i] -=0.5* 3.*G*star_mass*x_i12[i]*x_i12[i]/pow(planet_semimajor*au,3.);
             
     }
     phi[0]           = get_phi_grav(x_i12[1],         planet_mass);
@@ -74,8 +79,27 @@ void c_Sim::update_mass_and_pot() {
         //if use tidal gravity
         if(use_tides == 1) {
             double d3 = planet_semimajor*au;
+            double rh = planet_semimajor * au * pow(planet_mass / (3.* star_mass ),0.333333333333333333);
+	    double m0 = init_star_mass;
+	    double m1 = star_mass;
+            double t0 = ramp_star_mass_t0;
+	    double t1 = ramp_star_mass_t1;
+
+	    double a = (m0-m1)/(t0-t1);
+	    double b = 0.5*(m0+m1 - a *(t1+t0));
+
+	    double current_star_mass = m0;
+	    if(globalTime > t0)
+	     	current_star_mass =  a * globalTime + b;
+	    if(globalTime > t1)
+		current_star_mass = star_mass;
+
+            //if(steps==5)
+	   //	cout<<" In tidal grav, t0/t1 = "<<t0<<"/"<<t1<<" m0/current_mass ="<<m0/msolar<<"/"<<current_stellar_mass/msolar<<endl;
+
             d3 = d3*d3*d3;
-            phi[i] -= 0.5* 3.*G*star_mass*x_i12[i]*x_i12[i]/d3;
+	    //if(x_i[i]>0.2*rh)
+	            phi[i] -= 0.5* 3.*G*star_mass*x_i12[i]*x_i12[i]/d3;
         }
             
     }
@@ -207,11 +231,14 @@ void c_Species::update_kzz_and_gravpot(int argument) {
  * Wrapper function calling the appropriate analytical or numerical functions.
  */
 void c_Sim::compute_drag_update() {
-        if(alpha_collision > 0 && num_species > 1) {
+	//cout<<"In  drag_update"<<endl;
+        if(friction_solver >= 0 && num_species > 1) {
             if(friction_solver == 0)
                 compute_friction_analytical();
-            else
-                compute_friction_numerical();
+            else{
+		//cout<<"calling friction numerical"<<endl;
+                 compute_friction_numerical();
+		}
         }
     }
     
@@ -508,11 +535,13 @@ void c_Sim::fill_alpha_basis_arrays(int j) { //Called in compute_friction() in s
  */
 void c_Sim::compute_alpha_matrix(int j) { //Called in compute_friction() and compute_radiation() in source.cpp
         
+	if(steps< 4 && j ==100)
+		cout<<steps<<" In compute_alpha_matrix j==100"<<endl;
         double alpha_local;
         double coll_b;
         //double mtot;
         double mumass, mumass_amu, meanT;
-        
+
         for(int si=0; si<num_species; si++) {
             for(int sj=0; sj<num_species; sj++) {
                     

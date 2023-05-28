@@ -72,7 +72,12 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
         fluxmultiplier       = read_parameter_from_file<double>(filename,"FLUX_MULTIPLIER", debug, 1.).value; //Wavelength-constant multiplier for all top-of-atmosphere band fluxes
         
         star_mass        =  read_parameter_from_file<double>(filename,"PARI_MSTAR", debug, 1.).value; //Mass of the star in solar masses
-        star_mass        *= msolar;
+        //star_mass        *= msolar;
+        init_star_mass   = msolar * read_parameter_from_file<double>(filename,"INIT_MSTAR", debug, star_mass).value;
+	star_mass        *= msolar;
+        ramp_star_mass_t0 = read_parameter_from_file<double>(filename,"RAMP_MSTAR_T0", debug, 0.).value;
+        ramp_star_mass_t1 = read_parameter_from_file<double>(filename,"RAMP_MSTAR_T1", debug, 1.).value;
+
         T_star           = read_parameter_from_file<double>(filename,"PARI_TSTAR", debug, 5777.).value; //tau=2/3 temperature of the star, i.e. Teff in K
         R_star           = read_parameter_from_file<double>(filename,"PARI_RSTAR", debug, 0.).value;    //radius of the star in solar radii
         UV_star          = read_parameter_from_file<double>(filename,"PARI_UVSTAR", debug, 0.).value;   // UV luminosity of the star, used if no flux file is given, in erg/s
@@ -190,7 +195,10 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
         rad_energy_multiplier=read_parameter_from_file<double>(filename,"PARI_RAD_MULTIPL", debug, 1.).value; //Only for tests. Unused currently.
         collision_model   = read_parameter_from_file<char>(filename,"PARI_COLL_MODEL", debug, 'P').value;     //Collision model. P=physical collision rates (i.e. Schunk&Nagy). C=constant collision rate of value PARI_ALPHAS_COLL
         opacity_model     = read_parameter_from_file<char>(filename,"PARI_OPACITY_MODEL", debug, 'C').value; //Opacity model. List in opacities.cpp line 90.
-        
+        use_avg_temperature = read_parameter_from_file<int>(filename,"USE_AVG_T", debug, 0).value; //Compute avg c_v rho T  and use that as T_avg
+	avg_temperature_t0  = read_parameter_from_file<double>(filename,"avg_temperature_t0", debug, 1e99).value; //All T_s = T_avg before t0. Between t0 and t1 a ramp-down begins
+	avg_temperature_t1  = read_parameter_from_file<double>(filename,"avg_temperature_t1", debug, 1e99).value; //All T_s remain T_s after t1. T_avg is ignored after t1
+
         cout<<" CHOSEN OPACITY MODEL = "<<opacity_model<<endl;
         if(opacity_model == 'M')
             init_malygin_opacities();

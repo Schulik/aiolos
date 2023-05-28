@@ -15,7 +15,7 @@
 #include <cmath>
 #include <ctime>
 #include <type_traits>
-//#include <gsl/gsl_sf_lambert.h>
+#include <gsl/gsl_sf_lambert.h>
 #include <Eigen/Core>
 #include <Eigen/Dense>
 #include <Eigen/LU>
@@ -513,7 +513,10 @@ public:
     double star_mass;
     int    use_tides;
     double rhill;
-    
+    double init_star_mass;
+    double ramp_star_mass_t0;
+    double ramp_star_mass_t1;
+
     double planet_mass;     //in Earth masses
     double planet_position; //inside the simulation domain
     double planet_semimajor;
@@ -544,7 +547,10 @@ public:
     int update_coll_frequently;
     double init_coll_factor;
     double coll_rampup_time;
-    
+    int use_avg_temperature;
+    double avg_temperature_t0;
+    double avg_temperature_t1;
+
     //using Matrix_t = Eigen::Matrix<double, NUM_SPECIES,NUM_SPECIES, Eigen::RowMajor>;
     //using Vector_t = Eigen::Matrix<double, NUM_SPECIES, 1>;
     Matrix_t friction_matrix_T;
