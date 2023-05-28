@@ -1845,7 +1845,10 @@ void c_Species::apply_boundary_left(std::vector<AOS>& u) {
                     dens_wall = SHOCK_TUBE_UL.u1;
                 else {
                     prim.density = BACKGROUND_U.u1;
-                    prim.speed   = this->prim[2].speed;
+                    if(this->prim[2].speed > 0)
+                        prim.speed   = this->prim[2].speed;
+                    else
+                        prim.speed   = 0.;
                     prim.temperature = const_T_space;
                 }
                 

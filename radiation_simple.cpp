@@ -393,6 +393,9 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
                     
                 if(tt<temperature_floor)
                         tt=temperature_floor;
+                
+                //if(j<105 && globalTime<1e4)
+                //        tt=temperature_floor;
                     
                 if(tt>max_temperature)
                         tt=max_temperature;

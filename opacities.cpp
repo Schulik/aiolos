@@ -99,6 +99,8 @@ void c_Sim::update_opacities() {
  * K: 'Kombined' opacities. Planck and Rosseland is p-T dependent from *aiopa data and solar are p-T-constant, but spectrally resolved from *opa files.
  */
 void c_Species::update_opacities() {
+    
+    int htwo_idx = base->get_species_index("H2",0); 
 
     if (base->opacity_model == 'U') {
         // User-defined opacities
@@ -114,6 +116,9 @@ void c_Species::update_opacities() {
                 for(int b=0; b<num_bands_in; b++) {
                     opacity_twotemp(j,b) = base->const_opacity_solar_factor * opacity_avg_solar(b);// * (1. + pressure_broadening_factor * pow(prim[j].pres/1e5, pressure_broadening_exponent)); 
                     //commented the pressure broadening out for now, as it's eating up a lot of computing time (15% total) with 5 bands in 1 band out, for no effect
+                    
+                    if(this_species_index == htwo_idx)
+                        opacity(j, num_bands_in-1) = 1.;
                 }
                 for(int b=0; b<num_bands_out; b++) {
                     opacity(j,b)         = base->const_opacity_rosseland_factor * opacity_avg_rosseland(b);// * (1. + pressure_broadening_factor * pow(prim[j].pres/1e5, pressure_broadening_exponent)); 

@@ -399,7 +399,7 @@ void c_Sim::do_chemistry(double dt_chem) {
         if(j>10)
             do_highenergy_cooling(j);
         
-        if(steps==3113 && j==100) {
+        if(steps==3113e99 && j==100) {
             cout<<"in do_chemistry, cooling j = "<<j<<" for spec 2 = "<< species[2].dG(j)<<" + " << species[2].dGdT(j)<<endl;
             cout<<"in do_chemistry, cooling j = "<<j<<" for spec "<<e_idx<<" = "<< species[e_idx].dG(j)<<" + " << species[e_idx].dGdT(j)<<endl;
         }
@@ -1106,7 +1106,7 @@ void  c_Sim::do_highenergy_cooling(int cell) {
             species[e_idx].dGdT(cell) -=  n3p * ne * red * dfdx(h3plus_cooling, Te, dT);
         }
     }
-    if(steps == 3113 && cell==100) {
+    if(steps == 3113e99 && cell==100 && e_idx != -1) {
         for(int s=0; s<num_species; s++)
             cout<<"in highenergy cooling, cooling s = "<<species[s].speciesname<<" = "<< species[s].dG(cell)<<" + " << species[s].dGdT(cell)<<endl;
         
