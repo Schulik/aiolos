@@ -89,41 +89,114 @@ double HOnly_cooling(const std::array<double, 3> nX, double Te) {
     cooling += 1. * nX[1] * term  ;
 
     return 1.*cooling;
+} // */
+//std::vector<double[4]> lines_O;
+std::vector<std::array<double, 4>> lines_O;
+std::vector<std::array<double, 4>> lines_Op;
+std::vector<std::array<double, 4>> lines_Opp;
+std::vector<std::array<double, 4>> lines_C;
+std::vector<std::array<double, 4>> lines_Cp;
+std::vector<std::array<double, 4>> lines_Cpp;
+void init_line_cooling_data() {
+	lines_O.push_back( {6300*angstroem, 1.15685197E-14, 22830.7, 8.61213387e+05});
+	lines_Op.push_back( {834*angstroem, 5.78622E-4, 172421.6, 1.32174E15});
+	lines_Op.push_back( {2741*angstroem, 3.81198E-13, 58225.3, 4.48777E7});
+	lines_Op.push_back( {3727*angstroem, 4.29901E-16, 38575.0, 5.36461E3});
+	lines_Op.push_back( {7320*angstroem, 3.76929E-13, 53063.6, 3.11018E7});
+	lines_Opp.push_back( {52*micron, 3.13852E-18, 277.682, 2.5493E3});
+	lines_Opp.push_back( {5000*angstroem, 3.386678E-14 ,28728.6, 9.66741E5});
+	lines_Opp.push_back( {166*angstroem, 6.59979E-10, 86632.4, 1.475889E10});
+	lines_Opp.push_back( {83.5*angstroem, 1.75205E3, 172569.7, 5.405937E21});
+
+	lines_C.push_back( {0,0,0,1});
+	lines_Cp.push_back( {157*micron, 1.78292054E-20, 91.2, 1.38779668E+01});
+	lines_Cp.push_back( {2326*angstroem, 1.21471023E-10, 61853.9, 1.20977633e+09});
+	lines_Cp.push_back( {1334*angstroem, 2.41304508E-03, 107718.1, 3.74008770E+15});
+	lines_Cpp.push_back( {1910*angstroem, 3.84223024E-10, 75460.8, 1.31478953E+9});
+	lines_Cpp.push_back( {977*angstroem, 1.79050834E-03, 147263.9, 7.17164800E+14});
 }
 
+//std::vector<std::array<double, 4>> lines_O;
+//lines_O.push_back( {6300*angstr, 1.15685197E-14, 22830.7, 8.61213387e+05});
 
-double C_cooling(double Te) {
-    double term = 1e-24+3.1e-20*std::exp(-15162/Te)*(1.+std::pow(Te/2e4, 1.5));
+/*lines_Op = [
+    [834*angstr, 5.78622E-4, 172421.6, 1.32174E15],
+[2741*angstr, 3.81198E-13, 58225.3, 4.48777E7],
+[3727*angstr, 4.29901E-16, 38575.0, 5.36461E3],
+[7320*angstr, 3.76929E-13, 53063.6, 3.11018E7]]
+
+lines_Opp = [
+[52*micron, 3.13852E-18, 277.682, 2.5493E3],
+[5000*angstr, 3.386678E-14 ,28728.6, 9.66741E5],
+[166*angstr, 6.59979E-10, 86632.4, 1.475889E10],
+[83.5*angstr, 1.75205E3, 172569.7, 5.405937E21]]
+
+lines_C = [
+    [0, 0, 0, 1]]
+
+lines_Cp = [
+    [157*micron, 1.78292054E-20, 91.2, 1.38779668E+01],
+    [2326*angstr, 1.21471023E-10, 61853.9, 1.20977633e+09],
+    [1334*angstr, 2.41304508E-03, 107718.1, 3.74008770E+15]]
+
+lines_Cpp = [
+    [1910*angstr, 3.84223024E-10, 75460.8, 1.31478953E+9],
+    [977*angstr, 1.79050834E-03, 147263.9, 7.17164800E+14]]
+
+*/
+
+double C_cooling(double Te, double ne) {
+    double term = 1e-25;
+    for (auto & ln : lines_C) {
+        term += ln[1]*std::exp(-ln[2]/Te) / (ne*(1.+ln[3]/ne));
+    }
+}
+
+double Cp_cooling(double Te, double ne) {    
+    double term = 1e-25;
+    for (auto & ln : lines_Cp) {
+        term += ln[1]*std::exp(-ln[2]/Te) / (ne*(1.+ln[3]/ne));
+    }
     return term;
 }
 
-double Cp_cooling(double Te) {
-    double term = 1.5e-23+3.1e-20*std::exp(-45162/Te)*(1.+std::pow(Te/0.75e4,1.5));
-    
+double Cpp_cooling(double Te, double ne) {
+    double term = 1e-25;
+    for (auto & ln : lines_Cpp) {
+        term += ln[1]*std::exp(-ln[2]/Te) / (ne*(1.+ln[3]/ne));
+    }
     return term;
 }
 
-double Cpp_cooling(double Te) {
-    return 0.*Te;
-}
+double O_cooling(double Te, double ne) {
 
-double O_cooling(double Te) {
-    
-    double term = 5.5e-24+1.1e-20*std::exp(-30162/Te)*(1.+std::pow(Te/0.75e4, 0.5));
-    
+    double term = 1e-25;
+    for (auto & ln : lines_O) {
+        term += ln[1]*std::exp(-ln[2]/Te) / (ne*(1.+ln[3]/ne));
+	//cout<<ln[1]<<"/"<<ln[2]<<"/"<<ln[3]<<"/"<<ln[1]*std::exp(-ln[2]/Te) / (ne*(1.+ln[3]/ne))<<endl;
+    }
+    //for ln in lines_O:
+    //double term = 5.5e-24+1.1e-20*std::exp(-30162/Te)*(1.+std::pow(Te/0.75e4, 0.5));    
     return term;
 }
 
-double Op_cooling(double Te) {
+double Op_cooling(double Te, double ne) {
     
-    double term = 5.1e-20*std::exp(-35162/Te)*(1.+std::pow(Te/0.75e4, 0.5));
-    
+    double term = 1e-25;
+    for (auto & ln : lines_Op) {
+        term += ln[1]*std::exp(-ln[2]/Te) / (ne*(1.+ln[3]/ne));
+    }
     return term;
 }
 
-double Opp_cooling(double Te) {
+double Opp_cooling(double Te, double ne) {
     
-    return 0.*Te;
+    double term = 1e-25;
+    for (auto & ln : lines_Opp) {
+        term += ln[1]*std::exp(-ln[2]/Te) / (ne*(1.+ln[3]/ne));
+    }
+
+    return term;
 }
 
 double h3plus_cooling(double Te) {
@@ -699,12 +772,12 @@ void c_Sim::do_photochemistry() {
                 double tau = total_opacity(j,0)*(x_i12[j+1]-x_i12[j])*1e2;
                 double red = (1.+tau*tau);
                 
-                if( C_idx!=-1 && e_idx!=-1 ) { species[C_idx].dG(j)     -=  C_cooling(species[e_idx].prim[j].temperature)/red; }
-                if( Cp_idx!=-1 && e_idx!=-1 ) { species[Cp_idx].dG(j)   -=  Cp_cooling(species[e_idx].prim[j].temperature)/red; }
-                if( Cpp_idx!=-1 && e_idx!=-1 ) { species[Cpp_idx].dG(j) -=  Cpp_cooling(species[e_idx].prim[j].temperature)/red; }
-                if( O_idx!=-1 && e_idx!=-1 ) { species[O_idx].dG(j)     -=  O_cooling(species[e_idx].prim[j].temperature)/red; }
-                if( Op_idx!=-1 && e_idx!=-1 ) { species[Op_idx].dG(j)   -=  Op_cooling(species[e_idx].prim[j].temperature)/red; }
-                if( Opp_idx!=-1 && e_idx!=-1 ) { species[Opp_idx].dG(j) -=  Opp_cooling(species[e_idx].prim[j].temperature)/red; }
+                if( C_idx!=-1 && e_idx!=-1 ) { species[C_idx].dG(j)     -=  C_cooling(species[e_idx].prim[j].temperature, ne)/red; }
+                if( Cp_idx!=-1 && e_idx!=-1 ) { species[Cp_idx].dG(j)   -=  Cp_cooling(species[e_idx].prim[j].temperature, ne)/red; }
+                if( Cpp_idx!=-1 && e_idx!=-1 ) { species[Cpp_idx].dG(j) -=  Cpp_cooling(species[e_idx].prim[j].temperature, ne)/red; }
+                if( O_idx!=-1 && e_idx!=-1 ) { species[O_idx].dG(j)     -=  O_cooling(species[e_idx].prim[j].temperature, ne)/red; }
+                if( Op_idx!=-1 && e_idx!=-1 ) { species[Op_idx].dG(j)   -=  Op_cooling(species[e_idx].prim[j].temperature, ne)/red; }
+                if( Opp_idx!=-1 && e_idx!=-1 ) { species[Opp_idx].dG(j) -=  Opp_cooling(species[e_idx].prim[j].temperature, ne)/red; }
                 
                 //Correction in heating function for non-ionising radiation. 
                 double adddS[3] = {0.,0.,0.};

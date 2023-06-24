@@ -1,5 +1,7 @@
 #include "aiolos.h"
 
+extern void init_line_cooling_data();
+
 ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -24,6 +26,8 @@
  * @param[in] debug_steps Get detailed information for a specific timestep (To be implemented by user..)
  */
 c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, int debug, int debug_cell, int debug_steps) {
+
+	init_line_cooling_data();
 
         if(debug > 0) cout<<"Init position 0."<<endl;
         
@@ -69,8 +73,9 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
                             //Note how by default there is another band between 0 and lambda_min_out, and another band lamda_max_out and infty, if the band numbers are high enough
         lambda_per_decade_out= read_parameter_from_file<double>(filename,"PARI_LAM_PER_DECADE_OUT", debug, lambda_per_decade_in).value;
         fluxfile             = read_parameter_from_file<string>(filename,"FLUX_FILE", debug, "---").value;  //File to read in the wavelength-dependent data of the
+        wavebinsfile         = read_parameter_from_file<string>(filename,"WAVEBINS_FILE", debug, "---").value;  //File to read in the wavelength limits
         fluxmultiplier       = read_parameter_from_file<double>(filename,"FLUX_MULTIPLIER", debug, 1.).value; //Wavelength-constant multiplier for all top-of-atmosphere band fluxes
-        
+
         star_mass        =  read_parameter_from_file<double>(filename,"PARI_MSTAR", debug, 1.).value; //Mass of the star in solar masses
         //star_mass        *= msolar;
         init_star_mass   = msolar * read_parameter_from_file<double>(filename,"INIT_MSTAR", debug, star_mass).value;
@@ -195,9 +200,16 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
         rad_energy_multiplier=read_parameter_from_file<double>(filename,"PARI_RAD_MULTIPL", debug, 1.).value; //Only for tests. Unused currently.
         collision_model   = read_parameter_from_file<char>(filename,"PARI_COLL_MODEL", debug, 'P').value;     //Collision model. P=physical collision rates (i.e. Schunk&Nagy). C=constant collision rate of value PARI_ALPHAS_COLL
         opacity_model     = read_parameter_from_file<char>(filename,"PARI_OPACITY_MODEL", debug, 'C').value; //Opacity model. List in opacities.cpp line 90.
+        use_shadow_relaxation  = read_parameter_from_file<int>(filename,"USE_SHADOW_RELAXATION", debug, 0).value; //In regions of no heating, and if thermal cooling is switched off, relax the local Temperature to const_T_space, to prevent heating spikes from wave breaking
+        shadow_relaxation_time = read_parameter_from_file<double>(filename,"SHADOW_RELAXATION_TIME", debug, 1).value; //Use Newtonian cooling on timescale 
+        shadow_relaxation_threshold = read_parameter_from_file<double>(filename,"SHADOW_RELAXATION_THRESHOLD", debug, 1e-50).value; //Below solar heating of <threshold> we interpret this as shadow
+        wavedamp_factor             = read_parameter_from_file<double>(filename,"WAVEDAMP_FACTOR", debug, -0.5).value; //Below solar heating of <threshold> we interpret this as shadow
         use_avg_temperature = read_parameter_from_file<int>(filename,"USE_AVG_T", debug, 0).value; //Compute avg c_v rho T  and use that as T_avg
-	avg_temperature_t0  = read_parameter_from_file<double>(filename,"avg_temperature_t0", debug, 1e99).value; //All T_s = T_avg before t0. Between t0 and t1 a ramp-down begins
-	avg_temperature_t1  = read_parameter_from_file<double>(filename,"avg_temperature_t1", debug, 1e99).value; //All T_s remain T_s after t1. T_avg is ignored after t1
+        use_avg_velocity    = read_parameter_from_file<int>(filename,"USE_AVG_V", debug, 0).value; //Compute avg c_v rho T  and use that as T_avg
+	avg_temperature_t0  = read_parameter_from_file<double>(filename,"AVG_TEMPERATURE_T0", debug, 1e99).value; //All T_s = T_avg before t0. Between t0 and t1 a ramp-down begins
+	avg_temperature_t1  = read_parameter_from_file<double>(filename,"AVG_TEMPERATURE_T1", debug, 1e99).value; //All T_s remain T_s after t1. T_avg is ignored after t1
+        avg_velocity_t0  = read_parameter_from_file<double>(filename,"AVG_VELOCITY_T0", debug, 1e99).value; //All T_s = T_avg before t0. Between t0 and t1 a ramp-down begins
+        avg_velocity_t1  = read_parameter_from_file<double>(filename,"AVG_VELOCITY_T1", debug, 1e99).value; //All T_s remain T_s after t1. T_avg is ignored after t1
 
         cout<<" CHOSEN OPACITY MODEL = "<<opacity_model<<endl;
         if(opacity_model == 'M')
@@ -208,15 +220,21 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
         
         no_rad_trans               = read_parameter_from_file<double>(filename,"NO_RAD_TRANS", debug, 1.).value; //Multiplier for strength for thermal radiative losses in radiation transport. Set to 1e-100 to emulate perfect energy-limited escape.
         solve_for_j                = read_parameter_from_file<int>(filename,"SOLVE_FOR_J", debug, 1).value; //Debugging parameter. Switch to zero for decoupling of T and J in simple rad transport
-        photocooling_multiplier    = read_parameter_from_file<double>(filename,"PHOTOCOOL_MULTIPLIER", debug, 1.).value; //Multiplier for non-thermal cooling rates
-        photocooling_expansion     = read_parameter_from_file<double>(filename,"PHOTOCOOL_EXPANSION", debug, 1.).value; //Multiplier for non-thermal second order cooling rates
+        photocooling_multiplier    = read_parameter_from_file<double>(filename,"CO_COOL_MULTIPLIER", debug, 1.).value; //OLD DEPRECATED
+        photocooling_expansion     = read_parameter_from_file<double>(filename,"COOL_EXPANSION", debug, 1.).value; //OLD DEPRECATED
+        photocooling_multiplier    = read_parameter_from_file<double>(filename,"PHOTOCOOL_MULTIPLIER", debug, photocooling_multiplier).value; //Multiplier for non-thermal cooling rates
+        photocooling_expansion     = read_parameter_from_file<double>(filename,"PHOTOCOOL_EXPANSION", debug, photocooling_expansion).value; //Multiplier for non-thermal second order cooling rates
         radiation_rampup_time      = read_parameter_from_file<double>(filename,"RAD_RAMPUP_TIME", debug, 0.).value; //Ramp up the irradiation in all bands smoothly over xxx seconds.
         init_radiation_factor      = read_parameter_from_file<double>(filename,"INIT_RAD_FACTOR", debug, 0.).value; //Unused
         //radiation_solver           = read_parameter_from_file<int>(filename,"RADIATION_SOLVER", debug, 0).value; //replaced by use_rad_fluxes
         closed_radiative_boundaries = read_parameter_from_file<int>(filename,"PARI_CLOSED_RADIATIVE_BOUND", debug, 0).value; //Reflect thermal radiation at outer boundaries?
+        minimum_opacity             = read_parameter_from_file<double>(filename,"MINIMUM_OPACITY", debug, 1e-10).value;    //Minimum opacity for read-in opacities
         const_opacity_solar_factor = read_parameter_from_file<double>(filename,"CONSTOPA_SOLAR_FACTOR", debug, 1.).value;    //Multiplier for all stellar opacities (independent of opacity model)
         const_opacity_rosseland_factor = read_parameter_from_file<double>(filename,"CONSTOPA_ROSS_FACTOR", debug, 1.).value; //Multiplier for all rosseland opacities (")
         const_opacity_planck_factor = read_parameter_from_file<double>(filename,"CONSTOPA_PLANCK_FACTOR", debug, 1.).value;  //Multiplier for all planck opacities (")
+	const_opacity_solar_h2 = read_parameter_from_file<double>(filename,"CONSTOPA_SOLAR_H2", debug, 1.).value;    //Multiplier for all stellar opacities (independent of opacity model)
+        const_opacity_rosseland_h2 = read_parameter_from_file<double>(filename,"CONSTOPA_ROSS_H2", debug, 1.).value; //Multiplier for all rosseland opacities (")
+        const_opacity_planck_h2 = read_parameter_from_file<double>(filename,"CONSTOPA_PLANCK_H2", debug, 1.).value;  //Multiplier for all planck opacities (")
         temperature_model = read_parameter_from_file<char>(filename,"INIT_TEMPERATURE_MODEL", debug, 'P').value; //Initialize temperature as adiabatic+constant (P) or constant (C)
         friction_solver   = read_parameter_from_file<int>(filename,"FRICTION_SOLVER", debug, 0).value; //0: no friction, 1: analytic (only for two species), 2: numerical
         update_coll_frequently = read_parameter_from_file<int>(filename,"UPDATE_COLL_FREQUENTLY", debug, 1).value; //Switches on or off another update of collision rates after temperature and before temperature exchange update for rad solver==2. Important for code performance with many species
@@ -357,6 +375,43 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
                 
             }
         }
+
+      if(wavebinsfile.compare("---")!=0) { //NOTE: Wavebins boundaries given in micrometers! This is consistent with other data given in *opa files and the fluxfile
+
+            double tempenergy = 0.;
+            int cnt = 0;
+
+            double flux;
+            double lam;
+
+            ifstream file(wavebinsfile);
+            string line;
+            if(!file) {
+                cout<<"Couldnt open wavebins file "<<wavebinsfile<<"!!!!!!!!!!1111"<<endl;
+            }
+		else {
+		cout<<"Opening wavebins file "<<wavebinsfile<<"..";;
+	    }
+
+
+		int b_current = 1;
+
+            	while(std::getline( file, line )) {
+			if(b_current == num_bands_in-1)
+				break;
+			cout<<" band b = "<<b_current<<" / current l_i_in[b] ="<<l_i_in[b_current];
+        	        std::vector<string> stringlist = stringsplit(line," ");
+                	l_i_in[b_current]   = std::stod(stringlist[0]); //micrometer! ...  also user has to make sure that b_current doesnt exceed l_min
+			cout<<" changed to l_i_in[b] = "<<l_i_in[b_current]<<endl;
+
+			b_current++;
+             	}
+	   
+           file.close(); 
+
+	} else {
+		cout<<"No wavebins file provided, proceeding as usual.. wavebinsfile="<<wavebinsfile<<endl;
+	}
         /////////////////////////////////////////////////////////
         ////////////////////////////////Bands out
         /////////////////////////////////////////////////////////
@@ -400,7 +455,21 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
         photon_energies = np_somevalue(num_bands_in, 20. * ev_to_K * kb);
         
         for(int b=0; b<num_bands_in; b++) {
-            photon_energies[b] = 1.24/( l_i_in[b + 1] ) * ev_to_K * kb ;
+
+	    if(b==0)
+	            photon_energies[b] = 2. * 1.24/( l_i_in[b + 1] ) * ev_to_K * kb ;
+	    else{
+			double elow = 1.24/( l_i_in[b + 1] ) * ev_to_K * kb;
+			double ehigh= 1.24/( l_i_in[b] )     * ev_to_K * kb;
+
+			photon_energies[b]  = 0.9*elow + 0.1*ehigh;
+			//photon_energies[b]  = std::pow(10, 0.25*std::log10(elow) + 0.75*std::log10(ehigh)  );
+			if(b==num_bands_in-1)
+				photon_energies[b]  = elow;
+			
+			cout<<"Assigned to highenergy band b = "<<b<<" a photon energy of "<<photon_energies[b]/ev_to_K/kb<<" eV; elow / ehigh = "<<elow/ev_to_K/kb<<" / "<<ehigh/ev_to_K/kb<<endl;
+		}
+	
             cout<<"Assigned to highenergy band b = "<<b<<" a photon energy of "<<photon_energies[b]/ev_to_K/kb<<" eV "<<endl;
         }
 
@@ -886,7 +955,11 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
             } else {
                 solar_heating(b) = 0.;
             }
-            
+            //if(b!=2) {
+	//	solar_heating(b) = 0.;
+	//	solar_heating_final(b) = 0.;
+	  //  }
+
             cout<<"SOLAR HEATING read from file in bin "<<b;
             cout<<" from/to lmin/lmax"<<l_i_in[b];
             cout<<" is F = "<<solar_heating(b)<<endl;
@@ -1853,7 +1926,10 @@ void c_Species::apply_boundary_left(std::vector<AOS>& u) {
                     dens_wall = SHOCK_TUBE_UL.u1;
                 else {
                     prim.density = BACKGROUND_U.u1;
-                    prim.speed   = this->prim[2].speed;
+		    if(this->prim[2].speed < 0)
+			prim.speed = -this->prim[2].speed * base->wavedamp_factor;
+		    else
+	                prim.speed   = this->prim[2].speed;
                     prim.temperature = const_T_space;
                 }
                 
@@ -2031,6 +2107,8 @@ void c_photochem_reaction::set_base_pointer(c_Sim *base_simulation) {
     //cout<<" energy split factor = "<<energy_split_factor<<" / 1/energy_split_factor = "<<1./energy_split_factor<<" denom = "<<denom<<endl;
     
     base->highenergy_switch(educts[0], this->band) = 0.;
+
+    this->threshold_energy = 1.24/( base->l_i_in[this->band+1] )  * ev_to_K * kb ;
 }
 
 
@@ -2215,6 +2293,9 @@ c_photochem_reaction::c_photochem_reaction(int num_species, int num_bands, int b
         
         this->band = band; //TODO: Check that band <= num_bands
         this->branching_ratio = branching;
-        this->threshold_energy = threshold * ev_to_K * kb ;
+        //this->threshold_energy = threshold * ev_to_K * kb ;
+        //this->threshold_energy = 1.24/( l_i_in[band] )  * ev_to_K * kb ; //Moved to set_base_pointer, because at this moment, this->l_i_in[band] is not set yet
+
+//elow = 1.24/( l_i_in[b + 1] ) * ev_to_K * kb;
         //cout<<"pos7"<<endl;
 }

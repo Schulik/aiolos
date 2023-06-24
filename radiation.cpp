@@ -95,7 +95,7 @@ void c_Sim::update_dS() {
             for(int b=0; b<num_bands_out; b++) {
                 
                 if(radial_optical_depth(j,b) < 1.) 
-                    Jrad_FLD(j,b) *= init_J_factor; //*std::pow(x_i[j]/x_i[34] , -2.);
+                    Jrad_FLD(j,b) *= init_J_factor; // *std::pow(x_i[j]/x_i[34] , -2.);
                 
                 for(int s=0; s<num_species; s++)
                     species[s].prim[j].temperature = init_T_temp;
@@ -186,6 +186,7 @@ void c_Sim::update_dS_jb(int j, int b) {
                     species[s].fraction_total_solar_opacity(j,b) = highenergy_switch(s,b) * species[s].opacity_twotemp(j,b) * species[s].u[j].u1 * dx[j] / cell_optical_depth_twotemp(j,b);
                     //species[s].fraction_total_opacity(j,b) = species[s].opacity(j,b) * species[s].u[j].u1 * dx[j] / cell_optical_depth(j,b);
                 
+
                 //
                 // Now compute the attenuation of solar radiation and then assign the lost energy back to individual species in a manner that conserves energy
                 //
@@ -224,14 +225,14 @@ void c_Sim::update_dS_jb(int j, int b) {
                         if(dtau_tot > 1e-3)
                             dS_band(j,b) *= (-expm1(-dtau_tot));
                         else
-                            dS_band(j,b) *= (-fastexpm1_2(- dtau_tot));
-                            //dS_band(j,b) *= (-expm1(-const_opacity_solar_factor * dtau_tot));
+                            //dS_band(j,b) *= (-fastexpm1_2(- dtau_tot));
+                            dS_band(j,b) *= (-expm1(-dtau_tot));
                             
                         if( cell_optical_depth_highenergy(j,b) > 1e-3)
                             dS_he_temp *=  -expm1(-cell_optical_depth_highenergy(j,b)) ;
                         else 
-                            dS_he_temp *=  -fastexpm1_2(-cell_optical_depth_highenergy(j,b)) ;
-                            //dS_he_temp *=  -expm1(-const_opacity_solar_factor * cell_optical_depth_highenergy(j,b)) ;
+                            //dS_he_temp *=  -fastexpm1_2(-cell_optical_depth_highenergy(j,b)) ;
+                            dS_he_temp *=  -expm1(-cell_optical_depth_highenergy(j,b)) ;
                         
                         double heating3 = dS_he_temp * (1 - 13.6 * ev_to_K * kb / photon_energies[0]);
                         
@@ -270,7 +271,7 @@ void c_Sim::update_dS_jb(int j, int b) {
                     // Planetary heating 2
                     //
 
-                    if(use_planetary_temperature == 1 && false){ //Discontinued use due to new radiative boundaries
+                    if(use_planetary_temperature == 1){ //Discontinued use due to new radiative boundaries
                         
                         double lum = 1.0 * sigma_rad * T_int*T_int*T_int*T_int * 0.5;
                         //Spread the luminosity for fewer crashes

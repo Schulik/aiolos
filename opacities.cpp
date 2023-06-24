@@ -100,6 +100,10 @@ void c_Sim::update_opacities() {
  */
 void c_Species::update_opacities() {
 
+    int htwo_idx = base->get_species_index("H2",0);
+    int c_idx    = base->C_idx;
+    int o_idx    = base->O_idx;
+
     if (base->opacity_model == 'U') {
         // User-defined opacities
         user_opacity() ;
@@ -113,13 +117,20 @@ void c_Species::update_opacities() {
                 
                 for(int b=0; b<num_bands_in; b++) {
                     opacity_twotemp(j,b) = base->const_opacity_solar_factor * opacity_avg_solar(b);// * (1. + pressure_broadening_factor * pow(prim[j].pres/1e5, pressure_broadening_exponent)); 
-                    //commented the pressure broadening out for now, as it's eating up a lot of computing time (15% total) with 5 bands in 1 band out, for no effect
+                    //////commented the pressure broadening out for now, as it's eating up a lot of computing time (15% total) with 5 bands in 1 band out, for no effect
+	            if(this_species_index == htwo_idx || this_species_index == c_idx || this_species_index == o_idx)
+                        opacity_twotemp(j, num_bands_in-1) = base->const_opacity_solar_h2;
                 }
                 for(int b=0; b<num_bands_out; b++) {
                     opacity(j,b)         = base->const_opacity_rosseland_factor * opacity_avg_rosseland(b);// * (1. + pressure_broadening_factor * pow(prim[j].pres/1e5, pressure_broadening_exponent)); 
-                    opacity_planck(j,b)  = base->const_opacity_planck_factor * opacity_avg_planck(b);// * (1. + pressure_broadening_factor * pow(prim[j].pres/1e5, pressure_broadening_exponent)); 
+                    opacity_planck(j,b)  = base->const_opacity_planck_factor * opacity_avg_planck(b) * 1./(1. + 1./(prim[j].pres/pressure_broadening_factor)); //(1. + pressure_broadening_factor * pow(prim[j].pres/1e5, pressure_broadening_exponent)); 
+	            if(this_species_index == htwo_idx || this_species_index == c_idx || this_species_index == o_idx) {
+                        opacity(j, num_bands_out-1)        = base->const_opacity_rosseland_h2;
+                        opacity_planck(j, num_bands_out-1) = base->const_opacity_planck_h2;			
+		    }
                 }
             }
+
         } else { //is_dust_like
             
             for(int j=0; j< num_cells+2; j++) {
@@ -314,7 +325,7 @@ void c_Species::update_opacities() {
             
             for(int b=0; b<num_bands_in; b++) {
 
-                opacity_twotemp(j,b)= base->const_opacity_solar_factor * opacity_avg_solar(b); //* (1. + pressure_broadening_factor * pow(prim[j].pres/1e5, pressure_broadening_exponent)); 
+                opacity_twotemp(j,b)= base->const_opacity_solar_factor * opacity_avg_solar(b); // (1. + pressure_broadening_factor * pow(prim[j].pres/1e5, pressure_broadening_exponent)); 
                 
             }
             for(int b=0; b<num_bands_out; b++) {

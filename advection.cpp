@@ -58,6 +58,8 @@ void c_Sim::execute() {
     //                                                                         //
     ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~////
     for (globalTime = 0; (globalTime < t_max) && (steps < maxsteps); ) {
+
+        
         
     
           if(start_hydro_time > 0. && globalTime > start_hydro_time) {   //Comment in if a radiative equilibrium phase is desired before starting hydro
@@ -146,6 +148,7 @@ void c_Sim::execute() {
         //
         // Step 0: Hydrodynamics, if so desired
         //
+
         if (do_hydrodynamics == 1) {
         
             for(int s = 0; s < num_species; s++)
@@ -203,7 +206,7 @@ void c_Sim::execute() {
         
         for(int s = 0; s < num_species; s++) 
             species[s].compute_pressure(species[s].u);
-        
+
         //Computes the velocity drag update after the new hydrodynamic state is known for each species
         if (do_hydrodynamics == 1) 
             compute_drag_update() ;
@@ -215,9 +218,9 @@ void c_Sim::execute() {
         if( (photochemistry_level + use_rad_fluxes ) > 0 ) {
             
             update_opacities();
-            if(photochemistry_level == 0 && use_rad_fluxes > 0)
-                reset_dS();
-            
+            //if(photochemistry_level == 0 && use_rad_fluxes > 0)
+            //    reset_dS();
+
             // Compute high-energy dS and ionization
             if(photochemistry_level == 1) {   //C2Ray scheme
                 reset_dS();
@@ -248,9 +251,7 @@ void c_Sim::execute() {
                     }
                 }
                     
-            }
-            
-             
+            }             
             update_dS();               //Compute low-energy dS
         
             

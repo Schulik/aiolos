@@ -66,7 +66,8 @@ const double rsolar   = 695510*km;
 const double pc       = 3.08567758e18; //cm
 const double kpc      = 1e3 * pc;
 const double mpc      = 1e6 * pc;
-const double angstroem= 1e-4; //cm
+const double micron   = 1e-4; //cm
+const double angstroem= 1e-8; //cm
 const double ergcm2_to_wattperm2 = 1e-3;
 const double sigma_rad = 5.670374419e-5;   //erg cm-2 s-1 K-4
 const double sigma_rad2= 2*h_planck*c_light*c_light/pow(angstroem,4.);
@@ -78,7 +79,7 @@ const double elm_charge   = 4.80320425e-10; //statcoulomb
 
 // For entropy computation, to be set to sensible parameters e.g. at setting of initial conditions
 
-const double cflfactor = 0.9;
+//const double cflfactor = 0.9;
 const int debug2 = 0;
 
 ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -101,6 +102,11 @@ inline double dfdx(const function<double(double)>& f, double x0, double dx) {
     return (f(x0+dx)-f(x0-dx))/(dx+dx);
 }
 
+inline double dfdx2(const function<double(double, double)>& f, double x0, double dx, double otherarg) {
+    
+    return (f(x0+dx, otherarg)-f(x0-dx, otherarg))/(dx+dx);
+}
+
 inline float __int_as_float (int32_t a) { float r; memcpy (&r, &a, sizeof r); return r;} 
 inline int32_t __float_as_int (float a) { int32_t r; memcpy (&r, &a, sizeof r); return r;}
 
@@ -109,6 +115,7 @@ inline int32_t __float_as_int (float a) { int32_t r; memcpy (&r, &a, sizeof r); 
 /* natural log on [0x1.f7a5ecp-127, 0x1.fffffep127]. Maximum relative error 9.4529e-5 */
 inline float njuffas_logf (float a) 
 {
+return std::log(a);
     float m, r, s, t, i, f;
     int32_t e;
 
@@ -131,7 +138,7 @@ inline float njuffas_log10f(float a) {
 } 
 
 inline float fastpow1(float base, int exp) {
-
+return std::pow(base,exp);
     if( exp == 0)
        return 1;
     float temp = fastpow1(base, exp/2);       
@@ -146,21 +153,24 @@ inline float fastpow1(float base, int exp) {
 
 } 
 
-inline
-double fastexp2(double x) {
+inline double fastexp2(double x) {
   x = 1.0 + x / 1024;
   x *= x; x *= x; x *= x; x *= x;
   x *= x; x *= x; x *= x; x *= x;
   x *= x; x *= x;
-  return x;
+
+return std::exp(x);
+  //return x;
 }
 
 inline double fastexpm1(double x) {
-  return x + 0.5*x*x + 0.33333333333*x*x*x;
+  return std::expm1(x);
+//return x + 0.5*x*x + 0.33333333333*x*x*x;
 }
 
 inline double fastexpm1_2(double x) {
-  return x + 0.5*x*x;
+  return std::expm1(x);
+//return x + 0.5*x*x;
 }
 
 
@@ -400,6 +410,7 @@ public:
     string speciesfile_solo;
     string parfile;
     string fluxfile;
+    string wavebinsfile;
     string reactionfile;
     
     int num_bands_in;
@@ -547,10 +558,17 @@ public:
     int update_coll_frequently;
     double init_coll_factor;
     double coll_rampup_time;
+    int use_shadow_relaxation;
+    double shadow_relaxation_time;
+    double shadow_relaxation_threshold;
     int use_avg_temperature;
+    int use_avg_velocity;
     double avg_temperature_t0;
     double avg_temperature_t1;
+    double avg_velocity_t0;
+    double avg_velocity_t1;
 
+    double wavedamp_factor;
     //using Matrix_t = Eigen::Matrix<double, NUM_SPECIES,NUM_SPECIES, Eigen::RowMajor>;
     //using Vector_t = Eigen::Matrix<double, NUM_SPECIES, 1>;
     Matrix_t friction_matrix_T;
@@ -659,9 +677,13 @@ public:
     double const_opacity_solar_factor;
     double const_opacity_rosseland_factor;
     double const_opacity_planck_factor;
+    double const_opacity_solar_h2;
+    double const_opacity_rosseland_h2;
+    double const_opacity_planck_h2;
     double init_J_factor;
     double init_T_temp;
-    
+    double minimum_opacity;
+
     Eigen::MatrixXd planck_matrix;
     Eigen::MatrixXd Etot_corrected;
     Eigen::MatrixXd Jrad_FLD;

@@ -294,7 +294,7 @@ int c_Species::read_species_data(string filename, int species_index) {
                 int    wlcount = 0;
                 double lmin = (*lgrid)[b]; //base->l_i[b];
                 double lmax = (*lgrid)[b+1]; //base->l_i[b+1];
-                (*opacity_avg)[b] = 1e-10;
+                (*opacity_avg)[b] = base->minimum_opacity;
                 
                 //cout<<" DEBUG band b = "<<b<<" lmin/lmax = "<<lmin<<"/"<<lmax<<endl;
                 
@@ -371,17 +371,17 @@ int c_Species::read_species_data(string filename, int species_index) {
             cout<<"Pos after additional columns."<<endl;
         }
             
-        for(int b = 0; b < num_bands_in; b++)  if(std::isnan(opacity_avg_solar(b) )) opacity_avg_solar(b) = 1e-10;
-        for(int b = 0; b < num_bands_out; b++) if(std::isnan(opacity_avg_planck(b) )) opacity_avg_planck(b) = 1e-10;
-        for(int b = 0; b < num_bands_out; b++) if(std::isnan(opacity_avg_rosseland(b) )) opacity_avg_rosseland(b) = 1e-10;
+        for(int b = 0; b < num_bands_in; b++)  if(std::isnan(opacity_avg_solar(b) )) opacity_avg_solar(b) = base->minimum_opacity;
+        for(int b = 0; b < num_bands_out; b++) if(std::isnan(opacity_avg_planck(b) )) opacity_avg_planck(b) = base->minimum_opacity;
+        for(int b = 0; b < num_bands_out; b++) if(std::isnan(opacity_avg_rosseland(b) )) opacity_avg_rosseland(b) = base->minimum_opacity;
         
-        for(int b = 0; b < num_bands_in; b++)  if((opacity_avg_solar(b)<1e-10 )) opacity_avg_solar(b) = 1e-10;
-        for(int b = 0; b < num_bands_out; b++) if((opacity_avg_planck(b)<1e-10 )) opacity_avg_planck(b) = 1e-10;
-        for(int b = 0; b < num_bands_out; b++) if((opacity_avg_rosseland(b)<1e-10 )) opacity_avg_rosseland(b) = 1e-10;
+        for(int b = 0; b < num_bands_in; b++)  if((opacity_avg_solar(b)<1e-10 )) opacity_avg_solar(b) = base->minimum_opacity;
+        for(int b = 0; b < num_bands_out; b++) if((opacity_avg_planck(b)<1e-10 )) opacity_avg_planck(b) = base->minimum_opacity;
+        for(int b = 0; b < num_bands_out; b++) if((opacity_avg_rosseland(b)<1e-10 )) opacity_avg_rosseland(b) = base->minimum_opacity;
         
         if(this->this_species_index ==7) {
             if(num_bands_in >= 10) 
-                opacity_avg_solar(10) = 1e-10;
+                opacity_avg_solar(10) = base->minimum_opacity;
         }
         
         //Done! Now plot debug stuff so that we're sure the opacities do what they should.
@@ -766,7 +766,7 @@ void c_Species::print_AOS_component_tofile(int timestepnumber) {
             
             outfile<<base->x_i12[i]<<'\t'<<u[i].u1<<'\t'<<u[i].u2<<'\t'<<u[i].u3<<'\t'<<flux[i].u1<<'\t'<<flux[i].u2<<'\t'<<flux[i].u3<<'\t'<<balance1<<'\t'<<balance2<<'\t'<<balance3<<'\t'<<prim[i].pres<<'\t'<<u[i].u2/u[i].u1<<'\t'<<prim[i].temperature <<'\t'<<timesteps_cs[i]<<'\t'<<base->cflfactor/timesteps[i]<<'\t'<<prim[i].sound_speed<<'\t'<<timesteps_de[i]<<'\t'<<u_analytic[i]<<'\t'<<base->alphas_sample(i)<<'\t'<<phi_s[i]<<'\t'<<base->enclosed_mass_tmp[i]<<'\t'<<-dG(i)+dGdT(i)*prim[i].temperature <<'\t'<<dS(i)<<'\t'<<base->cell_optical_depth(i,0)<<endl;
         } 
-        
+        //cout<<"bonus cooling info at output time: "<<-dG(num_cells/2)+dGdT(num_cells/2)*prim[num_cells/2].temperature<<endl;
         //Print right ghost stuff
         outfile<<base->x_i12[num_cells+1]<<'\t'<<u[num_cells+1].u1<<'\t'<<u[num_cells+1].u2<<'\t'<<u[num_cells+1].u3<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<prim[num_cells+1].pres<<'\t'<<u[num_cells+1].u2/u[num_cells+1].u1<<'\t'<<prim[num_cells+1].temperature<<'\t'<<'-'<<'\t'<<base->phi[num_cells+1]<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<endl;
    

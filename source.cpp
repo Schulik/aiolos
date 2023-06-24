@@ -476,12 +476,57 @@ void c_Sim::compute_friction_numerical() {
             cin>>a;
         }
       
-        //*/
+        //
         // Update new speed and internal energy
         //
         
-        for(int si=0; si<num_species; si++)
-            species[si].prim[j].speed = friction_vec_output(si);
+	if(use_avg_velocity) {
+		double tot_mom = 0;
+		double tot_dens= 0;
+		double avg_velocity = 0;
+
+		for(int si=0; si<num_species; si++) {
+			tot_mom += friction_vec_output(si) * species[si].prim[j].density;
+			tot_dens += species[si].prim[j].density;
+		}
+
+		avg_velocity = tot_mom/tot_dens;
+
+		if(globalTime < avg_velocity_t1) {
+
+
+			if(globalTime < avg_velocity_t0) {
+				for(int si=0; si<num_species; si++) {
+					species[si].prim[j].speed = avg_velocity;
+				}
+
+				//if(steps%10000==0 && j==num_species/2)
+                                //        cout<<" In avg velocity, before t0, avg_v= "<<avg_velocity<<endl;
+			}
+			else {
+				alpha_collision = 1.; //Switch collision alphas to their nominal values
+				double a = (1+ 1e-10)/(avg_velocity_t1 - avg_velocity_t0 + 1e-10);
+				double b = (1+ 1e-10)/(1-avg_velocity_t1/avg_velocity_t0 + 1e-10);
+				double fac = a * globalTime + b;
+
+				//if(steps%50000==0)
+				//	cout<<" In avg velocity, between t0 and t1, fac= "<<fac<<endl;
+
+				for(int si=0; si<num_species; si++) {
+                                        species[si].prim[j].speed = friction_vec_output(si) * fac + avg_velocity * (1. - fac);
+                                }
+			}
+		}
+		else {
+			for(int si=0; si<num_species; si++)
+		                species[si].prim[j].speed = friction_vec_output(si);
+		}
+
+
+	} else {
+        	for(int si=0; si<num_species; si++)
+            	species[si].prim[j].speed = friction_vec_output(si);
+	}
         
         for(int si=0; si<num_species; si++) {
             double temp = 0;
