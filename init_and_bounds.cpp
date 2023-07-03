@@ -1782,40 +1782,6 @@ void c_Species::apply_boundary_left(std::vector<AOS>& u) {
     switch(boundary_left) {
         case BoundaryType::user:
             user_boundary_left(u);
-            /*double dm = 0;
-            
-            mass_reservoir = 0.;
-            t_evap = 50.;
-            latent_heat = 3.34e5*1e7/1e3; //3.34e5 J/kg
-            p_sat = 1e-3 * std::exp(latent_heat/(Rgas*T*(1.-T_evap/prim[i].temperature)));
-            
-            for (int i=num_ghosts; i > 0; i--) {
-                
-                dp = prim[2].press - p_sat;
-                
-                if(dp < 0) { // Condensation
-                    dm = -1;
-                }
-                else{ //Evaporation
-                    
-                    if(mass_reservoir < 0.) {
-                        dp = 0.;
-                        dm = 0;
-                    }
-                        
-                    dm = 1;
-                }
-                
-                mass_reservoir += base->dt * dm;
-                
-                AOS_prim prim ;
-                eos->compute_primitive(&u[i],&prim, 1) ;
-                prim.pres   = prim[2] - dp;
-                prim.pres   = std::max( prim.pres, 0.0) ;
-                eos->compute_conserved(&prim, &u[i-1], 1) ;
-            }
-            
-            */
             break;
         case BoundaryType::open:
             for (int i=num_ghosts; i > 0; i--) {
@@ -1841,28 +1807,21 @@ void c_Species::apply_boundary_left(std::vector<AOS>& u) {
         case BoundaryType::fixed:
             for (int i=0; i < num_ghosts; i++) {
                 
-                /*double dens_wall;  
                 if(base->problem_number == 1)
-                    dens_wall = SHOCK_TUBE_UL.u1 * mass_amu;
+                    u[i] = SHOCK_TUBE_UL ;
                 else {
-                    dens_wall = BACKGROUND_U.u1 *  mass_amu;
-                }*/
-                double dens_wall;
-                AOS_prim prim;
-                if(base->problem_number == 1)
-                    dens_wall = SHOCK_TUBE_UL.u1;
-                else {
+                    AOS_prim prim;
                     prim.density = BACKGROUND_U.u1;
                     if(this->prim[2].speed > 0)
                         prim.speed   = this->prim[2].speed;
                     else
                         prim.speed   = 0.;
                     prim.temperature = const_T_space;
+                    
+                    eos->update_eint_from_T(&(prim), 1);
+                    eos->update_p_from_eint(&(prim), 1);
+                    eos->compute_conserved(&(prim), &(u[i]), 1) ; //Ghost cell u is fixed after init, only need to update p in prim
                 }
-                
-                eos->update_eint_from_T(&(prim), 1);
-                eos->update_p_from_eint(&(prim), 1);
-                eos->compute_conserved(&(prim), &(u[i]), 1) ; //Ghost cell u is fixed after init, only need to update p in prim
             }
             
             break;
