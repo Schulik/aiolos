@@ -11,7 +11,7 @@ PARI_USE_COLL_HEAT      1
 #
 # Problem numbers explained: shock_tube, no grav = 1, planet with grav = 2
 #
-
+SPECIES_FILE            collheat_2spc_new.spc
 PARI_INIT_DATA_SWITCH   1
 PARI_INIT_DATA_U1L      1
 PARI_INIT_DATA_U2L      1.0
