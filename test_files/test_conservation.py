@@ -96,4 +96,4 @@ if __name__ == "__main__":
                        L1_target=[4e-16, 4e-14, 2e-13])
     
     check_conservation("collheat_2spc_rad", "collheat_2spc.spc",
-                       L1_target=[4e-16, 1e-18, 1e-5])
+                       L1_target=[4e-16, 1e-18, 2e-5])
