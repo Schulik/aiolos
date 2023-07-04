@@ -19,7 +19,7 @@ jobs:
 
       - name: Install test dependencies
         run: |
-          pip install numpy, scipy, matplotlib, pytest
+          pip install numpy scipy matplotlib pytest
       
       - name: Install code dependencies
         run: |
