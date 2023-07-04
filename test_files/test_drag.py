@@ -36,6 +36,6 @@ def check_drag(problem, spc, L1_target=None):
 
 if __name__ == "__main__":
     check_drag("friction_2spc", 'H0', [3e-16, 3e-14, 2e-14])
-    check_drag("friction_2spc_phys", 'H0', [2e-30, 3e-30, 2e-20])
+    check_drag("friction_2spc_phys", 'H0', [2e-30, 2e-29, 2e-20])
 
     

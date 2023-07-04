@@ -142,14 +142,14 @@ if __name__ == "__main__":
             ax[1].semilogx(data['x'], data['temperature'], ls='',
                         marker=m, label=snap)
 
-            ax[2].semilogx(data['x'], data['dt_cs'], ls='-',
-                marker=m, label=snap)
-            ax[2].semilogx(data['x'], data['dt_v'], ls='--',
-                marker=m, label=snap)
-            ax[2].semilogx(data['x'], data['dt_E'], ls=':',
-                marker=m, label=snap)
-            #ax[2].semilogx(data['x'], data['velocity'], ls='',
+            #ax[2].semilogx(data['x'], data['dt_cs'], ls='-',
             #    marker=m, label=snap)
+            #ax[2].semilogx(data['x'], data['dt_v'], ls='--',
+            #    marker=m, label=snap)
+            #ax[2].semilogx(data['x'], data['dt_E'], ls=':',
+            #    marker=m, label=snap)
+            ax[2].semilogx(data['x'], data['velocity']/data['soundspeed'], ls='',
+                marker=m, label=snap)
             #ax[2].semilogx(data['x'], data['soundspeed'], ls='--',
             #    marker=m)
         elif snap.startswith('diagnostic'):
