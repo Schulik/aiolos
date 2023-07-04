@@ -29,14 +29,16 @@ def check_steady_state(problem, L1_target=None):
         else:
             print('Test {} L1 checked failed:'.format(problem))
             print('\tL1={}, target={}'.format(L1, L1_target))
+        
+        np.testing.assert_array_less(L1, L1_target)
+
     else:
         print('Test {} L1 values:'.format(problem))
         print('\tL1={}'.format(L1))
 
-
-if __name__ == "__main__":
-    check_steady_state("shock_tube6_H2", [0,0,0])
-    check_steady_state("shock_tube7_H2", [4.9e-4, 4.9e-4, 0])
+def test_steady_states():
+    check_steady_state("shock_tube6_H2", [1e-30,1e-30,1e-30])
+    check_steady_state("shock_tube7_H2", [4.9e-4, 4.9e-4, 1e-30])
 
     check_steady_state("soundwave_32_H2", [8.72e-8,]*3)
     check_steady_state("soundwave_64_H2", [2.95e-8,]*3)
@@ -47,6 +49,11 @@ if __name__ == "__main__":
     check_steady_state("planet_cartesian_H2", [4e-13, 4e-10, 0.2])
     check_steady_state("planet_spherical_H2", [1e-11, 2e-10, 2.5])
 
+if __name__ == "__main__":
+    try:
+        test_steady_states()
+    except AssertionError:
+        pass
 
 
     

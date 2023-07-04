@@ -175,6 +175,9 @@ def check_dustywave_problem(name, L1s=None, make_plots=False):
         else:
             print('Test {} L1 checked failed:'.format(name))
             print('\tL1={}, target={}'.format(L1, L1s))
+        
+        np.testing.assert_array_less(L1, L1s)
+
     else:
          print('Test {} L1 values:'.format(name))
          print('\tL1={}'.format(L1))
@@ -182,6 +185,13 @@ def check_dustywave_problem(name, L1s=None, make_plots=False):
     if make_plots:
          plot_dustywave(name)
     
+def test_dustywave(make_plots=False):
+
+    check_dustywave_problem("dustywave_nonstiff", [1.25e-8, 1.34e-8],
+                            make_plots=make_plots)
+    check_dustywave_problem("dustywave_stiff", [4.78e-8, 4.78e-8],
+                            make_plots=make_plots)
+
 if __name__ == "__main__":
 
     import argparse
@@ -192,9 +202,7 @@ if __name__ == "__main__":
                         help="Make plots of the results")
     args = parser.parse_args()
 
-
-
-    check_dustywave_problem("dustywave_nonstiff", [1.25e-8, 1.34e-8],
-                            make_plots=args.make_plots)
-    check_dustywave_problem("dustywave_stiff", [4.78e-8, 4.78e-8],
-                            make_plots=args.make_plots)
+    try:
+        test_dustywave (args.make_plots)
+    except AssertionError:
+        pass

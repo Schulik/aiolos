@@ -265,7 +265,8 @@ def plot_riemann_solution(par_num):
                       hspace=0.05, wspace=0.235)
     return f
     
-def check_riemann_problem(par_num, L1_target=0, make_plots=False):
+def check_riemann_problem(par_num, L1_target=0,
+                          make_plots=False, raise_error=False):
     param_file = 'shock_tube{}.par'.format(par_num)
     snap_file = 'output_shock_tube{}_H2_t-1.dat'.format(par_num)
 
@@ -280,6 +281,11 @@ def check_riemann_problem(par_num, L1_target=0, make_plots=False):
 
     L1 = np.abs(data['density'] - exact.density(data['x']-x0, t)).mean()
 
+
+    if raise_error:
+        np.testing.assert_array_less(L1, L1_target)
+    
+    
     if L1 <= L1_target:
         print('Riemann test {} L1 check passed'.format(par_num))
     else:
@@ -291,7 +297,13 @@ def check_riemann_problem(par_num, L1_target=0, make_plots=False):
         fig_name = os.path.join('plots', 'shock_tube{}.png'.format(par_num))
         plot_riemann_solution(par_num).savefig(fig_name)
         
-    
+
+def test_shock_tube(make_plots=False):
+    L1_errors = [np.nan, 0.016, 0.033, 0.25,
+                 1.06, 0.078, 0.0040, 0.0035]
+    for i in range(1, 8):
+        check_riemann_problem(i, L1_errors[i], make_plots, not make_plots)
+        
 if __name__ == "__main__":
     import argparse
     
@@ -301,9 +313,7 @@ if __name__ == "__main__":
                         help="Make plots of the results")
     args = parser.parse_args()
 
-
-    L1_errors = [np.nan, 0.016, 0.033, 0.25,
-                 1.06, 0.078, 0.0040, 0.0035]
-    for i in range(1, 8):
-        check_riemann_problem(i, L1_errors[i], args.make_plots)
-
+    try:
+        test_shock_tube(args.make_plots)
+    except AssertionError:
+        pass

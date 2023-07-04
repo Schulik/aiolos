@@ -70,15 +70,15 @@ def check_conservation(problem, species='hydrogen.spc', L1_target=None):
         else:
             print('Conservation test {} L1 checked failed:'.format(problem))
             print('\tL1={}, target={}'.format(L1, L1_target))
+
+        np.testing.assert_array_less(L1, L1_target)
+
     else:
         print('Conservation test {} L1 values:'.format(problem))
         print('\tL1={}'.format(L1))
 
 
-if __name__ == "__main__":
-    
-    
-       
+def test_conservation():
     check_conservation("soundwave_128", L1_target=[5e-16, 2e-11,3e-16]) 
     
     check_conservation("dustywave_stiff", L1_target=[5e-16, 5e-8, 2e-14]) 
@@ -97,3 +97,10 @@ if __name__ == "__main__":
     
     check_conservation("collheat_2spc_rad", "collheat_2spc.spc",
                        L1_target=[4e-16, 1e-18, 2e-5])
+
+
+if __name__ == "__main__":
+    try:
+        test_conservation()
+    except AssertionError:
+        pass

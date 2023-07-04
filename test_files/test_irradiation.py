@@ -20,7 +20,7 @@ def Guillot_2band(tau, Tint4, Tirr40, gamma0, Tirr41, gamma1,
     return (Tint4*term_int + Tirr40*term0 + Tirr41*term1)**0.25
 
 
-def test_structure(sim, Tint, L1_target, make_plots):
+def check_structure(sim, Tint, L1_target, make_plots):
     filename = 'diagnostic_' + sim + '_t-1.dat'
     
     data = load_aiolos_diag(filename)
@@ -44,6 +44,8 @@ def test_structure(sim, Tint, L1_target, make_plots):
     else:
         print("Irradiation test L1 check failed. " + 
               "L1={}, expected={}".format(L1,L1_target))
+        
+
 
     if make_plots:
         import matplotlib.pyplot as plt
@@ -63,6 +65,13 @@ def test_structure(sim, Tint, L1_target, make_plots):
         os.makedirs('plots', exist_ok=True)
         plt.savefig('plots/Irradiation.png')
 
+    np.testing.assert_array_less(L1, L1_target)
+
+
+def test_structure(make_plots=False):
+    check_structure('irradiation', 175.0, 1.5e-3, make_plots)
+
+
 if __name__ == "__main__":
     import argparse
     
@@ -72,5 +81,7 @@ if __name__ == "__main__":
                         help="Make plots of the results")
     args = parser.parse_args()
 
-    test_structure('irradiation', 175.0, 1.5e-3, args.make_plots)
-
+    try:
+        test_structure(args.make_plots)
+    except AssertionError:
+        pass
