@@ -21,7 +21,7 @@ def Guillot_2band(tau, Tint4, Tirr40, gamma0, Tirr41, gamma1,
 
 
 def test_structure(sim, Tint, L1_target, make_plots):
-    filename = 'diagnostic_' + sim + '_t5.dat'
+    filename = 'diagnostic_' + sim + '_t-1.dat'
     
     data = load_aiolos_diag(filename)
 

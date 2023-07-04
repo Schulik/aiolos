@@ -148,10 +148,10 @@ if __name__ == "__main__":
             #    marker=m, label=snap)
             #ax[2].semilogx(data['x'], data['dt_E'], ls=':',
             #    marker=m, label=snap)
-            ax[2].semilogx(data['x'], data['velocity']/data['soundspeed'], ls='',
+            ax[2].semilogx(data['x'], data['velocity'], ls='',
                 marker=m, label=snap)
-            #ax[2].semilogx(data['x'], data['soundspeed'], ls='--',
-            #    marker=m)
+            ax[2].semilogx(data['x'], data['soundspeed'], ls='--',
+                marker=m)
         elif snap.startswith('diagnostic'):
             data = load_aiolos_diag(snap)
             ax[1].semilogx(data['x'], data['T_rad'], ls='',
