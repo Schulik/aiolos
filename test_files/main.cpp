@@ -37,42 +37,42 @@ bool run_test(std::string test_name, std::string spc = "hydrogen.spc",
 
 int main()
 {
-    int count = 0 ;
-    count += !run_test("shock_tube1.par") ;
-    count += !run_test("shock_tube2.par") ;
-    count += !run_test("shock_tube3.par") ;
-    count += !run_test("shock_tube4.par") ;
-    count += !run_test("shock_tube5.par") ;
-    count += !run_test("shock_tube6.par") ;
-    count += !run_test("shock_tube7.par") ;
+    int fail_count = 0 ;
+    fail_count += !run_test("shock_tube1.par") ;
+    fail_count += !run_test("shock_tube2.par") ;
+    fail_count += !run_test("shock_tube3.par") ;
+    fail_count += !run_test("shock_tube4.par") ;
+    fail_count += !run_test("shock_tube5.par") ;
+    fail_count += !run_test("shock_tube6.par") ;
+    fail_count += !run_test("shock_tube7.par") ;
 
-    count += !run_test("soundwave_32.par") ;
-    count += !run_test("soundwave_64.par") ;
-    count += !run_test("soundwave_128.par") ;
-    count += !run_test("soundwave_256.par") ;
-    count += !run_test("soundwave_512.par") ;
+    fail_count += !run_test("soundwave_32.par") ;
+    fail_count += !run_test("soundwave_64.par") ;
+    fail_count += !run_test("soundwave_128.par") ;
+    fail_count += !run_test("soundwave_256.par") ;
+    fail_count += !run_test("soundwave_512.par") ;
     
-    count += !run_test("friction_2spc.par", "friction_2spc.spc") ;
-    count += !run_test("friction_2spc_an.par", "friction_2spc.spc") ;
-    count += !run_test("friction_2spc_phys.par", "friction_2spc.spc") ;
-    count += !run_test("friction_2spc_phys_an.par", "friction_2spc.spc") ;
-    count += !run_test("friction_6spc.par", "friction_6spc.spc") ;
+    fail_count += !run_test("friction_2spc.par", "friction_2spc.spc") ;
+    fail_count += !run_test("friction_2spc_an.par", "friction_2spc.spc") ;
+    fail_count += !run_test("friction_2spc_phys.par", "friction_2spc.spc") ;
+    fail_count += !run_test("friction_2spc_phys_an.par", "friction_2spc.spc") ;
+    fail_count += !run_test("friction_6spc.par", "friction_6spc.spc") ;
     
-    count += !run_test("collheat_2spc.par", "collheat_2spc.spc") ;
-    count += !run_test("collheat_2spc_rad.par", "collheat_2spc.spc") ;
+    fail_count += !run_test("collheat_2spc.par", "collheat_2spc.spc") ;
+    fail_count += !run_test("collheat_2spc_rad.par", "collheat_2spc.spc") ;
 
-    count += !run_test("dustywave_nonstiff.par") ;
-    count += !run_test("dustywave_stiff.par") ;
+    fail_count += !run_test("dustywave_nonstiff.par") ;
+    fail_count += !run_test("dustywave_stiff.par") ;
 
-    count += !run_test("dusty_shock.par") ;
+    fail_count += !run_test("dusty_shock.par") ;
     
-    count += !run_test("planet_cartesian.par") ;
-    count += !run_test("planet_spherical.par") ;
+    fail_count += !run_test("planet_cartesian.par") ;
+    fail_count += !run_test("planet_spherical.par") ;
 
-    count += !run_test("irradiation.par", "irradiation.spc") ;
-
+    fail_count += !run_test("irradiation1.par", "irradiation.spc") ;
+    fail_count += !run_test("irradiation2.par", "irradiation.spc") ;
     
-    return count ;
+    return fail_count ;
 }
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

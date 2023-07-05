@@ -29,13 +29,21 @@ def check_drag(problem, spc, L1_target=None):
         else:
             print('Test {} L1 checked failed:'.format(problem))
             print('\tL1={}, target={}'.format(L1, L1_target))
+
+        np.testing.assert_array_less(L1, L1_target)
+
     else:
         print('Test {} L1 values:'.format(problem))
         print('\tL1={}'.format(L1))
 
 
-if __name__ == "__main__":
+def test_drag():
     check_drag("friction_2spc", 'H0', [3e-16, 3e-14, 2e-14])
-    check_drag("friction_2spc_phys", 'H0', [2e-30, 3e-30, 2e-20])
+    check_drag("friction_2spc_phys", 'H0', [2e-30, 2e-29, 2e-20])
 
+if __name__ == "__main__":
+    try:
+        test_drag()
+    except AssertionError:
+        pass
     

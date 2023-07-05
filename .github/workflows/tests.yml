@@ -1,0 +1,39 @@
+name: tests
+
+# Run this workflow for every commit
+on: push
+
+jobs:
+  test:
+    name: Run tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v2
+        with:
+          python-version: 3.11
+
+      - name: Install test dependencies
+        run: |
+          pip install numpy pytest
+      
+      - name: Install code dependencies
+        run: |
+          sudo apt-get install -y libgsl-dev libeigen3-dev
+
+      - name: Build tests
+        run: make -j tests
+
+      - name: Run the code tests
+        run: |
+          ./tests > /dev/null
+
+      - name: Check the results
+        run: |
+          cd test_files
+          mkdir -p test-reports
+          py.test -v --junitxml=test-reports/junit.xml .

@@ -289,7 +289,6 @@ void c_Sim::update_dS_jb(int j, int b) {
                 //
                 for(int s=0; s<num_species; s++) {
                     //if lowenergy or photochem < 2
-                    
                     if(photochemistry_level <= 2) {
                         species[s].dS(j)  += highenergy_switch(s,b) * dS_band(j,b) * species[s].fraction_total_solar_opacity(j,b);
                         if(species[s].dS(j) < 1e-50)
@@ -424,8 +423,6 @@ void c_Sim::update_fluxes_FLD() {
                 double R       = xi_rad * tau_inv * std::abs(Jrad_FLD(j+1,b) - Jrad_FLD(j,b)) / (Jrad_FLD(j, b) + 1e-300) ; // Put in 1.0 as prefactor to get correct rad shock
                 double D       = 1. * tau_inv * 1. * surf[j] * flux_limiter(R);
                 
-                //if(1./tau_inv < 1.e-13)
-                //    D = 0.;
                 
                 // divergence terms
                 u[idx] = -D ;
@@ -543,7 +540,7 @@ void c_Sim::update_fluxes_FLD() {
     
     if(radiation_matter_equilibrium_test <= 2) { //radtests 3 and 4 are delta-radiation peaks without energy-matter coupling
         
-        for (int j=0; j < num_cells+1; j++) {
+        for (int j=0; j < num_cells+2; j++) {
             for (int s=0; s < num_species; s++) {
                 
                 if(debug > 1) {
@@ -562,7 +559,7 @@ void c_Sim::update_fluxes_FLD() {
                 d[idx_s ] = 1 / dt ;
                 r[idx_rs] = Ts / dt ;
                 r[idx_rs] +=  (species[s].dS(j) + species[s].dG(j)) / species[s].u[j].u1 / species[s].cv; //Misc heating terms that are not directly related to self-consistent temperature are just added to the rhs
-                
+
                 for(int b=0; b<num_bands_out; b++) {
                     int idx_b  = j*stride + b * (num_vars+1) ;
                     int idx_bs = j*stride + b * num_vars + (s + num_bands_out) ; 
@@ -587,9 +584,7 @@ void c_Sim::update_fluxes_FLD() {
                 }
             }
             if (use_collisional_heating && num_species > 1) {
-                
-                double tau = total_opacity(j,0) * (x_i12[j+1]-x_i12[j]);
-                
+                                
                  //Heuristic fix for boundary heat bug at large optical depth
                     fill_alpha_basis_arrays(j);
                     compute_collisional_heat_exchange_matrix(j);
@@ -597,20 +592,10 @@ void c_Sim::update_fluxes_FLD() {
                     for (int si=0; si < num_species; si++) { 
                         int idx  = j*stride + (si + num_bands_out) * num_vars + num_bands_out;
                         for (int sj=0; sj < num_species; sj++) {
-                            
-                            if (tau < 1e3) {
-                            
                             d[idx+sj] -= friction_coefficients(si,sj) ;
-                            
-                            } else
-                                d[idx+sj] -= friction_coefficients(si,sj) * 1.e-4 ;
-                            //cout<<" si/sj = "<<si<<"/"<<sj<<" coeff = "<<friction_coefficients(si,sj);
                         }
                     }
                 
-                
-                //char a;
-                //cin>>a;
             }
         }
     }

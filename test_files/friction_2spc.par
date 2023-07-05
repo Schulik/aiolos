@@ -49,6 +49,7 @@ TEMPERATURE_BUMP_STRENGTH 0.
 WAVE_USE                0
 PARI_INIT_WIND          1
 PARI_ALPHA_COLL         0.1
+PARI_COLL_MODEL         C
 
 #Physical parameters
 PARI_PLANET_POS         0.

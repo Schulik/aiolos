@@ -21,7 +21,7 @@ def _solution_2sp(aij_dt, cv1, cv2, T1, T2):
     return T1, T2
 
 
-def check_collisional_heating_2spc(problem, L1_target=None):
+def check_collisional_heating_2spc(problem, L1_target=None, raise_error=False):
 
     param_file = problem + '.par'
     params = load_aiolos_params(param_file)
@@ -66,12 +66,19 @@ def check_collisional_heating_2spc(problem, L1_target=None):
         else:
             print('Test {} L1 checked failed:'.format(problem))
             print('\tL1={}, target={}'.format(L1, L1_target))
+    
+        np.testing.assert_array_less(L1, L1_target)
+
     else:
         print('Test {} L1 values:'.format(problem))
         print('\tL1={}'.format(L1))
 
+def test_coll_heating():
+     check_collisional_heating_2spc('collheat_2spc', [1.5e-3, 2.5e-3])
 
 if __name__ == "__main__":
-    check_collisional_heating_2spc('collheat_2spc', [1.5e-3, 2.5e-3])
-
+    try:
+        test_coll_heating()
+    except AssertionError:
+        pass
     

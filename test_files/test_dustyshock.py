@@ -116,10 +116,16 @@ def check_dusty_shock(L1s=None):
         else:
             print('Test {} L1 checked failed:'.format(name))
             print('\tL1={}, target={}'.format(L1, L1s))
+
+        np.testing.assert_array_less(L1, L1s)
+
     else:
          print('Test {} L1 values:'.format(name))
          print('\tL1={}'.format(L1))
     
+def test_dusty_shock():
+    check_dusty_shock([0.541, 0.540])
+
 if __name__ == "__main__":
 
     import argparse
@@ -130,8 +136,11 @@ if __name__ == "__main__":
                         help="Make plots of the results")
     args = parser.parse_args()
 
-    check_dusty_shock([0.541, 0.540])
-    
+    try:
+        test_dusty_shock()
+    except AssertionError:
+        pass
+        
     if args.make_plots:
         f = plot_dusty_shock()
         #f.show()

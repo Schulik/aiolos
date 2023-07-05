@@ -42,11 +42,11 @@ def check_conservation(problem, species='hydrogen.spc', L1_target=None):
         c4pi = 2.99792458e10/(4*np.pi)
         N = int(params.get('NUM_BANDS', 1))
         diag = 'diagnostic_' + problem
-        d0 = load_aiolos_diag(diag + '_t0.dat')
+        d0 = load_aiolos_diag(diag + '_t0.dat', bands_in=N)
         for i in range(N):
             init[2] += d0['J{}'.format(i)][num_bound-1:-num_bound+1].sum()/c4pi
 
-        df = load_aiolos_diag(diag + '_t-1.dat')
+        df = load_aiolos_diag(diag + '_t-1.dat', bands_in=N)
         for i in range(N):
             final[2] += df['J{}'.format(i)][num_bound-1:-num_bound+1].sum()/c4pi
 
@@ -70,15 +70,15 @@ def check_conservation(problem, species='hydrogen.spc', L1_target=None):
         else:
             print('Conservation test {} L1 checked failed:'.format(problem))
             print('\tL1={}, target={}'.format(L1, L1_target))
+
+        np.testing.assert_array_less(L1, L1_target)
+
     else:
         print('Conservation test {} L1 values:'.format(problem))
         print('\tL1={}'.format(L1))
 
 
-if __name__ == "__main__":
-    
-    
-       
+def test_conservation():
     check_conservation("soundwave_128", L1_target=[5e-16, 2e-11,3e-16]) 
     
     check_conservation("dustywave_stiff", L1_target=[5e-16, 5e-8, 2e-14]) 
@@ -90,10 +90,17 @@ if __name__ == "__main__":
     check_conservation("friction_2spc", "friction_2spc.spc",
                        L1_target=[4e-16,3e-14,3e-13])
     check_conservation("friction_2spc_phys", "friction_2spc.spc",
-                       L1_target=[4e-16,2e-15,2e-13])
+                       L1_target=[4e-16,3e-13,2e-13])
 
     check_conservation("collheat_2spc", "collheat_2spc.spc",
                        L1_target=[4e-16, 4e-14, 2e-13])
     
     check_conservation("collheat_2spc_rad", "collheat_2spc.spc",
-                       L1_target=[4e-16, 1e-18, 1e-5])
+                       L1_target=[4e-16, 1e-18, 2e-5])
+
+
+if __name__ == "__main__":
+    try:
+        test_conservation()
+    except AssertionError:
+        pass

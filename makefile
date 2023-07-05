@@ -41,10 +41,12 @@ aiolos: $(OBJ) makefile
 %.o: %.cpp makefile aiolos.h
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< $(BFLAGS) -o $@ 
 
-.PHONY: tests
+.PHONY: run_tests
 
 tests: $(TEST_OBJ) makefile aiolos.h
 	$(CXX) -o  $@  $(TEST_OBJ) $(CXXFLAGS) $(LDFLAGS)
+
+run_tests: tests
 	./tests > /dev/null
 	cd test_files ; python3 test_shock_tube.py -p
 	cd test_files ; python3 test_steady_state.py
