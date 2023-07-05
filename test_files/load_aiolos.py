@@ -8,14 +8,11 @@ def load_aiolos_snap(filename):
              ('pressure',   'f8'),
              ('velocity',    'f8'),
              ('temperature', 'f8'),
-             ('dt_cs', 'f8'),
-             ('dt_v', 'f8'),
-             ('soundspeed', 'f8'),
-             ('dt_E', 'f8'),
-             
-             
-             ]
-    cols=[0,1,2,3,10,11,12,13,14,15,16]
+             ('soundspeed',  'f8'),
+             ('potential',   'f8'),
+             ('cooling',     'f8'),
+             ('heating',     'f8')]
+    cols=[0,1,2,3,10,11,12,15,19,21,22]
     
     data = np.genfromtxt(filename, dtype=dtype, usecols=cols)
     return data
@@ -34,14 +31,14 @@ def load_aiolos_params(filename):
             params[key.strip()] = val.strip()
     return params
 
-def load_aiolos_diag(filename, bands=None, species=None):
-    if bands is None or species is None:
+def load_aiolos_diag(filename, bands_in=None, bands_out=1, species=None):
+    if bands_in is None or species is None:
         # Work out the number of bands:
         with open(filename) as f:
             line = f.readline()
             cols = len(line.strip().split())
 
-        def c(b, s): return 5 + 7*b + 3*b*s + s
+        def c(b, s): return 5 + (3 + s)*b + s + (4+2*s)*bands_out
         res = []
         b = 1
         while True:
@@ -58,42 +55,45 @@ def load_aiolos_diag(filename, bands=None, species=None):
             raise ValueError("Error when finding bands and species")
         if len(res) > 1:
             for b, s in res:
-                if b == bands or s == species:
-                    bands = b
+                if b == bands_in or s == species:
+                    bands_in = b
                     species = s
                     break
             else:
                 raise ValueError("Error determining the number of bands and"
                                  "species, help out by specifying them")
         else:
-            bands, species = res[0]
+            bands_in, species = res[0]
             
     # Construct the dtype:
-    def add_cols(name, dt='f8'):
+    def add_cols(name, bands=bands_out, dt='f8'):
         return [ (name + str(i), dt) for i in range(bands)]
     def add_kappa_cols():
         cols = []
-        for i in range(bands):
+        for i in range(bands_in):
+            for j in range(species):
+                cols += [('kappa_P(Tsun)' + str(i) + '_' + str(j), 'f8')]
+        for i in range(bands_out):
             for j in range(species):
                 cols += [('kappa_R' + str(i) + '_' + str(j), 'f8')]
+            for j in range(species):
                 cols += [('kappa_P' + str(i) + '_' + str(j), 'f8')]
-                cols += [('kappa_P(Tsun)' + str(i) + '_' + str(j), 'f8')]
         return cols
         
     dtype = [('x',    'f8'),
              ('Jtot', 'f8'),
              ('Stot', 'f8')]
-    dtype += add_cols('J')
-    dtype += add_cols('S')
-    dtype += add_cols('dS')
-    dtype += add_cols('rho_kappaR')
-    dtype += add_cols('tau_cell')
-    dtype += add_cols('tau_radial')
+    dtype += add_cols('J',bands_out)
+    dtype += add_cols('S',bands_in)
+    dtype += add_cols('dS', bands_in)
+    dtype += add_cols('rho_kappaR',bands_out)
+    dtype += add_cols('tau_cell',bands_out)
+    dtype += add_cols('tau_radial', bands_in)
     dtype += add_kappa_cols()
     dtype += [('T_rad', 'f8')]
     dtype += [ ('T_gas' + str(i), 'f8') for i in range(species)]
     dtype += [('pressure' , 'f8')]
-    dtype += add_cols('Flux')
+    dtype += add_cols('Flux',bands_out)
 
     # Load the data
     return np.genfromtxt(filename, dtype=dtype)
@@ -125,9 +125,11 @@ if __name__ == "__main__":
     import sys
     import matplotlib.pyplot as plt
 
-    f, ax = plt.subplots(3,1)
+    f, ax = plt.subplots(4,1, sharex=True)
 
-    for snap in sys.argv[1:]:
+    snaps = [s for s in sys.argv[1:] if s[0] == 'o'] + [s for s in sys.argv[1:] if s[0] != 'o']
+    
+    for snap in snaps:
         if snap.startswith('output'): 
             data = load_aiolos_snap(snap)
             if 'Gas' in snap:
@@ -141,26 +143,30 @@ if __name__ == "__main__":
 
             ax[1].semilogx(data['x'], data['temperature'], ls='',
                         marker=m, label=snap)
+            #ax[1].semilogx(data['x'], data['pressure']/data['density']**1.29, ls='',
+            #            marker=m, label=snap)
 
-            #ax[2].semilogx(data['x'], data['dt_cs'], ls='-',
-            #    marker=m, label=snap)
-            #ax[2].semilogx(data['x'], data['dt_v'], ls='--',
-            #    marker=m, label=snap)
-            #ax[2].semilogx(data['x'], data['dt_E'], ls=':',
-            #    marker=m, label=snap)
             ax[2].semilogx(data['x'], data['velocity'], ls='',
                 marker=m, label=snap)
-            ax[2].semilogx(data['x'], data['soundspeed'], ls='--',
-                marker=m)
+
+            l,= ax[3].loglog(data['x'], data['heating'], ls='-',
+                label=snap)
+            ax[3].semilogx(data['x'], np.abs(data['cooling']), ls='--',
+                c=l.get_color())
+            #ax[2].semilogx(data['x'], data['soundspeed'], ls='--',
+            #    marker=m)
         elif snap.startswith('diagnostic'):
-            data = load_aiolos_diag(snap)
+            data = load_aiolos_diag(snap, species=2)
             ax[1].semilogx(data['x'], data['T_rad'], ls='',
                         marker='^', label=snap)
+            #ax[3].semilogx(data['x'], np.abs(data['dS0']), marker='^', ls='')
 
     ax[-1].set_xlabel('r')
     ax[0].set_ylabel('density')
     ax[1].set_ylabel('temperature')
+    ax[1].set_ylim(0, 4000)
     ax[2].set_ylabel('velocity')
+    ax[3].set_ylabel('heating / cooling')
 
 
     ax[1].legend(ncol=3)

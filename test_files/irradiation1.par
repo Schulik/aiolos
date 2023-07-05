@@ -1,0 +1,85 @@
+#
+# Parameterfile for atmosphere simulations
+# Do not use tabs, only white spaces as value separators
+#
+SPECIES_FILE            irradiation.spc
+DENSITY_FLOOR           1e-20
+PARI_TIME_TMAX          1.01e11
+CFL_BREAK_TIME          1e3
+PARI_TIME_OUTPUT        2.e10
+PARI_CFLFACTOR          0.1
+PARI_TIME_DT            1e10
+PARI_DPHI_FACTOR        1.5e-2
+ENERGY_EPSILON          0.01
+MAX_TIMESTEP_CHANGE     1.01
+XI_RAD                  2.
+# Control parameters
+#
+# Problem numbers explained: shock_tube, no grav == 1, planet with grav == 2#
+# Friction solver: analytic == 0, numerical == 1
+# Collision model: constant == C, physical == P
+PARI_PROBLEM_NUMBER     2
+PARI_NUM_SPECIES        1
+PARI_NUM_BANDS          2
+NUM_BANDS_OUT           1
+DO_HYDRO                0
+#CONST_TEMP         1430.
+PARI_CONST_TEMP         2.7
+INIT_TEMPERATURE_MODEL  P
+INIT_J_FACTOR           1e0
+INIT_T_TEMP             2.7
+USE_PLANET_TEMPERATURE  1
+PARI_TPLANET            350.
+PARI_CORE_CV            1e9
+
+# Solar radiation temps at 0.1 AU: 645K for bond albedo=0.75, 913K for bond albedo = 0
+# print 5777*(1./20./2.)**0.5*(1-0.75)**0.25
+
+FRICTION_SOLVER         1
+PARI_COLL_MODEL         P
+PARI_ALPHA_COLL         1.
+PARI_ORDER              2
+PARI_USE_RADIATION      1
+PARI_OPACITY_MODEL      C
+PRESSURE_BROADENING     0.
+CONSTOPA_SOLAR_FACTOR   0.35
+PARI_CONST_OPAC         1.0
+
+PARI_SELF_GRAV_SWITCH   0
+PARI_LINEAR_GRAV        0
+PARI_DEBUGLEVEL         1
+PARI_INIT_STATIC        1
+USE_TIDES               1
+#Physical parameters
+
+PARI_PLANET_MASS        224.
+PARI_INIT_DATA_SWITCH   1
+PARI_INIT_DATA_U1      1e-5
+PARI_INIT_DATA_U2      1.0
+PARI_INIT_DATA_U3      1e-68
+
+#Radiation parameters
+PARI_LAM_MIN            9.0e-2
+PARI_LAM_MAX            9.0e-2
+PARI_LAM_PER_DECADE     0.1
+PARI_TSTAR              6070.
+PARI_RSTAR              0.1227
+PARI_UVSTAR             1.e1
+
+PARI_PLANET_DIST        0.05
+
+#Numerical parameters
+PARI_BOUND_TYPE         2
+PARI_BOUND_TYPE_LEFT    2
+PARI_BOUND_TYPE_RIGHT   1
+PARI_DOMAIN_DX          1e-3
+PARI_GRID_TYPE          1
+PARI_GEOMETRY           2
+PARI_CELLS_PER_DECADE   1000
+#Domain min/max are 8 me core radius for earth density, and 100*hill radius
+PARI_DOMAIN_MIN         9.200e9
+PARI_DOMAIN_MAX         9.2e11
+
+#Scenarios
+PARI_INIT_WIND          1
+REVERSE_HYDROSTAT_CONSTRUCTION 1
