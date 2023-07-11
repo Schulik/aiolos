@@ -24,6 +24,7 @@ int main(int argc, char** argv)
     string simulationname;
     string speciesfile;
     string workingdir = "./";
+    string tempintent = "---";
     int debug;
     int debug_cell = 40;
     int debug_steps = 8965;
@@ -96,6 +97,11 @@ int main(int argc, char** argv)
             external_thread_num      = std::stoi(yet_another_string);
             i++;
         }
+        if(tmpstring.compare("-int") == 0) {
+            tempintent      = argv[i+1];
+            cout<<"Intent comment found as "<<tempintent<<endl;
+            i++;
+        }
     }
     
     if(!parameterfile_found) {
@@ -117,7 +123,7 @@ int main(int argc, char** argv)
         cout<<endl<<"In main, construction of simulation is about to start."<<endl;
        
         //Main simulation class object, is initialized with the simulation parameters from a file
-        c_Sim simulation1(simulationname, speciesfile, workingdir, debug, debug_cell, debug_steps);
+        c_Sim simulation1(simulationname, speciesfile, workingdir, tempintent, debug, debug_cell, debug_steps);
         
         simulation1.set_suppress_warnings(suppress_warnings_global);
 

@@ -1092,10 +1092,13 @@ void c_Sim::write_into_execution_log(string dir, string par, string spcfile) {
     
     exlogstream<<str<<": "<<dir<<par;
     
-    if(spcfile.compare("default.spc")==0)
-        exlogstream<<endl;
+    if(spcfile.compare("default.spc")!=0)
+        exlogstream<<"   with "<<spcfile;
+
+    if(intent.compare("---")!=0)
+       exlogstream<<" intent: "<<intent<<endl;
     else
-        exlogstream<<"   with "<<spcfile<<endl;
+       exlogstream<<endl;
     
     exlogstream.close();
 }

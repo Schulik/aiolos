@@ -25,7 +25,7 @@ extern void init_line_cooling_data();
  * @param[in] debug_cell Get detailed information for a specific cell (To be implemented by user..)
  * @param[in] debug_steps Get detailed information for a specific timestep (To be implemented by user..)
  */
-c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, int debug, int debug_cell, int debug_steps) {
+c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, string tintent, int debug, int debug_cell, int debug_steps) {
 
 	init_line_cooling_data();
 
@@ -37,6 +37,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
         this->debug_steps= debug_steps;
         simname          = filename_solo;
         this->workingdir = workingdir;
+        this->intent     = tintent;
         string filename    = workingdir + filename_solo;
         parfile            = workingdir + filename_solo;
         
@@ -138,6 +139,8 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
             cout<<"Domain specifics:  "<<domain_min<<" | . .  .  "<<num_cells<<" nonuniform cells .       .             .     | "<<domain_max<<endl;
         }
         reverse_hydrostat_constrution = read_parameter_from_file<int>(filename,"REVERSE_HYDROSTAT_CONSTRUCTION", debug, 0).value; //If false, or zero, construct density from large r to small r.
+
+	imaxchem          = read_parameter_from_file<int>(filename,"IMAXCHEM", debug, num_cells+1).value;
                                                                                                                    //Otherwise reversed. First density is the PARI_INIT_DATA_U1parameter.
         init_wind         = read_parameter_from_file<int>(filename,"PARI_INIT_WIND", debug, 0).value; //Initialize a step in density at init_sonic_radius of variable magnitude. 
         //Magnitude of density jump is set by species dependent parameter in *spc file in column 7 "initial density excess". If init_sonic_radius is negative, then do nothing. 
@@ -244,6 +247,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
         dust_to_gas_ratio = read_parameter_from_file<double>(filename,"DUST_TO_GAS", debug, 0.).value;    //dust-to-gas ratio for Semenov/Malygin opacities
         temperature_floor = read_parameter_from_file<double>(filename,"TEMPERATURE_FLOOR", debug, 0.).value;  //Limit the temperature to a minimum in radiation solver (negative T crashes can still occur due to negative pressures, whichever is found first)
         max_temperature   = read_parameter_from_file<double>(filename,"TEMPERATURE_MAX", debug, 9e99).value;  //Limit the temperature to a maximum
+        max_temperature_time   = read_parameter_from_file<double>(filename,"MAX_T_RAMPUP_TIME", debug, 9e99).value;  //Limit the temperature to a maximum
         use_chemistry      = read_parameter_from_file<int>(filename,"DO_CHEM", debug, 0).value;               //Unused currently.
         use_total_pressure = read_parameter_from_file<int>(filename,"USE_TOTAL_PRESSURE", debug, 0).value;    //Compute total pressure of all species? Unused currently.
         coll_rampup_time      = read_parameter_from_file<double>(filename,"COLL_RAMPUP_TIME", debug, 0.).value; //Ramp up collision rates gently from INIT_COLL_FACTOR to PARI_ALPHA_COLL in the rampup time
@@ -462,7 +466,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, i
 			double elow = 1.24/( l_i_in[b + 1] ) * ev_to_K * kb;
 			double ehigh= 1.24/( l_i_in[b] )     * ev_to_K * kb;
 
-			photon_energies[b]  = 0.9*elow + 0.1*ehigh;
+			photon_energies[b]  = 0.1*elow + 0.9*ehigh;
 			//photon_energies[b]  = std::pow(10, 0.25*std::log10(elow) + 0.75*std::log10(ehigh)  );
 			if(b==num_bands_in-1)
 				photon_energies[b]  = elow;
@@ -1168,6 +1172,8 @@ c_Species::c_Species(c_Sim *base_simulation, string filename, string species_fil
         boundary_right = read_parameter_from_file<BoundaryType>(filename,"PARI_BOUND_TYPE_RIGHT", debug, BoundaryType::fixed).value;
 
         const_T_space  = read_parameter_from_file<double>(filename,"PARI_CONST_TEMP", debug, 1.).value; //Temperature at boundary. Use depending on INIT_TEMPERATURE_MODEL
+        const_T_space2 = read_parameter_from_file<double>(filename,"CONST_TEMP2", debug, 1.).value; //Temperature at r>const_T_transition_r. 
+        const_T_transition_r  = read_parameter_from_file<double>(filename,"T_TRANSITION_R", debug, 1.e99).value; //Transition radius between the two-step temperatire initial condition
         TEMPERATURE_BUMP_STRENGTH    = read_parameter_from_file<double>(filename,"TEMPERATURE_BUMP_STRENGTH", debug, 0.).value; //Discontinued
         pressure_broadening_factor   = read_parameter_from_file<double>(filename,"PRESSURE_BROADENING", debug, 0.).value;  //For opacity model==P, weaken/strengthen pressure broadening
         pressure_broadening_exponent = read_parameter_from_file<double>(filename,"BROADENING_EXP", debug, 1.).value;       //For opacity model==P, opacity = (1+broad_factor * (p/1e5)^exponent)
@@ -1448,7 +1454,10 @@ void c_Species::initialize_hydrostatic_atmosphere(string filename) {
             //prim[i].temperature = const_T_space;
             //if(i>=num_cells-1)
                 //prim[i].temperature = 1.0*const_T_space - 1e-4 * base->phi[i] / (cv * gamma_adiabat); //Need initial temperature gradient for FLD
-                prim[i].temperature = const_T_space; // - 1e-5 * std::pow(base->x_i12[i], 0.5); //Need initial temperature gradient for FLD
+                if(base->x_i12[i] < const_T_transition_r)
+			prim[i].temperature = const_T_space; // - 1e-5 * std::pow(base->x_i12[i], 0.5); //Need initial temperature gradient for FLD
+		else
+			prim[i].temperature = const_T_space2;
 
         }
         //prim[i].temperature = - dphi_factor * base->phi[i] / (cv * gamma_adiabat) + const_T_space;

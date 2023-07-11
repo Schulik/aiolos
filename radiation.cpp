@@ -241,7 +241,7 @@ void c_Sim::update_dS_jb(int j, int b) {
                         }
                         
                         //cout<<" j/b = "<<j<<"/"<<b<<" dS_band(j,b) "<<dS_band(j,b)<<" dS_he_temp "<<dS_he_temp<<endl;
-                        dS_band(j,b) -= dS_he_temp; //Substract highenergy heating again, as this has already been added in update_dS_jb_photochem() around line 700 in chemistry.cpp
+                        dS_band(j,b) -= 0. * dS_he_temp; //Substract highenergy heating again, as this has already been added in update_dS_jb_photochem() around line 700 in chemistry.cpp
                         dS_band(j,b) = std::max(dS_band(j,b), 0.); //Safeguard against highenergy shenanigans
                         if(BAND_IS_HIGHENERGY[b] && photochemistry_level==1)
                             dS_band(j,b) = 0.;

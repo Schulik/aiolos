@@ -190,15 +190,16 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
                 eta2[idx_s] += 4.* pi * ddt * kappa * no_rad_trans / species[s].cv;
                 
                 //if(false) {
-                if(steps == 3363 && j==2) {
+                if(steps == 3363e99 && j==2) {
                     //cout<<"reporting cooling terms["<<s<<"]: dG / dGdT * Ts "<<species[s].dG(j)<<" / "<< - photocooling_multiplier * species[s].dGdT(j)*Ts <<endl;
 		    cout<<steps<<" etas = "<<eta1[idx_s]<<"/"<<eta2[idx_s]<<" Ts = "<<Ts<<endl;
 		}
                 
-                //if(j == 90 && steps > 41800)
-                if(false)
-                    cout<<"j ="<<j<<" denoms = "<<denom<<" eta1 = "<<eta1[idx_s]<<" eta1 parts = Ts/dS "<<Ts * ( 1. + 12. * fac)<<"/"<<1. * ddt * (species[s].dS(j) + species[s].dG(j)) / species[s].u[j].u1 / species[s].cv<<" Ts parts = Ts/(1+12fac)/facp1/facp2 = "<<Ts<<"/"<<(1.+12.*fac)<<"/"<<ddt * kappa / species[s].cv * sigma_rad<<"/"<<Ts3<<endl; 
-                
+                if(j == 200e99 && steps == 430){
+                //if(false)
+                    cout<<"s ="<<s<<" denoms = "<<denom<<" eta1 = "<<eta1[idx_s]<<" eta1 parts = Ts/dS "<<Ts * ( 1. + 12. * fac)<<"/"<<1. * ddt * (species[s].dS(j) + species[s].dG(j)) / species[s].u[j].u1 / species[s].cv<<" Ts parts = Ts/(1+12fac)/facp1/facp2 = "<<Ts<<"/"<<(1.+12.*fac)<<"/"<<ddt * kappa / species[s].cv * sigma_rad<<"/"<<Ts3<<endl; 
+		    cout<<"reporting cooling terms["<<s<<"]: dG / dGdT * Ts "<<species[s].dG(j)<<" / "<< - photocooling_multiplier * species[s].dGdT(j)*Ts <<" "<<" etas = "<<eta1[idx_s]<<"/"<<eta2[idx_s]<<" Ts = "<<Ts<<endl;
+                }
                 
                 if(j==48000) {
                     cout<<" eta1/eta2/tempeta1 = "<<eta1[idx_s]<<"/"<<eta2[idx_s]<<"/"<<tempeta<<endl;
@@ -358,8 +359,8 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
             LU.compute(coll_heat_matrix) ;
             coll_heat_output.noalias() = LU.solve(coll_heat_b);
             
-            if(steps > 350e99 && steps < 355e99 && j==175) {
-                cout<<"j==5, steps=="<<steps<<", Coll Matrix / b was "<<endl<<coll_heat_matrix<<endl<<coll_heat_b<<endl;
+            if((steps == 0 || steps == 1) && (j==100 || j==300) && false) {
+                cout<<"j=="<<j<<", steps=="<<steps<<", Coll Matrix / b was "<<endl<<coll_heat_matrix<<endl<<coll_heat_b<<endl;
 
 		//cout<<"invtotalmasses = "<<inv_totmasses<<endl;
 
@@ -404,8 +405,8 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
                 if(tt<temperature_floor)
                         tt=temperature_floor;
                     
-                if(tt>max_temperature)
-                        tt=max_temperature;
+                if(tt> ( max_temperature + globalTime/max_temperature_time * 1e4) )
+                        tt=(max_temperature + globalTime/max_temperature_time * 1e4);
 		//if(j<=4)
 		//	tt=species[si].const_T_space;                
 
@@ -413,7 +414,7 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
 		avgT_denom += species[si].u[j].u1 * species[si].cv;
 
 		
-                if(globalTime > 1e-10)
+                if(globalTime > 1e-30)
                     species[si].prim[j].temperature = tt ;
                 else
                     species[si].prim[j].temperature = species[si].const_T_space;
@@ -458,8 +459,15 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
 		  }
               }
 
+		//for(int si=0; si<num_species; si++) 
+		//	if( (steps==0 || steps==1) && j==300)
+                //      		cout<<"t / j /s = "<<steps<<" / "<<j<< " / "<<si<<" FINAL T = "<<species[si].prim[j].temperature<<" num_cells = "<<num_cells<<endl;
+
+
          } //end j loop
-        
+
+
+ 
     } else {
         
             
@@ -489,6 +497,9 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
                 if(Jswitch == 0)
                     species[s].prim[j].temperature = tt ;
                 
+
+		if( (steps==0 || steps==1) || j==300)
+                     cout<<"t = "<<steps<<" j ="<<j<<" FINAL T = "<<tt<<" num_cells = "<<num_cells<<endl;
             }
         }
         

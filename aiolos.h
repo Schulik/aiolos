@@ -379,7 +379,8 @@ public:
 
     string simname;
     string workingdir;
-    
+    string intent;
+
     int problem_number;
     int debug;
     int cdebug = 0;
@@ -463,6 +464,7 @@ public:
     int ion_heating_maxiter;
     double temperature_floor;
     double max_temperature;
+    double max_temperature_time;
     
     Geometry geometry ;
     
@@ -703,6 +705,7 @@ public:
     int num_reactions;
     int num_photoreactions;
     int read_reactions_from_species_file;
+    int imaxchem;
     std::vector<c_reaction> reactions;
     std::vector<c_photochem_reaction> photoreactions;
     
@@ -838,7 +841,7 @@ public:
 public:
     
     c_Sim() {};
-    c_Sim(string parameter_filename, string species_filename, string workingdir, int debug=0, int debug_cell=1, int debug_steps=99999999);
+    c_Sim(string parameter_filename, string species_filename, string workingdir, string intent, int debug=0, int debug_cell=1, int debug_steps=99999999);
     ~c_Sim();
     
     void execute(); //Main loop
@@ -945,6 +948,8 @@ public:
     double bondi_radius;
     
     double const_T_space;
+    double const_T_space2;
+    double const_T_transition_r;
     double const_rho_scale;
     double const_opacity;
     int    is_dust_like;

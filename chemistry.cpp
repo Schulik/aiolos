@@ -306,7 +306,8 @@ void c_reaction::update_reaction_rate(double T) {
 void c_Sim::do_chemistry(double dt_chem) {
     
     #pragma omp parallel for schedule(static,5)
-    for (int j = num_cells+1; j >= 0; j--) {
+//    for (int j = num_cells+1; j >= 0; j--) {
+    for (int j = imaxchem; j >= 0; j--) {  //imaxchem is num_cells+1 by default
         
        
 
@@ -385,13 +386,21 @@ void c_Sim::do_chemistry(double dt_chem) {
         //if(switch1 + switch2 == 0) {
          //{ cout<<" "<<n_tmp(0) * n_tot * species[0].mass_amu*amu; }
         
-        
-            
+	//count charges, assume quasi-neutrality for electrons
+        double charge_imbalance = 0;
+        for(int s=0;s<num_species; s++) {
+		if(species[s].static_charge > 0)
+            charge_imbalance += ((double)species[s].static_charge) * n_tmp(s);
+        }
         
         for(int s=0;s<num_species; s++) {
             
             if(n_tmp(s) < chemistry_numberdens_floor)
                 n_tmp(s) = chemistry_numberdens_floor;
+
+	   if(false && species[s].this_species_index == e_idx) //Force electrons to balance out the charges per cell
+		n_tmp(s) = std::fabs(charge_imbalance);
+		
                 
             species[s].prim[j].number_density = n_tmp(s) * n_tot;
             species[s].prim[j].density        = species[s].prim[j].number_density * species[s].mass_amu*amu;
@@ -414,7 +423,7 @@ void c_Sim::do_chemistry(double dt_chem) {
         if(j>10)
             do_highenergy_cooling(j);
         
-        if(steps>311 && steps < 330 && j==100) {
+        if(steps>311e99 && steps < 330 && j==100) {
             cout<<"in do_chemistry, cooling j = "<<j<<" for spec 2 = "<< species[2].dG(j)<<" + " << species[2].dGdT(j)<<endl;
             cout<<"in do_chemistry, cooling j = "<<j<<" for spec "<<e_idx<<" = "<< species[e_idx].dG(j)<<" + " << species[e_idx].dGdT(j)<<endl;
         }
