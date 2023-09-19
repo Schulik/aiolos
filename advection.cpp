@@ -100,8 +100,9 @@ void c_Sim::execute() {
         
         update_mass_and_pot();
         
-        for(int s=0; s<num_species; s++)
-            species[s].update_kzz_and_gravpot(s);  //Recomputes the homopause boundary and adjusts species-specific potentials
+	if(steps<10)
+	        for(int s=0; s<num_species; s++)
+        	    species[s].update_kzz_and_gravpot(s);  //Recomputes the homopause boundary and adjusts species-specific potentials
         
         if(debug >= 2)
             cout<<"Before fluxes... ";

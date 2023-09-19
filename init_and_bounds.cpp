@@ -1454,10 +1454,12 @@ void c_Species::initialize_hydrostatic_atmosphere(string filename) {
             //prim[i].temperature = const_T_space;
             //if(i>=num_cells-1)
                 //prim[i].temperature = 1.0*const_T_space - 1e-4 * base->phi[i] / (cv * gamma_adiabat); //Need initial temperature gradient for FLD
-                if(base->x_i12[i] < const_T_transition_r)
+		if(base->x_i12[i] < const_T_transition_r) {
 			prim[i].temperature = const_T_space; // - 1e-5 * std::pow(base->x_i12[i], 0.5); //Need initial temperature gradient for FLD
-		else
+		}
+		else {
 			prim[i].temperature = const_T_space2;
+		}
 
         }
         //prim[i].temperature = - dphi_factor * base->phi[i] / (cv * gamma_adiabat) + const_T_space;
@@ -1759,13 +1761,19 @@ void c_Species::initialize_hydrostatic_atmosphere(string filename) {
  * Historical initialiser for analytic isothermal density profiles, unused now.
  */
 void c_Species::initialize_exponential_atmosphere() {
+    double gm = G*base->planet_mass;
     
     for(int i=num_cells+1; i>=0; i--) {
             prim[i].temperature = const_T_space;
     }
     
     for(int i=num_cells; i>=0; i--)  {
-        double temp_rhofinal = u[i].u1*std::exp(-1./const_rho_scale*(base->x_i[i] - base->x_i[num_cells]));
+
+	double cs2;
+	eos->get_p_over_rho_analytic(&prim[i].temperature, &cs2);
+
+        //double temp_rhofinal = u[i].u1*std::exp(-1./const_rho_scale*(base->x_i[i] - base->x_i[num_cells]));
+        double temp_rhofinal = u[2].u1*std::exp(-gm/cs2 * (1/base->x_i[2] - 1/base->x_i[i]));
         
         u[i] = AOS(temp_rhofinal, 0., cv * temp_rhofinal * prim[i].temperature) ;
     }

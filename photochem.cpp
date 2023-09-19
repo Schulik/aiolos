@@ -30,7 +30,7 @@ double H_radiative_recombination(double T_e) {
     //return 1.e+0 * 2.7e-13 * pow(T_e/1e4, -0.9) ;//* pow(T_e/1e4, -0.9); //MC2009 value
     
     //JOwens code:
-    //  rec_coeff =  8.7d-27*tgas**0.5 * t3**(-0.2)*(1+t6**0.7)**(-1)
+    //  rec_coeff =  8.7d-27*tgas**0.5 * t3**(-0.2)*(1+t6**0.7)**(-1) */
 }
 double H_threebody_recombination(double T_e) {
     using std::pow;
@@ -108,7 +108,7 @@ void init_line_cooling_data() {
 	lines_Opp.push_back( {166*angstroem, 6.59979E-10, 86632.4, 1.475889E10});
 	lines_Opp.push_back( {83.5*angstroem, 1.75205E3, 172569.7, 5.405937E21});
 
-	lines_C.push_back( {0,0,0,1});
+	lines_C.push_back( {1.*angstroem,0, 1., 1.});  //C line cooling currently unclear, dummy line
 	lines_Cp.push_back( {157*micron, 1.78292054E-20, 91.2, 1.38779668E+01});
 	lines_Cp.push_back( {2326*angstroem, 1.21471023E-10, 61853.9, 1.20977633e+09});
 	lines_Cp.push_back( {1334*angstroem, 2.41304508E-03, 107718.1, 3.74008770E+15});
@@ -150,6 +150,7 @@ double C_cooling(double Te, double ne) {
     for (auto & ln : lines_C) {
         term += ln[1]*std::exp(-ln[2]/Te) / (ne*(1.+ln[3]/ne));
     }
+    return term;
 }
 
 double Cp_cooling(double Te, double ne) {    

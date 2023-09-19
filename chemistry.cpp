@@ -1056,17 +1056,22 @@ void  c_Sim::do_highenergy_cooling(int cell) {
     double mul = photocooling_multiplier;
     double red = beta * mul;
 
-    //if(steps==200)
+    if(steps==200 && cell==100)
+	cout<<" HI 200 STEPS AND 100 CELLS pos 1"<<endl;
 	// cout<<cell<<" = j, tau ="<<tau<<" beta = "<<beta<<" red = "<<red<<" photocool_multiplier = "<<photocooling_multiplier<<endl;
 
+    for(int s=0; s<num_species; s++) //Safety test: set all factors to zero
+       species[s].dG(cell)=0;
     
     if (e_idx > -1) {
-        
+         
         double ne = species[e_idx].prim[cell].number_density;
         double Te = species[e_idx].prim[cell].temperature;
         double dT = 1e-5;
         species[e_idx].dG(cell) = 0;
         
+	if(steps==200 && cell==100)
+             cout<<" HI 200 STEPS AND 100 CELLS AND WE HAVE ELECTRONS, pos2 totalcool = "<<species[e_idx].dG(cell)<<endl;
         
         if( e_idx!=-1 && hnull_idx!=-1 && hplus_idx!=-1  ) { //If all species are there - H0, H+ and e-
             std::array<double, 3> nX = {
@@ -1081,7 +1086,7 @@ void  c_Sim::do_highenergy_cooling(int cell) {
         if( C_idx!=-1 && e_idx!=-1 ) { 
             double nc   = species[C_idx].prim[cell].number_density;
             
-            species[e_idx].dG(cell)   =  nc * ne * red * C_cooling(Te, ne); 
+            species[e_idx].dG(cell)   -=  nc * ne * red * C_cooling(Te, ne); 
             species[e_idx].dGdT(cell) -=  nc * ne * red * dfdx2(C_cooling, Te, dT, ne);
         }
         if( Cp_idx!=-1 && e_idx!=-1 ) { 
@@ -1101,7 +1106,7 @@ void  c_Sim::do_highenergy_cooling(int cell) {
             species[e_idx].dGdT(cell) -= ncpp * ne * 4 * 1.426e-27 * 1.3 * 0.5 /std::sqrt(Te) * mul;
         }
         if( O_idx!=-1 && e_idx!=-1 ) { 
-            if(steps == 3113e99 && cell==100) {
+            if(steps == 311 && cell==100) {
                 cout<<"species[O_idx].dG(cell) before assignment = "<<species[O_idx].dG(cell);
             }
             
@@ -1110,12 +1115,12 @@ void  c_Sim::do_highenergy_cooling(int cell) {
             species[e_idx].dG(cell)   -=  no * ne * red * O_cooling(Te, ne); 
             species[e_idx].dGdT(cell) -=  no * ne * red * dfdx2(O_cooling, Te, dT, ne);
             
-            if(steps == 3113e99 && cell==100) {
+            if(steps == 311 && cell==100) {
                     cout<<"species[O_idx].dG(cell) = "<<species[O_idx].dG(cell)<<" parts = "<< no<<"/"<<ne<<"/"<<red<<"/"<<O_cooling(Te, ne)<<"/"<<Te<<" product = "<< no * ne * red * O_cooling(Te, ne)<<endl;
             }
         }
         if( Op_idx!=-1 && e_idx!=-1 ) { 
-            if(steps == 3113e99 && cell==100) {
+            if(steps == 311 && cell==100) {
                 cout<<"species[Op_idx].dG(cell) before assignment = "<<species[Op_idx].dG(cell);
             }
             
@@ -1126,7 +1131,7 @@ void  c_Sim::do_highenergy_cooling(int cell) {
             species[e_idx].dGdT(cell) -= nop * ne * red * dfdx2(Op_cooling, Te, dT, ne);
             species[e_idx].dGdT(cell) -= nop * ne * 1.426e-27 * 1.3 * 0.5 /std::sqrt(Te) * mul;
             
-            if(steps == 3113e99 && cell==100) {
+            if(steps == 311 && cell==100) {
                     cout<<"species[Op_idx].dG(cell) = "<<species[Op_idx].dG(cell)<<" parts = "<< nop<<"/"<<ne<<"/"<<red<<"/"<<Op_cooling(Te,ne)<<"/"<<Te<<" product = "<< nop * ne * red * Op_cooling(Te,ne)<<endl;
                     cout<<"species[Op_idx].dG(cell) = "<<species[Op_idx].dG(cell)<<" parts = "<< nop<<"/"<<ne<<"/"<<sqrt(Te)<<"/"<<mul<< " product = "<<nop * ne * 1.426e-27 * 1.3 * sqrt(Te) * mul<<endl;
             }
@@ -1139,26 +1144,37 @@ void  c_Sim::do_highenergy_cooling(int cell) {
             species[e_idx].dGdT(cell) -= nopp * ne * red * dfdx2(Opp_cooling, Te, dT, ne);
             species[e_idx].dGdT(cell) -= nopp * ne * 4 * 1.426e-27 * 1.3 * 0.5 /std::sqrt(Te) * mul;
             
-            if(steps == 3113e99 && cell==100) {
+            if(steps == 311 && cell==100) {
                     cout<<"species[Opp_idx].dG(cell) = "<<species[Opp_idx].dG(cell)<<" parts = "<< nopp<<"/"<<ne<<"/"<<red<<"/"<<Opp_cooling(Te,ne)<<"/"<<Te<<endl;
                     cout<<"species[Opp_idx].dG(cell) = "<<species[Opp_idx].dG(cell)<<" parts = "<< nopp<<"/"<<ne<<"/"<<sqrt(Te)<<"/"<<mul<<endl;
             }
         }
+
+	if(cell<=2) //Zero cooling in ghost cell
+		species[e_idx].dG(cell) = 0.;
         
         if( h3plus_idx!=-1 && e_idx!=-1 ) { 
             double n3p   = species[h3plus_idx].prim[cell].number_density;
             species[e_idx].dG(cell)   -=  n3p * ne * red * h3plus_cooling(Te); 
             species[e_idx].dGdT(cell) -=  n3p * ne * red * dfdx(h3plus_cooling, Te, dT);
         }
+
+	if(steps==200 && cell==100)
+              cout<<" HI 200 STEPS AND 100 CELLS AND WE HAVE ELECTRONS, pos3 FINAL totalcool = "<<species[e_idx].dG(cell)<<endl;
     }
-    if(steps == 3113e99 && cell==100) {
+
+
+    if(steps==200 && cell==100)
+              cout<<" HI 200 STEPS AND 100 CELLS AFTER ALL COOL, pos4 dG[electrons] = "<<species[e_idx].dG(cell)<<endl;
+
+    if(steps == 200 && cell==100) {
         for(int s=0; s<num_species; s++)
             cout<<"in highenergy cooling, cooling s = "<<species[s].speciesname<<" = "<< species[s].dG(cell)<<" + " << species[s].dGdT(cell)<<endl;
         
         std::array<double, 3> nX = {
                         species[hnull_idx].prim[cell].number_density,
                         species[hplus_idx].prim[cell].number_density,
-                        species[e_idx].prim[cell].number_density};
+                        species[e_idx].prim[cell].number_density   };
             
         double Te = species[e_idx].prim[100].temperature;
 	double ne = species[e_idx].prim[100].number_density;
@@ -1170,6 +1186,9 @@ void  c_Sim::do_highenergy_cooling(int cell) {
         cout<<" O0 "<<O_cooling(Te,ne)<<endl;
         cout<<" Op "<<Op_cooling(Te,ne)<<endl;
         cout<<" Opp "<<Opp_cooling(Te,ne)<<endl;
+
+	//char a;
+	//cin>>a;
     }
         
 }
