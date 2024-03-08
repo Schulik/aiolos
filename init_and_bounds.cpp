@@ -1583,7 +1583,7 @@ void c_Species::initialize_hydrostatic_atmosphere(string filename) {
             //if(speciesname.compare("e-")==0 ) { //Force light electrons to be the same number as protons
                 
                 //int p_index = base->get_species_index("H+");
-                int p_index = base->get_species_index("S1 H+ p+ p", 0);
+                int p_index = base->get_species_index("S1 H+ p+ p Hp", 0);
                 if(p_index < 0) {
                     cout<<" IN HYDROSTAT CONSTRUCTION for e-: Protons (H+) species not found! "<<endl;
                 }

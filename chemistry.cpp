@@ -556,11 +556,11 @@ Vector_t c_Sim::solver_cchem_implicit_general(double dtt, int cell, int cdebug, 
         //
         //for(c_photochem_reaction& reaction : photoreactions) {
         for(int pr=0; pr < num_photoreactions; pr++) {
-            
+            int ieduct = 0;
             if(photoreactions[pr].band >= b) {
-                
-                ntot_b    +=  photoreactions[pr].branching_ratio * n_olds[photoreactions[pr].educts[0]];
-                tau_tot_b +=  photoreactions[pr].branching_ratio * n_olds[photoreactions[pr].educts[0]] * species[photoreactions[pr].educts[0]].opacity_twotemp(cell, b) * species[photoreactions[pr].educts[0]].mass_amu*amu ;
+                ieduct    = photoreactions[pr].educts[0];
+                ntot_b    +=  n_olds[ieduct];
+                tau_tot_b +=  n_olds[ieduct] * species[ieduct].opacity_twotemp(cell, b) * species[ieduct].mass_amu*amu ;
                 
             }
             
@@ -568,7 +568,7 @@ Vector_t c_Sim::solver_cchem_implicit_general(double dtt, int cell, int cdebug, 
         ntot_b    *= n_tot;
         tau_tot_b *= n_tot*ds; 
 
-	std::vector<double> reac_e_stoch;
+        std::vector<double> reac_e_stoch;
         std::vector<double> reac_p_stoch;
         std::vector<int> reac_educts;
         std::vector<int> reac_products;
@@ -596,10 +596,11 @@ Vector_t c_Sim::solver_cchem_implicit_general(double dtt, int cell, int cdebug, 
                     double dfdn = 0.;
                     double dfdn_po = 0.;
                     double kappa = species[ei].opacity_twotemp(cell, b) * species[reac_educts[0]].mass_amu*amu; 
+                    double expm1_tau_tot_b = std::expm1(-tau_tot_b);
                     
                     dtau    = ds*kappa*n_olds[ei]*n_tot;       //Note that dtau is not generally tau_tot_b, because optically thin photons need to be split between all absorbants
                     dfdn    = dtt*F*kappa/ n_tot * branching;  
-                    dfdn   *= (dtau * std::exp(-tau_tot_b) - std::expm1(-tau_tot_b) * (1. - dtau/tau_tot_b)  ) / tau_tot_b;
+                    dfdn   *= (dtau * std::exp(-tau_tot_b) - expm1_tau_tot_b * (1. - dtau/tau_tot_b)  ) / tau_tot_b;
                     
                     dfdn_po = -dfdn*n_olds[ei];  //df/dn|k * n^k
                     
@@ -622,7 +623,7 @@ Vector_t c_Sim::solver_cchem_implicit_general(double dtt, int cell, int cdebug, 
                         reaction_b_ptr[loc_thr](pj)          += reac_p_stoch[pj] * dfdn_po;
                     }
                     
-                    t1     += dtt*F/ds/n_tot * branching * (-std::expm1(-tau_tot_b)) * dtau/tau_tot_b;
+                    t1     += dtt*F/ds/n_tot * branching * (-expm1_tau_tot_b) * dtau/tau_tot_b;
                 }
                 
                 //
@@ -874,11 +875,11 @@ void c_Sim::update_dS_jb_photochem(int cell) {
                 //
                 int ej = reaction.educts[0]; 
                 chem_momentum_matrix(ej, ej) += dt * reaction.dndt_old;
-                //momentum_b(ej)               += dt * reaction.dndt_old;
+                momentum_b(ej)               += dt * reaction.dndt_old;
                 
                 for(int& pj : reaction.products) {
                         chem_momentum_matrix(pj, ej) -= dt * reaction.dndt_old * species[pj].mass_amu/reaction.products_total_mass;
-                        //momentum_b(pj)               -= dt * reaction.dndt_old * species[pj].mass_amu/reaction.products_total_mass;
+                        momentum_b(pj)               -= dt * reaction.dndt_old * species[pj].mass_amu/reaction.products_total_mass;
                         
                         //cout<<" from "<<species[ej].speciesname<<" to "<<species[pj].speciesname<<endl;
                 }
@@ -1024,15 +1025,16 @@ void c_Sim::update_dS_jb_photochem(int cell) {
         
         //species[2].dS(cell) -= dEk2/dt;
         
-        if(globalTime > 1e50) {
+        //if(globalTime > 1e50) {
+        if(steps%300==0 && cell==111) {
             
             for (int s = 0; s < num_species; s++) {
-                cout<<endl<<" s = "<<species[s].speciesname<<" mom_news(s) = "<<mom_news(s)<<" dm = "<<(mom_news(s)-mom[s])<<" dm_rel = "<<(1.-mom_news(s)/mom[s])<<" n = "<<n_olds[s]<<endl;
+                cout<<" s = "<<species[s].speciesname<<" mom_news(s) = "<<mom_news(s)<<" dm = "<<(mom_news(s)-mom[s])<<" dm_rel = "<<(1.-mom_news(s)/mom[s])<<" n = "<<n_olds[s]<<endl;
             }
             cout<<" final dmom_tot = "<<dmom_tot<<" with dI = "<<photoreactions[0].dndt_old<<" dEk/dt = "<<dEk2/dt<<endl;
             
-            char cc;
-            cin>>cc;    
+            //char cc;
+            //cin>>cc;    
             
             
         }
