@@ -150,6 +150,9 @@ void c_Sim::execute() {
         // Step 0: Hydrodynamics, if so desired
         //
 
+	//if (do_hydrodynamics == 1) 
+        //    compute_drag_update() ;
+
         if (do_hydrodynamics == 1) {
         
             for(int s = 0; s < num_species; s++)

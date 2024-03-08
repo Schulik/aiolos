@@ -632,9 +632,13 @@ public:
     int C_idx;
     int Cp_idx;
     int Cpp_idx;
+    int C3p_idx;
+    int C4p_idx;
     int O_idx;
     int Op_idx;
     int Opp_idx;
+    int O3p_idx;
+    int O4p_idx;
     int h3plus_idx;
     
     //int radiation_solver;

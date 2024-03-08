@@ -393,7 +393,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, s
             if(!file) {
                 cout<<"Couldnt open wavebins file "<<wavebinsfile<<"!!!!!!!!!!1111"<<endl;
             }
-		else {
+	    else {
 		cout<<"Opening wavebins file "<<wavebinsfile<<"..";;
 	    }
 
@@ -401,7 +401,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, s
 		int b_current = 1;
 
             	while(std::getline( file, line )) {
-			if(b_current == num_bands_in-1)
+			if(b_current == num_bands_in)
 				break;
 			cout<<" band b = "<<b_current<<" / current l_i_in[b] ="<<l_i_in[b_current];
         	        std::vector<string> stringlist = stringsplit(line," ");
@@ -927,7 +927,9 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, s
             
             double tempenergy = 0.;
             int cnt = 0;
-            
+            double dlam = 0;
+	    double lastlam = 0;
+
             double flux;
             double lam;
             
@@ -945,14 +947,19 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, s
                 flux  = std::stod(stringlist[1]);
                 
                 if(lam > l_i_in[b] && lam < l_i_in[b+1]) {
-                    tempenergy += lam*flux;
+		   if(cnt==0)
+			lastlam = l_i_in[b];
+
+		    dlam = lam-lastlam;
+		    lastlam = lam;
+                    tempenergy += dlam*flux;
                     cnt++;
                 }
              }
              file.close();
              
              if(cnt > 0) {
-                 tempenergy /= (double)cnt;
+                 //tempenergy /= (double)cnt;
                  solar_heating(b) += tempenergy * fluxmultiplier;
                  templumi += solar_heating(b);
                  solar_heating_final(b) += solar_heating(b);
@@ -965,8 +972,8 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, s
 	  //  }
 
             cout<<"SOLAR HEATING read from file in bin "<<b;
-            cout<<" from/to lmin/lmax"<<l_i_in[b];
-            cout<<" is F = "<<solar_heating(b)<<endl;
+            cout<<" from/to lmin/lmax"<<l_i_in[b]<<"/"<<l_i_in[b+1];
+            cout<<" is F = "<<solar_heating(b)<<" w/ datapoints ="<<cnt<<endl;
         }
         
     }
@@ -1947,7 +1954,8 @@ void c_Species::apply_boundary_left(std::vector<AOS>& u) {
 			prim.speed = -this->prim[2].speed * base->wavedamp_factor;
 		    else
 	                prim.speed   = this->prim[2].speed;
-                    prim.temperature = const_T_space;
+                    prim.temperature = this->prim[2].temperature;
+                    //prim.temperature = const_T_space;
                 }
                 
                 eos->update_eint_from_T(&(prim), 1);

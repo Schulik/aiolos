@@ -16,9 +16,13 @@ extern double HOnly_cooling(const std::array<double, 3> nX, double Te);
 extern double C_cooling(double Te, double ne);
 extern double Cp_cooling(double Te, double ne);
 extern double Cpp_cooling(double Te, double ne);
+extern double C3p_cooling(double Te, double ne);
+extern double C4p_cooling(double Te, double ne);
 extern double O_cooling(double Te, double ne);
 extern double Op_cooling(double Te, double ne);
 extern double Opp_cooling(double Te, double ne);
+extern double O3p_cooling(double Te, double ne);
+extern double O4p_cooling(double Te, double ne);
 extern double h3plus_cooling(double Te);
 
 std::vector<double> get_thermo_variables(double T,string species_string);
@@ -307,7 +311,7 @@ void c_Sim::do_chemistry(double dt_chem) {
     
     #pragma omp parallel for schedule(static,5)
 //    for (int j = num_cells+1; j >= 0; j--) {
-    for (int j = imaxchem; j >= 0; j--) {  //imaxchem is num_cells+1 by default
+    for (int j = imaxchem; j >= 2; j--) {  //imaxchem is num_cells+1 by default
         
        
 
@@ -834,10 +838,29 @@ void c_Sim::update_dS_jb_photochem(int cell) {
                 
                 //Distribute energy according to mass
                 for(int& pj : reaction.products) {
-                    if(reaction.count_p == 1)
-                        species[pj].dS(cell) += fractional_dS;
+                    if(reaction.count_p == 1) {
+
+			if(cell>5) {
+                                 species[pj].dS(cell) += 1.0 * fractional_dS;
+                                 //species[pj].dS(cell-1) += 0.3  * fractional_dS;
+                                 //species[pj].dS(cell-2) += 0.15 * fractional_dS;
+                                 //species[pj].dS(cell-3) += 0.10 * fractional_dS;
+			}
+			else
+                                 species[pj].dS(cell) += fractional_dS;
+		    }
                     else {
-                        species[pj].dS(cell) += fractional_dS * reaction.energy_split_factor/species[pj].mass_amu;
+
+			if(cell>5) {
+				double heat = fractional_dS * reaction.energy_split_factor/species[pj].mass_amu;
+                        	species[pj].dS(cell)   += 1.0  * heat;
+                        	//species[pj].dS(cell-1) += 0.30 * heat;
+                        	//species[pj].dS(cell-2) += 0.15 * heat;
+                        	//species[pj].dS(cell-3) += 0.10 * heat;
+			}
+			else {
+                        	species[pj].dS(cell) += fractional_dS * reaction.energy_split_factor/species[pj].mass_amu;
+			}
                     }
                 }
                 
@@ -1028,9 +1051,13 @@ void c_Sim::init_highenergy_cooling_indices()
     C_idx     = get_species_index("S4 C0 C",1);
     Cp_idx    = get_species_index("S5 C+ Cp",1);
     Cpp_idx   = get_species_index("S6 C++ Cpp",1);
+    C3p_idx   = get_species_index("C+++ C3p",1);
+    C4p_idx   = get_species_index("C++++ C4p",1);
     O_idx     = get_species_index("S7 O O0",1);
     Op_idx    = get_species_index("S8 O+ Op",1);
-    Opp_idx   = get_species_index("S9 Opp C++",1);
+    Opp_idx   = get_species_index("S9 Opp O++",1);
+    O3p_idx   = get_species_index("O3p O+++",1);
+    O4p_idx   = get_species_index("O4p O++++",1);
     h3plus_idx = get_species_index("H3+",1);
 }
 
@@ -1105,11 +1132,18 @@ void  c_Sim::do_highenergy_cooling(int cell) {
             species[e_idx].dGdT(cell) -= ncpp * ne * red * dfdx2(Cpp_cooling, Te, dT, ne);
             species[e_idx].dGdT(cell) -= ncpp * ne * 4 * 1.426e-27 * 1.3 * 0.5 /std::sqrt(Te) * mul;
         }
+	if( C3p_idx!=-1 && e_idx!=-1) { 
+            double nc3p = species[C3p_idx].prim[cell].number_density;
+            species[e_idx].dG(cell) -= nc3p * ne * red * C3p_cooling(Te, ne); 
+        }
+	if( C4p_idx!=-1 && e_idx!=-1) { 
+            double nc4p = species[C4p_idx].prim[cell].number_density;
+            species[e_idx].dG(cell) -= nc4p * ne * red * C4p_cooling(Te, ne); 
+        }
         if( O_idx!=-1 && e_idx!=-1 ) { 
             if(steps == 311 && cell==100) {
                 cout<<"species[O_idx].dG(cell) before assignment = "<<species[O_idx].dG(cell);
-            }
-            
+            }            
             double no   = species[O_idx].prim[cell].number_density;
             //species[O_idx].dG(cell) = 0;
             species[e_idx].dG(cell)   -=  no * ne * red * O_cooling(Te, ne); 
@@ -1149,6 +1183,17 @@ void  c_Sim::do_highenergy_cooling(int cell) {
                     cout<<"species[Opp_idx].dG(cell) = "<<species[Opp_idx].dG(cell)<<" parts = "<< nopp<<"/"<<ne<<"/"<<sqrt(Te)<<"/"<<mul<<endl;
             }
         }
+	if( O3p_idx!=-1 && e_idx!=-1) { 
+            double no3p = species[O3p_idx].prim[cell].number_density;
+            species[e_idx].dG(cell) -= no3p * ne * red * O3p_cooling(Te, ne);
+        }
+	if( O4p_idx!=-1 && e_idx!=-1) { 
+            double no4p = species[O4p_idx].prim[cell].number_density;
+            species[e_idx].dG(cell) -= no4p * ne * red * O4p_cooling(Te, ne);
+		if(steps == 311 && cell==100) {
+                     cout<<"species[O4p_idx].dG(cell) = "<<species[O4p_idx].dG(cell)<<" parts = "<< no4p<<"/"<<ne<<"/"<<red<<"/"<<O4p_cooling(Te,ne)<<"/"<<Te<<endl;
+		}
+        }
 
 	if(cell<=2) //Zero cooling in ghost cell
 		species[e_idx].dG(cell) = 0.;
@@ -1167,7 +1212,7 @@ void  c_Sim::do_highenergy_cooling(int cell) {
     if(steps==200 && cell==100)
               cout<<" HI 200 STEPS AND 100 CELLS AFTER ALL COOL, pos4 dG[electrons] = "<<species[e_idx].dG(cell)<<endl;
 
-    if(steps == 200 && cell==100) {
+    if(steps == 200 && cell==100e99) {
         for(int s=0; s<num_species; s++)
             cout<<"in highenergy cooling, cooling s = "<<species[s].speciesname<<" = "<< species[s].dG(cell)<<" + " << species[s].dGdT(cell)<<endl;
         

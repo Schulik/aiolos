@@ -178,22 +178,35 @@ void c_Species::update_kzz_and_gravpot(int argument) {
     int homopause_boundary_i = 0;
     double mu = base->species[0].mass_amu;
     double mi = this->mass_amu;
+    double slope = 1;
     
-    if(argument > 0 && mi > 1e-3) { //Do the kzz buildup for all other species except atomic hydrogen (assumed species[0]) and no electrons (mass = 5e-4).
+    if(argument > 0) { //Do the kzz buildup for all other species except atomic hydrogen (assumed species[0]) and no electrons (mass = 5e-4).
+    //if(argument > 0 && mi > 1e-3) { //Do the kzz buildup for all other species except atomic hydrogen (assumed species[0]) and no electrons (mass = 5e-4).
         
         for(int i=0; i<num_cells+2; i++) {
             double n   = base->species[0].prim[i].number_density;
             double kzz = base->K_zz[i]; //This is a meta-parameter for k_zz/b 
             double par = std::pow(n, 1./1.);
             
-            K_zzf[i] = (1. + kzz*par*mu/mi) / (1. + kzz*par);
+            //K_zzf[i] = (1. + kzz*par*mu/mi) / (1. + kzz*par); //This is some old formulation i've tried, supposedly better for smooth kzz profiles, but somethings wrong with it, cant remember
             if(kzz*n < 1.)
                 K_zzf[i] = 1.;
-            else
-                K_zzf[i] = mu/mi;
-            
+            else {
+		K_zzf[i] = mu/mi;
+                slope    = mu/mi;
+	    }
+	
+	    //special treatment for electrons: create zero gradient below approx. ionisation radius (ignoring homopause), so that they don't drop anymore
+	    if(mi < 0.5) {
+		if(base->x_i12[i] < 0. * base->x_i12[2])
+			K_zzf[i] = mu/mi; //-2e-1;
+			slope    = mu/mi; //+1e-3;
+            }
+
+
             double one = 0.99999;
-            if(K_zzf[i] > one && K_zzf[i-1] < one) //found homopause
+            //if(K_zzf[i] > one && K_zzf[i-1] < one) //found homopause
+            if( std::fabs(K_zzf[i] - 1.) < 1e-5 && std::fabs( K_zzf[i-1] - 1.) > 1e-5) //found homopause
                 homopause_boundary_i = i;
         }
             
@@ -207,12 +220,22 @@ void c_Species::update_kzz_and_gravpot(int argument) {
     for(int i=0; i<num_cells+2; i++) {
                 phi_s[i] = base->phi[i] * K_zzf[i];
     }
-    double phicorrection = base->phi[homopause_boundary_i]*(1.-mu/mi); //Correct for the jump in Phi at the homopause
+    double phicorrection = base->phi[homopause_boundary_i]*(1.-slope); //Correct for the jump in Phi at the homopause
+    if(mi < 1e-3){
+		cout<<"in electron phicorrection before:"<<phicorrection<<" homopause boundary = "<<homopause_boundary_i<<endl;
+		cout<<"current phi_s[homo_i] "<<phi_s[homopause_boundary_i]<<" +correction: "<<phi_s[homopause_boundary_i]+phicorrection<<endl;
+		cout<<"current phi_s[homo_i/2] "<<phi_s[homopause_boundary_i/2]<<" +correction: "<<phi_s[homopause_boundary_i/2]+phicorrection<<endl;
+	        //phicorrection *= -1;
+		//cout<<"phicorrection after:"<<phicorrection<<endl;
+		//double hh;
+		//cin>>hh;
+	}
+
     if(homopause_boundary_i == 0)
         phicorrection = 0;
     
     for(int i=0; i<homopause_boundary_i; i++) 
-        phi_s[i] += phicorrection;
+        phi_s[i] += 1. * phicorrection;
     
     //cout<<"s = "<<argument<<" phicorr = "<<phicorrection<<" homopause_i = "<<homopause_boundary_i<<endl;
     //cout<<"Finished updating kzz in species "<<speciesname<<endl;

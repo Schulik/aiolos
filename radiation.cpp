@@ -295,6 +295,9 @@ void c_Sim::update_dS_jb(int j, int b) {
                         species[s].dS(j)  += no_rad_trans * highenergy_switch(s,b) * dS_band(j,b) * species[s].fraction_total_solar_opacity(j,b);
                         if(species[s].dS(j) < 1e-50)
                             species[s].dS(j) = 0.;
+
+			if(j<=1)
+			 	species[s].dS(j) = 0.;
                         
                         if(species[s].dG(j) > -1e-50)
                             species[s].dG(j) = 0.;

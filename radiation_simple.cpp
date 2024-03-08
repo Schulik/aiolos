@@ -390,7 +390,7 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
                 int idx_s = j * (num_species) + si;
                 //double tt = eta1[idx_s]/denoms[idx_s] + eta2[idx_s]/denoms[idx_s]*Jrad_FLD(j, 0);
                 
-                if(tt < 0. && j > 0) {
+                if(tt < 0. && j > 0 && false) {
                     cout<<" negative T after TiTj s = "<<species[si].speciesname<<" j/s = "<<j<<"/"<<si<<" eta1/eta2/J = "<<eta1[idx_s]<<"/"<<eta2[idx_s]<<"/"<<Jrad_FLD(j, 0)<<" denom/eta2*J = "<<denoms[idx_s]<<"/"<<eta2[idx_s]*Jrad_FLD(j,0)<<" t/dt/steps = "<<globalTime<<"/"<<ddt<<"/"<<steps<<endl;
                     
                     for(int ss=0; ss<num_species; ss++)
