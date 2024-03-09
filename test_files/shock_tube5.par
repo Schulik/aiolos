@@ -18,7 +18,7 @@ PARI_INIT_DATA_U3R      0.01
 PARI_INIT_SHOCK_MID      0.8
 PARI_NUM_SPECIES        1
 
-
+SPECIES_FILE            mix3.spc
 OUTPUT_FILENAME         test_files/shock_tube5
 
 
