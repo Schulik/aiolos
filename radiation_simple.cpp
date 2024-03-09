@@ -318,7 +318,7 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
             double   tau = total_opacity(j,0) * (x_i12[j+1]-x_i12[j]);
             double security_multiplier = tau<1e3?1.:1.e-4;
             
-            if(update_coll_frequently) {
+            if(update_coll_frequently && j>=2) {
                 fill_alpha_basis_arrays(j);
                 compute_alpha_matrix(j);
             }

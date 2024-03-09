@@ -570,7 +570,7 @@ Vector_t c_Sim::solver_cchem_implicit_general(double dtt, int cell, int cdebug, 
 
         std::vector<double> reac_e_stoch;
         std::vector<double> reac_p_stoch;
-        std::vector<int> reac_educts;
+        //std::vector<int> reac_educts;
         std::vector<int> reac_products;
 
         //for(c_photochem_reaction& reaction : photoreactions) {
@@ -580,7 +580,9 @@ Vector_t c_Sim::solver_cchem_implicit_general(double dtt, int cell, int cdebug, 
             
                 reac_e_stoch = photoreactions[pr].e_stoch;
                 reac_p_stoch = photoreactions[pr].p_stoch;
-                reac_educts     = photoreactions[pr].educts;
+                //reac_educts     = photoreactions[pr].educts; //A list of indices, but this is only one index
+                int ei  = photoreactions[pr].educts[0];
+                int ej = ei;
                 reac_products   = photoreactions[pr].products;
                 double branching                 = photoreactions[pr].branching_ratio;
                 double dndt_local = 0. ;
@@ -590,12 +592,12 @@ Vector_t c_Sim::solver_cchem_implicit_general(double dtt, int cell, int cdebug, 
                 //
                 double t1    = 0.;
                 
-                for(int& ei : reac_educts) { //We assume that photochem reactions look likes reaction.educts[ei] + hv -> products, but leave the more general case open here
-                    
+                //for(int& ei : reac_educts) { //We assume that photochem reactions look likes reaction.educts[ei] + hv -> products, but leave the more general case open here
+                if(true) {    
                     double dtau = 0.;
                     double dfdn = 0.;
                     double dfdn_po = 0.;
-                    double kappa = species[ei].opacity_twotemp(cell, b) * species[reac_educts[0]].mass_amu*amu; 
+                    double kappa = species[ei].opacity_twotemp(cell, b) * species[ei].mass_amu*amu; 
                     double expm1_tau_tot_b = std::expm1(-tau_tot_b);
                     
                     dtau    = ds*kappa*n_olds[ei]*n_tot;       //Note that dtau is not generally tau_tot_b, because optically thin photons need to be split between all absorbants
@@ -610,10 +612,10 @@ Vector_t c_Sim::solver_cchem_implicit_general(double dtt, int cell, int cdebug, 
                     // and adds dfdn*n to b for this educt
                     //
                     //
-                    for(int& ej : reac_educts ) {
+                    //for(int& ej : reac_educts ) {
                         reaction_matrix_ptr[loc_thr](ei, ej) += reac_e_stoch[ej] * dfdn;           //Change e_stoch j --> ej!
                         reaction_b_ptr[loc_thr](ej)          -= reac_e_stoch[ej] * dfdn_po;
-                    }
+                    //}
                     
                     //
                     //Now add reaction term in column for products
@@ -629,10 +631,10 @@ Vector_t c_Sim::solver_cchem_implicit_general(double dtt, int cell, int cdebug, 
                 //
                 // Write the RHS of the Matrix equation
                 //
-                for(int& ei : reac_educts) {
+                //for(int& ei : reac_educts) {
                     reaction_b_ptr[loc_thr](ei)          -= reac_e_stoch[ei] * t1; 
                     dndt_local                           -= reac_e_stoch[ei] * t1 / (dtt * n_olds[ei]); //Total momentum correction term
-                }
+                //}
                 
                 for(int& pi : reac_products) {
                     reaction_b_ptr[loc_thr](pi)            += reac_p_stoch[pi] * t1;
