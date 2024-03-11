@@ -759,7 +759,8 @@ Vector_t c_Sim::solver_cchem_implicit_general(double dtt, int cell, int cdebug, 
 void c_Sim::update_dS_jb_photochem(int cell) {
     
     Vector_t n_olds          = Vector_t(num_species);
-    double   n_tot = 0.;
+    double  n_tot = 0.;
+    double ndot_multiplier =1e0;
     
     chem_momentum_matrix = Matrix_t::Zero(num_species, num_species);
     momentum_b           = Vector_t(num_species);
@@ -823,7 +824,7 @@ void c_Sim::update_dS_jb_photochem(int cell) {
                 //
 		dlognu = 1.;
 		double eratio = reaction.threshold_energy/photon_energies[b];
-                double eratio2 = reaction.threshold_energy/photon_energies[b+1];
+        double eratio2 = reaction.threshold_energy/photon_energies[b+1];
 		if(b == reaction.band) { //When we sit in the band just above the ionisation threshold, we need to check that it might be that E_lower[b] < E_ion but E_higher[b] > E_ion
 			
 			dlognu = (1. - eratio2 * std::log( 1. + 1./eratio2) );
@@ -843,27 +844,28 @@ void c_Sim::update_dS_jb_photochem(int cell) {
                 for(int& pj : reaction.products) {
                     if(reaction.count_p == 1) {
 
-			if(cell>5) {
-                                 species[pj].dS(cell) += 1.0 * fractional_dS;
-                                 //species[pj].dS(cell-1) += 0.3  * fractional_dS;
-                                 //species[pj].dS(cell-2) += 0.15 * fractional_dS;
-                                 //species[pj].dS(cell-3) += 0.10 * fractional_dS;
-			}
-			else
-                                 species[pj].dS(cell) += fractional_dS;
-		    }
-                    else {
+                        if(cell>5) {
+                                            species[pj].dS(cell) += 1.0 * fractional_dS;
+                                            //species[pj].dS(cell-1) += 0.3  * fractional_dS;
+                                            //species[pj].dS(cell-2) += 0.15 * fractional_dS;
+                                            //species[pj].dS(cell-3) += 0.10 * fractional_dS;
+                        } else {
+                            species[pj].dS(cell) += fractional_dS;
+                        }
+                                            
+                        
+                    } else {
 
-			if(cell>5) {
-				double heat = fractional_dS * reaction.energy_split_factor/species[pj].mass_amu;
-                        	species[pj].dS(cell)   += 1.0  * heat;
-                        	//species[pj].dS(cell-1) += 0.30 * heat;
-                        	//species[pj].dS(cell-2) += 0.15 * heat;
-                        	//species[pj].dS(cell-3) += 0.10 * heat;
-			}
-			else {
-                        	species[pj].dS(cell) += fractional_dS * reaction.energy_split_factor/species[pj].mass_amu;
-			}
+                        if(cell>5) {
+                            double heat = fractional_dS * reaction.energy_split_factor/species[pj].mass_amu;
+                                        species[pj].dS(cell)   += 1.0  * heat;
+                                        //species[pj].dS(cell-1) += 0.30 * heat;
+                                        //species[pj].dS(cell-2) += 0.15 * heat;
+                                        //species[pj].dS(cell-3) += 0.10 * heat;
+                        }
+                        else {
+                                        species[pj].dS(cell) += fractional_dS * reaction.energy_split_factor/species[pj].mass_amu;
+                        }
                     }
                 }
                 
@@ -876,12 +878,12 @@ void c_Sim::update_dS_jb_photochem(int cell) {
                 // Momentum terms
                 //
                 int ej = reaction.educts[0]; 
-                chem_momentum_matrix(ej, ej) += dt * reaction.dndt_old;
-                momentum_b(ej)               += dt * reaction.dndt_old;
+                chem_momentum_matrix(ej, ej) += dt * reaction.dndt_old * ndot_multiplier;
+                momentum_b(ej)               += dt * reaction.dndt_old * ndot_multiplier;
                 
                 for(int& pj : reaction.products) {
-                        chem_momentum_matrix(pj, ej) -= dt * reaction.dndt_old * species[pj].mass_amu/reaction.products_total_mass;
-                        momentum_b(pj)               -= dt * reaction.dndt_old * species[pj].mass_amu/reaction.products_total_mass;
+                        chem_momentum_matrix(pj, ej) -= dt * reaction.dndt_old * species[pj].mass_amu/reaction.products_total_mass  * ndot_multiplier;
+                        momentum_b(pj)               -= dt * reaction.dndt_old * species[pj].mass_amu/reaction.products_total_mass  * ndot_multiplier;
                         
                         //cout<<" from "<<species[ej].speciesname<<" to "<<species[pj].speciesname<<endl;
                 }
@@ -910,9 +912,9 @@ void c_Sim::update_dS_jb_photochem(int cell) {
         double dLbit   = 0;
         
         for(int& ej : reaction.educts) {
-            chem_momentum_matrix(ej, ej) += 1.* dt * reaction.dndts[ej]; //reaction.dndt_old;
-            //momentum_b(ej)               += 1.* dt * reaction.dndts[ej];
-            dLbit                =  dt * reaction.dndt_old * species[ej].cv * species[ej].mass_amu * species[ej].prim[cell].temperature;
+            chem_momentum_matrix(ej, ej) += 1.* dt * reaction.dndts[ej]  * ndot_multiplier; //reaction.dndt_old;
+            momentum_b(ej)               += 1.* dt * reaction.dndts[ej]  * ndot_multiplier;
+            dLbit                =  dt * reaction.dndt_old * ndot_multiplier * species[ej].cv * species[ej].mass_amu * species[ej].prim[cell].temperature;
             dLambda              += dLbit;
             species[ej].dG(cell) += dLbit;
             
@@ -920,8 +922,8 @@ void c_Sim::update_dS_jb_photochem(int cell) {
         //momentum_b(ej)               += reaction.dndt_old;
         for(int& pj : reaction.products) {
             for(int& ej : reaction.educts) {
-                chem_momentum_matrix(pj, ej) -= 1.*dt * reaction.dndt_old * species[pj].mass_amu/reaction.products_total_mass;
-                //momentum_b(pj)               -= 1.*dt * reaction.dndt_old * species[pj].mass_amu/reaction.products_total_mass;
+                chem_momentum_matrix(pj, ej) -= 1.*dt * reaction.dndt_old  * ndot_multiplier * species[pj].mass_amu/reaction.products_total_mass;
+                momentum_b(pj)               -= 1.*dt * reaction.dndt_old  * ndot_multiplier * species[pj].mass_amu/reaction.products_total_mass;
                 //species[ej].dG(cell)         -= dLambda/reaction.products_total_mass;  //This is reaction heating, but we add it to dG, in order to be able to split it from thermal heating
             
                 //cout<<" from "<<species[ej].speciesname<<" to "<<species[pj].speciesname<<endl;
@@ -984,7 +986,7 @@ void c_Sim::update_dS_jb_photochem(int cell) {
             //std::array<double, 3> mom = { species[0].u[cell].u2, species[1].u[cell].u2, species[2].u[cell].u2 } ;
             
             //double ne = nX_bar[2], nH = nX_bar[0] ;
-            double dn_R = 0.; //(ion.R + ion.B*ne)*ne*ne*dt ;
+            double dn_R = reactions[0].dndt_old * dt; //(ion.R + ion.B*ne)*ne*ne*dt ;
             double dn_I = photoreactions[0].dndt_old * dt ;// * nX[0];// (ion.C*ne + ion.photoionization_rate(x_bar))*nH*dt ;
 
             double fe = 1/(1 + mX[2]/mX[1]), fp = 1/(1 + mX[1]/mX[2]) ;
@@ -1020,7 +1022,7 @@ void c_Sim::update_dS_jb_photochem(int cell) {
                 //0.5*(mom[0]*mom[0]*nX_new[0] / mX[0] - mX[0]*nX[0]*vX[0]*vX[0] +  mom[1]*mom[1]*nX_new[1] / mX[1] - mX[1]*nX[1]*vX[1]*vX[1] + mom[2]*mom[2]*nX_new[2] / mX[2] - mX[2]*nX[2]*vX[2]*vX[2]) ;
                 
                 vnew[s]                     = mom_news(s) / (n_olds[s]*n_tot*species[s].mass_amu*amu) ; 
-                //cout<<" vold/vnew = "<<species[s].prim[cell].speed<<"/"<<vnew[s]<<" dv = "<<vnew[s]-species[s].prim[cell].speed<<" dvrel = "<<1-vnew[s]/species[s].prim[cell].speed<<endl;
+                         //cout<<" vold/vnew = "<<species[s].prim[cell].speed<<"/"<<vnew[s]<<" dv = "<<vnew[s]-species[s].prim[cell].speed<<" dvrel = "<<1-vnew[s]/species[s].prim[cell].speed<<endl;
                 species[s].prim[cell].speed = vnew[s] ;
                 species[s].dS(cell) -= dEk2/dt;
         }
