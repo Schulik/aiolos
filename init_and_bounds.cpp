@@ -2130,7 +2130,10 @@ void c_photochem_reaction::set_base_pointer(c_Sim *base_simulation) {
     energy_split_factor /= denom;
     
     //cout<<" energy split factor = "<<energy_split_factor<<" / 1/energy_split_factor = "<<1./energy_split_factor<<" denom = "<<denom<<endl;
-    
+    //for(int& pj : products) {
+    //    cout<<"Species of mass ="<<base->species[pj].mass_amu<<" gets a fraction of energy xi/mass ="<<energy_split_factor/base->species[pj].mass_amu<<endl;
+    //}
+
     base->highenergy_switch(educts[0], this->band) = 0.;
 
     this->threshold_energy = 1.24/( base->l_i_in[this->band+1] )  * ev_to_K * kb ;

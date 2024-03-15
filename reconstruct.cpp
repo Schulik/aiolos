@@ -32,8 +32,14 @@ double MonotonizedCentralSlope(double ql, double qm, double qr,
  * Reconstruct the primitive hydro states at the cell edges based on the cell centered value and a slope, which is interpreted from the neighbouring cells.
  */
 void c_Species::reconstruct_edge_states() {
+    
+    if(base->steps > 619 && this_species_index == 1) {
+        cout<<"t="<<base->steps<<"IN RECONSTRUCT Pos 1 T[423]_s = [1]= "<<prim[423].temperature;
+        cout<<" manual pressure u_in = "<<(u[423].u3 - 0.5*u[423].u2*u[423].u2/u[423].u1)<<endl;
+    }
 
     const bool is_gas = !is_dust_like ;
+    int problematic = 0;
 
     // Step 1:
     //   1st order hydrostatic reconstruction
@@ -49,6 +55,7 @@ void c_Species::reconstruct_edge_states() {
             // TODO: add warning?
             if (prim_l[i].pres < 0 || prim_r[i].pres < 0) {
                 prim_l[i] = prim_r[i] = prim[i] ;
+                problematic += 1;
             }
         }
     }
@@ -103,8 +110,11 @@ void c_Species::reconstruct_edge_states() {
             prim_r[i].speed += slope * (x_i[ i ] - x_iVC[i]) ;
             
             if ((prim_l[i].pres < 0) || (prim_r[i].pres < 0) || 
-                (prim_l[i].density < 0) || (prim_r[i].density < 0))
-                prim_l[i] = prim_r[i] = prim[i] ;
+                (prim_l[i].density < 0) || (prim_r[i].density < 0)) {
+                    prim_l[i] = prim_r[i] = prim[i] ;
+                    problematic += 1;
+                }
+                
 
         }
     }
@@ -113,5 +123,10 @@ void c_Species::reconstruct_edge_states() {
     //   Extra thermodynamic variables
     eos->compute_auxillary(&(prim_l[0]), num_cells+2);
     eos->compute_auxillary(&(prim_r[0]), num_cells+2);
+    
+    if(base->steps > 619 && this_species_index == 1) {
+        cout<<"t="<<base->steps<<"IN RECONSTRUCT Pos -1 T[423]_s = [1]= "<<prim[423].temperature;
+        cout<<" manual pressure u_in = "<<(u[423].u3 - 0.5*u[423].u2*u[423].u2/u[423].u1)<<" problematic = "<<problematic<<" lr pressures = "<<prim_l[423].pres<<"/"<<prim_r[423].pres<<endl;
+    }
 
 } 

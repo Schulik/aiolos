@@ -313,8 +313,6 @@ void c_Sim::do_chemistry(double dt_chem) {
 //    for (int j = num_cells+1; j >= 0; j--) {
     for (int j = imaxchem; j >= 2; j--) {  //imaxchem is num_cells+1 by default
         
-       
-
         //std::vector<double> n_init = np_zeros(num_species);
         //std::vector<double> n_tmp  = np_zeros(num_species);
         Vector_t n_init = Vector_t(num_species);
@@ -402,28 +400,31 @@ void c_Sim::do_chemistry(double dt_chem) {
             if(n_tmp(s) < chemistry_numberdens_floor)
                 n_tmp(s) = chemistry_numberdens_floor;
 
-	   if(false && species[s].this_species_index == e_idx) //Force electrons to balance out the charges per cell
-		n_tmp(s) = std::fabs(charge_imbalance);
+            if(false && species[s].this_species_index == e_idx) //Force electrons to balance out the charges per cell
+                n_tmp(s) = std::fabs(charge_imbalance);
 		
                 
             species[s].prim[j].number_density = n_tmp(s) * n_tot;
             species[s].prim[j].density        = species[s].prim[j].number_density * species[s].mass_amu*amu;
-            //species[s].prim[cell].internal_energy *= n_news(s)/n_olds[s];
-            
-            //species[s].prim[j].speed = vX[s] ;
-            //species[s].prim[j].internal_energy = uX[s];
-            //species[s].prim[j].temperature = TX[s];
-            
-            //species[s].eos->update_eint_from_T(&species[s].prim[cell], 1);
-            species[s].eos->update_p_from_eint(&species[s].prim[j], 1);
-            species[s].eos->compute_auxillary(&species[s].prim[j], 1);
-            species[s].eos->compute_conserved(&species[s].prim[j], &species[s].u[j], 1);
         }
        
         //Correct species internal energy and momentum due to change in number density
         //Correct species internal energy due to total change in Gibbs energy dU = dG - PdV + TdS
+        //
+        // The scheme requires the variables to be semi-updated: We need dn/dt per reaction per species divided by the new number density, but 
+        // the momentum and internal energy may not be updated yet, as those are quantities we are solving for. So they get updated after update_dS_jb_photochem.
         
         update_dS_jb_photochem(j);
+        
+        // Upon return momentum and v are updated (with e, p to be confirmed). Now with prim.density, primt.v, primt.eint?? updated, recomputed auxilliaries
+        
+        for(int s=0;s<num_species; s++) {
+            
+            species[s].eos->update_p_from_eint(&species[s].prim[j], 1);
+            species[s].eos->compute_auxillary(&species[s].prim[j], 1);
+            species[s].eos->compute_conserved(&species[s].prim[j], &species[s].u[j], 1);
+        }
+        
         if(j>10)
             do_highenergy_cooling(j);
         
@@ -432,7 +433,9 @@ void c_Sim::do_chemistry(double dt_chem) {
             cout<<"in do_chemistry, cooling j = "<<j<<" for spec "<<e_idx<<" = "<< species[e_idx].dG(j)<<" + " << species[e_idx].dGdT(j)<<endl;
         }
             
-        
+        //
+        // Flooring
+        //
         for(int s=0;s<num_species; s++) {
                 
                 if(n_tmp(s) < chemistry_numberdens_floor)
@@ -535,6 +538,11 @@ Vector_t c_Sim::solver_cchem_implicit_general(double dtt, int cell, int cdebug, 
     // Photochemical reactions
     // For all bands, check participant photoreactions, construct ionization rates and generate chemical matrix entries
     //
+    
+    for(int pr=0; pr < num_photoreactions; pr++) {
+            photoreactions[pr].dndt_old = 0.;
+    }
+    
     for(int b=0; b<num_bands_in; b++) {
         
         double temptau = 0.;
@@ -575,6 +583,8 @@ Vector_t c_Sim::solver_cchem_implicit_general(double dtt, int cell, int cdebug, 
 
         //for(c_photochem_reaction& reaction : photoreactions) {
         for(int pr=0; pr < num_photoreactions; pr++) {
+            
+            //photoreactions[pr].dndt_old = 0.;
             
             if(photoreactions[pr].band >= b) {
             
@@ -633,16 +643,20 @@ Vector_t c_Sim::solver_cchem_implicit_general(double dtt, int cell, int cdebug, 
                 //
                 //for(int& ei : reac_educts) {
                     reaction_b_ptr[loc_thr](ei)          -= reac_e_stoch[ei] * t1; 
-                    dndt_local                           -= reac_e_stoch[ei] * t1 / (dtt * n_olds[ei]); //Total momentum correction term
+                    dndt_local                           -= reac_e_stoch[ei] * t1 / dtt; //Total momentum correction term
+                    //dndt_local                           -= reac_e_stoch[ei] * t1 / (dtt * n_olds[ei]); //Total momentum correction term
                 //}
                 
                 for(int& pi : reac_products) {
                     reaction_b_ptr[loc_thr](pi)            += reac_p_stoch[pi] * t1;
                 }
                 
-                photoreactions[pr].dndt_old = dndt_local; //This needs to be saved per cell, if we are parallelizing!
+                //This needs to be saved per cell, if we are parallelizing!
+                photoreactions[pr].dndt_old += dndt_local;
             
             }
+            
+
         }
     
     }//END Photochemical reactions
@@ -727,7 +741,8 @@ Vector_t c_Sim::solver_cchem_implicit_general(double dtt, int cell, int cdebug, 
         
         for(int& ei : reaction.educts) {
             reaction_b_ptr[loc_thr](ei)  -= reaction.e_stoch[ei] * t1;           
-            reaction.dndts[ei]            = -reaction.e_stoch[ei] * t1 / (dtt * n_olds[ei]); // Reactant momentum correction term 
+            reaction.dndts[ei]            = -reaction.e_stoch[ei] * t1 / dtt; // Reactant momentum correction term 
+            //reaction.dndts[ei]            = -reaction.e_stoch[ei] * t1 / (dtt * n_olds[ei]); // Reactant momentum correction term 
             reaction.dndt_old            += -reaction.dndts[ei];                             // Total momentum correction term for products
         }
         for(int& pi : reaction.products) {
@@ -759,21 +774,26 @@ Vector_t c_Sim::solver_cchem_implicit_general(double dtt, int cell, int cdebug, 
 void c_Sim::update_dS_jb_photochem(int cell) {
     
     Vector_t n_olds          = Vector_t(num_species);
-    double  n_tot = 0.;
+    Vector_t n_news          = Vector_t(num_species);
+    double   n_tot = 0.;
     double ndot_multiplier =1e0;
     
-    chem_momentum_matrix = Matrix_t::Zero(num_species, num_species);
-    momentum_b           = Vector_t(num_species);
-    Vector_t mom_new     = Vector_t(num_species);
+    std::vector<double> mom    = np_zeros(num_species);
+    chem_momentum_matrix       = Matrix_t::Zero(num_species, num_species);
+    momentum_b                 = Vector_t(num_species);
+    Vector_t internalenergy_b  = Vector_t(num_species);
     
     for(int s=0;s<num_species; s++) {
         n_tot += species[s].prim[cell].number_density;
-        momentum_b(s) = 0.;
-        mom_new(s)    = 0.;
+        momentum_b(s) = species[s].u[cell].u2;  //The r.h.s of the matrix equation needs to be the old, non-updated momentum. Hence us not updating the conserved quantities just before calling update_dS_jb_photochem
+        mom[s]              = species[s].u[cell].u2;
+        internalenergy_b[s] = species[s].prim[cell].internal_energy * species[s].u[cell].u1; //The r.h.s of the energy matrix equation needs to be the non-updated internal energy density
+        n_news[s]           = species[s].prim[cell].number_density;
+
     }
     
     for(int s=0;s<num_species; s++) {
-        n_olds[s]     = species[s].prim[cell].number_density / n_tot;
+        n_olds[s]     = species[s].prim[cell].number_density / n_tot; //TODO: Eliminate this double use of normalized and non-normalized variables
         reaction_b[s] = n_olds[s];
     }
     
@@ -873,22 +893,37 @@ void c_Sim::update_dS_jb_photochem(int cell) {
                 // Cooling
                 //
                 //species[ej].dG(cell) +=  dt * reaction.dndt_old * species[ej].cv * species[ej].mass_amu * species[ej].prim[cell].temperature;
+                //--> This is now called separately outside of heating_dS_jb
                 
-                //
-                // Momentum terms
-                //
-                int ej = reaction.educts[0]; 
-                chem_momentum_matrix(ej, ej) += dt * reaction.dndt_old * ndot_multiplier;
-                momentum_b(ej)               += dt * reaction.dndt_old * ndot_multiplier;
                 
-                for(int& pj : reaction.products) {
-                        chem_momentum_matrix(pj, ej) -= dt * reaction.dndt_old * species[pj].mass_amu/reaction.products_total_mass  * ndot_multiplier;
-                        momentum_b(pj)               -= dt * reaction.dndt_old * species[pj].mass_amu/reaction.products_total_mass  * ndot_multiplier;
-                        
-                        //cout<<" from "<<species[ej].speciesname<<" to "<<species[pj].speciesname<<endl;
-                }
             }
+            
+            
+        
+            
+        
+        
         }
+        
+    }
+    //
+    // Momentum matrix contructions here
+    //
+    //
+        
+    for(c_photochem_reaction& reaction : photoreactions) {
+            // Momentum terms
+            //
+            int ej = reaction.educts[0]; 
+            chem_momentum_matrix(ej, ej) += dt * reaction.dndt_old / n_news[ej];
+            //momentum_b(ej)               += dt * reaction.dndt_old / n_news[ej];
+                
+            for(int& pj : reaction.products) {
+                chem_momentum_matrix(pj, ej) -= dt * reaction.dndt_old / n_news[ej] * species[pj].mass_amu/reaction.products_total_mass;
+                //momentum_b(pj)               -= dt * reaction.dndt_old / n_news[ej] * species[pj].mass_amu/reaction.products_total_mass  * ndot_multiplier;
+                        
+            //cout<<" from "<<species[ej].speciesname<<" to "<<species[pj].speciesname<<endl;
+            }
         
     }
     
@@ -912,8 +947,8 @@ void c_Sim::update_dS_jb_photochem(int cell) {
         double dLbit   = 0;
         
         for(int& ej : reaction.educts) {
-            chem_momentum_matrix(ej, ej) += 1.* dt * reaction.dndts[ej]  * ndot_multiplier; //reaction.dndt_old;
-            momentum_b(ej)               += 1.* dt * reaction.dndts[ej]  * ndot_multiplier;
+            chem_momentum_matrix(ej, ej) += 1.* dt * reaction.dndts[ej]  / n_news[ej]; //reaction.dndt_old;
+            //momentum_b(ej)               += 1.* dt * reaction.dndts[ej]  * ndot_multiplier;
             dLbit                =  dt * reaction.dndt_old * ndot_multiplier * species[ej].cv * species[ej].mass_amu * species[ej].prim[cell].temperature;
             dLambda              += dLbit;
             species[ej].dG(cell) += dLbit;
@@ -922,8 +957,8 @@ void c_Sim::update_dS_jb_photochem(int cell) {
         //momentum_b(ej)               += reaction.dndt_old;
         for(int& pj : reaction.products) {
             for(int& ej : reaction.educts) {
-                chem_momentum_matrix(pj, ej) -= 1.*dt * reaction.dndt_old  * ndot_multiplier * species[pj].mass_amu/reaction.products_total_mass;
-                momentum_b(pj)               -= 1.*dt * reaction.dndt_old  * ndot_multiplier * species[pj].mass_amu/reaction.products_total_mass;
+                chem_momentum_matrix(pj, ej) -= 1.* dt * reaction.dndts[ej]  / n_news[ej]  * species[pj].mass_amu/reaction.products_total_mass;
+                //momentum_b(pj)               -= 1.*dt * reaction.dndt_old  * ndot_multiplier * species[pj].mass_amu/reaction.products_total_mass;
                 //species[ej].dG(cell)         -= dLambda/reaction.products_total_mass;  //This is reaction heating, but we add it to dG, in order to be able to split it from thermal heating
             
                 //cout<<" from "<<species[ej].speciesname<<" to "<<species[pj].speciesname<<endl;
@@ -954,13 +989,12 @@ void c_Sim::update_dS_jb_photochem(int cell) {
     //
     if(do_hydrodynamics >= 0 && globalTime > 1.0e-19 && chem_momentum_correction == 1) {
         
-        std::vector<double> mom  = np_zeros(num_species);
         std::vector<double> vnew = np_zeros(num_species);
         
-        for(int s=0;s<num_species; s++) {
-            mom[s] = species[s].u[cell].u2;
-            momentum_b(s) = mom[s];
-        }
+        //for(int s=0;s<num_species; s++) {
+        //    mom[s] = species[s].u[cell].u2;
+        //    momentum_b(s) = mom[s];
+        //}
         
         if(globalTime > 1e50) {
             cout<<cell<<" In correct momentum, matrix = "<<endl<<chem_momentum_matrix<<endl<<" b = "<<endl<<momentum_b;
@@ -971,10 +1005,12 @@ void c_Sim::update_dS_jb_photochem(int cell) {
             cout<<endl;
         }
         
-        Vector_t mom_news = Vector_t(num_species);
+        Vector_t mom_news  = Vector_t(num_species);
+        Vector_t eint_news = Vector_t(num_species);
         LUchem_mom.compute(identity_matrix + chem_momentum_matrix) ;
         //LUchem_mom.compute(chem_momentum_matrix.transpose()) ;
         mom_news.noalias() = LUchem_mom.solve(momentum_b);
+        eint_news.noalias()= LUchem_mom.solve(internalenergy_b);
         
         double dmom_tot = 0.;
         
@@ -1020,21 +1056,31 @@ void c_Sim::update_dS_jb_photochem(int cell) {
                     dEk2 += 0.;
         
                 //0.5*(mom[0]*mom[0]*nX_new[0] / mX[0] - mX[0]*nX[0]*vX[0]*vX[0] +  mom[1]*mom[1]*nX_new[1] / mX[1] - mX[1]*nX[1]*vX[1]*vX[1] + mom[2]*mom[2]*nX_new[2] / mX[2] - mX[2]*nX[2]*vX[2]*vX[2]) ;
+                //cout<<" vold/vnew = "<<species[s].prim[cell].speed<<"/"<<vnew[s]<<" dv = "<<vnew[s]-species[s].prim[cell].speed<<" dvrel = "<<1-vnew[s]/species[s].prim[cell].speed<<endl;
+
                 
-                vnew[s]                     = mom_news(s) / (n_olds[s]*n_tot*species[s].mass_amu*amu) ; 
-                         //cout<<" vold/vnew = "<<species[s].prim[cell].speed<<"/"<<vnew[s]<<" dv = "<<vnew[s]-species[s].prim[cell].speed<<" dvrel = "<<1-vnew[s]/species[s].prim[cell].speed<<endl;
+                vnew[s]                     = mom_news(s) / (n_olds[s]*n_tot*species[s].mass_amu*amu) ; //Although n_olds is called "olds", this contains the density at the advanced time and is what we need here
                 species[s].prim[cell].speed = vnew[s] ;
+                //species[s].prim[cell].internal_energy = eint_news[s] / (n_olds[s]*n_tot*species[s].mass_amu*amu);
+                //species[s].prim[cell].temperature     = eint_news[s] /species[s].cv / (n_olds[s]*n_tot*species[s].mass_amu*amu);
+                
                 species[s].dS(cell) -= dEk2/dt;
         }
         
         //species[2].dS(cell) -= dEk2/dt;
         
         //if(globalTime > 1e50) {
-        if(steps%300==0 && cell==111) {
+        if(steps%300==0 && cell==200e99) {
             
             for (int s = 0; s < num_species; s++) {
-                cout<<" s = "<<species[s].speciesname<<" mom_news(s) = "<<mom_news(s)<<" dm = "<<(mom_news(s)-mom[s])<<" dm_rel = "<<(1.-mom_news(s)/mom[s])<<" n = "<<n_olds[s]<<endl;
+                cout<<" s = "<<species[s].speciesname<<" mom_news(s) = "<<mom_news(s)<<" mom_old(s) = "<<mom[s]<<" dm = "<<(mom_news(s)-mom[s])<<" dm_rel = "<<(1.-mom_news(s)/mom[s])<<" n = "<<n_olds[s]<<endl;
             }
+            cout<<cell<<" In correct momentum, matrix = "<<endl<<chem_momentum_matrix<<endl<<" b = "<<endl<<momentum_b;
+            if(photoreactions.size() > 0)
+                cout<<" dndt_photochem = "<<photoreactions.at(0).dndt_old;
+            if(reactions.size() > 0)
+                cout<<" dndt_chem = "<<reactions.at(0).dndt_old;
+            cout<<endl;
             cout<<" final dmom_tot = "<<dmom_tot<<" with dI = "<<photoreactions[0].dndt_old<<" dEk/dt = "<<dEk2/dt<<endl;
             
             //char cc;

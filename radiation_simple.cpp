@@ -75,7 +75,7 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
                 d[idx+stride] = D ;
                 l[idx+stride] = -D ;
                 
-                if(debug > 1)
+                if(debug > 3)
                     cout<<" radiation part 0. t,j,b="<<steps<<","<<j<<","<<b<<" tau_inv/R/D = "<<tau_inv<<"/"<<R<<"/"<<D<<" J/J/dJ = "<<Jrad_FLD(j+1,b)<<"/"<<Jrad_FLD(j,b)<<"/"<<(Jrad_FLD(j+1,b)-Jrad_FLD(j,b))<<" flux = "<<D*(Jrad_FLD(j+1,b)-Jrad_FLD(j,b))<<endl;
             }
         }
@@ -133,7 +133,7 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
             r[idx_r] = 0 ;
         }
         
-        if(debug >= 1) {
+        if(debug >= 3) {
             
             for(int index=0; index < num_cells+2; index++) {    
 //                 /int index = (num_cells/2+1);
@@ -498,8 +498,8 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
                     species[s].prim[j].temperature = tt ;
                 
 
-		if( (steps==0 || steps==1) || j==300)
-                     cout<<"t = "<<steps<<" j ="<<j<<" FINAL T = "<<tt<<" num_cells = "<<num_cells<<endl;
+		//if( (steps==0 || steps==1) || j==300)
+         //            cout<<"t = "<<steps<<" j ="<<j<<" FINAL T = "<<tt<<" num_cells = "<<num_cells<<endl;
             }
         }
         
