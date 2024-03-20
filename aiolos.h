@@ -310,8 +310,8 @@ public:
     bool is_reverse_reac;    //Will try to automatically find the reverse reaction by computing r * exp(-dG/T), where the Gibbs energy difference dG has to be in the chemistry lookup tables
     bool mtype_reaction = 0; //Reaction has a catalyst in it?
     double current_dG = 0.;
-    double dndt_old;           //Total momentum correction term, split on reaction products according to their mass
-    std::vector<double> dndts; //Momentum correction term per reactant, needs to be known for all reactants for all reactions
+    double dndt_old;           //Total momentum correction term, split on reaction products according to their mass.           Gain term fo each product species
+    std::vector<double> dndts; //Momentum correction term per reactant, needs to be known for all reactants for all reactions. Loss terms for each reactant species
     
 public:
     
@@ -384,8 +384,9 @@ public:
     int problem_number;
     int debug;
     int cdebug = 0;
-    int debug_cell = 40;
-    int debug_steps = 8965;
+    int debug_cell = 1e99; //default values that should never trigger debugging, if not set to sensible values
+    int debug_steps = 1e99;
+    int debug_species = 999;
     int use_self_gravity;
     int use_linear_gravity;
     int use_rad_fluxes;
@@ -784,6 +785,7 @@ public:
     //
     double get_max_soundspeed();
     double get_cfl_timestep();
+    double get_cfl_timestep2();
     
     void print_monitor(int i);
     void print_diagnostic_file(int i);
@@ -845,7 +847,7 @@ public:
 public:
     
     c_Sim() {};
-    c_Sim(string parameter_filename, string species_filename, string workingdir, string intent, int debug=0, int debug_cell=1, int debug_steps=99999999);
+    c_Sim(string parameter_filename, string species_filename, string workingdir, string intent, std::vector<int> debug_data);
     ~c_Sim();
     
     void execute(); //Main loop
@@ -907,11 +909,12 @@ public:
     int static_charge;
     double initial_fraction;
     
-    std::vector<AOS> u, u0;          // Conserved hyperbolic variables: density, mass flux, energy density
+    std::vector<AOS> u, u0, u_tmp;          // Conserved hyperbolic variables: density, mass flux, energy density
     std::vector<AOS> dudt[2];        // Time derivative of u at each stage ;      
     std::vector<AOS> source;         // Gravitational source term
     std::vector<AOS> source_pressure;// Geometric source term
     std::vector<AOS> flux;
+    std::vector<double> u_mask;   //Switches 2nd spatial order on and off, depending if a cell breaks
     std::vector<double> lconvect;
     std::vector<double> u_analytic;
     std::vector<double> K_zzf;     //(1+K_zz*n/b*mu/m_s) / (1+Kzz*n/b), which can be computed globally, so that every species s in cell i just needs to replace phi_i -> phi_i (1 + k_zzf / m_s)
@@ -1046,7 +1049,7 @@ public:
         return dp_final;
     }
 
-    void reconstruct_edge_states() ;
+    void reconstruct_edge_states(std::vector<AOS>&, int orderstep) ;
     
     AOS hllc_flux(int);
     AOS dust_flux(int);
@@ -1062,6 +1065,7 @@ public:
     
     void update_opacities();
     double interpol_tabulated_opacity(const Eigen::VectorXd& array, int band, double T_gas, double pressure);
+    int count_broken_cells(std::vector<AOS>&u, std::vector<AOS>&u_mask);
     
     //
     // Equations of state
@@ -1102,7 +1106,7 @@ public:
     //c_Species();
     c_Species(c_Sim *base_simulation, string filename, string species_filename, int species_index, int debug=0);
     ~c_Species();
-    void execute(std::vector<AOS>& u, std::vector<AOS>& dudt);
+    void execute(std::vector<AOS>& u, std::vector<AOS>& dudt, std::vector<AOS>& u_mask, int orderstep);
     
 };
 

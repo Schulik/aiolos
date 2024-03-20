@@ -28,6 +28,8 @@ int main(int argc, char** argv)
     int debug;
     int debug_cell = 40;
     int debug_steps = 8965;
+    std::vector<int> debug_data = inp_somevalue(4, 1e99);
+    debug_data[0] = 0;
     int suppress_warnings_global = 0;
     int external_thread_num = 1;
     cout<<endl<<"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"<<endl;
@@ -69,7 +71,7 @@ int main(int argc, char** argv)
         }
         if(tmpstring.compare("-debug") == 0) {
             string yet_another_string = argv[i+1];
-            debug      = std::stoi(yet_another_string);
+            debug_data[0]      = std::stoi(yet_another_string);
             cout<<"Accepted debug modus "<<debug<<endl;
             i++;
         }
@@ -82,14 +84,20 @@ int main(int argc, char** argv)
         }
         if(tmpstring.compare("-dcell") == 0) {
             string yet_another_string = argv[i+1];
-            debug_cell    = std::stoi(yet_another_string);
+            debug_data[1]    = std::stoi(yet_another_string);
             cout<<"Debugging cell "<<debug<<endl;
             i++;
         }
         if(tmpstring.compare("-dsteps") == 0) {
             string yet_another_string = argv[i+1];
-            debug_steps    = std::stoi(yet_another_string);
+            debug_data[2]    = std::stoi(yet_another_string);
             cout<<"Debugging info output after steps number "<<debug<<endl;
+            i++;
+        }
+        if(tmpstring.compare("-dspec") == 0) {
+            string yet_another_string = argv[i+1];
+            debug_data[3]    = std::stoi(yet_another_string);
+            cout<<"Debugging info output for species number "<<debug<<endl;
             i++;
         }
         if(tmpstring.compare("-n") == 0) {
@@ -123,7 +131,7 @@ int main(int argc, char** argv)
         cout<<endl<<"In main, construction of simulation is about to start."<<endl;
        
         //Main simulation class object, is initialized with the simulation parameters from a file
-        c_Sim simulation1(simulationname, speciesfile, workingdir, tempintent, debug, debug_cell, debug_steps);
+        c_Sim simulation1(simulationname, speciesfile, workingdir, tempintent, debug_data);
         
         simulation1.set_suppress_warnings(suppress_warnings_global);
 

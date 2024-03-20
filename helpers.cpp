@@ -86,6 +86,94 @@ double c_Sim::get_cfl_timestep() {
         
 }
 
+
+/**
+ * Computes the cfl timestep based on sound speed, velocity, and a custom internal energy-change criterion.
+ * New part in the new routine: reshuffle the nonsensical double-inversion of timesteps, so that it becomes easier to understand and update
+ * with the left and right timesteps.
+ * Also make sure the CFL safetyfactor works, because in the old one it mostly didn't.
+ * 
+ * @return The stable cfl timestep dt in s
+ */
+double c_Sim::get_cfl_timestep2() {
+    
+    //
+    // Compute heuristic radiative timestep
+    //
+    double maxde = 0;
+    
+    for(int s = 0; s < num_species; s++) {
+        for(int i=num_cells-1; i>0; i--)  {
+            species[s].de_e[i] = std::abs(species[s].primlast[i].internal_energy - species[s].prim[i].internal_energy)/species[s].prim[i].internal_energy;
+            
+            species[s].timesteps_de[i] = dt / species[s].de_e[i] * energy_epsilon;
+            
+            maxde = std::max(species[s].de_e[i], maxde) ;
+            if(debug >= 1 && globalTime > 1e-1)
+                cout<<" steps "<<steps<<" species "<<s<<" i = "<<i<<" de/e = "<<species[s].de_e[i]<<" de/e/cflfactor = "<<species[s].de_e[i]/cflfactor<<endl;
+        }
+    }
+    
+    if(debug >= 1 && globalTime > 1e-1) {
+        char a;
+        cin>>a;
+    }
+    
+    timestep_rad2 = dt / maxde * energy_epsilon;
+
+    //
+    // Compute individual max wave crossing timesteps per cell
+    //  t = delta x / v = delta x / momentum / density
+    //
+    double minstep = 0.;
+    double s_l =0;
+    double s_r =0;
+    
+    max_snd_crs_time=0;
+    for(int s=0; s < num_species; s++) {
+        
+        species[s].snd_crs_time = 0;
+        for(int i=1; i<=num_cells; i++) {
+            
+            //Computing the inverse timesteps first
+            //species[s].timesteps[i]    = std::abs(species[s].prim[i].speed / dx[i]); 
+            //species[s].timesteps_cs[i] = species[s].prim[i].sound_speed / dx[i];
+            s_l = std::sqrt(species[s].prim_l[i].speed*species[s].prim_l[i].speed + species[s].prim_l[i].sound_speed*species[s].prim_l[i].sound_speed);
+            s_r = std::sqrt(species[s].prim_r[i].speed*species[s].prim_r[i].speed + species[s].prim_r[i].sound_speed*species[s].prim_r[i].sound_speed);
+            //species[s].finalstep[i]    = species[s].timesteps[i] + species[s].timesteps_cs[i] ;
+            species[s].finalstep[i]    = std::max(s_l,s_r)/dx[i] ;
+            minstep = std::max(minstep, species[s].finalstep[i]) ;
+            
+            if(i>1 && i<num_cells-1) {
+                species[s].finalstep[i]    = std::max(s_l,s_r)/dx[i-1] ; //Take neighbouring cells into account
+                minstep = std::max(minstep, species[s].finalstep[i]) ;
+                
+                species[s].finalstep[i]    = std::max(s_l,s_r)/dx[i+1] ;
+                minstep = std::max(minstep, species[s].finalstep[i]) ; 
+            }
+            
+            
+            species[s].snd_crs_time += 2.* dx[i] / species[s].prim[i].sound_speed ;
+        }
+        max_snd_crs_time = std::max(max_snd_crs_time, species[s].snd_crs_time) ;
+    }
+    
+    //Set CFLfactor to safe value once finding the radiative equilibrium is over
+    if(globalTime > CFL_break_time)
+        cflfactor = 0.9;
+    
+    //Invert and apply CFL secutiry factor
+    cfl_step = cflfactor / minstep;
+    
+    if(do_hydrodynamics)
+        return min(cfl_step, dt*max_timestep_change);
+    else {
+        double ddt = min(timestep_rad2, dt*max_timestep_change);
+        return min(ddt, dt_max);
+    }
+        
+}
+
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 //
 // Helper functions

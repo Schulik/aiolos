@@ -25,16 +25,19 @@ extern void init_line_cooling_data();
  * @param[in] debug_cell Get detailed information for a specific cell (To be implemented by user..)
  * @param[in] debug_steps Get detailed information for a specific timestep (To be implemented by user..)
  */
-c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, string tintent, int debug, int debug_cell, int debug_steps) {
+c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, string tintent, std::vector<int> debug_data) {
 
 	init_line_cooling_data();
 
         if(debug > 0) cout<<"Init position 0."<<endl;
         
         steps = -1;
-        this->debug      = debug ;
-        this->debug_cell = debug_cell;
-        this->debug_steps= debug_steps;
+        this->debug      = debug_data[0] ;
+        this->debug_cell = debug_data[1];
+        this->debug_steps= debug_data[2];
+        this->debug_species= debug_data[3];
+        cout<<" debug parameters : debug leve l ="<<debug<<" dcell = "<<debug_cell<<" "<<" dsteps >= "<<debug_steps<<" dspecies = "<<debug_species<<endl;
+
         simname          = filename_solo;
         this->workingdir = workingdir;
         this->intent     = tintent;
@@ -1201,6 +1204,8 @@ c_Species::c_Species(c_Sim *base_simulation, string filename, string species_fil
         
         u               = init_AOS(num_cells+2); //Conserved hyperbolic variables: density, mass flux, energy density
         u0              = init_AOS(num_cells+2); //Conserved hyperbolic variables: density, mass flux, energy density
+        u_tmp           = init_AOS(num_cells+2); 
+        u_mask          = std::vector<double>(num_cells+2);
         dudt[0]         = init_AOS(num_cells+2);
         dudt[1]         = init_AOS(num_cells+2);
         source          = init_AOS(num_cells+2);  

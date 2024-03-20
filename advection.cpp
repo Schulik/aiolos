@@ -153,32 +153,50 @@ void c_Sim::execute() {
 	//if (do_hydrodynamics == 1) 
         //    compute_drag_update() ;
 
-        if(steps > 619) {
+        if(steps > debug_steps) {
             cout<<"t="<<steps<<" Pos 0 T[423]_s = ";
             for(int s = 0; s < num_species; s++) {
-                cout<<" ["<<s<<"]= "<<species[s].prim[423].temperature;
+                cout<<" ["<<s<<"]= "<<species[s].prim[debug_cell].temperature;
             }
-            cout<<" manual pressure u_in = "<<(species[1].u[423].u3 - 0.5*species[1].u[423].u2*species[1].u[423].u2/species[1].u[423].u1)<<endl;
+            cout<<" manual pressure u_in = "<<(species[debug_species].u[debug_cell].u3 - 0.5*species[debug_species].u[debug_cell].u2*species[debug_species].u[debug_cell].u2/species[debug_species].u[debug_cell].u1)<<endl;
         }
         
         if (do_hydrodynamics == 1) {
         
-            for(int s = 0; s < num_species; s++)
-                species[s].execute(species[s].u, species[s].dudt[0]);
+            //int cnt_broken_cells = 0;
             
-            for(int s=0; s < num_species; s++) {
-                species[s].u0 = species[s].u ;
-                for(int j=0; j < num_cells+2; j++)
-                    species[s].u[j] = species[s].u[j] + species[s].dudt[0][j]*dt ;
+            for(int k=0; k<=1; k++) {
+                for(int s = 0; s < num_species; s++) {
+                    species[s].execute(species[s].u, species[s].dudt[0], u_mask 0);
+                }
+                    
+                
+                //
+                //March 19th 2024: Added get_cfl_timestep2() to sit here, to obtain the updated timestep based on the extrapolated left and right values - they can produce inconsistent fluxes with the cell-centered values, which the call of dt = get_cfl_timestep(); at the beginning of the timestep is based on;
+                //
+                dt = std::min(get_cfl_timestep2(), dt);
+                
+                for(int s=0; s < num_species; s++) {
+                    species[s].u0 = species[s].u ;
+                    for(int j=0; j < num_cells+2; j++)
+                        species[s].u[j] = species[s].u[j] + species[s].dudt[0][j]*dt ;
+                }
+                
+                if( count_broken_cells(species[s].u, std::vector<double>&u_mask) == 0)
+                    k=2;
             }
         }
         
-        if(steps > 619) {
+        if(steps > debug_steps) {
             cout<<"t="<<steps<<" Pos 1 T[423]_s = ";
-            for(int s = 0; s < num_species; s++) {
-                cout<<" ["<<s<<"]= "<<species[s].prim[423].temperature;
+            for(int s = 1; s < 2; s++) {
+                cout<<" ["<<s<<"]= "<<species[s].prim[debug_cell].temperature;
             }
-            cout<<" manual pressure u_in = "<<(species[1].u[423].u3 - 0.5*species[1].u[423].u2*species[1].u[423].u2/species[1].u[423].u1)<<endl;
+            cout<<" s1 numbers, p ="<<species[debug_species].prim[debug_cell].pres<<" eint = "<<species[debug_species].prim[debug_cell].internal_energy<<" rho = "<<species[debug_species].u[debug_cell].u1<<" mom = "<<species[debug_species].u[debug_cell].u2<<" E = "<<species[debug_species].u[debug_cell].u3;
+            cout<<" manual pressure u_in = "<<(species[debug_species].u[debug_cell].u3 - 0.5*species[debug_species].u[debug_cell].u2*species[debug_species].u[debug_cell].u2/species[debug_species].u[debug_cell].u1)<<endl;
+            cout<<" fluxes in 423 and neighbours: "<<endl;
+            for(int ll=-1; ll<=1; ll++)
+                cout<<" "<<species[debug_species].dudt[0][debug_cell+ll].u1<<" "<<species[debug_species].dudt[0][debug_cell+ll].u2<<" "<<species[debug_species].dudt[0][debug_cell+ll].u3<<" E="<<species[debug_species].u[debug_cell+ll].u3<<" p="<<(species[debug_species].u[debug_cell+ll].u3 - 0.5*species[debug_species].u[debug_cell+ll].u2*species[debug_species].u[debug_cell+ll].u2/species[debug_species].u[debug_cell+ll].u1)<<" ekin = "<<0.5*species[debug_species].u[debug_cell+ll].u2*species[debug_species].u[debug_cell+ll].u2/species[debug_species].u[debug_cell+ll].u1<<endl;
         }
         
         if (order == IntegrationType::first_order) {
@@ -202,24 +220,24 @@ void c_Sim::execute() {
                         compute_collisional_heat_exchange() ; //Disable if radiation is used?
                 }
                 
-                if(steps > 619) {
+                if(steps > debug_steps) {
                     cout<<"t="<<steps<<" Pos 1.05 T[423]_s = ";
                     for(int s = 0; s < num_species; s++) {
-                        cout<<" ["<<s<<"]= "<<species[s].prim[423].temperature;
+                        cout<<" ["<<s<<"]= "<<species[s].prim[debug_cell].temperature;
                     }
-                    cout<<" manual pressure u_in = "<<(species[1].u[423].u3 - 0.5*species[1].u[423].u2*species[1].u[423].u2/species[1].u[423].u1)<<endl;
+                    cout<<" manual pressure u_in = "<<(species[debug_species].u[debug_cell].u3 - 0.5*species[debug_species].u[debug_cell].u2*species[debug_species].u[debug_cell].u2/species[debug_species].u[debug_cell].u1)<<endl;
                 }
 
                 //debug = 2;
                 for(int s = 0; s < num_species; s++)
-                    species[s].execute(species[s].u, species[s].dudt[1]);
+                    species[s].execute(species[s].u, species[s].dudt[1], 1);
 
-                if(steps > 619) {
+                if(steps > debug_steps) {
                     cout<<"t="<<steps<<" Pos 1.1 T[423]_s = ";
                     for(int s = 0; s < num_species; s++) {
-                        cout<<" ["<<s<<"]= "<<species[s].prim[423].temperature;
+                        cout<<" ["<<s<<"]= "<<species[s].prim[debug_cell].temperature;
                     }
-                    cout<<" manual pressure u_in = "<<(species[1].u[423].u3 - 0.5*species[1].u[423].u2*species[1].u[423].u2/species[1].u[423].u1)<<endl;
+                    cout<<" manual pressure u_in = "<<(species[debug_species].u[debug_cell].u3 - 0.5*species[debug_species].u[debug_cell].u2*species[debug_species].u[debug_cell].u2/species[debug_species].u[debug_cell].u1)<<endl;
                 }
                 
                 for(int s = 0; s < num_species; s++){
@@ -234,12 +252,16 @@ void c_Sim::execute() {
                 
                 
                 
-                if(steps > 619) {
+                if(steps > debug_steps) {
                     cout<<"t="<<steps<<" Pos 1.2 T[423]_s = ";
-                    for(int s = 0; s < num_species; s++) {
-                        cout<<" ["<<s<<"]= "<<species[s].prim[423].temperature;
+                    for(int s = 1; s < 2; s++) {
+                        cout<<" ["<<s<<"]= "<<species[s].prim[debug_cell].temperature;
                     }
-                    cout<<endl;
+                    cout<<" s1 numbers, p ="<<species[debug_species].prim[debug_cell].pres<<" eint = "<<species[debug_species].prim[debug_cell].internal_energy<<" rho = "<<species[debug_species].u[debug_cell].u1<<" mom = "<<species[debug_species].u[debug_cell].u2<<" E = "<<species[debug_species].u[debug_cell].u3;
+                    cout<<" manual pressure u_in = "<<(species[debug_species].u[debug_cell].u3 - 0.5*species[debug_species].u[debug_cell].u2*species[debug_species].u[debug_cell].u2/species[debug_species].u[debug_cell].u1)<<endl;
+                    cout<<" fluxes in 423 and neighbours: "<<endl;
+                    for(int ll=-1; ll<=1; ll++)
+                        cout<<" "<<species[debug_species].dudt[1][debug_cell+ll].u1<<" "<<species[debug_species].dudt[1][debug_cell+ll].u2<<" "<<species[debug_species].dudt[1][debug_cell+ll].u3<<" E="<<species[debug_species].u[debug_cell+ll].u3<<" p="<<(species[debug_species].u[debug_cell+ll].u3 - 0.5*species[debug_species].u[debug_cell+ll].u2*species[debug_species].u[debug_cell+ll].u2/species[debug_species].u[debug_cell+ll].u1)<<" ekin = "<<0.5*species[debug_species].u[debug_cell+ll].u2*species[debug_species].u[debug_cell+ll].u2/species[debug_species].u[debug_cell+ll].u1<<endl;
                 }
                 
                 
@@ -251,10 +273,10 @@ void c_Sim::execute() {
             }
         }
         
-        if(steps > 619) {
+        if(steps > debug_steps) {
                 cout<<"t="<<steps<<" Pos 1.3 T[423]_s = ";
                 for(int s = 0; s < num_species; s++) {
-                    cout<<" ["<<s<<"]= "<<species[s].prim[423].temperature;
+                    cout<<" ["<<s<<"]= "<<species[s].prim[debug_cell].temperature;
                 }
                 cout<<endl;
         }
@@ -262,10 +284,10 @@ void c_Sim::execute() {
         for(int s = 0; s < num_species; s++) 
             species[s].compute_pressure(species[s].u);
 
-        if(steps > 619) {
+        if(steps > debug_steps) {
                 cout<<"t="<<steps<<" Pos 1.5 T[423]_s = ";
                 for(int s = 0; s < num_species; s++) {
-                    cout<<" ["<<s<<"]= "<<species[s].prim[423].temperature;
+                    cout<<" ["<<s<<"]= "<<species[s].prim[debug_cell].temperature;
                 }
                 cout<<endl;
             }
@@ -277,10 +299,10 @@ void c_Sim::execute() {
         if (do_hydrodynamics == 0 && friction_solver > 0) 
                 compute_drag_update() ;
         
-        if(steps > 619) {
+        if(steps > debug_steps) {
                 cout<<"t="<<steps<<" Pos 2 T[423]_s = ";
                 for(int s = 0; s < num_species; s++) {
-                    cout<<" ["<<s<<"]= "<<species[s].prim[423].temperature;
+                    cout<<" ["<<s<<"]= "<<species[s].prim[debug_cell].temperature;
                 }
                 cout<<endl;
             }
@@ -340,8 +362,8 @@ void c_Sim::execute() {
             }
         }
         
-        if(steps > 619) {
-            for(int k=420;k<425;k++) {
+        if(steps > debug_steps) {
+            for(int k=debug_cell;k<debug_cell+1;k++) {
                 cout<<"t="<<steps<<"Pos 3 T["<<k<<"]_s = ";
                     for(int s = 0; s < num_species; s++) {
                         cout<<" ["<<s<<"]= "<<species[s].prim[k].temperature;
@@ -491,14 +513,15 @@ void c_Sim::compute_total_pressure() {
  * Compute first or second order time derivatives of conservative variables, i.e. flux gradients using intermediate primitives. Includes well-balanced gravity. 
  * Called from c_Sim::execute()
  * 
- * @param[in] u_in  Vector of conservative variables over the entire grid.
+ * @param[in] u_in Vector of conservative variables over the entire grid.
+ * @param[in] orderstep assures that the first order step is a strictly flux conserving step, by switching off the slope predictor for rho and v in the first step
  * @param[out] dudt Vector of time derivatives of conservative variables over entire grid.
  */
-void c_Species::execute(std::vector<AOS>& u_in, std::vector<AOS>& dudt) {
+void c_Species::execute(std::vector<AOS>& u_in, std::vector<AOS>& dudt, std::vector<AOS>& u_mask, int orderstep) {
     
     
-        if(base->steps > 619 && this_species_index == 1) {
-            cout<<"t="<<base->steps<<"IN EXECUTE Pos 1 T[423]_s = [1]= "<<prim[423].temperature<<" p ="<<prim[423].pres<<" eint = "<<prim[423].internal_energy<<" rho = "<<u[423].u1<<" mom = "<<u[423].u2<<" E = "<<u[423].u3<<endl;
+        if(base->steps > base->debug_steps && this_species_index == base->debug_species) {
+            cout<<"t="<<base->steps<<"IN EXECUTE Pos 1 T[423]_s = [1]= "<<prim[base->debug_cell].temperature<<" p ="<<prim[base->debug_cell].pres<<" eint = "<<prim[base->debug_cell].internal_energy<<" rho = "<<u[base->debug_cell].u1<<" mom = "<<u[base->debug_cell].u2<<" E = "<<u[base->debug_cell].u3<<endl;
         }
         
         //
@@ -509,8 +532,8 @@ void c_Species::execute(std::vector<AOS>& u_in, std::vector<AOS>& dudt) {
         apply_boundary_left(u_in) ;
         apply_boundary_right(u_in) ;
         
-        if(base->steps > 619 && this_species_index == 1) {
-            cout<<"t="<<base->steps<<"IN EXECUTE Pos 2 T[423]_s = [1]= "<<prim[423].temperature<<" p ="<<prim[423].pres<<" eint = "<<prim[423].internal_energy<<" rho = "<<u[423].u1<<" mom = "<<u[423].u2<<" E = "<<u[423].u3<<" manual pressure u_in = "<<(u_in[423].u3 - 0.5*u_in[423].u2*u_in[423].u2/u_in[423].u1)<<" manual pressure u_in = "<<(u[423].u3 - 0.5*u[423].u2*u[423].u2/u[423].u1)<<endl;
+        if(base->steps > base->debug_steps && this_species_index == base->debug_species) {
+            cout<<"t="<<base->steps<<"IN EXECUTE Pos 2 T[423]_s = [1]= "<<prim[base->debug_cell].temperature<<" p ="<<prim[base->debug_cell].pres<<" eint = "<<prim[base->debug_cell].internal_energy<<" rho = "<<u[base->debug_cell].u1<<" mom = "<<u[base->debug_cell].u2<<" E = "<<u[base->debug_cell].u3<<" manual pressure u_in = "<<(u[base->debug_cell].u3 - 0.5*u[base->debug_cell].u2*u[base->debug_cell].u2/u[base->debug_cell].u1)<<endl;
         }
         
         if(USE_WAVE==1) 
@@ -556,21 +579,20 @@ void c_Species::execute(std::vector<AOS>& u_in, std::vector<AOS>& dudt) {
         //
         compute_pressure(u_in);
         
-        if(base->steps > 619 && this_species_index == 1) {
-            cout<<"t="<<base->steps<<"IN EXECUTE Pos 3 T[423]_s = [1]= "<<prim[423].temperature<<" p ="<<prim[423].pres<<" eint = "<<prim[423].internal_energy<<" rho = "<<u[423].u1<<" mom = "<<u[423].u2<<" E = "<<u[423].u3<<" manual pressure u_in = "<<(u_in[423].u3 - 0.5*u_in[423].u2*u_in[423].u2/u_in[423].u1)<<" manual pressure u_in = "<<(u[423].u3 - 0.5*u[423].u2*u[423].u2/u[423].u1)<<endl;
+        if(base->steps > base->debug_steps && this_species_index == base->debug_species) {
+            cout<<"t="<<base->steps<<"IN EXECUTE Pos 3 T[423]_s = [1]= "<<prim[base->debug_cell].temperature<<" p ="<<prim[base->debug_cell].pres<<" eint = "<<prim[base->debug_cell].internal_energy<<" rho = "<<u[base->debug_cell].u1<<" mom = "<<u[base->debug_cell].u2<<" E = "<<u[base->debug_cell].u3<<" manual pressure u_in = "<<(u[base->debug_cell].u3 - 0.5*u[base->debug_cell].u2*u[base->debug_cell].u2/u[base->debug_cell].u1)<<endl;
         }
         
         if(debug >= 2)
             cout<<"Done. Starting edge-states."<<endl;
         
-        reconstruct_edge_states() ;
-        
+        reconstruct_edge_states(u_mask, orderstep) ;
         
         if(debug >= 2)
             cout<<"Done. Starting fluxes."<<endl;
         
-        if(base->steps > 619 && this_species_index == 1) {
-            cout<<"t="<<base->steps<<"IN EXECUTE Pos 4 T[423]_s = [1]= "<<prim[423].temperature<<" p ="<<prim[423].pres<<" eint = "<<prim[423].internal_energy<<" rho = "<<u[423].u1<<" mom = "<<u[423].u2<<" E = "<<u[423].u3<<" manual pressure u_in = "<<(u_in[423].u3 - 0.5*u_in[423].u2*u_in[423].u2/u_in[423].u1)<<" manual pressure u_in = "<<(u[423].u3 - 0.5*u[423].u2*u[423].u2/u[423].u1)<<endl;
+        if(base->steps > base->debug_steps && this_species_index == base->debug_species) {
+            cout<<"t="<<base->steps<<"IN EXECUTE Pos 4 T[423]_s = [1]= "<<prim[base->debug_cell].temperature<<" p ="<<prim[base->debug_cell].pres<<" eint = "<<prim[base->debug_cell].internal_energy<<" rho = "<<u[base->debug_cell].u1<<" mom = "<<u[base->debug_cell].u2<<" E = "<<u[base->debug_cell].u3<<" manual pressure u_in = "<<(u[base->debug_cell].u3 - 0.5*u[base->debug_cell].u2*u[base->debug_cell].u2/u[base->debug_cell].u1)<<endl;
         }
         //
         // Step 2: Compute fluxes and sources
@@ -745,5 +767,35 @@ AOS c_Species::dust_flux(int j)
     } else {
         return (flux(Wl) + flux(Wr)) * 0.5 ;
     }
+}
+
+/**
+ * The higher-order hydro solver can return unphysical values, i.e. negative pressures from the reconstruction p=E-0.5*rho*u^2, when E is dominated by kinetic energy
+ * or even E itself can become negative for e.g. electrons.
+ * We try to fix this by identifying offending cells, and re-running their entire hydro update after cells have been found.
+ * The slope correction in the hydro reconstruction in cell j is always done with (1-u_mask) as multiplier.
+ * The original hydro run is performed with all mask values being 0. This function counts breaking cells using the data u, and setting their u_mask values to 1 in the offending cell j
+ * as well as the surrounding cells j-1 and j+1 (as we cannot know which flux edge is broken without going even deeper into analysis).
+ * 
+ * @param[in] u Input hydrodynamic data to be checked for negative E and negative p
+ * @param[out] u_mask Output mask values. Any offending cell is set from 0 to 1
+ * @return the sum of all u_mask values. The main loop will react if non-zero values are returned.
+ */
+int c_Species::count_broken_cells(std::vector<AOS>&u, std::vector<double>&u_mask) {
+    
+    int cnt =0;
+    std::vector<double> p_temps = np_somevalue(num_cells+2, 0.);
+    
+    //Predict pressures from this hydro data
+    for(int j=0; j<=num_cells+1; j++) {
+            p_temps[j] = u[j].u3 - 0.5*u[j].u2*u[j].u2/u[j].u1;
+        }
+    for(int j=0; j<=num_cells; j++) {
+            //Cheap -E detection and -p detection
+            u_mask[j] = std::signbit( u[j].u3 ) + std::signbit( p_temps[j] );
+            cnt      += (double)u_mask[j];
+        }
+
+        return cnt;
 }
 
