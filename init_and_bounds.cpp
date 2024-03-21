@@ -2017,8 +2017,11 @@ void c_Species::apply_boundary_right(std::vector<AOS>& u) {
                 //dphi2 *= (prim.density * base->omegaplus[i]*base->dx[i] + this->prim[i].density * base->omegaminus[i-1]*base->dx[i-1]) ;
                 //prim.pres = prim.pres - dphi2 ; 
                 
-                prim.pres = std::max( prim.pres, 1e-1*prim.pres) ; //TODO: Replace 1e-3 with an estimate for the max pressure jump in a adiabatic shock
+                prim.pres = std::max( prim.pres, 1e-40) ; //TODO: Replace 1e-3 with an estimate for the max pressure jump in a adiabatic shock
                 //prim.pres = std::max( prim.pres, 0.0) ;          //27.10.2021: Not in use anymore, due to this causing problems with negative temperatures. p=0 -> E = 0 -> T = 0  and negative after a bit of hydro
+                
+                //if(base->steps >= base->debug_steps-3)
+                //    cout<<" boundary i = "<<i<<" p_extrap = "<<prim.pres;
                 
                 eos->compute_conserved(&prim, &u[i], 1) ;
             }

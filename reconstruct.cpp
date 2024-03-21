@@ -31,9 +31,9 @@ double MonotonizedCentralSlope(double ql, double qm, double qr,
 /**
  * Reconstruct the primitive hydro states at the cell edges based on the cell centered value and a slope, which is interpreted from the neighbouring cells.
  */
-void c_Species::reconstruct_edge_states(int orderstep) {
+void c_Species::reconstruct_edge_states( std::vector<double>&u_mask, int orderstep) {
     
-    if(base->steps > base->debug_steps && this_species_index == base->debug_species) {
+    if(base->steps > base->debug_steps && this_species_index == base->debug_species  && base->debug_steps < num_cells+1) {
         cout<<"t="<<base->steps<<"IN RECONSTRUCT Pos 1 T[423]_s = [1]= "<<prim[base->debug_cell].temperature;
         cout<<" manual pressure u_in = "<<(u[base->debug_cell].u3 - 0.5*u[base->debug_cell].u2*u[base->debug_cell].u2/u[base->debug_cell].u1)<<endl;
     }
@@ -69,6 +69,8 @@ void c_Species::reconstruct_edge_states(int orderstep) {
             dx = base->dx ;
        
         for (int i=1; i <= num_cells; i++) {
+            double maskmul = u_mask[i]>0.5?0.:1.; //i>num_cells/2?0.:1.; // Multiply all slopes with 1 in the nominal case, or 0 in case we get a message from above that this cell is broken
+            
             double dp_l = 0, dp_r = 0 ;
             if (is_gas) {
                 dp_l = 
@@ -89,7 +91,7 @@ void c_Species::reconstruct_edge_states(int orderstep) {
             // Pressure perturbation
             double slope ;
             slope = MonotonizedCentralSlope(
-                prim[i-1].pres - dp_l, prim[i].pres, prim[i+1].pres - dp_r, cF, cB, dxF, dxB) ;
+                maskmul*prim[i-1].pres -  dp_l, maskmul*prim[i].pres, prim[i+1].pres - dp_r, cF, cB, dxF, dxB) ;
 
             prim_l[i].pres += slope * (x_i[i-1] - x_iVC[i]) ; 
             prim_r[i].pres += slope * (x_i[ i ] - x_iVC[i]) ;
@@ -99,21 +101,21 @@ void c_Species::reconstruct_edge_states(int orderstep) {
             slope = MonotonizedCentralSlope(
                 prim[i-1].density, prim[i].density, prim[i+1].density, cF, cB, dxF, dxB) ;
 
-            prim_l[i].density += slope * (x_i[i-1] - x_iVC[i]) ; 
-            prim_r[i].density += slope * (x_i[ i ] - x_iVC[i]) ;
+            prim_l[i].density +=  maskmul *slope * (x_i[i-1] - x_iVC[i]) ; 
+            prim_r[i].density +=  maskmul *slope * (x_i[ i ] - x_iVC[i]) ;
 
             // Speed
             slope = MonotonizedCentralSlope(
                 prim[i-1].speed, prim[i].speed, prim[i+1].speed, cF, cB, dxF, dxB) ;
 
-            prim_l[i].speed += slope * (x_i[i-1] - x_iVC[i]) ; 
-            prim_r[i].speed += slope * (x_i[ i ] - x_iVC[i]) ;
+            prim_l[i].speed +=  maskmul *slope * (x_i[i-1] - x_iVC[i]) ; 
+            prim_r[i].speed +=  maskmul *slope * (x_i[ i ] - x_iVC[i]) ;
             
-            if ((prim_l[i].pres < 0) || (prim_r[i].pres < 0) || 
-                (prim_l[i].density < 0) || (prim_r[i].density < 0)) {
-                    prim_l[i] = prim_r[i] = prim[i] ;
-                    problematic += 1;
-                }
+             if ((prim_l[i].pres < 0) || (prim_r[i].pres < 0) || 
+                 (prim_l[i].density < 0) || (prim_r[i].density < 0)) {
+                     prim_l[i] = prim_r[i] = prim[i] ;
+                     problematic += 1;
+                 }
                 
 
         }
@@ -125,8 +127,15 @@ void c_Species::reconstruct_edge_states(int orderstep) {
     eos->compute_auxillary(&(prim_r[0]), num_cells+2);
     
     if(base->steps > base->debug_steps && this_species_index == base->debug_species) {
-        cout<<"t="<<base->steps<<"IN RECONSTRUCT Pos -1 T[423]_s = [1]= "<<prim[base->debug_cell].temperature;
-        cout<<" manual pressure u_in = "<<(u[base->debug_cell].u3 - 0.5*u[base->debug_cell].u2*u[base->debug_cell].u2/u[base->debug_cell].u1)<<" problematic = "<<problematic<<" p_lr = "<<prim_l[423].pres<<"/"<<prim_r[423].pres<<" v_lr = "<<prim_l[423].speed<<"/"<<prim_r[423].speed<<" rho_lr = "<<prim_l[423].density<<"/"<<prim_r[423].density<<endl;
+        for(int k=-1;k<=1;k++) {
+            cout<<"t="<<base->steps<<"IN RECONSTRUCT Pos -1 T["<<(base->debug_cell+k)<<"]_s = [1]= "<<prim[base->debug_cell+k].temperature;
+            cout<<" manual pressure u_in = "<<(u[base->debug_cell+k].u3 - 0.5*u[base->debug_cell+k].u2*u[base->debug_cell+k].u2/u[base->debug_cell+k].u1);
+            cout<<" problematic = "<<problematic<<" p_lr = "<<prim_l[base->debug_cell+k].pres<<"/"<<prim_r[base->debug_cell+k].pres;
+            cout<<" v_lr = "<<prim_l[base->debug_cell+k].speed<<"/"<<prim_r[base->debug_cell+k].speed;
+            cout<<" rho_lr = "<<prim_l[base->debug_cell+k].density<<"/"<<prim_r[base->debug_cell+k].density<<endl;
+            
+        }
+
     }
 
 } 

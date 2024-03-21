@@ -206,8 +206,9 @@ void c_Species::update_kzz_and_gravpot(int argument) {
 
             double one = 0.99999;
             //if(K_zzf[i] > one && K_zzf[i-1] < one) //found homopause
-            if( std::fabs(K_zzf[i] - 1.) < 1e-5 && std::fabs( K_zzf[i-1] - 1.) > 1e-5) //found homopause
-                homopause_boundary_i = i;
+            if(i>1)
+                if( std::fabs(K_zzf[i] - 1.) < 1e-5 && std::fabs( K_zzf[i-1] - 1.) > 1e-5) //found homopause
+                    homopause_boundary_i = i;
         }
             
     }
@@ -216,6 +217,9 @@ void c_Species::update_kzz_and_gravpot(int argument) {
             K_zzf[i] = 1.;
         }
     }
+    
+    if(homopause_boundary_i == 1)
+        homopause_boundary_i = 0;
     
     for(int i=0; i<num_cells+2; i++) {
                 phi_s[i] = base->phi[i] * K_zzf[i];

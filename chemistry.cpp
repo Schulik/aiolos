@@ -418,13 +418,6 @@ void c_Sim::do_chemistry(double dt_chem) {
         
         // Upon return momentum and v are updated (with e, p to be confirmed). Now with prim.density, primt.v, primt.eint?? updated, recomputed auxilliaries
         
-        for(int s=0;s<num_species; s++) {
-            
-            species[s].eos->update_p_from_eint(&species[s].prim[j], 1);
-            species[s].eos->compute_auxillary(&species[s].prim[j], 1);
-            species[s].eos->compute_conserved(&species[s].prim[j], &species[s].u[j], 1);
-        }
-        
         if(j>10)
             do_highenergy_cooling(j);
         
@@ -1042,6 +1035,7 @@ void c_Sim::update_dS_jb_photochem(int cell) {
         double dEk2 = 0.;
         
         for (int s = 0; s < num_species; s++) {
+               double dEkin_s = 0.;
 //                 cout<<endl<<" s = "<<species[s].speciesname<<" mom_news(s) = "<<mom_news(s)<<" dm = "<<(mom_news(s)-mom[s])<<" n = "<<n_olds[s]<<endl;
 //                 cout<<" s/j = "<<s<<"/"<<cell;
 //                 cout<<" dens = "<<species[s].u[cell].u1<<" n_tot= "<<n_tot<<endl;
@@ -1051,18 +1045,28 @@ void c_Sim::update_dS_jb_photochem(int cell) {
                 
                 dmom_tot += mom_news(s)-mom[s];
                 if(chem_ekin_correction)
-                    dEk2 += (mom_news(s)*mom_news(s)*species[s].prim[cell].number_density - mom[s]*mom[s]*n_init[s])/(species[s].mass_amu * amu);
+                    //dEkin_s = (mom_news(s)*mom_news(s)*species[s].prim[cell].number_density - mom[s]*mom[s]*n_init[s])/(species[s].mass_amu * amu);
+                    dEkin_s = 0.5*(mom_news(s)*mom_news(s)/std::pow(species[s].prim[cell].number_density*species[s].mass_amu * amu,2.) - species[s].prim[cell].speed*species[s].prim[cell].speed);
                 else
-                    dEk2 += 0.;
-        
+                    dEkin_s = 0.;
+                
+                dEk2 += dEkin_s;
                 //0.5*(mom[0]*mom[0]*nX_new[0] / mX[0] - mX[0]*nX[0]*vX[0]*vX[0] +  mom[1]*mom[1]*nX_new[1] / mX[1] - mX[1]*nX[1]*vX[1]*vX[1] + mom[2]*mom[2]*nX_new[2] / mX[2] - mX[2]*nX[2]*vX[2]*vX[2]) ;
                 //cout<<" vold/vnew = "<<species[s].prim[cell].speed<<"/"<<vnew[s]<<" dv = "<<vnew[s]-species[s].prim[cell].speed<<" dvrel = "<<1-vnew[s]/species[s].prim[cell].speed<<endl;
 
                 
                 vnew[s]                     = mom_news(s) / (n_olds[s]*n_tot*species[s].mass_amu*amu) ; //Although n_olds is called "olds", this contains the density at the advanced time and is what we need here
-                species[s].prim[cell].speed = vnew[s] ;
+                species[s].prim[cell].speed = std::min(vnew[s], 1e-3*c_light) ; //Limit to +300km/s
+                species[s].prim[cell].speed = std::max(species[s].prim[cell].speed, -1e-4*c_light); //Limit to -30km/s
                 //species[s].prim[cell].internal_energy = eint_news[s] / (n_olds[s]*n_tot*species[s].mass_amu*amu);
                 //species[s].prim[cell].temperature     = eint_news[s] /species[s].cv / (n_olds[s]*n_tot*species[s].mass_amu*amu);
+                
+                species[s].prim[cell].internal_energy += std::fabs(dEkin_s);
+                //E_new = p + 0.5 *mom_news(s)*mom_new(s)/( n_news[s]*species[s].mass_amu*amu );
+                
+                species[s].eos->update_p_from_eint(&species[s].prim[cell], 1);
+                species[s].eos->compute_auxillary(&species[s].prim[cell], 1);
+                species[s].eos->compute_conserved(&species[s].prim[cell], &species[s].u[cell], 1);
                 
                 species[s].dS(cell) -= dEk2/dt;
         }
@@ -1087,6 +1091,13 @@ void c_Sim::update_dS_jb_photochem(int cell) {
             //cin>>cc;    
             
             
+        }
+        
+        
+        //Update quantities. Take care particularly to update E, so that no negative pressures are later computed from high momentum, as it is p = E -0.5 * rho * u^2
+        
+        for(int s=0;s<num_species; s++) {
+   
         }
     }
 }

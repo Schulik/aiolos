@@ -1049,7 +1049,7 @@ public:
         return dp_final;
     }
 
-    void reconstruct_edge_states(std::vector<AOS>&, int orderstep) ;
+    void reconstruct_edge_states(std::vector<double>& u_mask, int orderstep) ;
     
     AOS hllc_flux(int);
     AOS dust_flux(int);
@@ -1065,7 +1065,8 @@ public:
     
     void update_opacities();
     double interpol_tabulated_opacity(const Eigen::VectorXd& array, int band, double T_gas, double pressure);
-    int count_broken_cells(std::vector<AOS>&u, std::vector<AOS>&u_mask);
+    int count_broken_cells(std::vector<AOS>&u, std::vector<double>&u_mask);
+    int fix_negative_pressures_sometimes(std::vector<AOS>&u_tmp);
     
     //
     // Equations of state
@@ -1106,7 +1107,7 @@ public:
     //c_Species();
     c_Species(c_Sim *base_simulation, string filename, string species_filename, int species_index, int debug=0);
     ~c_Species();
-    void execute(std::vector<AOS>& u, std::vector<AOS>& dudt, std::vector<AOS>& u_mask, int orderstep);
+    void execute(std::vector<AOS>& u, std::vector<AOS>& dudt, std::vector<double>& u_mask, int orderstep);
     
 };
 
