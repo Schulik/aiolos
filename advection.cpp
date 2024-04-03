@@ -150,15 +150,22 @@ void c_Sim::execute() {
         // Step 0: Hydrodynamics, if so desired
         //
 
-	//if (do_hydrodynamics == 1) 
-        //    compute_drag_update() ;
+	    if (do_hydrodynamics == 1) 
+            compute_drag_update() ;
 
         if(steps > debug_steps && debug_cell < num_cells+1) {
-            cout<<"t="<<steps<<" Pos 0 T[423]_s = ";
+            cout<<endl<<" Pos 0 v["<<debug_cell<<"]_s/v_e = "<<endl;
             for(int s = 0; s < num_species; s++) {
-                cout<<" ["<<s<<"]= "<<species[s].prim[debug_cell].temperature;
+                cout<<" ["<<s<<"]= "<<species[s].prim[debug_cell].speed/species[2].prim[debug_cell].speed;
             }
-            cout<<" manual pressure u_in = "<<(species[debug_species].u[debug_cell].u3 - 0.5*species[debug_species].u[debug_cell].u2*species[debug_species].u[debug_cell].u2/species[debug_species].u[debug_cell].u1)<<endl;
+            cout<<endl<<" Pos 0 1-n["<<debug_cell<<"]_s/n_e = "<<endl;
+            for(int s = 0; s < num_species; s++) {
+                cout<<" ["<<s<<"]= "<<1-species[s].prim[debug_cell].number_density/species[2].prim[debug_cell].number_density;
+            }
+            //cout<<" manual pressure u_in = "<<(species[debug_species].u[debug_cell].u3 - 0.5*species[debug_species].u[debug_cell].u2*species[debug_species].u[debug_cell].u2/species[debug_species].u[debug_cell].u1)<<endl;
+        }
+        if(steps %1000==0) {    
+                print_velocity_numberdens_ratios(" Pos 0:: ", 210); 
         }
         
         if (do_hydrodynamics == 1) {
@@ -174,18 +181,18 @@ void c_Sim::execute() {
                 species[s].u0    = species[s].u ;
                 species[s].u_tmp = species[s].u ;
                 
-                for(int k=0; k<=1; k++) { //The k=0 run is the nominal run. k=1 is only triggered if some cells are broken
+                for(int k=0; k<=0; k++) { //The k=0 run is the nominal run. k=1 is only triggered if some cells are broken
+                    int ex_order = 0; //(s==e_idx)?0:1;
+                    species[s].execute(species[s].u, species[s].dudt[0], species[s].u_mask, ex_order);
                     
-                    species[s].execute(species[s].u, species[s].dudt[0], species[s].u_mask, 1);
-                    
-                    species[s].u0 = species[s].u ;
+                    //species[s].u0 = species[s].u ;
                     for(int j=0; j < num_cells+2; j++)
                         species[s].u_tmp[j] += species[s].dudt[0][j]*dt ;
                     
                     species[s].u_mask           = np_zeros(num_cells+2);
                     int numbroken = species[s].count_broken_cells(species[s].u_tmp, species[s].u_mask);
-                    if(numbroken > 0)
-                        cout<<" 1st order, steps = "<<steps<<" species "<<s<<" numbroken == "<<numbroken<<endl;
+                   //if(numbroken > 0)
+                    //    cout<<" 1st order, steps = "<<steps<<" species "<<s<<" numbroken == "<<numbroken<<endl;
                     //else
                     //    cout<<" steps = "<<steps<<" species "<<s<<" numbroken == "<<numbroken<<endl;
                     if( numbroken == 0)
@@ -215,6 +222,9 @@ void c_Sim::execute() {
                 cout<<" rho ="<<species[debug_species].u[debug_cell+ll].u1<<" E="<<species[debug_species].u[debug_cell+ll].u3<<" p="<<(species[debug_species].u[debug_cell+ll].u3 - 0.5*species[debug_species].u[debug_cell+ll].u2*species[debug_species].u[debug_cell+ll].u2/species[debug_species].u[debug_cell+ll].u1)<<" ekin = "<<0.5*species[debug_species].u[debug_cell+ll].u2*species[debug_species].u[debug_cell+ll].u2/species[debug_species].u[debug_cell+ll].u1<<endl;
             }
         }
+        if(steps %1000==0) {    
+                print_velocity_numberdens_ratios(" Pos 1:: ", 210);
+        }
         
         if (order == IntegrationType::first_order) {
             globalTime += dt;
@@ -228,6 +238,13 @@ void c_Sim::execute() {
             if (do_hydrodynamics == 1) {
 
                 if (use_drag_predictor_step) {
+                    for(int s = 0; s < num_species; s++) {
+                        for(int j=0; j < num_cells+2; j++) {
+                            species[s].u0[j]    = species[s].u[j];
+                        }
+                         //Those values contain the fixed cells, they might not be identical to u + dudt[0]*dt
+                    }
+                    
                     for(int s = 0; s < num_species; s++)
                         species[s].compute_pressure(species[s].u);
                     compute_total_pressure();
@@ -235,7 +252,11 @@ void c_Sim::execute() {
                     compute_drag_update() ;
                     if (use_collisional_heating)
                         compute_collisional_heat_exchange() ; //Disable if radiation is used?
-                }
+                        
+                        
+                    
+                } else
+                        compute_drag_update(); //MARCH 28 ONLY FOR DEBUGGING
                 
                 if(steps > debug_steps && debug_cell < num_cells+1) {
                     cout<<"t="<<steps<<" Pos 1.05 T["<<debug_cell<<"]_s = ";
@@ -245,28 +266,33 @@ void c_Sim::execute() {
                     cout<<" manual pressure u_in = "<<(species[debug_species].u[debug_cell].u3 - 0.5*species[debug_species].u[debug_cell].u2*species[debug_species].u[debug_cell].u2/species[debug_species].u[debug_cell].u1)<<endl;
                 }
                 
+                //if(steps > debug_steps && debug_cell < num_cells+1) {
+                if(steps %1000==0) {    
+                    print_velocity_numberdens_ratios(" Pos 1.05:: ", 210);
+                }
+                
 
                 for(int s = 0; s < num_species; s++) {
                     species[s].u_mask           = np_zeros(num_cells+2);
-                    species[s].u0    = species[s].u ;
+                    //species[s].u0    = species[s].u ;
                     species[s].u_tmp = species[s].u ;
                     
-                    for(int k=0; k<=1; k++) { //The k=0 run is the nominal run. k=1 is only triggered if some cells are broken
+                    for(int k=0; k<=0; k++) { //The k=0 run is the nominal run. k=1 is only triggered if some cells are broken
+                        int ex_order = (s==e_idx)?0:1;
+                        species[s].execute(species[s].u, species[s].dudt[1], species[s].u_mask, ex_order);
                         
-                        species[s].execute(species[s].u, species[s].dudt[1], species[s].u_mask, 1);
-                        
-                        species[s].u0 = species[s].u ;
+                        //species[s].u0 = species[s].u ;
                         for(int j=0; j < num_cells+2; j++) {
                             if (use_drag_predictor_step)
-                                species[s].u[j] = species[s].u0[j] + species[s].dudt[0][j]*dt ;
+                                species[s].u_tmp[j] = species[s].u0[j];// + species[s].dudt[0][j]*dt;// March28th 2024 changed this line, as u0 now contains the first-order correct, non-crashed values
                             
                             species[s].u_tmp[j] +=  (species[s].dudt[1][j] - species[s].dudt[0][j])*dt / 2 ;  
                         }
                             
                         species[s].u_mask           = np_zeros(num_cells+2);
                         int numbroken = species[s].count_broken_cells(species[s].u_tmp, species[s].u_mask);
-                        if(numbroken > 0)
-                            cout<<" 2nd order, steps = "<<steps<<" species "<<s<<" numbroken == "<<numbroken<<endl;
+                        //if(numbroken > 0)
+                        //    cout<<" 2nd order, steps = "<<steps<<" species "<<s<<" numbroken == "<<numbroken<<endl;
                         //else
                         //    cout<<" steps = "<<steps<<" species "<<s<<" numbroken == "<<numbroken<<endl;
                         if( numbroken == 0)
@@ -281,6 +307,13 @@ void c_Sim::execute() {
                     }
                     
                 }
+                
+                if(steps %1000==0) {    
+                    print_velocity_numberdens_ratios(" Pos 1.2:: ", 210);
+                }   
+                
+                for(int s = 0; s < num_species; s++)
+                        species[s].compute_pressure(species[s].u);
                 
                 /*
                 //debug = 2;
@@ -299,7 +332,10 @@ void c_Sim::execute() {
                     }
                 }*/
                 
-                
+                for(int s = 0; s < num_species; s++) {
+                    species[s].apply_boundary_left(species[s].u) ;
+                    species[s].apply_boundary_right(species[s].u) ;
+                }
                 
                 
                 if(steps > debug_steps && debug_cell < num_cells+1) {
@@ -330,6 +366,9 @@ void c_Sim::execute() {
                 }
                 cout<<endl;
         }
+        if(steps %1000==0) {    
+                print_velocity_numberdens_ratios(" Pos 1.3:: ", 210);
+        }
         
         for(int s = 0; s < num_species; s++) 
             species[s].compute_pressure(species[s].u);
@@ -341,6 +380,9 @@ void c_Sim::execute() {
                 }
                 cout<<endl;
             }
+        if(steps %1000==0) {    
+                print_velocity_numberdens_ratios(" Pos 1.5:: ", 210);
+        }
         
         //Computes the velocity drag update after the new hydrodynamic state is known for each species
         if (do_hydrodynamics == 1) 
@@ -356,6 +398,9 @@ void c_Sim::execute() {
                 }
                 cout<<endl;
             }
+        if(steps %1000==0) {    
+                print_velocity_numberdens_ratios(" Pos 2:: ", 210);
+        }
         
         // If either switch is set we need to think more carefully about what should be done
         if( (photochemistry_level + use_rad_fluxes ) > 0 ) {
@@ -421,6 +466,9 @@ void c_Sim::execute() {
                 cout<<endl;
             }
             
+        }
+        if(steps %1000==0) {    
+                print_velocity_numberdens_ratios(" Pos 3:: ", 210);
         }
         
         if(steps==0)
@@ -644,6 +692,18 @@ void c_Species::execute(std::vector<AOS>& u_in, std::vector<AOS>& dudt, std::vec
         if(base->steps > base->debug_steps && this_species_index == base->debug_species && base->debug_cell < num_cells+1) {
             cout<<"t="<<base->steps<<"IN EXECUTE Pos 4 T[423]_s = [1]= "<<prim[base->debug_cell].temperature<<" p ="<<prim[base->debug_cell].pres<<" eint = "<<prim[base->debug_cell].internal_energy<<" rho = "<<u[base->debug_cell].u1<<" mom = "<<u[base->debug_cell].u2<<" E = "<<u[base->debug_cell].u3<<" manual pressure u_in = "<<(u[base->debug_cell].u3 - 0.5*u[base->debug_cell].u2*u[base->debug_cell].u2/u[base->debug_cell].u1)<<endl;
         }
+        
+        if(base->steps %1000==0  && this_species_index == -1 ) {    
+                    cout<<endl<<"         IN EXECUTE Pos 4:: v["<<20<<"]_s/v_e = "<<endl<<"         ";
+                    for(int s = 0; s < base->num_species; s++) {
+                        cout<<" ["<<s<<"]= "<<base->species[s].u[20].u2/base->species[s].u[20].u1 / (base->species[2].u[20].u2/base->species[2].u[20].u1);
+                    }
+                    cout<<endl<<"                           1-n["<<20<<"]_s/n_e = "<<endl<<"         ";
+                    for(int s = 0; s < base->num_species; s++) {
+                        cout<<" ["<<s<<"]= "<<1-base->species[s].prim[20].number_density/base->species[2].prim[20].number_density;
+                    }
+                    //cout<<" manual pressure u_in = "<<(species[debug_species].u[debug_cell].u3 - 0.5*species[debug_species].u[debug_cell].u2*species[debug_species].u[debug_cell].u2/species[debug_species].u[debug_cell].u1)<<endl;
+                }
         //
         // Step 2: Compute fluxes and sources
         //
@@ -900,7 +960,7 @@ int c_Species::fix_negative_pressures_sometimes(std::vector<AOS>&u_temp) {
         if(u_temp[j].u3 < 0) {
             //u_temp[j].u3 = u[j].u3;// + (ekinold-ekin);
             
-            double etmp = 0.5*(std::log10(u[j-1].u3) + std::log10(u[j+1].u3) );
+            double etmp = 0.5*std::log10(u[j-1].u3) + 0.5*std::log10(u[j+1].u3) ;
             
             u_temp[j].u3 = std::pow(10.,etmp);
             
@@ -919,4 +979,22 @@ int c_Species::fix_negative_pressures_sometimes(std::vector<AOS>&u_temp) {
     }
     
     return fixed_cells;
+}
+
+void c_Sim::print_velocity_numberdens_ratios(string position, int dcell)
+{
+    cout<<endl<<position<<" v["<<dcell<<"]_s = "<<endl<<"           ";
+                    for(int s = 0; s < num_species; s++) {
+                        cout<<" ["<<s<<"]= "<<species[s].prim[dcell].speed;
+                    }
+    cout<<endl<<position<<" v["<<dcell<<"]_s/v_e = "<<endl<<"           ";
+                    for(int s = 0; s < num_species; s++) {
+                        cout<<std::setprecision (15)<<" ["<<s<<"]= "<<(species[s].u[dcell].u2/species[s].u[dcell].u1) / (species[2].u[dcell].u2/species[2].u[dcell].u1);
+                    }
+    cout<<endl<<position<<" 1-n["<<dcell<<"]_s/n_e = "<<endl<<"           ";
+                    for(int s = 0; s < num_species; s++) {
+                        cout<<std::setprecision (15)<<" ["<<s<<"]= "<<1.-(species[s].u[dcell].u1/species[s].mass_amu) / (species[2].u[dcell].u1/species[2].mass_amu);
+                    }
+                    cout<<endl<<"_____________________________________________________"<<endl;
+    
 }

@@ -292,7 +292,20 @@ void c_Sim::update_dS_jb(int j, int b) {
                     //if lowenergy or photochem < 2
                     
                     if(photochemistry_level <= 2) {
-                        species[s].dS(j)  += no_rad_trans * highenergy_switch(s,b) * dS_band(j,b) * species[s].fraction_total_solar_opacity(j,b);
+                        double newheating =  0.25 * solar_heating(b)  / dx[j];
+                        //double newheating =  0.25 * solar_heating(b)  * (surf[j])/vol[j];
+                        if(j==61e99 && b==1) {
+                            species[s].dS(j-1)   += 0.0 * newheating;
+                            species[s].dS(j)     += 0.0 * newheating;
+                            species[s].dS(j+1)   += 0.0 * newheating;
+                        }
+                        if(j==61e99 && b==1) {//170
+                            species[s].dS(j-1)   += 0.25 * newheating;
+                            species[s].dS(j)     += 0.5 * newheating;
+                            species[s].dS(j+1)   += 0.25 * newheating;
+                        }
+                            
+                        species[s].dS(j)  += highenergy_switch(s,b) * dS_band(j,b) * species[s].fraction_total_solar_opacity(j,b)   ;
                         if(species[s].dS(j) < 1e-50)
                             species[s].dS(j) = 0.;
 

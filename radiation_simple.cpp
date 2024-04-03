@@ -62,7 +62,7 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
                 double dJ = std::abs(Jrad_FLD(j+1,b) - Jrad_FLD(j,b))/(Jrad_FLD(j, b) + 1e-300);
                     
                 double R       = 1.* xi_rad * tau_inv *  dJ ; // Put in 1.0 as prefactor to get correct rad shock
-                double D       = 1.* tau_inv * surf[j] * flux_limiter(R);
+                double D       = 1.* tau_inv * surf[j] * flux_limiter(R) * no_rad_trans;
                 
                 arr_rhokr[j] = rhokr;
                 arr_R[j]        = R;
@@ -192,13 +192,13 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
                 //if(false) {
                 if(steps == 3363e99 && j==2) {
                     //cout<<"reporting cooling terms["<<s<<"]: dG / dGdT * Ts "<<species[s].dG(j)<<" / "<< - photocooling_multiplier * species[s].dGdT(j)*Ts <<endl;
-		    cout<<steps<<" etas = "<<eta1[idx_s]<<"/"<<eta2[idx_s]<<" Ts = "<<Ts<<endl;
-		}
+                        cout<<steps<<" etas = "<<eta1[idx_s]<<"/"<<eta2[idx_s]<<" Ts = "<<Ts<<endl;
+                }
                 
                 if(j == 200e99 && steps == 430){
                 //if(false)
                     cout<<"s ="<<s<<" denoms = "<<denom<<" eta1 = "<<eta1[idx_s]<<" eta1 parts = Ts/dS "<<Ts * ( 1. + 12. * fac)<<"/"<<1. * ddt * (species[s].dS(j) + species[s].dG(j)) / species[s].u[j].u1 / species[s].cv<<" Ts parts = Ts/(1+12fac)/facp1/facp2 = "<<Ts<<"/"<<(1.+12.*fac)<<"/"<<ddt * kappa / species[s].cv * sigma_rad<<"/"<<Ts3<<endl; 
-		    cout<<"reporting cooling terms["<<s<<"]: dG / dGdT * Ts "<<species[s].dG(j)<<" / "<< - photocooling_multiplier * species[s].dGdT(j)*Ts <<" "<<" etas = "<<eta1[idx_s]<<"/"<<eta2[idx_s]<<" Ts = "<<Ts<<endl;
+                    cout<<"reporting cooling terms["<<s<<"]: dG / dGdT * Ts "<<species[s].dG(j)<<" / "<< - photocooling_multiplier * species[s].dGdT(j)*Ts <<" "<<" etas = "<<eta1[idx_s]<<"/"<<eta2[idx_s]<<" Ts = "<<Ts<<endl;
                 }
                 
                 if(j==48000) {
@@ -380,7 +380,7 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
                 
             }
             double avgT_nom = 0;
-	    double avgT_denom = 0;
+            double avgT_denom = 0;
 
             for(int si=0; si<num_species; si++) {
                 
@@ -410,8 +410,8 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
 		//if(j<=4)
 		//	tt=species[si].const_T_space;                
 
-		avgT_nom +=   species[si].u[j].u1 * species[si].cv * tt;
-		avgT_denom += species[si].u[j].u1 * species[si].cv;
+                avgT_nom +=   species[si].u[j].u1 * species[si].cv * tt;
+                avgT_denom += species[si].u[j].u1 * species[si].cv;
 
 		
                 if(globalTime > 1e-30)
@@ -476,8 +476,8 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
                 
                 int idx_s = j * (num_species) + s;
                 double tt = eta1[idx_s]/denoms[idx_s]; 
-		if(couple_J_into_T)
-			tt += eta2[idx_s]/denoms[idx_s]*Jrad_FLD(j, 0);
+                if(couple_J_into_T)
+                    tt += eta2[idx_s]/denoms[idx_s]*Jrad_FLD(j, 0);
                 
                 if( j==2 && steps>3364 && false)
                     cout<<"t = "<<steps<<" j ="<<j<<" T = "<<tt<<" num_cells = "<<num_cells<<endl;
@@ -485,7 +485,7 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
                 //if(j==140)
                 //    cout<<"t = "<<steps<<" T = "<<tt<<endl;
                 
-                if(tt < 0.) {
+                if(tt < 0. && (j<num_cells+numcells_offset)) {
                 //if(steps == 221160) {
                     cout<<" negative T in s = "<<species[s].speciesname<<" j/s = "<<j<<"/"<<s<<" eta1/eta2/J = "<<eta1[idx_s]<<"/"<<eta2[idx_s]<<"/"<<Jrad_FLD(j, 0)<<" denom/eta2*J = "<<denoms[idx_s]<<"/"<<eta2[idx_s]*Jrad_FLD(j,0)<<" t/dt/steps = "<<globalTime<<"/"<<ddt<<"/"<<steps<<endl;
                     Tswitch = 1;
@@ -493,6 +493,9 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
                 
                 if(tt<temperature_floor)
                     tt=temperature_floor;
+                
+                if(tt>max_temperature)
+                    tt=max_temperature;
                 
                 if(Jswitch == 0)
                     species[s].prim[j].temperature = tt ;

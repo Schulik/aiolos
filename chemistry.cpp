@@ -1121,7 +1121,7 @@ void c_Sim::init_highenergy_cooling_indices()
     Opp_idx   = get_species_index("S9 Opp O++",1);
     O3p_idx   = get_species_index("O3p O+++",1);
     O4p_idx   = get_species_index("O4p O++++",1);
-    h3plus_idx = get_species_index("H3+",1);
+    h3plus_idx = get_species_index("H3+ H3p",1);
 }
 
 /**

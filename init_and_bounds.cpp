@@ -226,8 +226,8 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, s
         
         no_rad_trans               = read_parameter_from_file<double>(filename,"NO_RAD_TRANS", debug, 1.).value; //Multiplier for strength for thermal radiative losses in radiation transport. Set to 1e-100 to emulate perfect energy-limited escape.
         solve_for_j                = read_parameter_from_file<int>(filename,"SOLVE_FOR_J", debug, 1).value; //Debugging parameter. Switch to zero for decoupling of T and J in simple rad transport
-        photocooling_multiplier    = read_parameter_from_file<double>(filename,"CO_COOL_MULTIPLIER", debug, 1.).value; //OLD DEPRECATED
-        photocooling_expansion     = read_parameter_from_file<double>(filename,"COOL_EXPANSION", debug, 1.).value; //OLD DEPRECATED
+        photocooling_multiplier    = read_parameter_from_file<double>(filename,"CO_COOL_MULTIPLIER", debug, 0.).value; //OLD DEPRECATED
+        photocooling_expansion     = read_parameter_from_file<double>(filename,"COOL_EXPANSION", debug, 0.).value; //OLD DEPRECATED
         photocooling_multiplier    = read_parameter_from_file<double>(filename,"PHOTOCOOL_MULTIPLIER", debug, photocooling_multiplier).value; //Multiplier for non-thermal cooling rates
         photocooling_expansion     = read_parameter_from_file<double>(filename,"PHOTOCOOL_EXPANSION", debug, photocooling_expansion).value; //Multiplier for non-thermal second order cooling rates
         radiation_rampup_time      = read_parameter_from_file<double>(filename,"RAD_RAMPUP_TIME", debug, 0.).value; //Ramp up the irradiation in all bands smoothly over xxx seconds.

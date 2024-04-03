@@ -843,6 +843,9 @@ public:
     double compute_planck_function_integral3(double lmin, double lmax, double temperature);
     double compute_planck_function_integral4(double lmin, double lmax, double temperature);
     
+    //Debug functions
+    
+    void print_velocity_numberdens_ratios(string position, int dcell);
     
 public:
     

@@ -70,6 +70,7 @@ void c_Species::reconstruct_edge_states( std::vector<double>&u_mask, int orderst
        
         for (int i=1; i <= num_cells; i++) {
             double maskmul = u_mask[i]>0.5?0.:1.; //i>num_cells/2?0.:1.; // Multiply all slopes with 1 in the nominal case, or 0 in case we get a message from above that this cell is broken
+            maskmul = 1.;
             
             double dp_l = 0, dp_r = 0 ;
             if (is_gas) {
@@ -98,11 +99,20 @@ void c_Species::reconstruct_edge_states( std::vector<double>&u_mask, int orderst
 
 
             // Density
+//             slope = MonotonizedCentralSlope(
+//                 prim[i-1].density, prim[i].density, prim[i+1].density, cF, cB, dxF, dxB) ;
+// 
+//             prim_l[i].density +=  maskmul *slope * (x_i[i-1] - x_iVC[i]) ; 
+//             prim_r[i].density +=  maskmul *slope * (x_i[ i ] - x_iVC[i]) ;
+//             
             slope = MonotonizedCentralSlope(
-                prim[i-1].density, prim[i].density, prim[i+1].density, cF, cB, dxF, dxB) ;
+                prim[i-1].number_density, prim[i].number_density, prim[i+1].number_density, cF, cB, dxF, dxB) ;
 
-            prim_l[i].density +=  maskmul *slope * (x_i[i-1] - x_iVC[i]) ; 
-            prim_r[i].density +=  maskmul *slope * (x_i[ i ] - x_iVC[i]) ;
+            prim_l[i].number_density +=  maskmul *slope * (x_i[i-1] - x_iVC[i]) ; 
+            prim_r[i].number_density +=  maskmul *slope * (x_i[ i ] - x_iVC[i]) ;
+            
+            prim_l[i].density =  prim_l[i].number_density * mass_amu*amu;
+            prim_r[i].density =  prim_r[i].number_density * mass_amu*amu;
 
             // Speed
             slope = MonotonizedCentralSlope(

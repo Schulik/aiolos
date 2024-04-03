@@ -904,7 +904,7 @@ void c_Sim::print_diagnostic_file(int outputnumber) {
                     else 
                         flux_limiter = 10 / (10*R + 9 + std::sqrt(81 + 180*R)) ;
                     
-                    double D       = surf[i] * flux_limiter * tau_inv;
+                    double D       = surf[i] * flux_limiter * tau_inv * no_rad_trans;
                     double flux    = - 4. * pi * D * (Jrad_FLD(i+1,b) - Jrad_FLD(i,b));
 
                     outfileDiagnostic<<'\t'<<flux;

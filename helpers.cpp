@@ -22,6 +22,7 @@
  */
 double c_Sim::get_cfl_timestep() {
     
+    int most_restrictive_cell = 0;
     //
     // Compute heuristic radiative timestep
     //
