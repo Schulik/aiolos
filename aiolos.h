@@ -244,6 +244,13 @@ struct AOS {
     {
         return AOS(u1/a, u2/a, u3/a);
     }
+    
+    void operator << (const AOS& rhs)
+    {
+        cout<< rhs.u1<<" "
+            << rhs.u2<<" "
+            << rhs.u3<<" ";
+    }
  
 }; 
 
@@ -489,6 +496,7 @@ public:
     int monitor_output_index;
 
     IntegrationType order ;
+    HydroSolver solver;
     int num_ghosts ;
     
     ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -547,11 +555,18 @@ public:
     std::vector<double> phi;
     std::vector<double> enclosed_mass;
     std::vector<double> enclosed_mass_tmp;
-    //std::vector<double> total_pressure;
+    std::vector<double> total_press;
     std::vector<double> total_press_l ; // Reconstructed left/ right edges
     std::vector<double> total_press_r ;
     std::vector<double> total_adiabatic_index;
     int use_total_pressure;
+    
+    //
+    // Mixed Riemann solver model parameters
+    //
+    double mix_p1;
+    double mix_p2;
+    double mix_p3;
     
     //
     // Friction
@@ -1055,7 +1070,15 @@ public:
     void reconstruct_edge_states(std::vector<double>& u_mask, int orderstep) ;
     
     AOS hllc_flux(int);
+    AOS laxfriedrich_flux(int j);
+    AOS laxwendroff_flux(int j);
+    AOS roe_flux(int j);
     AOS dust_flux(int);
+    AOS passivescalar_flux(int);
+    AOS passivescalar_flux2(int);
+    AOS exact_flux(AOS u);
+    AOS exact_advection_flux(AOS u);
+    
     AOS source_grav(AOS &u, int &j);
     std::vector<double> phi_s;
 

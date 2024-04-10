@@ -690,7 +690,8 @@ template simulation_parameter<BoundaryType> read_parameter_from_file(string, str
 template simulation_parameter<BoundaryType> read_parameter_from_file(string, string, int);
 template simulation_parameter<IntegrationType> read_parameter_from_file(string, string, int, IntegrationType);
 template simulation_parameter<IntegrationType> read_parameter_from_file(string, string, int);
-
+template simulation_parameter<HydroSolver> read_parameter_from_file(string, string, int, HydroSolver);
+template simulation_parameter<HydroSolver> read_parameter_from_file(string, string, int);
 
 /**
  * Write the main output file. Each species generates their own output file of a fixed column number (as opposed to diagnostic files, which change their column numbers depending on simulation setup, i.e. num species, bands in, bands out).

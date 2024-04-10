@@ -65,6 +65,10 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, s
         domain_max       = read_parameter_from_file<double>(filename,"PARI_DOMAIN_MAX", debug).value; //Largest value of 1-D domain   in cm
         geometry         = read_parameter_from_file<Geometry>(filename, "PARI_GEOMETRY", debug, Geometry::cartesian).value; //Cartesian, Polar, Spherical. Determines differentials. More in enum.h
         order            = read_parameter_from_file<IntegrationType>(filename, "PARI_ORDER", debug, IntegrationType::second_order).value; //Spatial order of differentials.
+        solver           = read_parameter_from_file<HydroSolver>(filename, "HYDRO_SOLVER", debug, HydroSolver::hllc).value; //Spatial order of differentials.
+        mix_p1           = read_parameter_from_file<double>(filename,"MIX_HYDROSOLVER_PAR1", debug, 1).value;
+        mix_p2           = read_parameter_from_file<double>(filename,"MIX_HYDROSOLVER_PAR2", debug, 1).value;
+        mix_p3           = read_parameter_from_file<double>(filename,"MIX_HYDROSOLVER_PAR3", debug, 1).value;
         
         num_bands_in     = read_parameter_from_file<int>(filename,"PARI_NUM_BANDS", debug, 1).value; //Number of instellation bands. Low performance impact.
         num_bands_out    = read_parameter_from_file<int>(filename,"NUM_BANDS_OUT", debug, num_bands_in).value; //Number of outgoing radiation bands. Enormous performance impact.
@@ -238,7 +242,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, s
         const_opacity_solar_factor = read_parameter_from_file<double>(filename,"CONSTOPA_SOLAR_FACTOR", debug, 1.).value;    //Multiplier for all stellar opacities (independent of opacity model)
         const_opacity_rosseland_factor = read_parameter_from_file<double>(filename,"CONSTOPA_ROSS_FACTOR", debug, 1.).value; //Multiplier for all rosseland opacities (")
         const_opacity_planck_factor = read_parameter_from_file<double>(filename,"CONSTOPA_PLANCK_FACTOR", debug, 1.).value;  //Multiplier for all planck opacities (")
-	const_opacity_solar_h2 = read_parameter_from_file<double>(filename,"CONSTOPA_SOLAR_H2", debug, 1.).value;    //Multiplier for all stellar opacities (independent of opacity model)
+        const_opacity_solar_h2 = read_parameter_from_file<double>(filename,"CONSTOPA_SOLAR_H2", debug, 1.).value;    //Multiplier for all stellar opacities (independent of opacity model)
         const_opacity_rosseland_h2 = read_parameter_from_file<double>(filename,"CONSTOPA_ROSS_H2", debug, 1.).value; //Multiplier for all rosseland opacities (")
         const_opacity_planck_h2 = read_parameter_from_file<double>(filename,"CONSTOPA_PLANCK_H2", debug, 1.).value;  //Multiplier for all planck opacities (")
         temperature_model = read_parameter_from_file<char>(filename,"INIT_TEMPERATURE_MODEL", debug, 'P').value; //Initialize temperature as adiabatic+constant (P) or constant (C)
@@ -330,7 +334,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, s
         enclosed_mass     = np_zeros(num_cells+2);
         enclosed_mass_tmp = np_zeros(num_cells+2);
         phi               = np_zeros(num_cells+2);
-        //total_pressure    = np_zeros(num_cells+2);
+        total_press        = std::vector<double>(num_cells+2);
         total_press_l            = std::vector<double>(num_cells+2);
         total_press_r            = std::vector<double>(num_cells+2);
         total_adiabatic_index   = std::vector<double>(num_cells+2);
@@ -523,10 +527,10 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, s
                 if(i <= grid2_transition_i) {
                     
                     templogx = dlogx;
-                } else if (i >= (grid2_transition_i + 5)) {
+                } else if (i >= (grid2_transition_i + 20)) {
                     templogx = dlogx2;
                 } else {
-                    templogx = dlogx + double(i-grid2_transition_i)/5. * (dlogx2 - dlogx);
+                    templogx = dlogx + double(i-grid2_transition_i)/20. * (dlogx2 - dlogx);
                 }
                     
                 x_i[i]   =  x_i[i-1] * templogx;
@@ -931,7 +935,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, s
             double tempenergy = 0.;
             int cnt = 0;
             double dlam = 0;
-	    double lastlam = 0;
+            double lastlam = 0;
 
             double flux;
             double lam;
@@ -950,11 +954,11 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, s
                 flux  = std::stod(stringlist[1]);
                 
                 if(lam > l_i_in[b] && lam < l_i_in[b+1]) {
-		   if(cnt==0)
-			lastlam = l_i_in[b];
+                    if(cnt==0)
+                        lastlam = l_i_in[b];
 
-		    dlam = lam-lastlam;
-		    lastlam = lam;
+                    dlam = lam-lastlam;
+                    lastlam = lam;
                     tempenergy += dlam*flux;
                     cnt++;
                 }
@@ -1942,30 +1946,40 @@ void c_Species::apply_boundary_left(std::vector<AOS>& u) {
             break;
         case BoundaryType::fixed:
             for (int i=0; i < num_ghosts; i++) {
-                
+                //cout<<" IN FIXED LEFT BOUNDARIES"<<endl;
                 /*double dens_wall;  
                 if(base->problem_number == 1)
                     dens_wall = SHOCK_TUBE_UL.u1 * mass_amu;
                 else {
                     dens_wall = BACKGROUND_U.u1 *  mass_amu;
                 }*/
-                double dens_wall;
-                AOS_prim prim;
+                //double dens_wall;
+                
                 if(base->problem_number == 1)
-                    dens_wall = SHOCK_TUBE_UL.u1;
+                {
+                    u[i] = SHOCK_TUBE_UL;
+                    eos->compute_primitive(&u[i],&(prim[i]), 1) ;
+                    eos->compute_auxillary(&(prim[i]), 1);
+                    
+                          //eos->compute_primitive(&(u[0]), &(prim[0]), num_cells+2) ;    
+                        //eos->compute_auxillary(&(prim[0]), num_cells+2);
+                }
+                    
                 else {
+                    AOS_prim prim;
                     prim.density = BACKGROUND_U.u1;
-		    if(this->prim[2].speed < 0)
-			prim.speed = -this->prim[2].speed * base->wavedamp_factor;
-		    else
-	                prim.speed   = this->prim[2].speed;
+                    if(this->prim[2].speed < 0)
+                        prim.speed = -this->prim[2].speed * base->wavedamp_factor;
+                    else
+                        prim.speed   = this->prim[2].speed;
                     prim.temperature = this->prim[2].temperature;
                     //prim.temperature = const_T_space;
+                    eos->update_eint_from_T(&(prim), 1);
+                    eos->update_p_from_eint(&(prim), 1);
+                    eos->compute_conserved(&(prim), &(u[i]), 1) ; //Ghost cell u is fixed after init, only need to update p in prim
                 }
                 
-                eos->update_eint_from_T(&(prim), 1);
-                eos->update_p_from_eint(&(prim), 1);
-                eos->compute_conserved(&(prim), &(u[i]), 1) ; //Ghost cell u is fixed after init, only need to update p in prim
+       
             }
             
             break;

@@ -551,6 +551,8 @@ double get_implicit_photochem3(double dt, double n1_old, double n2_old, double F
  * The actual C2Ray scheme.
  */
 void c_Sim::do_photochemistry() {
+    
+    this->print_velocity_numberdens_ratios("STARTING C2RAY", 3);
     // cout<<" Doing photochemistry "<<endl;
             
             //double tau0 = 0;
@@ -942,6 +944,8 @@ void c_Sim::do_photochemistry() {
                 species[s].eos->compute_conserved(&species[s].prim[0], &species[s].u[0], num_cells + 2);
             }
             //cout<<endl;
+            this->print_velocity_numberdens_ratios("ENDED C2RAY", 3  );
         }
+        
     //}
 //}

@@ -49,7 +49,6 @@ enum class IntegrationType {
 IOS_INPUT(IntegrationType);
 IOS_OUTPUT(IntegrationType);
 
-
 enum class EOS_pressure_type {
     adiabatic = 0, polytropic = 1, tabulated = 2, supernova = 3, user=4
 };
@@ -61,6 +60,12 @@ enum class EOS_internal_energy_type {
 };
 IOS_INPUT(EOS_internal_energy_type);
 IOS_OUTPUT(EOS_internal_energy_type);
+
+enum class HydroSolver {
+    hllc = 0, roe = 1, mix = 2, laxfriedrich = 3, laxwendroff = 4
+} ;
+IOS_INPUT(HydroSolver);
+IOS_OUTPUT(HydroSolver);
 
 
 
