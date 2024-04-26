@@ -152,8 +152,8 @@ void c_Sim::execute() {
         // Step 0: Hydrodynamics, if so desired
         //
 
-	    if (do_hydrodynamics == 1) 
-            compute_drag_update() ;
+	    //if (do_hydrodynamics == 1) 
+        //    compute_drag_update() ;
         compute_total_pressure();
 
         if(steps %prinstuff_steps==0) {    
@@ -700,8 +700,10 @@ void c_Species::execute(std::vector<AOS>& u_in, std::vector<AOS>& dudt, std::vec
         //
         // Step 2: Compute fluxes and sources
         //
+        std::vector<double> grav_prefactors = np_ones(num_cells+2);
         if (not is_dust_like) {
             const double params[3] = {base->mix_p1, base->mix_p2, base->mix_p3};
+            
             
             switch(base->solver) {
                 case HydroSolver::hllc:
@@ -726,9 +728,15 @@ void c_Species::execute(std::vector<AOS>& u_in, std::vector<AOS>& dudt, std::vec
                     //else
                     
                     
-                    if(this_species_index <= 2) {
+                    if(this_species_index >= 1) {
                         for(int j=0; j <= num_cells; j++) {
-                            const double flim  = params[this_species_index]; //previously 0.1
+                            double flim  = params[this_species_index]; //previously 0.1
+                            if(this_species_index==base->e_idx)
+                                flim  = params[2];
+                            else if(this_species_index==0)
+                                flim  = params[0];
+                            else
+                                flim  = params[1];
                             double totpress = 0.;
                             int negpresscontributions = 0;
                             
@@ -739,15 +747,44 @@ void c_Species::execute(std::vector<AOS>& u_in, std::vector<AOS>& dudt, std::vec
                             }
                             //double f           = prim[j].pres/base->total_press[j];
                             double f           = prim[j].pres/totpress;
-                            if(f < flim)
-                                f=flim;
-                            AOS flux1 = hllc_flux(j);
-                            AOS flux2 = passivescalar_flux(j);
-                            flux[j]   = (flux1 * f) +  (flux2 * (1.-f)); 
+                            //f=std::sqrt(f);
+                            //if(f < flim)
+                            //    f=flim;
+                            
+                            if(f > flim)
+                                f=1;
+                            //else
+                            //    f=2.*f;
+                            //f = 1./(1+x);
+                            
+                            auto ff = [](double x,double x0) {
+                                if(x>x0)
+                                    return 1.;
+                                else if(x<x0*x0)
+                                    return x;
+                                
+                                return x*x/(x0*x0);
+                            } ;
+                            
+                            auto ff2 = [](double x,double alpha) {
+                              return 2.*3./(1.+2./std::pow(x,alpha));
+                            } ;
+                            //f = ff2(f, params[0]);
+                            //f=ff(f, flim);
+                            
+                            grav_prefactors[j] = f;
+                            AOS flux1 = hllc_flux2(j, f);
+                            flux[j] = flux1;
+                            
+                            AOS flux2 = passivescalar_flux2(j);
+                            //if(this_species_index <= 2 )
+                            //    flux[j] = flux1;
+                            //else
+                            //    flux[j]   = (flux1 * f) +  (flux2 * (1.-f)); 
                             //if(base->steps%1000==0) {
-                            if(base->steps%5000==0 && base->steps > 33000e99) {
+                            if(base->steps%10000==0 && base->steps > 3000e99) {
                             //if(0==0) {
-                                cout<<" s = "<<this_species_index<<" f ="<<f<<" 1.-f "<<(1.-f)<<" hllc.u1*f = "<<flux1.u1<< " "<<flux1.u1 * f<<" pflux.u1*(1-f) = "<<flux2.u1<<" "<<flux2.u1 * (1.-f)<<" 1-flux.u1/hllc.u1 = "<<1.-flux[j].u1/flux1.u1<<" negpress = "<<negpresscontributions<<endl; 
+                                cout<<" s = "<<this_species_index<<" cell "<<j<<" f ="<<f<<" 1.-f "<<(1.-f)<<" hllc.u1*f = "<<flux1.u1<< " "<<flux1.u1 * f<<" pflux.u1*(1-f) = "<<flux2.u1<<" "<<flux2.u1 * (1.-f)<<" 1-flux.u1/hllc.u1 = "<<1.-flux[j].u1/flux1.u1<<" negpress = "<<negpresscontributions<<endl; 
                             }
 
                             //flux[j]  = hllc_flux(j); // * f + passivescalar_flux(j) * (1.-f); 
@@ -804,7 +841,7 @@ void c_Species::execute(std::vector<AOS>& u_in, std::vector<AOS>& dudt, std::vec
             cout<<"Done. Starting sources."<<endl;
         
         for(int j=1; j<=num_cells; j++) {
-            source[j]          = source_grav(u_in[j], j);
+            source[j]          = (source_grav(u_in[j], j)); //* grav_prefactors[j]
             source_pressure[j] = AOS(0, -(base->source_pressure_prefactor_left[j] * prim_l[j].pres - 
                                           base->source_pressure_prefactor_right[j] * prim_r[j].pres)  ,0); 
         }
@@ -922,6 +959,91 @@ AOS c_Species::hllc_flux(int j)
         double comp3_R = Er/dr + (SS-ur)*(SS + pr_e/(dr*(SR-ur)));
         AOS US_R       = AOS(advectionfactor, SS, comp3_R) * dr * (SR - ur)/(SR-SS);
         AOS FS_R       = FR + (US_R - AOS(dr * advectionfactor, mom_r, Er)) * SR;
+        
+        flux = FS_R;
+        option = 2;
+    }
+    else if (SL >= 0) {
+        AOS FL = AOS (mom_l, mom_l * ul + pl, ul * (El + pl_e) );
+        flux = FL;
+        option = 3;
+    }
+    else if (SR <= 0) {
+        AOS FR = AOS(mom_r, mom_r * ur + pr, ur * (Er + pr_e) );
+        flux = FR;
+        option= 4 ;
+    }
+    if((debug > 2) && (j>0 && j<13))
+        cout<<" opt = "<<option<<" SL/SS/SR = "<<SL<<"/"<<SS<<"/"<<SR<<" f = "<<flux.u1<<"/"<<flux.u2<<"/"<<flux.u3<<" ((f.u2-Pl)/Pl)-1 = "<<((flux.u2-pl)/pl)<<" ((f.u2-Pr)/Pr)-1 = "<<((flux.u2-pr)/pr)<<endl;
+    return flux;
+}
+
+AOS c_Species::hllc_flux2(int j, double f) 
+{
+    int jleft = j, jright = j+1;
+    AOS flux;
+    int option = 0;
+    
+    //Speed of gas
+    double ul = prim_r[jleft].speed;  
+    double ur = prim_l[jright].speed; 
+    
+    double pl = f*prim_r[jleft].pres;  
+    double pr = f*prim_l[jright].pres;
+    double pl_e = pl;
+    double pr_e = pr;
+    if(base->use_total_pressure) {
+            pl = base->total_press_r[jleft];
+            pr = base->total_press_l[jright];
+    }
+    
+    double dl = prim_r[jleft].density;  
+    double dr = prim_l[jright].density;
+
+    double mom_l = dl*ul ;
+    double mom_r = dr*ur ;
+
+    double El = dl*prim_r[jleft].internal_energy + 0.5*mom_l*ul ;
+    double Er = dr*prim_l[jright].internal_energy + 0.5*mom_r*ur ;
+
+    if( (debug > 2) && (j>0 && j<13) ) {
+        cout<<" IN HLLC, j = "<<j<<" dl/dr = "<<dl<<"/"<<dr<<" ul/ul = "<<ul<<"/"<<ur<<" pl/pr = "<<pl<<"/"<<pr<<" El/Er = "<<El<<"/"<<Er;
+    }
+    
+    //Speed of shocks
+    double SL = ul - prim_r[jleft].sound_speed ;
+    double SR = ur + prim_l[jright].sound_speed ;
+    
+    //Intermediate values in the star region, equations 10.30 -10.39 in Toro
+    double SS     = ( pr-pl+ mom_l*(SL - ul)-mom_r*(SR-ur) )/(dl*(SL - ul)-dr*(SR-ur) );
+    
+    double advectionfactor = 1;
+    double uavg   = (std::sqrt(u[j].u1) * ul + std::sqrt(u[j].u1) * ur )/(std::sqrt(u[j].u1) + std::sqrt(u[j].u1));
+    double hl  = (pl + u[j].u3)/u[j].u1;
+    double hr  = (pr + u[j].u3)/u[j].u1;
+    double h   = (std::sqrt(u[j].u1) * hl + std::sqrt(u[j].u1) * hr)/(std::sqrt(u[j].u1) + std::sqrt(u[j].u1));
+    double c   = std::sqrt((gamma_adiabat-1.) * (h-0.5*uavg*uavg));
+    double mach = (std::fabs(uavg)/c);
+    if(1==0){
+        SL = uavg-c;
+        SR = uavg+c;
+    }
+    
+    if ((SL <= 0) &&  (SS >= 0)) {
+        AOS FL         = AOS (mom_l, mom_l * ul + pl, ul * (El + pl_e) );
+        double comp3_L = El/dl + (SS-ul)*(SS + pl_e/(dl*(SL-ul)));
+        AOS US_L       = AOS(1 ,SS, comp3_L) * dl * (SL - ul)/(SL-SS);
+        AOS FS_L       = FL + (US_L - AOS(dl, mom_l, El))  * SL;    
+           
+        flux = FS_L;
+        option = 1;
+    }
+    else if ((SS <= 0) && (SR >= 0)) {
+        
+        AOS FR         = AOS (mom_r, mom_r * ur + pr, ur * (Er + pr_e) );
+        double comp3_R = Er/dr + (SS-ur)*(SS + pr_e/(dr*(SR-ur)));
+        AOS US_R       = AOS(1, SS, comp3_R) * dr * (SR - ur)/(SR-SS);
+        AOS FS_R       = FR + (US_R - AOS(dr, mom_r, Er)) * SR;
         
         flux = FS_R;
         option = 2;
@@ -1137,7 +1259,7 @@ AOS c_Species::passivescalar_flux(int j)
 
 
 /**
- * Passive scalar flux 2 - derived from HLLC
+ * Passive scalar flux 2 - simple upwinding with pressureless guess as to the velocity in the star region
  * 
  * @param[in] j cell interface number at which to compute the flux. 
  * @return flux at cell interface j
@@ -1148,18 +1270,21 @@ AOS c_Species::passivescalar_flux2(int j)
     AOS state_l = u[j];
     AOS state_r = u[j+1];
     AOS flux_l  = exact_advection_flux(u[j]);
-    AOS flux_r  = exact_advection_flux(u[j+1]);    
+    AOS flux_r  = exact_advection_flux(u[j+1]);
     
-    double dt  = base->dt;
-    double dx1 = 0.5*(base->x_i[j]-base->x_i[j-1]);
-    double dx2 = 0.5*(base->x_i[j+1]-base->x_i[j]);
+    double u1mean = 0.5 * (state_l.u1 + state_r.u1);
+    double u3mean = 0.5 * (state_l.u3 + state_r.u3);
+ 
+    double uhalf = 0.5*(state_l.u2/state_l.u1 + state_r.u2/state_r.u1);
+    double phalf = (gamma_adiabat - 1.) *(u3mean - 0.5 * u1mean * uhalf*uhalf);
     
-    //cout<<" cell j = "<<j<<" fluxes_l ="<<flux_l.u1<<" "<<flux_l.u2<<" "<<flux_l.u3<<" "<<" fluxes_r ="<<flux_r.u1<<" "<<flux_r.u2<<" "<<flux_r.u3<<" "<<endl;
-    //cout<<"             "<<" state_l ="<<state_l.u1<<" "<<state_l.u2<<" "<<state_l.u3<<" "<<" fluxes_r ="<<state_r.u1<<" "<<state_r.u2<<" "<<state_r.u3<<" "<<endl;
+    AOS result = AOS(0,0,0);
+    if(uhalf > 0)
+        result = AOS(state_l.u1* uhalf, state_l.u2* uhalf, (state_l.u3 + 0.*phalf)* uhalf )  ;
+    else if(uhalf < 0)
+        result = AOS(state_r.u1* uhalf, state_r.u2* uhalf, (state_r.u3 + 0.*phalf)* uhalf );
     
-    AOS result = ((flux_l + flux_r) * 0.5) +  ((state_l - state_r) * (0.5*(dx1+dx2)/dt)); 
-    if(j<= 1 || j>=num_cells-1) result = (0,0,0);
-    //cout<<"          result  j  "<<j<<" "<<result.u1<<" "<<result.u2<<" "<<result.u3<<endl;
+    if(j<= 1 || j>=num_cells-1) result = AOS(0,0,0);
     
     return result;
 }
@@ -1293,7 +1418,7 @@ int c_Species::fix_negative_pressures_sometimes(std::vector<AOS>&u_temp) {
 
 void c_Sim::print_velocity_numberdens_ratios(string position, int dcell)
 {
-    if(1==1) {
+    if(0==1) {
         cout<<endl<<position<<" v["<<dcell<<"]_s = "<<endl<<"           ";
                     for(int s = 0; s < num_species; s++) {
                         cout<<" ["<<s<<"]= "<<species[s].prim[dcell].speed;

@@ -548,6 +548,9 @@ Vector_t c_Sim::solver_cchem_implicit_general(double dtt, int cell, int cdebug, 
             
         double F = 0.25 * solar_heating(b) / photon_energies[b] * std::exp(-temptau) * dlognu;
         
+        //if(steps%1000==0)
+        //    cout<<" F ="<<solar_heating(b)<<endl;
+        
         double ntot_b = 0.;
         double tau_tot_b = 0.;
     

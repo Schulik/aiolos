@@ -2022,6 +2022,10 @@ void c_Species::apply_boundary_right(std::vector<AOS>& u) {
                 AOS_prim prim ;
                 eos->compute_primitive(&u[i-1],&prim, 1) ;
                 
+                prim.temperature = const_T_space;
+                eos->update_eint_from_T(&(prim), 1);
+                eos->update_p_from_eint(&(prim), 1);                
+                
                 double dphi = (base->phi[i]*K_zzf[i] - base->phi[i-1]*K_zzf[i-1]) / (base->dx[i-1] + base->dx[i]) ;
                 dphi       *= (base->omegaplus[i]*base->dx[i] + base->omegaminus[i-1]*base->dx[i-1]) ;
                 prim.pres = prim.pres - base->right_extrap_press_multiplier * prim.density * dphi ;    
@@ -2031,7 +2035,7 @@ void c_Species::apply_boundary_right(std::vector<AOS>& u) {
                 //dphi2 *= (prim.density * base->omegaplus[i]*base->dx[i] + this->prim[i].density * base->omegaminus[i-1]*base->dx[i-1]) ;
                 //prim.pres = prim.pres - dphi2 ; 
                 
-                prim.pres = std::max( prim.pres, 1e-40) ; //TODO: Replace 1e-3 with an estimate for the max pressure jump in a adiabatic shock
+                prim.pres = std::max( prim.pres, 1e-50) ; //TODO: Replace 1e-3 with an estimate for the max pressure jump in a adiabatic shock
                 //prim.pres = std::max( prim.pres, 0.0) ;          //27.10.2021: Not in use anymore, due to this causing problems with negative temperatures. p=0 -> E = 0 -> T = 0  and negative after a bit of hydro
                 
                 //if(base->steps >= base->debug_steps-3)
@@ -2155,8 +2159,10 @@ void c_photochem_reaction::set_base_pointer(c_Sim *base_simulation) {
     //for(int& pj : products) {
     //    cout<<"Species of mass ="<<base->species[pj].mass_amu<<" gets a fraction of energy xi/mass ="<<energy_split_factor/base->species[pj].mass_amu<<endl;
     //}
-
-    base->highenergy_switch(educts[0], this->band) = 0.;
+    for(int b=0; b<=this->band; b++){
+        base->highenergy_switch(educts[0], b) = 0.;
+        cout<<" In c_photochem_reaction::set_base_pointer, zeroing for spec = "<<educts[0]<<" band = "<<b<<endl;
+    }
 
     this->threshold_energy = 1.24/( base->l_i_in[this->band+1] )  * ev_to_K * kb ;
 }

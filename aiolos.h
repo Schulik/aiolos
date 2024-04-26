@@ -1070,6 +1070,7 @@ public:
     void reconstruct_edge_states(std::vector<double>& u_mask, int orderstep) ;
     
     AOS hllc_flux(int);
+    AOS hllc_flux2(int, double);
     AOS laxfriedrich_flux(int j);
     AOS laxwendroff_flux(int j);
     AOS roe_flux(int j);

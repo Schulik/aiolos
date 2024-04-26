@@ -20,7 +20,7 @@ void c_Sim::reset_dS() {
             species[s].dGdT(j)  = 0.;
         }
     }
-        
+
     if(globalTime < radiation_rampup_time) {
         for(int b=0; b<num_bands_in; b++) {
         
@@ -31,6 +31,9 @@ void c_Sim::reset_dS() {
             solar_heating(b) = solar_heating_final(b);
         }        
     }
+    
+        //if(steps%1000==0)
+        //    cout<<" in reset dS F ="<<solar_heating(0)<<" times "<<globalTime<<" "<<radiation_rampup_time<<endl;
                 
 }
 
@@ -293,19 +296,13 @@ void c_Sim::update_dS_jb(int j, int b) {
                     
                     if(photochemistry_level <= 2) {
                         double newheating =  0.25 * solar_heating(b)  / dx[j];
-                        //double newheating =  0.25 * solar_heating(b)  * (surf[j])/vol[j];
-                        if(j==61e99 && b==1) {
-                            species[s].dS(j-1)   += 0.0 * newheating;
-                            species[s].dS(j)     += 0.0 * newheating;
-                            species[s].dS(j+1)   += 0.0 * newheating;
-                        }
-                        if(j==61e99 && b==1) {//170
+                        if(j==100 && b==1) {
                             species[s].dS(j-1)   += 0.25 * newheating;
                             species[s].dS(j)     += 0.5 * newheating;
                             species[s].dS(j+1)   += 0.25 * newheating;
                         }
                             
-                        species[s].dS(j)  += highenergy_switch(s,b) * dS_band(j,b) * species[s].fraction_total_solar_opacity(j,b)   ;
+                        species[s].dS(j)  += 0.* highenergy_switch(s,b) * dS_band(j,b) * species[s].fraction_total_solar_opacity(j,b)   ;
                         if(species[s].dS(j) < 1e-50)
                             species[s].dS(j) = 0.;
 
