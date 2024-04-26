@@ -790,8 +790,13 @@ void c_Sim::do_photochemistry() {
                     cooling = heat.cooling_rate(Te);
                     
                     Eigen::Matrix<double, 3, 1> newT = heat.compute_T(Te);
-                    for (int s = 0; s < 3; s++)
+                    for (int s = 0; s < 3; s++) {
+                        
+                        if(newT(s)>max_temperature)
+                            newT(s)=max_temperature;
+                        
                         species[s].prim[j].temperature = newT(s);   
+                    }
                 }
                 
                 if(debug >= 1 && j==num_cells) {

@@ -295,7 +295,7 @@ void c_Sim::update_dS_jb(int j, int b) {
                     //if lowenergy or photochem < 2
                     
                     if(photochemistry_level <= 2) {
-                        double newheating =  0.25 * solar_heating(b)  / dx[j];
+                        double newheating =  1. * 0.25 * solar_heating(b)  / dx[j];
                         if(j==100 && b==1) {
                             species[s].dS(j-1)   += 0.25 * newheating;
                             species[s].dS(j)     += 0.5 * newheating;
