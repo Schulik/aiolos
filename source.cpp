@@ -192,14 +192,14 @@ void c_Species::update_kzz_and_gravpot(int argument) {
             if(kzz*n < 1.)
                 K_zzf[i] = 1.;
             else {
-		K_zzf[i] = mu/mi;
+                K_zzf[i] = mu/mi;
                 slope    = mu/mi;
-	    }
+            }
 	
 	    //special treatment for electrons: create zero gradient below approx. ionisation radius (ignoring homopause), so that they don't drop anymore
 	    if(mi < 0.5) {
-		if(base->x_i12[i] < 0. * base->x_i12[2])
-			K_zzf[i] = mu/mi; //-2e-1;
+            if(base->x_i12[i] < 0. * base->x_i12[2])
+                K_zzf[i] = mu/mi; //-2e-1;
 			slope    = mu/mi; //+1e-3;
             }
 
@@ -240,6 +240,9 @@ void c_Species::update_kzz_and_gravpot(int argument) {
     
     for(int i=0; i<homopause_boundary_i; i++) 
         phi_s[i] += 1. * phicorrection;
+    
+    if(argument == 0)
+        phi_s[1] = phi_s[2];
     
     //cout<<"s = "<<argument<<" phicorr = "<<phicorrection<<" homopause_i = "<<homopause_boundary_i<<endl;
     //cout<<"Finished updating kzz in species "<<speciesname<<endl;

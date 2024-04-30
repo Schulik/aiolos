@@ -1501,6 +1501,8 @@ void c_Species::initialize_hydrostatic_atmosphere(string filename) {
     else
         iter_start = num_cells;
     
+    
+    
     if(base->reverse_hydrostat_constrution == 0) {
         
             for(int i=iter_start; i>=0; i--)  {
@@ -1561,115 +1563,94 @@ void c_Species::initialize_hydrostatic_atmosphere(string filename) {
             //Ghost cells
             for(int i =0; i<2; i++)
                 u[i] = AOS(u[i].u1, 0., cv * u[i].u1 *prim[i].temperature);
-            
+                        
             for(int i=1; i<=iter_start; i++)  {
             
-            //
-            // Construct next density as to fulfil the hydrostatic condition
-            //
-            T_outer = prim[i+1].temperature ;
-            T_inner = prim[i].temperature ;
-            
-            eos->get_p_over_rho_analytic(&T_outer, &factor_outer);
-            eos->get_p_over_rho_analytic(&T_inner, &factor_inner);
-            
-            double dphi = phi_s[i+1] - phi_s[i];
-            //double dphi = base->phi[i+1]*K_zzf[i+1] - base->phi[i]*K_zzf[i];
-            //double dphi = base->phi[i+1] - base->phi[i];
-            
-            metric_outer = dphi * base->omegaplus[i+1] * base->dx[i+1] / (base->dx[i+1] + base->dx[i]);
-            metric_inner = dphi * base->omegaminus[i]  * base->dx[i]   / (base->dx[i+1] + base->dx[i]);
-            
-            temp_rhofinal = u[i].u1 *  (factor_inner - metric_inner)/(factor_outer + metric_outer);
-            
-            if(dphi < 0.)
-                temp_rhofinal = u[i].u1;
-            
-            //cout<<" s/i = "<<speciesname<<"/"<<i<<"   metric_inner debug: dPhi = "<<dphi<<" rhonew/rhoold = "<<temp_rhofinal<<"/"<<u[i].u1<<endl;
-            
-            //if(speciesname.compare("S2")==0) { //Force light electrons to be the same number as protons
-            if(mass_amu < 0.90) {    
-            //if(speciesname.compare("e-")==0 ) { //Force light electrons to be the same number as protons
+                //
+                // Construct next density as to fulfil the hydrostatic condition
+                //
+                T_outer = prim[i+1].temperature ;
+                T_inner = prim[i].temperature ;
                 
-                //int p_index = base->get_species_index("H+");
-                int p_index = base->get_species_index("S1 H+ p+ p Hp", 0);
-                if(p_index < 0) {
-                    cout<<" IN HYDROSTAT CONSTRUCTION for e-: Protons (H+) species not found! "<<endl;
+                eos->get_p_over_rho_analytic(&T_outer, &factor_outer);
+                eos->get_p_over_rho_analytic(&T_inner, &factor_inner);
+                
+                double dphi = phi_s[i+1] - phi_s[i];
+                //double dphi = base->phi[i+1]*K_zzf[i+1] - base->phi[i]*K_zzf[i];
+                //double dphi = base->phi[i+1] - base->phi[i];
+                
+                metric_outer = dphi * base->omegaplus[i+1] * base->dx[i+1] / (base->dx[i+1] + base->dx[i]);
+                metric_inner = dphi * base->omegaminus[i]  * base->dx[i]   / (base->dx[i+1] + base->dx[i]);
+                
+                temp_rhofinal = u[i].u1 *  (factor_inner - metric_inner)/(factor_outer + metric_outer);
+                                
+                if(dphi < 0.)
+                    temp_rhofinal = u[i].u1;
+                
+                //cout<<" s/i = "<<speciesname<<"/"<<i<<"   metric_inner debug: dPhi = "<<dphi<<" rhonew/rhoold = "<<temp_rhofinal<<"/"<<u[i].u1<<endl;
+                
+                //if(speciesname.compare("S2")==0) { //Force light electrons to be the same number as protons
+                if(mass_amu < 0.90) {    
+                //if(speciesname.compare("e-")==0 ) { //Force light electrons to be the same number as protons
+                    
+                    //int p_index = base->get_species_index("H+");
+                    int p_index = base->get_species_index("S1 H+ p+ p Hp", 0);
+                    if(p_index < 0) {
+                        cout<<" IN HYDROSTAT CONSTRUCTION for e-: Protons (H+) species not found! "<<endl;
+                    }
+                    temp_rhofinal = base->species[p_index].u[i+1].u1 * initial_fraction / base->species[p_index].initial_fraction;
+                    
                 }
-                temp_rhofinal = base->species[p_index].u[i+1].u1 * initial_fraction / base->species[p_index].initial_fraction;
                 
-            }
-            
-            //////////////////////////////////////////////////////////////////////////////////////
-            //double floor = base->density_floor / mass_amu * std::pow(base->x_i12[i]/base->x_i12[1], -4.);
-            
-            double floor          = base->density_floor * std::pow(base->x_i12[i]/base->x_i12[1], -4.) * initial_fraction;
-            //double lastval_scaled = u[i].u1 * std::pow(base->x_i12[i]/base->x_i12[i+1], 8.);
-            double lastval_scaled = u[i].u1 * u[i].u1/u[i-1].u1;
-            
-            if(temp_rhofinal < 0.) {
+                //////////////////////////////////////////////////////////////////////////////////////
+                //double floor = base->density_floor / mass_amu * std::pow(base->x_i12[i]/base->x_i12[1], -4.);
                 
-                if(lastval_scaled > floor && base->use_init_discont_smoothing)
-                    temp_rhofinal = lastval_scaled;
-                else
-                    temp_rhofinal = lastval_scaled; //this was formerly triggered when  //if( (temp_rhofinal < floor) || ( base->x_i12[i] > 0.5*base->rhill  && base->use_tides == 2       ) ) {
+                double floor          = base->density_floor * std::pow(base->x_i12[i]/base->x_i12[1], -4.) * initial_fraction;
+                //double lastval_scaled = u[i].u1 * std::pow(base->x_i12[i]/base->x_i12[i+1], 8.);
+                double lastval_scaled = u[i].u1 * u[i].u1/u[i-1].u1;
                 
-                negdens = 1;
-            }
-            /*
-            if(base->use_init_discont_smoothing && temp_rhofinal < 0. && temp_rhofinal > floor) {
-                //if(temp_rhofinal < lastval_scaled)
-                    temp_rhofinal = lastval_scaled;
-            }
-            
-            //if( (temp_rhofinal < floor) || ( base->x_i12[i] > 0.5*base->rhill  && base->use_tides == 2       ) ) {
-            if(false){
-                
-                if(temp_rhofinal < 0.)
+                if(temp_rhofinal < 0.) {
+                    
+                    if(lastval_scaled > floor && base->use_init_discont_smoothing)
+                        temp_rhofinal = lastval_scaled;
+                    else
+                        temp_rhofinal = lastval_scaled; //this was formerly triggered when  //if( (temp_rhofinal < floor) || ( base->x_i12[i] > 0.5*base->rhill  && base->use_tides == 2       ) ) {
+                    
                     negdens = 1;
-                
-                temp_rhofinal = floor;
-            }*/
-            //////////////////////////////////////////////////////////////////////////////////////
-            
-            //if(this_species_index == 2) {
-            //    cout<<" electrons, i/rho = "<<i<<"/"<<temp_rhofinal<<endl;
-            //}
-            
-            //cout<<" s/i = "<<speciesname<<"/"<<i<<"   metric_inner debug: dPhi = "<<(base->phi[i+1]*K_zzf[i+1] - base->phi[i]*K_zzf[i])<<" rhonew/rhoold = "<<temp_rhofinal<<"/"<<u[i].u1<<" kzz = "<<K_zzf[i+1]<<"/"<<K_zzf[i]<<" To/Ti = "<<T_outer<<"/"<<T_inner<<endl;
-            
-            u[i+1] = AOS(temp_rhofinal, 0., cv * temp_rhofinal * T_outer);
-            
-            if(debug > 2) {
-            //if(i < 3) {
-                
-                char a;
-                cout.precision(16);
-                cout<<"NEGATIVE DENSITY IN INIT HYDROSTATIC i="<<i<<"/"<<num_cells<<endl;
-                if((factor_inner - metric_inner) < 0) {
-                    
-                    cout<<"     Negative denominator detected. Product (gamma-1)*cv*T_inner is too small for chosen discretization."<<endl;
-                    
                 }
-                cout<<endl;
-                cout<<"     dphi debug: phi["<<i+1<<"] = "<<base->phi[i+1]*K_zzf[i+1]<<" phi["<<i<<"] = "<<base->phi[i]*K_zzf[i]<<" num_cells = "<<num_cells<<endl;
-                cout<<"     metric_inner debug: dPhi = "<<(base->phi[i+1]*K_zzf[i+1] - base->phi[i]*K_zzf[i])<<" dx[i+1]+dx[i] = "<<(base->dx[i+1] + base->dx[i])<<" omega*dx  = "<<base->omegaminus[i]  * base->dx[i]<<endl;
-                cout<<"     factor_inner debug: gamma-1 = "<<(gamma_adiabat-1.)<<" cv = "<<cv<<" T_inner = "<<T_inner<<endl;
-                cout<<"     metric_outer = "<< metric_outer << " metric_inner = "<<metric_inner <<endl;
-                cout<<"     factor_outer = "<< factor_outer << " factor_inner = "<<factor_inner <<endl;
-                cout<<"     factor_outer+metric_outer = "<< (factor_outer + metric_outer) << " factor_inner-metric_inner = "<<( factor_inner - metric_inner) <<endl;
-                cout<<"     RATIO = "<< ((factor_outer + metric_outer)/ (factor_inner - metric_inner)) <<endl;
-                //cout<<"In hydostatic init: factor_dens = "<< (2.* factor_outer / delta_phi + 1.) / (2. * factor_inner / delta_phi - 1.) <<endl;
-                cout<<"     Ratio of densities inner/outer = "<< temp_rhofinal/u[i+1].u1 <<endl;
-                cout<<"     Ratio of temperatures inner/outer = "<<T_inner/T_outer<<" t_inner ="<<T_inner<<" t_outer ="<<T_outer<<endl;
-                cout<<"     Ratio of pressures inner/outer = "<<cv * temp_rhofinal * T_inner /u[i+1].u3<<endl;
-                cout<<"     Resulting density == "<<temp_rhofinal<<endl;
-                cout<<"     floor ="<<floor<<endl;
-                cout<<"     density before "<<u[i+1].u1<<endl;
-                cin>>a;
-            }
+                
+                u[i+1] = AOS(temp_rhofinal, 0., cv * temp_rhofinal * T_outer);
+                
+                if(debug > 2) {
+                //if(i < 3) {
+                    
+                    char a;
+                    cout.precision(16);
+                    cout<<"NEGATIVE DENSITY IN INIT HYDROSTATIC i="<<i<<"/"<<num_cells<<endl;
+                    if((factor_inner - metric_inner) < 0) {
+                        
+                        cout<<"     Negative denominator detected. Product (gamma-1)*cv*T_inner is too small for chosen discretization."<<endl;
+                        
+                    }
+                    cout<<endl;
+                    cout<<"     dphi debug: phi["<<i+1<<"] = "<<base->phi[i+1]*K_zzf[i+1]<<" phi["<<i<<"] = "<<base->phi[i]*K_zzf[i]<<" num_cells = "<<num_cells<<endl;
+                    cout<<"     metric_inner debug: dPhi = "<<(base->phi[i+1]*K_zzf[i+1] - base->phi[i]*K_zzf[i])<<" dx[i+1]+dx[i] = "<<(base->dx[i+1] + base->dx[i])<<" omega*dx  = "<<base->omegaminus[i]  * base->dx[i]<<endl;
+                    cout<<"     factor_inner debug: gamma-1 = "<<(gamma_adiabat-1.)<<" cv = "<<cv<<" T_inner = "<<T_inner<<endl;
+                    cout<<"     metric_outer = "<< metric_outer << " metric_inner = "<<metric_inner <<endl;
+                    cout<<"     factor_outer = "<< factor_outer << " factor_inner = "<<factor_inner <<endl;
+                    cout<<"     factor_outer+metric_outer = "<< (factor_outer + metric_outer) << " factor_inner-metric_inner = "<<( factor_inner - metric_inner) <<endl;
+                    cout<<"     RATIO = "<< ((factor_outer + metric_outer)/ (factor_inner - metric_inner)) <<endl;
+                    //cout<<"In hydostatic init: factor_dens = "<< (2.* factor_outer / delta_phi + 1.) / (2. * factor_inner / delta_phi - 1.) <<endl;
+                    cout<<"     Ratio of densities inner/outer = "<< temp_rhofinal/u[i+1].u1 <<endl;
+                    cout<<"     Ratio of temperatures inner/outer = "<<T_inner/T_outer<<" t_inner ="<<T_inner<<" t_outer ="<<T_outer<<endl;
+                    cout<<"     Ratio of pressures inner/outer = "<<cv * temp_rhofinal * T_inner /u[i+1].u3<<endl;
+                    cout<<"     Resulting density == "<<temp_rhofinal<<endl;
+                    cout<<"     floor ="<<floor<<endl;
+                    cout<<"     density before "<<u[i+1].u1<<endl;
+                    cin>>a;
+                }
         }
-        
+                
         if(negdens) 
             cout<<" Negative densities in init_hydrostatic. Check conditions for hydrostatic construction and/or debug."<<endl;
         
@@ -1678,6 +1659,8 @@ void c_Species::initialize_hydrostatic_atmosphere(string filename) {
         //prim[1] = prim[2];
         //prim[0] = prim[3];
     }
+    
+    cout<<" after CONSTRUCTION DENSITY "<<u[2].u1;
     
     //cout<<" POS2 dens[2] = "<<u[2].u1<<" temp[2] = "<<prim[2].temperature<<" rhoe1, rhoe2 = "<<u[1].u3<<"/"<<u[2].u3<<" cv ="<<cv<<endl;
     //cout<<"Assigned densities in num_cell-1 = "<<u[num_cells-1].u1<<endl;
@@ -1701,26 +1684,6 @@ void c_Species::initialize_hydrostatic_atmosphere(string filename) {
                 u[i] = AOS(floor, 0., cv * floor * prim[i].temperature) ;
             }
     }
-    
-    if(base->init_T_temp > 2.7) {
-        
-            if(this_species_index == 0)
-                cout<<" In INIT: Overwriting T with user-defined temperature:"<<base->init_T_temp;
-                
-            for(int i=num_cells; i>=0; i--)  {
-                
-                if(base->x_i12[i]>1.0e10) {
-                    
-                    //double temprho = u[i].u1;
-                
-                    //u[i] = AOS(temprho, 0., cv * temprho * base->init_T_temp) ;
-                }
-                
-                //prim[i].temperature = base->init_T_temp;
-            }
-        }
-        //else
-        //    cout<<" In INIT: Did NOT overwrite T, because init_T_temp < 2.7= = "<<base->init_T_temp;
     
     
     if(u[2].u1 > 1e40) {

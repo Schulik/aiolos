@@ -1270,13 +1270,13 @@ void  c_Sim::do_highenergy_cooling(int cell) {
             species[e_idx].dGdT(cell) -=  n3p * ne * red * dfdx(h3plus_cooling, Te, dT);
         }
 
-	if(steps==200 && cell==100)
-              cout<<" HI 200 STEPS AND 100 CELLS AND WE HAVE ELECTRONS, pos3 FINAL totalcool = "<<species[e_idx].dG(cell)<<endl;
+	//if(steps==200 && cell==100)
+        //      cout<<" HI 200 STEPS AND 100 CELLS AND WE HAVE ELECTRONS, pos3 FINAL totalcool = "<<species[e_idx].dG(cell)<<endl;
     }
 
 
-    if(steps==200 && cell==100)
-              cout<<" HI 200 STEPS AND 100 CELLS AFTER ALL COOL, pos4 dG[electrons] = "<<species[e_idx].dG(cell)<<endl;
+    //if(steps==200 && cell==100)
+    //          cout<<" HI 200 STEPS AND 100 CELLS AFTER ALL COOL, pos4 dG[electrons] = "<<species[e_idx].dG(cell)<<endl;
 
     if(steps == 200 && cell==100e99) {
         for(int s=0; s<num_species; s++)
