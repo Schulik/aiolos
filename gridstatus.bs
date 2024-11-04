@@ -1,0 +1,111 @@
+#!/bin/bash
+
+#TODO: PUTIN here a typical usage string
+
+#setup the master-ssh for the case that we want to simultaneously download the most up-to-date grid data
+MASTER="-o ControlPath=~/.ssh/mschulik@jeowen-ubuntu2.ph.ic.ac.uk" 
+LOGIN="schulik@aurora.lunarc.lu.se:/lunarc/nobackup/users/schulik/production"
+SIM="stl-visc-3_5_opacities"
+SERVER="jeowen-ubuntu2.ph.ic.ac.uk"
+USER="mschulik"
+#login and create the master file
+dldata=0
+
+if [ $dldata -eq "1" ]
+then
+	ssh $MASTER -MNf $SERVER -l $USER
+fi
+
+#https://stackoverflow.com/questions/19458104/how-do-i-pass-a-wildcard-parameter-to-a-bash-file
+#https://stackoverflow.com/questions/58113909/get-content-of-wildcard-asterisk
+printf "____________________________________________________________________________________________________________________________________________________________________________________________\n"
+
+printf "%120s | %11s | %12s | %15s | %24s \n" "logfile" "outnumber/" "exit status" "date" "convergence"
+printf "%120s | %11s | %12s | %15s | %24s \n" " " "last useful" " " " " " "
+printf "____________________________________________________________________________________________________________________________________________________________________________________________\n"
+for logfile in "$@"
+#for logfile in testfile*
+do
+	#echo $logfile
+	outnumber=""
+	lastuseful="-"       #In the
+	outtime=""
+	convstring=""
+	flag=0
+	month=$(ls -ltr $logfile | awk '{print($6)}')
+	day=$(ls -ltr $logfile | awk '{print($7)}')
+	year=$(ls -ltr $logfile | awk '{print($8)}')
+	if [ $(grep -c "NEGATIVE" $logfile) -ge 1 ]
+	then
+		#Crashed simulations, need to extract crash time
+		#echo "${logfile} CRASHED!"
+		outnumber="..."
+		lastuseful=$(grep 'written.*S1' $logfile | tail -n 2 | awk '{print($4)}' | head -n 1 | tail -c 8 | sed 's/[^0-9]//g')
+		flag=0
+		#If download data then lets goo
+		if [ $dldata -eq "1" ]
+		then
+			scp "mschulik@jeowen-ubuntu2.ph.ic.ac.uk:/home/mschulik/aiolos/runs_2023_co/output_${simbase}_*_t${lastuseful}.dat" .
+		fi
+	else
+		#Non-crashed simulations
+		#echo "${logfile} ran..."
+		lastline=$(tail -n 1 $logfile)
+		#echo "            found lastline = ${lastline}"
+		#lastuseful="0"
+		#echo $lastline
+		if [[ $lastline == *"written"* ]]
+		then
+			#Simulation still running, need to extract current output and time
+			#TODO: Add case that checks for seemingly running simulation (get run strings from ps -A and compare)
+			#echo "                            found a still running simulation."
+			###tail -n 1 log_4me_atoms_2H1e-8_kzz_nocool_FUV1e+4_hd2_moredens_long.log | awk '{print($4)}' | tail -c 9 | sed 's/[^0-9]//g'
+			outnumber=$(echo $lastline | awk '{print($4)}' | tail -c 9 | sed 's/[^0-9]//g' )
+			outtime=$(echo $lastline | awk '{print($11)}' )
+			flag=1
+			#echo $outnumber
+			#echo $outtime
+		else
+			#Simulation successfully finished, need to extract final time
+			#echo "                            found a finished simulation"
+			flag=2
+			outnumber="-1"
+			outtime=""
+		fi
+	fi
+	#echo $year
+
+	#Get and compute last three convergence measures on the fly.
+	#Note that this string has some hardcoded things:
+	#It's searching for species Cpp
+	#convstring=$(grep 'written.*S1' $logfile | tail -n 4 | awk '{print($4)}' | xargs awk 'FNR==600{print($3*$1*$1*4.*3.141592)}' | awk 'BEGIN{LAST=0.}NR>1{printf("%e\n",(LAST-$1)/$1)}{LAST=$1}' | awk 'BEGIN { ORS = " " } { print } END{printf("")}')
+	#convstring=$(grep 'written.*S0' $logfile | tail -n 4 | awk '{print($4)}' | xargs awk 'FNR==450{print($3*$1*$1*4.*3.141592)}' | awk 'BEGIN{LAST=0.}NR>1{printf("%e\t",sqrt( ((LAST-$1)/$1)^2 ) )}{LAST=$1}')
+	#convstring=$(grep 'written.*Cpp' $logfile | tail -n 4 | awk '{print($4)}' | xargs awk '{prevlast=last; last=$3*$1*$1*4.*3.141592} END {print(prevlast)}' | awk 'BEGIN{LAST=0.}NR>1{printf("%e\t",sqrt( ((LAST-$1)/$1)^2 ) )}{LAST=$1}')
+        convstring=$(grep 'written.*Hep' $logfile | tail -n 5 | awk '{print($4)}' | xargs awk 'BEGIN{s=1;flenght=9999999;} (NR!=FNR && s==1){s=0;flength=NR-2} FNR==flength{printf("%1.10e\n",$3*$1*$1*4.*3.141592)}' | awk 'BEGIN{LAST=0.}NR>1{printf("%e\t",sqrt( ((LAST-$1)/$1)^2 ) )}{LAST=$1}')
+
+	if [ "$year" != "2022" ]
+	then
+		#printf "%120s | %5s/%5s | %12s | %4s %4s %4s | %1.6e %1.6e %1.6e |\n" $logfile $outnumber $lastuseful $flag $day $month $year $convstring
+		printf "%120s | %5s/%5s | %12s | %4s %4s %4s ||\n" $logfile $outnumber $lastuseful $flag $day $month $year
+	fi
+done
+printf "\n"
+
+
+####################################################################################################################
+#Part 2: Download the same 
+#
+#If download option is set, download the latest files into folders
+#
+if [ $dldata -eq "1" ]
+then
+        ssh $MASTER -MNf $SERVER -l $USER
+fi
+#Download all data
+
+
+#End ssh connection, in case we started one earlier
+if [ $dldata -eq "1" ]
+then
+	ssh $MASTER -O exit $SERVER
+fi
