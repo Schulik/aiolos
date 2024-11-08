@@ -202,6 +202,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, s
         use_convective_fluxes = read_parameter_from_file<int>(filename,"USE_CONVECTION", debug, 0).value;   //Switch to turn on convective energy transport in the radiation module
         use_conduction        = read_parameter_from_file<int>(filename,"USE_CONDUCTION", debug, 0).value;   //Switch to turn on conductive energy transport in thesimple radiation module
         conductivity          = read_parameter_from_file<double>(filename,"CONDUCTIVITY", debug, 1e-5).value;  //Value of conductivity prefactor
+        conductivity2         = read_parameter_from_file<double>(filename,"CONDUCT2",     debug, conductivity).value;  //Value of conductivity prefactor
         K_zz_init = read_parameter_from_file<double>(filename,"KZZ_INIT", debug, 0.).value;                 //Initial atmospheric mixing parameter in cm^2/s
         convect_boundary_strength = read_parameter_from_file<double>(filename,"CONVECT_BOUNDARY_STRENGTH", debug, 1.1).value; //Unused currently.
         
@@ -1488,7 +1489,7 @@ void c_Species::initialize_hydrostatic_atmosphere(string filename) {
             //prim[i].temperature = const_T_space;
             //if(i>=num_cells-1)
                 //prim[i].temperature = 1.0*const_T_space - 1e-4 * base->phi[i] / (cv * gamma_adiabat); //Need initial temperature gradient for FLD
-		if(base->x_i12[i] < const_T_transition_r) {
+		if( base->x_i12[i] < const_T_transition_r ) {
 			prim[i].temperature = const_T_space; // - 1e-5 * std::pow(base->x_i12[i], 0.5); //Need initial temperature gradient for FLD
 		}
 		else {

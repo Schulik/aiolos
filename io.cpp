@@ -344,11 +344,11 @@ int c_Species::read_species_data(string filename, int species_index) {
                 // For bands which have no opacity data given / first and last band, we assume the nearest datapoint
                 //
                 if(lmax < opacity_data(0,0) ) {
-                    (*opacity_avg)[b] = opacity_data(0,col);
+                    (*opacity_avg)[b] = base->minimum_opacity;//opacity_data(0,col);
                     cout<<" Band b, lmax "<<lmax<<"< opa_data(0,0)"<<opacity_data(0,0)<<endl;
                 }
                 if(lmin > opacity_data(num_tmp_lambdas-1,0) ) {
-                    (*opacity_avg)[b] = opacity_data(num_tmp_lambdas-1,col);
+                    (*opacity_avg)[b] = base->minimum_opacity; //opacity_data(num_tmp_lambdas-1,col);
                     cout<<" Band b, lmin "<<lmin<<"< opa_data(-1,0)"<<opacity_data(num_tmp_lambdas,0)<<endl;
                 }
                 if((*opacity_avg)[b] < 0.) {

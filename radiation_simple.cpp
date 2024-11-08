@@ -540,17 +540,17 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
                 }
                 mumean = mumean_nom / n_tot;
                 
-                double dT1     = (species[0].prim[j-1].temperature - species[0].prim[j].temperature) / (x_i12[j]-x_i12[j-1]);
+                double dT1     = (species[0].prim[j-1].temperature - species[0].prim[j].temperature) / (x_i12[j-1]-x_i12[j]);
                 double  T1avg  = (species[0].prim[j-1].temperature + species[0].prim[j].temperature) * 0.5;
-                double dT2     = (species[0].prim[j].temperature -   species[0].prim[j+1].temperature) / (x_i12[j+1]-x_i12[j]);
+                double dT2     = (species[0].prim[j].temperature -   species[0].prim[j+1].temperature) / (x_i12[j]-x_i12[j+1]);
                 double  T2avg  = (species[0].prim[j].temperature +   species[0].prim[j+1].temperature) * 0.5;
                 
-                //double kappa_cond = (1. - n_neutrals/n_tot) * conductivity; //1e-5
-                double kappa_cond = conductivity; //1e-5
+                double kappa_cond = n_neutrals/n_tot * conductivity + (1. - n_neutrals/n_tot) * conductivity2; //1e-5
+                //double kappa_cond = conductivity; //1e-5
 		double vfactor1    = std::max((1. - std::fabs(species[0].prim[j-1].speed/species[0].prim[j-1].sound_speed) ), 0.);
 		double vfactor2    = std::max((1. - std::fabs(species[0].prim[j].speed/species[0].prim[j].sound_speed) ), 0.);
-                double c1 = kappa_cond * n_tot * std::pow(T1avg, 0.7); //*n_tot
-                double c2 = kappa_cond * n_tot * std::pow(T2avg, 0.7); // *n_tot
+                double c1 = kappa_cond * std::pow(T1avg, 0.7); //*n_tot
+                double c2 = kappa_cond * std::pow(T2avg, 0.7); // *n_tot
                 
                 temp_temperatures[j] +=  - dt * (c1 * dT1 * vfactor1 * surf[j-1] - c2 * dT2 * vfactor2 * surf[j]) / vol[j] ;
 
