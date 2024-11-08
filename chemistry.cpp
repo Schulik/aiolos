@@ -286,7 +286,7 @@ void c_reaction::update_reaction_rate(double T) {
  */
 void c_Sim::do_chemistry(double dt_chem) {
     
-    #pragma omp parallel for schedule(static,5)
+ //   #pragma omp parallel for schedule(static,5)
 //    for (int j = num_cells+1; j >= 0; j--) {
     for (int j = imaxchem; j >= 2; j--) {  //imaxchem is num_cells+1 by default
         

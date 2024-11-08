@@ -160,8 +160,12 @@ void c_Sim::update_tau_s_jb(int j, int b) {
     for(int s=0; s<num_species; s++) 
         total_opacity_twotemp(j,b)  += species[s].opacity_twotemp(j,b) * species[s].u[j].u1;
 
-    for(auto r : photoreactions) 
-        total_cell_opa              += r.opacity_twotemp(b) * species[r.educts[0]].u[j].u1;
+    //for(auto r : photoreactions) 
+    //    total_cell_opa              += r.opacity_twotemp(b) * species[r.educts[0]].u[j].u1;
+    
+    for(int pr=0; pr < num_photoreactions; pr++) {
+        total_cell_opa              += photoreactions[pr].opacity_twotemp(b) * species[photoreactions[pr].educts[0]].u[j].u1;
+    }
 
     cell_optical_depth_twotemp(j,b) = total_opacity_twotemp(j, b) * dx[j] ;
     double tmp_cell_depth_he        = total_cell_opa              * dx[j];
