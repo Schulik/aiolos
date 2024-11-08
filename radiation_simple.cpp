@@ -549,8 +549,8 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
                 double kappa_cond = conductivity; //1e-5
 		double vfactor1    = std::max((1. - std::fabs(species[0].prim[j-1].speed/species[0].prim[j-1].sound_speed) ), 0.);
 		double vfactor2    = std::max((1. - std::fabs(species[0].prim[j].speed/species[0].prim[j].sound_speed) ), 0.);
-                double c1 = kappa_cond * n_tot * std::pow(T1avg, 0.7); //*n_tot
-                double c2 = kappa_cond * n_tot * std::pow(T2avg, 0.7); // *n_tot
+                double c1 = kappa_cond * std::pow(T1avg, 0.7); //*n_tot
+                double c2 = kappa_cond * std::pow(T2avg, 0.7); // *n_tot
                 
                 temp_temperatures[j] +=  - dt * (c1 * dT1 * vfactor1 * surf[j-1] - c2 * dT2 * vfactor2 * surf[j]) / vol[j] ;
 

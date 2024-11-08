@@ -1539,15 +1539,15 @@ void c_Sim::enforce_charge_neutrality(int j) {
 
          double charge_imbalance = 0;
          for(int s=0;s<num_species; s++) {
-             //if(species[s].static_charge != 0)
-             charge_imbalance += ((double)species[s].static_charge) * n_tmp(s);
+             if(s != e_idx)
+	             charge_imbalance += ((double)species[s].static_charge) * n_tmp(s);
          }
 
          for(int s=0;s<num_species; s++) {
 
-            if(species[s].this_species_index == e_idx) {//Force electrons to balance out the charges per cell
+            if(s == e_idx) {//Force electrons to balance out the charges per cell
                  n_tmp(s) = std::fabs(charge_imbalance);
-  
+
                  species[s].prim[j].number_density = n_tmp(s);
                  species[s].prim[j].density        = species[s].prim[j].number_density * species[s].mass_amu*amu;
 
