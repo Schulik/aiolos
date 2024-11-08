@@ -1540,7 +1540,7 @@ void c_Sim::enforce_charge_neutrality(int j) {
          double charge_imbalance = 0;
          for(int s=0;s<num_species; s++) {
              if(s != e_idx)
-	             charge_imbalance += ((double)species[s].static_charge) * n_tmp(s);
+                 charge_imbalance += ((double)species[s].static_charge) * n_tmp(s);
          }
 
          for(int s=0;s<num_species; s++) {

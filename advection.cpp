@@ -76,10 +76,14 @@ void c_Sim::execute() {
             
         dt = get_cfl_timestep();
         dt = std::min(dt, timestep_rad2) ;
-        dt = std::min(dt, t_max - globalTime) ;
+        dt = std::min(dt, t_max - globalTime);
         if(steps == 0)
             dt = std::min(dt, dt_initial);
-        
+        //if(steps > 400) {
+	//    cout<<" steps  = "<<steps<<" shrinking dt = "<<dt<<endl;
+	//    dt = dt * 0.5;
+        //}
+
         if( globalTime > next_print_time) {
             cout<<" Beginning step "<<steps<<" @ globalTime "<<globalTime<<" dt "<<dt;
             cout<< ", CFL " << cfl_step << ", energy dt " << timestep_rad2 << "\n";
@@ -140,7 +144,6 @@ void c_Sim::execute() {
             
              monitor_counter += 1.;
         }
-         
         ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~////
         //
         // Proper start

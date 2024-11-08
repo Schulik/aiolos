@@ -410,6 +410,7 @@ public:
     double convect_boundary_strength;
     double start_hydro_time;
     double conductivity;
+    double conductivity2;
     ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     //
     //  Numerical
