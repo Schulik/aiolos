@@ -2388,7 +2388,7 @@ void c_Sim::init_highenergy_opacities() {
  
      for(c_photochem_reaction& r: photoreactions) {
 
-        cout<<"Attmepting to construct opacities for reaction number "<<r.reaction_number<<" with opastring "<<r.opafile<<endl;
+        cout<<"Attempting to construct opacities for reaction number "<<r.reaction_number<<" with opastring "<<r.opafile<<endl;
 	if( r.opafile.compare("") == 0 ) { //None given, revert to default value
                 cout<<"      Setting defaults... iwth species index "<<r.educts[0]<<" and name "<<species[r.educts[0]].speciesname<<endl;
                 r.opacity_twotemp = species[r.educts[0]].opacity_avg_solar;
