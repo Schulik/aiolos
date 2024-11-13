@@ -15,7 +15,7 @@
 #include <cmath>
 #include <ctime>
 #include <type_traits>
-#include <gsl/gsl_sf_lambert.h>
+//#include <gsl/gsl_sf_lambert.h>
 #include <Eigen/Core>
 #include <Eigen/Dense>
 #include <Eigen/LU>
