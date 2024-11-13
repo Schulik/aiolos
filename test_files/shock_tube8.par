@@ -1,0 +1,55 @@
+#
+# Parameterfile for atmosphere simulations
+# Do not use tabs, only white spaces as value separators
+#
+
+#Control parameters
+PARI_PROBLEM_NUMBER     1
+#
+# Problem numbers explained: shock_tube, no grav = 1, planet with grav = 2
+#
+SPECIES_FILE            mix3.spc
+PARI_INIT_DATA_SWITCH   1
+PARI_INIT_DATA_U1L      7.78e-10
+PARI_INIT_DATA_U2L      0e0
+PARI_INIT_DATA_U3L      6.0e-1
+PARI_INIT_DATA_U1R      7.78e-10
+PARI_INIT_DATA_U2R      -6e5
+PARI_INIT_DATA_U3R      6.0e-1
+PARI_INIT_SHOCK_MID     0.
+PARI_NUM_SPECIES        1
+
+
+OUTPUT_FILENAME         test_files/shock_tube1
+
+PARI_SELF_GRAV_SWITCH   0
+PARI_LINEAR_GRAV        0
+PARI_DEBUGLEVEL         1
+PARI_INIT_STATIC        1
+
+#Numerical parameters
+PARI_BOUND_TYPE_LEFT    2
+PARI_BOUND_TYPE_RIGHT   3
+PARI_DOMAIN_DX          3.5e7
+PARI_GRID_TYPE          0
+PARI_CELLS_PER_DECADE   20.
+PARI_DOMAIN_MIN         0.
+PARI_DOMAIN_MAX         7.e10
+PARI_TIME_DT            1e5
+PARI_CFLFACTOR          0.9
+PARI_TIME_TMAX          3.8e4
+PARI_TIME_OUTPUT        4.0e4
+PARI_GEOMETRY           0
+
+#Physical parameters
+PARI_PLANET_POS         0.
+PARI_PLANET_MASS        0.
+PARI_SMOOTHING_LENGTH   1e-3
+PARI_SMOOTHING_TIME     0.0
+ACCRETION_RATE          1.e-1
+PARI_TEMP_INCR          1.e-8
+PARI_USE_RADIATION      1
+PARI_CONST_OPAC         0.4
+PARI_OPACITY_MODEL      C
+
+PARI_RSTAR              0.

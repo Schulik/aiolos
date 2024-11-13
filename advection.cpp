@@ -733,45 +733,47 @@ void c_Species::execute(std::vector<AOS>& u_in, std::vector<AOS>& dudt, std::vec
                     if(this_species_index >= 1) {
                         for(int j=0; j <= num_cells; j++) {
                             double flim = 1.; //previously 0.1
-			    if(this_species_index == 0)
-				flim = params[0];
-			     if(this_species_index == base->e_idx)
-                                flim = params[2];
-			     else {
-				if(j>base->mix_reset_i)
-	                                flim = params[1]; //1e-100; 
-				else 
-					flim = params[1];
-			     }
-			    if(j > homopause_boundary_i)
-				flim = 1e-40;
+                            if(this_species_index == 0)
+                                flim = params[0];
+                            if(this_species_index == base->e_idx)
+                                            flim = params[2];
+                            else {
+                                    if(j>base->mix_reset_i)
+                                        flim = params[1]; //1e-100; 
+                                    else 
+                                        flim = params[1];
+                            }
+                            //if(j > homopause_boundary_i)
+                            if(base->x_i12[j] > 9e99)
+                                flim = 1e-40;
 
                             double totpress = 0.;
                             int negpresscontributions = 0;
-                            
+                                        
                             for(int s=0; s<base->num_species; s++) {
                                 totpress += base->species[s].prim[j].pres;
                                 if(base->species[s].prim[j].pres < 0)
                                     negpresscontributions++;
                             }
-                            //double f           = prim[j].pres/base->total_press[j];
+                                    //double f           = prim[j].pres/base->total_press[j];
                             double f           = prim[j].pres/totpress;
-                            //f = (f/flim)*(f/flim);
-			    //if(f > flim)
-                            //    f=1;
+                                        //f = (f/flim)*(f/flim);
+                            //if(f > flim)
+                                        //    f=1;
 
-			    f = 1.-1./std::exp( f*f/flim/flim );
-                            //f = std::pow(f, params[0]); //Allow for continuous-linear scaling below threshold
-			    f = std::max(f,1e-10);//Cut at very low values to keep sound speeds from rapidly fluctuating
-			    //AOS flux1 = hllc_flux(j);
-                            //AOS flux2 = passivescalar_flux2(j);
-                            //flux[j]   = (flux1 * f) +  (flux2 * (1.-f)); 
-			    grav_prefactors[j] = f;
+                            f = 1.-1./std::exp( f*f/flim/flim );
+                                        //f = std::pow(f, params[0]); //Allow for continuous-linear scaling below threshold
+                            f = std::max(f,1e-10);//Cut at very low values to keep sound speeds from rapidly fluctuating
+                            //AOS flux1 = hllc_flux(j);
+                                        //AOS flux2 = passivescalar_flux2(j);
+                                        //flux[j]   = (flux1 * f) +  (flux2 * (1.-f)); 
+                            grav_prefactors[j] = f;
                             flux[j] = hllc_flux2(j, f);
-                            //if(base->steps%1000==0) {
-                            if(base->steps%5000==0 && base->steps > 33000e99) {
+                            if(base->steps%1000==0) {
+                            //if(base->steps%5000==0 && base->steps > 33000e99) {
                             //if(0==0) {
-                                //cout<<" s = "<<this_species_index<<" f ="<<f<<" 1.-f "<<(1.-f)<<" hllc.u1*f = "<<flux1.u1<< " "<<flux1.u1 * f<<" pflux.u1*(1-f) = "<<flux2.u1<<" "<<flux2.u1 * (1.-f)<<" 1-flux.u1/hllc.u1 = "<<1.-flux[j].u1/flux1.u1<<" negpress = "<<negpresscontributions<<endl; 
+                                //cout<<" s = "<<this_species_index<<" f ="<<f<<" 1.-f "<<(1.-f)<<" species "<<this_species_index<<" flim "<<flim<<endl;
+                                //<<" hllc.u1*f = "<<flux[j].u1<< " "<<flux[j].u1 * f<<" pflux.u1*(1-f) = "<<flux[j].u1<<" "<<flux[j].u1 * (1.-f)<<" 1-flux.u1/hllc.u1 = "<<1.-flux[j].u1/flux1.u1<<" negpress = "<<negpresscontributions<<endl; 
                             }
 
                             //flux[j]  = hllc_flux(j); // * f + passivescalar_flux(j) * (1.-f); 
