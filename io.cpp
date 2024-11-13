@@ -1543,8 +1543,10 @@ Eigen::VectorXd c_Sim::read_and_bin_opacityfile(string filename, int col) {
             for(int b = 0; b< num_bands_readin; b++) {
                 
                 int    wlcount = 0;
+                int    faultycount = 0;
                 double lmin = (*lgrid)[b]; //base->l_i[b];
                 double lmax = (*lgrid)[b+1]; //base->l_i[b+1];
+		double tmp_opacity_data = 0;
                 (*opacity_avg)[b] = minimum_opacity;
                 
                 //cout<<" DEBUG band b = "<<b<<" lmin/lmax = "<<lmin<<"/"<<lmax<<endl;
@@ -1557,8 +1559,16 @@ Eigen::VectorXd c_Sim::read_and_bin_opacityfile(string filename, int col) {
                     
                     if( wl < lmax && wl > lmin) {
                         
-                        (*opacity_avg)[b]+= opacity_data(i,col); 
-                        wlcount++;
+			tmp_opacity_data = opacity_data(i,col);
+			if(!std::isnan(tmp_opacity_data)) {
+				(*opacity_avg)[b]+= opacity_data(i,col); 
+				wlcount++;
+			}
+			else
+				faultycount++;
+
+                        //(*opacity_avg)[b]+= opacity_data(i,col); 
+                        //wlcount++;
                     }
                     if(i==0) {
                         
@@ -1571,22 +1581,24 @@ Eigen::VectorXd c_Sim::read_and_bin_opacityfile(string filename, int col) {
                 
                 if(wlcount > 1) {
                     (*opacity_avg)[b] /= (double)wlcount;
+                    cout<<" DEBUG. Band "<<b<<" has wlcount=="<<wlcount<<" faultycount "<<faultycount<<". lmin/wl/lmax//opacity_data(0,0/1); = "<<lmin<<"/"<<wl<<"/"<<lmax<<"//"<<opacity_data(0,0)<<"/"<<opacity_data(0,1)<<" opa_found = "<<(*opacity_avg)[b]<<endl;
                 }
                 else 
                     cout<<" Band "<<b<<" has wlcount==0! lmin/wl/lmax//opacity_data(0,0/1); = "<<lmin<<"/"<<wl<<"/"<<lmax<<"//"<<opacity_data(0,0)<<"/"<<opacity_data(0,1)<<" wlcount = "<<wlcount<<endl;
                 
                 if(debug > 1)
                     cout<<" DEBUG. Band "<<b<<" has wlcount=="<<wlcount<<". lmin/wl/lmax//opacity_data(0,0/1); = "<<lmin<<"/"<<wl<<"/"<<lmax<<"//"<<opacity_data(0,0)<<"/"<<opacity_data(0,1)<<" opa_found = "<<(*opacity_avg)[b]<<endl;
+
                 //
                 // For bands which have no opacity data given / first and last band, we assume the nearest datapoint
                 //
                 if(lmax < opacity_data(0,0) ) {
                     (*opacity_avg)[b] = opacity_data(0,col);
-                    cout<<" Band b, lmax "<<lmax<<"< opa_data(0,0)"<<opacity_data(0,0)<<endl;
+                    cout<<" Band "<<b<<", lmax "<<lmax<<"< opa_data(0,0)"<<opacity_data(0,0)<<endl;
                 }
                 if(lmin > opacity_data(num_tmp_lambdas-1,0) ) {
                     (*opacity_avg)[b] = opacity_data(num_tmp_lambdas-1,col);
-                    cout<<" Band b, lmin "<<lmin<<"< opa_data(-1,0)"<<opacity_data(num_tmp_lambdas,0)<<endl;
+                    cout<<" Band "<<b<<", lmin "<<lmin<<"< opa_data(-1,0)"<<opacity_data(num_tmp_lambdas,0)<<endl;
                 }
                 if((*opacity_avg)[b] < 0.) {
                     
