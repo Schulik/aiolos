@@ -270,14 +270,14 @@ void c_Species::update_kzz_and_gravpot(int argument) {
 /**
  * Wrapper function calling the appropriate analytical or numerical functions.
  */
-void c_Sim::compute_drag_update() {
+void c_Sim::compute_drag_update(double dtt) {
 	//cout<<"In  drag_update"<<endl;
         if(friction_solver >= 0 && num_species > 1) {
             if(friction_solver == 0)
                 compute_friction_analytical();
             else{
 		//cout<<"calling friction numerical"<<endl;
-                 compute_friction_numerical();
+                 compute_friction_numerical(dtt);
 		}
         }
     }
@@ -476,7 +476,7 @@ void c_Sim::compute_friction_analytical() {
  * Friction solver 1: Compute collision coefficients, build collision matrix and solve in a fast way
  * Collision coefficients are hard-coded in compute_alpha_matrix().
  */
-void c_Sim::compute_friction_numerical() {
+void c_Sim::compute_friction_numerical(double dtt) {
     
     Eigen::internal::set_is_malloc_allowed(false) ;
          
@@ -494,8 +494,8 @@ void c_Sim::compute_friction_numerical() {
             cout<<"    rho[0] = "<<species[0].u[j].u1<<endl;
         }
         
-        friction_matrix_T = identity_matrix - friction_coefficients * dt;
-        friction_matrix_T.diagonal().noalias() += dt * (friction_coefficients * unity_vector);
+        friction_matrix_T = identity_matrix - friction_coefficients * dtt;
+        friction_matrix_T.diagonal().noalias() += dtt * (friction_coefficients * unity_vector);
         
         LU.compute(friction_matrix_T) ;
         friction_vec_output.noalias() = LU.solve(friction_vec_input);
@@ -575,7 +575,7 @@ void c_Sim::compute_friction_numerical() {
                 double v_end = friction_vec_output(si) - friction_vec_output(sj) ;
                 double v_half = 0.5*(v_end + friction_vec_input(si) - friction_vec_input(sj)) ; 
                                                
-                temp +=  dt * friction_coefficients(si,sj) * (species[sj].mass_amu/(species[sj].mass_amu+species[si].mass_amu)) * v_half * v_end ;
+                temp +=  dtt * friction_coefficients(si,sj) * (species[sj].mass_amu/(species[sj].mass_amu+species[si].mass_amu)) * v_half * v_end ;
                 
                 if(si==0 && sj == 1) {
                     friction_sample(j) = alphas_sample(j) * (friction_vec_input(si) - friction_vec_input(sj));

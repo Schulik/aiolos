@@ -1033,7 +1033,7 @@ void c_Sim::update_dS_jb_photochem(int cell, double dtt) {
 
                 
                 vnew[s]                     = mom_news(s) / (n_olds[s]*n_tot*species[s].mass_amu*amu) ; //Although n_olds is called "olds", this contains the density at the advanced time and is what we need here
-                species[s].prim[cell].speed = std::min(vnew[s], 1e-3*c_light) ; //Limit to +300km/s
+                species[s].prim[cell].speed = std::min(vnew[s], 1e-4*c_light) ; //Limit to +30km/s
                 species[s].prim[cell].speed = std::max(species[s].prim[cell].speed, -1e-4*c_light); //Limit to -30km/s
                 //species[s].prim[cell].internal_energy = eint_news[s] / (n_olds[s]*n_tot*species[s].mass_amu*amu);
                 //species[s].prim[cell].temperature     = eint_news[s] /species[s].cv / (n_olds[s]*n_tot*species[s].mass_amu*amu);

@@ -155,8 +155,8 @@ void c_Sim::execute() {
         // Step 0: Hydrodynamics, if so desired
         //
 
-	if (do_hydrodynamics == 1) 
-            compute_drag_update() ;
+	//if (do_hydrodynamics == 1) 
+        //    compute_drag_update(1.0*dt) ;
         compute_total_pressure();
 
         if(steps %prinstuff_steps==0) {    
@@ -244,14 +244,14 @@ void c_Sim::execute() {
                         species[s].compute_pressure(species[s].u);
                     compute_total_pressure();
                 
-                    compute_drag_update() ;
+                    compute_drag_update(0.99*dt) ;
                     if (use_collisional_heating)
                         compute_collisional_heat_exchange() ; //Disable if radiation is used?
                         
                         
                     
                 } else
-                        compute_drag_update(); //MARCH 28 ONLY FOR DEBUGGING
+                        compute_drag_update(0.99*dt); //MARCH 28 ONLY FOR DEBUGGING
                 
                 if(steps > debug_steps && debug_cell < num_cells+1) {
                     cout<<"t="<<steps<<" Pos 1.05 T["<<debug_cell<<"]_s = ";
@@ -382,10 +382,10 @@ void c_Sim::execute() {
         
         //Computes the velocity drag update after the new hydrodynamic state is known for each species
         if (do_hydrodynamics == 1) 
-            compute_drag_update() ;
+            compute_drag_update(0.99*dt) ;
 
         if (do_hydrodynamics == 0 && friction_solver > 0) 
-                compute_drag_update() ;
+                compute_drag_update(0.99*dt) ;
         
         if(steps > debug_steps && debug_cell < num_cells+1) {
                 cout<<"t="<<steps<<" Pos 2 T[423]_s = ";
@@ -439,8 +439,10 @@ void c_Sim::execute() {
             update_dS();               //Compute low-energy dS
         
             
-            if(false) {
-                cout<<"Pos 3 dS_UV = "<<dS_band(num_cells-10,0)<<endl;
+            if(true) {
+                if (do_hydrodynamics == 1) 
+                    compute_drag_update(0.1*dt) ; //This step completes 0.5dt*0.5*dt cycles on the drag update
+                compute_total_pressure();
             }
             
             if(use_rad_fluxes==1) {
