@@ -377,8 +377,8 @@ void c_Sim::do_chemistry(double dt_chem) {
             if(n_tmp(s) < chemistry_numberdens_floor)
                 n_tmp(s) = chemistry_numberdens_floor;
 
-            //if( (j < grid2_transition_i) && species[s].this_species_index == e_idx) //Force electrons to balance out the charges per cell
-            //    n_tmp(s) = std::fabs(charge_imbalance);
+            if( (j < grid2_transition_i) && species[s].this_species_index == e_idx) //Force electrons to balance out the charges per cell
+                n_tmp(s) = std::fabs(charge_imbalance);
 		
                 
             species[s].prim[j].number_density = n_tmp(s) * n_tot;
