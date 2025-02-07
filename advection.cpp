@@ -1393,7 +1393,8 @@ int c_Species::fix_negative_pressures_sometimes(std::vector<AOS>&u_temp) {
         
         //Second check: negative pressure
         //if(ptemp < 0 && plast > 0 && ( eratio > 1.)) {
-        if(ptemp < 0 && plast > 0 ) {
+        //if(ptemp < 0 && plast > 0 ) {
+        if(ptemp < 0) {
             u_temp[j].u3 = ekin + plast/(gamma_adiabat-1);
             fixed_cells++;
         }
