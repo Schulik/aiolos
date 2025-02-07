@@ -122,8 +122,8 @@ void c_Sim::execute() {
             for(int s=0; s<num_species; s++) {
                 species[s].print_AOS_component_tofile((int) output_counter);
             }
-            print_monitor((int)monitor_counter);
-            print_diagnostic_file((int)output_counter);
+            //print_monitor((int)monitor_counter);
+            //print_diagnostic_file((int)output_counter);
             
             monitor_counter+=1.;
             output_counter +=1.;
@@ -155,8 +155,8 @@ void c_Sim::execute() {
         // Step 0: Hydrodynamics, if so desired
         //
 
-	if (do_hydrodynamics == 1) 
-            compute_drag_update() ;
+	//if (do_hydrodynamics == 1) 
+        //    compute_drag_update() ;
         compute_total_pressure();
 
         if(steps %prinstuff_steps==0) {    
@@ -244,14 +244,14 @@ void c_Sim::execute() {
                         species[s].compute_pressure(species[s].u);
                     compute_total_pressure();
                 
-                    compute_drag_update() ;
+                    compute_drag_update(0.99*dt) ;
                     if (use_collisional_heating)
                         compute_collisional_heat_exchange() ; //Disable if radiation is used?
                         
                         
                     
                 } else
-                        compute_drag_update(); //MARCH 28 ONLY FOR DEBUGGING
+                        compute_drag_update(0.99*dt); //MARCH 28 ONLY FOR DEBUGGING
                 
                 if(steps > debug_steps && debug_cell < num_cells+1) {
                     cout<<"t="<<steps<<" Pos 1.05 T["<<debug_cell<<"]_s = ";
@@ -382,10 +382,10 @@ void c_Sim::execute() {
         
         //Computes the velocity drag update after the new hydrodynamic state is known for each species
         if (do_hydrodynamics == 1) 
-            compute_drag_update() ;
+            compute_drag_update(0.99*dt) ;
 
         if (do_hydrodynamics == 0 && friction_solver > 0) 
-                compute_drag_update() ;
+                compute_drag_update(0.99*dt) ;
         
         if(steps > debug_steps && debug_cell < num_cells+1) {
                 cout<<"t="<<steps<<" Pos 2 T[423]_s = ";
@@ -438,7 +438,9 @@ void c_Sim::execute() {
             }             
             update_dS();               //Compute low-energy dS
         
-            
+            if (do_hydrodynamics == 1) 
+                compute_drag_update(0.01*dt) ;
+
             if(false) {
                 cout<<"Pos 3 dS_UV = "<<dS_band(num_cells-10,0)<<endl;
             }
@@ -743,8 +745,10 @@ void c_Species::execute(std::vector<AOS>& u_in, std::vector<AOS>& dudt, std::vec
 				else 
 					flim = params[1];
 			     }
-			    if(j > homopause_boundary_i)
-				flim = 1e-40;
+			    //if(j > homopause_boundary_i)
+			    if(j > base->grid2_transition_i)
+			    //if(base->x_i12[j] > 1e10)
+			    	flim = 1e-10;
 
                             double totpress = 0.;
                             int negpresscontributions = 0;

@@ -201,16 +201,22 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, s
         use_rad_fluxes    = read_parameter_from_file<int>(filename,"PARI_USE_RADIATION", debug, 0).value;   //Switch to turn on the radiation module
         use_convective_fluxes = read_parameter_from_file<int>(filename,"USE_CONVECTION", debug, 0).value;   //Switch to turn on convective energy transport in the radiation module
         use_conduction        = read_parameter_from_file<int>(filename,"USE_CONDUCTION", debug, 0).value;   //Switch to turn on conductive energy transport in thesimple radiation module
+        neutralize_electrons  = read_parameter_from_file<int>(filename,"NEUTRALIZE_ELECTRONS", debug, 0).value;   //Switch to turn on conductive energy transport in thesimple radiation module
         conductivity          = read_parameter_from_file<double>(filename,"CONDUCTIVITY", debug, 1e-5).value;  //Value of conductivity prefactor
         conductivity2         = read_parameter_from_file<double>(filename,"CONDUCT2",     debug, conductivity).value;  //Value of conductivity prefactor
         K_zz_init = read_parameter_from_file<double>(filename,"KZZ_INIT", debug, 0.).value;                 //Initial atmospheric mixing parameter in cm^2/s
+	homopause_smoothing_rad = read_parameter_from_file<int>(filename,"HOMOPAUSE_SMOOTHING_RAD", debug, 0).value;
+	homopause_smoothing_rep = read_parameter_from_file<int>(filename,"HOMOPAUSE_SMOOTHING_REP", debug, 0).value;
         convect_boundary_strength = read_parameter_from_file<double>(filename,"CONVECT_BOUNDARY_STRENGTH", debug, 1.1).value; //Unused currently.
+        do_cond_until         = read_parameter_from_file<double>(filename,"DO_COND_UNTIL", debug, 1e99).value; //Unused currently.
+       
         
         use_collisional_heating = read_parameter_from_file<int>(filename,"PARI_USE_COLL_HEAT", debug, 1).value; //Switch on collisional energy exchange between species
         use_drag_predictor_step = read_parameter_from_file<int>(filename, "PARI_SECONDORDER_DRAG", debug, 0).value; //Switch on drag predictor substep
         alpha_collision        = read_parameter_from_file<double>(filename,"PARI_ALPHA_COLL", debug, 1.).value; //Multiplier for collision alphas 
         alpha_collision_ions   = read_parameter_from_file<double>(filename,"PARI_ALPHA_IONS", debug, 1.).value; //Multiplier for collision alphas for ions
         max_mdot              = read_parameter_from_file<double>(filename,"MAX_MDOT", debug, -1.).value;        //Max negative mdot through outer boundary in g/s
+        couple_ions           = read_parameter_from_file<int>(filename, "COUPLE_IONS", debug, -100).value;      //All values which have NOT COUPLE_IONS charge are coupled when use_avg_v is switched on
         
         rad_energy_multiplier=read_parameter_from_file<double>(filename,"PARI_RAD_MULTIPL", debug, 1.).value; //Only for tests. Unused currently.
         collision_model   = read_parameter_from_file<char>(filename,"PARI_COLL_MODEL", debug, 'P').value;     //Collision model. P=physical collision rates (i.e. Schunk&Nagy). C=constant collision rate of value PARI_ALPHAS_COLL
@@ -218,6 +224,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, s
         use_shadow_relaxation  = read_parameter_from_file<int>(filename,"USE_SHADOW_RELAXATION", debug, 0).value; //In regions of no heating, and if thermal cooling is switched off, relax the local Temperature to const_T_space, to prevent heating spikes from wave breaking
         shadow_relaxation_time = read_parameter_from_file<double>(filename,"SHADOW_RELAXATION_TIME", debug, 1).value; //Use Newtonian cooling on timescale 
         shadow_relaxation_threshold = read_parameter_from_file<double>(filename,"SHADOW_RELAXATION_THRESHOLD", debug, 1e-50).value; //Below solar heating of <threshold> we interpret this as shadow
+        shadow_relaxation_radius    = read_parameter_from_file<double>(filename,"SHADOW_RELAXATION_RADIUS", debug, domain_max*0.25).value; //Below solar heating of <threshold> we interpret this as shadow
         wavedamp_factor             = read_parameter_from_file<double>(filename,"WAVEDAMP_FACTOR", debug, -0.5).value; //Below solar heating of <threshold> we interpret this as shadow
         use_avg_temperature = read_parameter_from_file<int>(filename,"USE_AVG_T", debug, 0).value; //Compute avg c_v rho T  and use that as T_avg
         use_avg_velocity    = read_parameter_from_file<int>(filename,"USE_AVG_V", debug, 0).value; //Compute avg c_v rho T  and use that as T_avg

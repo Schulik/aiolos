@@ -197,8 +197,8 @@ void c_Sim::init_reactions(int cdebug) {
 
          //for(auto r : photoreactions) {
          for(int pr=0; pr < photoreactions.size(); pr++){ 
-             thin_photorates_m[pr] += photoreactions[pr].opacity_twotemp(b) * solar_heating(b);
-             thin_photorates_n[pr] += photoreactions[pr].opacity_twotemp(b) * solar_heating(b) * species[photoreactions[pr].educts[0]].mass_amu * amu;
+             thin_photorates_m[pr] += photoreactions[pr].opacity_twotemp(b) * solar_heating(b)/photon_energies[b];
+             thin_photorates_n[pr] += photoreactions[pr].opacity_twotemp(b) * solar_heating(b)/photon_energies[b] * species[photoreactions[pr].educts[0]].mass_amu * amu;
 	     cout<<photoreactions[pr].opacity_twotemp(b)<<" ";
 	     //cout<<r.opacity_twotemp(b)<<" ";
 
@@ -377,8 +377,12 @@ void c_Sim::do_chemistry(double dt_chem) {
             if(n_tmp(s) < chemistry_numberdens_floor)
                 n_tmp(s) = chemistry_numberdens_floor;
 
-            if( (j < grid2_transition_i) && species[s].this_species_index == e_idx) //Force electrons to balance out the charges per cell
-                n_tmp(s) = std::fabs(charge_imbalance);
+            if( (j < grid2_transition_i) && species[s].this_species_index == e_idx) { //Force electrons to balance out the charges per cell
+                 if(neutralize_electrons) {
+                   n_tmp(s) = std::fabs(charge_imbalance);
+                 }
+            }
+            //if( s == e_idx) //Force electrons to balance out the charges per cell
 		
                 
             species[s].prim[j].number_density = n_tmp(s) * n_tot;
@@ -746,6 +750,7 @@ void c_Sim::update_dS_jb_photochem(int cell, double dtt) {
     
     Vector_t n_olds          = Vector_t(num_species);
     Vector_t n_news          = Vector_t(num_species);
+    Vector_t T_olds          = Vector_t(num_species);
     double   n_tot = 0.;
     double ndot_multiplier =1e0;
     
@@ -760,7 +765,7 @@ void c_Sim::update_dS_jb_photochem(int cell, double dtt) {
         mom[s]              = species[s].u[cell].u2;
         internalenergy_b[s] = species[s].prim[cell].internal_energy * species[s].u[cell].u1; //The r.h.s of the energy matrix equation needs to be the non-updated internal energy density
         n_news[s]           = species[s].prim[cell].number_density;
-
+        T_olds[s]           = species[s].prim[cell].temperature;
     }
     
     for(int s=0;s<num_species; s++) {
@@ -1038,9 +1043,11 @@ void c_Sim::update_dS_jb_photochem(int cell, double dtt) {
                 //species[s].prim[cell].internal_energy = eint_news[s] / (n_olds[s]*n_tot*species[s].mass_amu*amu);
                 //species[s].prim[cell].temperature     = eint_news[s] /species[s].cv / (n_olds[s]*n_tot*species[s].mass_amu*amu);
                 
-                species[s].prim[cell].internal_energy += std::fabs(dEkin_s);
-                //E_new = p + 0.5 *mom_news(s)*mom_new(s)/( n_news[s]*species[s].mass_amu*amu );
+                //species[s].prim[cell].internal_energy += std::fabs(dEkin_s);
+                //species[s].prim[cell].temperature = T_olds[s];
+                //////E_new = p + 0.5 *mom_news(s)*mom_new(s)/( n_news[s]*species[s].mass_amu*amu );
                 
+                //species[s].eos->update_eint_from_T(&species[s].prim[cell], 1);
                 species[s].eos->update_p_from_eint(&species[s].prim[cell], 1);
                 species[s].eos->compute_auxillary(&species[s].prim[cell], 1);
                 species[s].eos->compute_conserved(&species[s].prim[cell], &species[s].u[cell], 1);

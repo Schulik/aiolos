@@ -411,6 +411,8 @@ public:
     double start_hydro_time;
     double conductivity;
     double conductivity2;
+    double do_cond_until;
+    int neutralize_electrons;
     ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     //
     //  Numerical
@@ -585,6 +587,7 @@ public:
     int use_shadow_relaxation;
     double shadow_relaxation_time;
     double shadow_relaxation_threshold;
+    double shadow_relaxation_radius;
     int use_avg_temperature;
     int use_avg_velocity;
     double avg_temperature_t0;
@@ -624,6 +627,8 @@ public:
     
     double K_zz_init;
     std::vector<double> K_zz;
+    int homopause_smoothing_rad;
+    int homopause_smoothing_rep;
     
     //
     // Radiation
@@ -789,7 +794,7 @@ public:
     double alpha_collision;
     double alpha_collision_ions;
     double dust_to_gas_ratio;
-    
+    int couple_ions;
     ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     //
     // Functions
@@ -821,8 +826,8 @@ public:
     // Friction
     //
     void compute_friction_analytical(); 
-    void compute_friction_numerical(); 
-    void compute_drag_update();
+    void compute_friction_numerical(double dt); 
+    void compute_drag_update(double dt);
     
     void fill_alpha_basis_arrays(int j);
     void fill_rad_basis_arrays(int, double, Eigen::MatrixXd &, Eigen::MatrixXd &);
