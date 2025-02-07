@@ -286,7 +286,7 @@ void c_reaction::update_reaction_rate(double T) {
  */
 void c_Sim::do_chemistry(double dt_chem) {
     
- //   #pragma omp parallel for schedule(static,5)
+//#pragma omp parallel for schedule(static,5)
 //    for (int j = num_cells+1; j >= 0; j--) {
     for (int j = imaxchem; j >= 2; j--) {  //imaxchem is num_cells+1 by default
         
@@ -1038,7 +1038,7 @@ void c_Sim::update_dS_jb_photochem(int cell, double dtt) {
 
                 
                 vnew[s]                     = mom_news(s) / (n_olds[s]*n_tot*species[s].mass_amu*amu) ; //Although n_olds is called "olds", this contains the density at the advanced time and is what we need here
-                species[s].prim[cell].speed = std::min(vnew[s], 1e-3*c_light) ; //Limit to +300km/s
+                species[s].prim[cell].speed = std::min(vnew[s], 1e-4*c_light) ; //Limit to +30km/s
                 species[s].prim[cell].speed = std::max(species[s].prim[cell].speed, -1e-4*c_light); //Limit to -30km/s
                 //species[s].prim[cell].internal_energy = eint_news[s] / (n_olds[s]*n_tot*species[s].mass_amu*amu);
                 //species[s].prim[cell].temperature     = eint_news[s] /species[s].cv / (n_olds[s]*n_tot*species[s].mass_amu*amu);
@@ -1554,7 +1554,7 @@ void c_Sim::enforce_charge_neutrality(int j) {
 
             if(s == e_idx) {//Force electrons to balance out the charges per cell
                  n_tmp(s) = std::fabs(charge_imbalance);
-  
+
                  species[s].prim[j].number_density = n_tmp(s);
                  species[s].prim[j].density        = species[s].prim[j].number_density * species[s].mass_amu*amu;
 
