@@ -122,7 +122,7 @@ void c_Sim::execute() {
             for(int s=0; s<num_species; s++) {
                 species[s].print_AOS_component_tofile((int) output_counter);
             }
-            print_monitor((int)monitor_counter);
+            //print_monitor((int)monitor_counter);
             //print_diagnostic_file((int)output_counter);
             
             monitor_counter+=1.;
@@ -438,11 +438,13 @@ void c_Sim::execute() {
             }             
             update_dS();               //Compute low-energy dS
         
-            
-            if(true) {
-                if (do_hydrodynamics == 1) 
-                    compute_drag_update(0.1*dt) ; //This step completes 0.5dt*0.5*dt cycles on the drag update
+            if (do_hydrodynamics == 1) {
+                compute_drag_update(0.01*dt) ;
                 compute_total_pressure();
+            }
+
+            if(false) {
+                cout<<"Pos 3 dS_UV = "<<dS_band(num_cells-10,0)<<endl;
             }
             
             if(use_rad_fluxes==1) {
@@ -735,19 +737,21 @@ void c_Species::execute(std::vector<AOS>& u_in, std::vector<AOS>& dudt, std::vec
                     if(this_species_index >= 1) {
                         for(int j=0; j <= num_cells; j++) {
                             double flim = 1.; //previously 0.1
-                            if(this_species_index == 0)
-                                flim = params[0];
-                            if(this_species_index == base->e_idx)
-                                            flim = params[2];
-                            else {
-                                    if(j>base->mix_reset_i)
-                                        flim = params[1]; //1e-100; 
-                                    else 
-                                        flim = params[1];
-                            }
-                            //if(j > homopause_boundary_i)
-                            if(base->x_i12[j] > 9e99)
-                                flim = 1e-40;
+
+			    if(this_species_index == 0)
+				flim = params[0];
+			     if(this_species_index == base->e_idx)
+                                flim = params[2];
+			     else {
+				if(j>base->mix_reset_i)
+	                                flim = params[1]; //1e-100; 
+				else 
+					flim = params[1];
+			     }
+			    //if(j > homopause_boundary_i)
+			    //if(j > base->grid2_transition_i)
+			    if(base->x_i12[j] > 9e99)
+			    	flim = 1e-10;
 
                             double totpress = 0.;
                             int negpresscontributions = 0;
