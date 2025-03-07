@@ -268,16 +268,19 @@ void c_Sim::execute() {
                 
                 compute_total_pressure();
 
+                //*********************************************Feb 1hth 2025: Anomalous electron temperatures at shocks occur here, after Pos 1.05 and are then perpetuated. Try fix with a bit of friction **//
+                //compute_drag_update(0.01*dt);
+                //compute_total_pressure();
+		//*******************************************//
+
                 for(int s = 0; s < num_species; s++) {
                     species[s].u_mask           = np_zeros(num_cells+2);
-                    //species[s].u0    = species[s].u ;
                     species[s].u_tmp = species[s].u ;
                     
                     for(int k=0; k<=0; k++) { //The k=0 run is the nominal run. k=1 is only triggered if some cells are broken
                         int ex_order = 1;// (s==e_idx)?0:1;
                         species[s].execute(species[s].u, species[s].dudt[1], species[s].u_mask, ex_order);
                         
-                        //species[s].u0 = species[s].u ;
                         for(int j=0; j < num_cells+2; j++) {
                             if (use_drag_predictor_step)
                                 species[s].u_tmp[j] = species[s].u0[j];// + species[s].dudt[0][j]*dt;// March28th 2024 changed this line, as u0 now contains the first-order correct, non-crashed values
@@ -287,10 +290,6 @@ void c_Sim::execute() {
                             
                         species[s].u_mask           = np_zeros(num_cells+2);
                         int numbroken = species[s].count_broken_cells(species[s].u_tmp, species[s].u_mask);
-                        //if(numbroken > 0)
-                        //    cout<<" 2nd order, steps = "<<steps<<" species "<<s<<" numbroken == "<<numbroken<<endl;
-                        //else
-                        //    cout<<" steps = "<<steps<<" species "<<s<<" numbroken == "<<numbroken<<endl;
                         if( numbroken == 0)
                             break;
                     }
@@ -298,8 +297,11 @@ void c_Sim::execute() {
                     species[s].fix_negative_pressures_sometimes(species[s].u_tmp);
                     
                     //Done, now all values should be ok
-                    for(int j=0; j < num_cells+2; j++) {
-                        species[s].u[j] = species[s].u_tmp[j];
+	            //if(s != e_idx) { //Feb18th: switch off second order update for electrons, as that seems to cause the shock problem
+	            if(s > -1) { //Feb18th: switch off second order update for electrons, as that seems to cause the shock problem
+	                for(int j=0; j < num_cells+2; j++) {
+                        	species[s].u[j] = species[s].u_tmp[j];
+                    	}
                     }
                     
                 }
@@ -409,13 +411,13 @@ void c_Sim::execute() {
             if(photochemistry_level == 1) {   //C2Ray scheme
                 reset_dS();
                 
-                if(false) {
-                    cout<<"Pos 1 dS_UV = "<<dS_band(num_cells-10,0)<<endl;
+                if(debug >= 2) {
+                    cout<<"Before Photochem dS_UV = "<<dS_band(num_cells-10,0)<<endl;
                 }
                 do_photochemistry();
                 
-                if(false) {
-                    cout<<"Pos 2 dS_UV = "<<dS_band(num_cells-10,0)<<endl;
+                if(debug >= 2) {
+                    cout<<"After photochem dS_UV = "<<dS_band(num_cells-10,0)<<endl;
                 }
                 
             }
@@ -734,7 +736,8 @@ void c_Species::execute(std::vector<AOS>& u_in, std::vector<AOS>& dudt, std::vec
                     //else
                     
                     //cout<<" In mix solver ";
-                    if(this_species_index >= 1) {
+                    //if(this_species_index == base->e_idx) {
+                    if(this_species_index >= 0) {
                         for(int j=0; j <= num_cells; j++) {
                             double flim = 1.; //previously 0.1
 
@@ -1382,7 +1385,7 @@ int c_Species::fix_negative_pressures_sometimes(std::vector<AOS>&u_temp) {
         plast  = prim[j].pres;
         
         //First check: Negative E - big problem - use last value and fix pressure in case its also negative 
-        if(u_temp[j].u3 < 0) {
+        if( (u_temp[j].u3 < 0) || (ptemp < 0)) {
             //u_temp[j].u3 = u[j].u3;// + (ekinold-ekin);
             
             double etmp = 0.5*std::log10(u[j-1].u3) + 0.5*std::log10(u[j+1].u3) ;
@@ -1399,8 +1402,8 @@ int c_Species::fix_negative_pressures_sometimes(std::vector<AOS>&u_temp) {
         //if(ptemp < 0 && plast > 0 && ( eratio > 1.)) {
         //if(ptemp < 0 && plast > 0 ) {
         if(ptemp < 0) {
-            u_temp[j].u3 = ekin + plast/(gamma_adiabat-1);
-            fixed_cells++;
+            //u_temp[j].u3 = ekin + plast/(gamma_adiabat-1);
+            //fixed_cells++;
         }
     }
     

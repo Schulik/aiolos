@@ -173,6 +173,10 @@ inline double fastexpm1_2(double x) {
 //return x + 0.5*x*x;
 }
 
+//
+// Slope limiters
+//
+
 
 //
 // Functions mimicking certain numpy functionalities
@@ -576,6 +580,7 @@ public:
     double mix_p2;
     double mix_p3;
     int mix_reset_i;
+    int ignore_electron_cfl_cell;
     //
     // Friction
     //
@@ -653,6 +658,9 @@ public:
     double radiation_rampup_time;
     
     //Indices for highenergy cooling
+    int h3plus_idx;
+    int h2_idx;
+    int h2o_idx;
     int hnull_idx; 
     int hplus_idx;
     int e_idx;
@@ -666,7 +674,6 @@ public:
     int Opp_idx;
     int O3p_idx;
     int O4p_idx;
-    int h3plus_idx;
     
     //int radiation_solver;
     int use_planetary_temperature;
@@ -714,6 +721,7 @@ public:
     double const_opacity_solar_h2;
     double const_opacity_rosseland_h2;
     double const_opacity_planck_h2;
+    double const_opacity_planck_h2o;
     double init_J_factor;
     double init_T_temp;
     double minimum_opacity;
@@ -813,7 +821,8 @@ public:
     double get_max_soundspeed();
     double get_cfl_timestep();
     double get_cfl_timestep2();
-    
+    double get_electron_fraction(int j);
+
     void print_monitor(int i);
     void print_diagnostic_file(int i);
     void write_into_execution_log(string dir, string par, string spcfile);
@@ -1083,7 +1092,8 @@ public:
     }
 
     void reconstruct_edge_states(std::vector<double>& u_mask, int orderstep) ;
-    
+    double (*reconstruct_pointer)(double, double, double, double, double, double, double);
+
     AOS hllc_flux(int);
     AOS hllc_flux2(int, double);
     AOS laxfriedrich_flux(int j);

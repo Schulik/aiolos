@@ -1,6 +1,8 @@
 #include "aiolos.h"
 
 extern void init_line_cooling_data();
+extern double MonotonizedCentralSlope(double ql, double qm, double qr, double cF, double cB, double dxF, double dxB);
+extern double VanLeerSlope(double ql, double qm, double qr, double cF, double cB, double dxF, double dxB);
 
 ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -70,6 +72,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, s
         mix_p2           = read_parameter_from_file<double>(filename,"MIX_HYDROSOLVER_PAR2", debug, 1).value;
         mix_p3           = read_parameter_from_file<double>(filename,"MIX_HYDROSOLVER_PAR3", debug, 1).value;
         mix_reset_i      = read_parameter_from_file<int>(filename,"MIX_RESET_I", debug, 0).value;
+        ignore_electron_cfl_cell      = read_parameter_from_file<int>(filename,"IGNORE_ELECTRON_CFL_CELL", debug, 1).value;
         
         num_bands_in     = read_parameter_from_file<int>(filename,"PARI_NUM_BANDS", debug, 1).value; //Number of instellation bands. Low performance impact.
         num_bands_out    = read_parameter_from_file<int>(filename,"NUM_BANDS_OUT", debug, num_bands_in).value; //Number of outgoing radiation bands. Enormous performance impact.
@@ -212,7 +215,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, s
        
         
         use_collisional_heating = read_parameter_from_file<int>(filename,"PARI_USE_COLL_HEAT", debug, 1).value; //Switch on collisional energy exchange between species
-        use_drag_predictor_step = read_parameter_from_file<int>(filename, "PARI_SECONDORDER_DRAG", debug, 0).value; //Switch on drag predictor substep
+        use_drag_predictor_step = read_parameter_from_file<int>(filename, "PARI_SECONDORDER_DRAG", debug, 1).value; //Switch on drag predictor substep
         alpha_collision        = read_parameter_from_file<double>(filename,"PARI_ALPHA_COLL", debug, 1.).value; //Multiplier for collision alphas 
         alpha_collision_ions   = read_parameter_from_file<double>(filename,"PARI_ALPHA_IONS", debug, 1.).value; //Multiplier for collision alphas for ions
         max_mdot              = read_parameter_from_file<double>(filename,"MAX_MDOT", debug, -1.).value;        //Max negative mdot through outer boundary in g/s
@@ -256,7 +259,8 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, s
         const_opacity_planck_factor = read_parameter_from_file<double>(filename,"CONSTOPA_PLANCK_FACTOR", debug, 1.).value;  //Multiplier for all planck opacities (")
         const_opacity_solar_h2 = read_parameter_from_file<double>(filename,"CONSTOPA_SOLAR_H2", debug, 1.).value;    //Multiplier for all stellar opacities (independent of opacity model)
         const_opacity_rosseland_h2 = read_parameter_from_file<double>(filename,"CONSTOPA_ROSS_H2", debug, 1.).value; //Multiplier for all rosseland opacities (")
-        const_opacity_planck_h2 = read_parameter_from_file<double>(filename,"CONSTOPA_PLANCK_H2", debug, 1.).value;  //Multiplier for all planck opacities (")
+        const_opacity_planck_h2 = read_parameter_from_file<double>(filename,"CONSTOPA_PLANCK_H2", debug, 1e-20).value;  //Multiplier for all planck opacities (")
+        const_opacity_planck_h2o= read_parameter_from_file<double>(filename,"CONSTOPA_H2O_PLANCK", debug, 1e-20).value;  //Multiplier for all planck opacities (")
         temperature_model = read_parameter_from_file<char>(filename,"INIT_TEMPERATURE_MODEL", debug, 'P').value; //Initialize temperature as adiabatic+constant (P) or constant (C)
         friction_solver   = read_parameter_from_file<int>(filename,"FRICTION_SOLVER", debug, 0).value; //0: no friction, 1: analytic (only for two species), 2: numerical
         update_coll_frequently = read_parameter_from_file<int>(filename,"UPDATE_COLL_FREQUENTLY", debug, 1).value; //Switches on or off another update of collision rates after temperature and before temperature exchange update for rad solver==2. Important for code performance with many species
@@ -1204,6 +1208,12 @@ c_Species::c_Species(c_Sim *base_simulation, string filename, string species_fil
         
         boundary_left  = read_parameter_from_file<BoundaryType>(filename,"PARI_BOUND_TYPE_LEFT", debug, BoundaryType::fixed).value; //Which boundaries to use. See enum.h or this file, lines 1800
         boundary_right = read_parameter_from_file<BoundaryType>(filename,"PARI_BOUND_TYPE_RIGHT", debug, BoundaryType::fixed).value;
+
+	int slopelimiter = read_parameter_from_file<int>(filename,"SLOPE_LIMITER", debug, 1).value;  //0 is the central monotonic, 1 is Van leer
+	if(slopelimiter == 0)
+		reconstruct_pointer = &MonotonizedCentralSlope;
+	else
+		reconstruct_pointer = &VanLeerSlope;
 
         const_T_space  = read_parameter_from_file<double>(filename,"PARI_CONST_TEMP", debug, 1.).value; //Temperature at boundary. Use depending on INIT_TEMPERATURE_MODEL
         const_T_space2 = read_parameter_from_file<double>(filename,"CONST_TEMP2", debug, 1.).value; //Temperature at r>const_T_transition_r. 

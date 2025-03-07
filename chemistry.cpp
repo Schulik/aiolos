@@ -367,19 +367,29 @@ void c_Sim::do_chemistry(double dt_chem) {
         
 	//count charges, assume quasi-neutrality for electrons
         double charge_imbalance = 0;
+        double n_e = 0;
+        double charge_momentum = 0;
+
         for(int s=0;s<num_species; s++) {
-		if(species[s].static_charge > 0)
-            charge_imbalance += ((double)species[s].static_charge) * n_tmp(s);
+		if(species[s].static_charge > 0) {
+         	   charge_imbalance += ((double)species[s].static_charge) * n_tmp(s);
+                   charge_momentum  += ((double)species[s].static_charge) * n_tmp(s) * species[s].prim[j].speed;
+                }
+		if(species[s].this_species_index == e_idx)
+		   n_e = species[s].prim[j].number_density;
         }
-        
+
         for(int s=0;s<num_species; s++) {
             
             if(n_tmp(s) < chemistry_numberdens_floor)
                 n_tmp(s) = chemistry_numberdens_floor;
 
-            if( (j < grid2_transition_i) && species[s].this_species_index == e_idx) { //Force electrons to balance out the charges per cell
+            //if( (j < grid2_transition_i) && species[s].this_species_index == e_idx) { //Force electrons to balance out the charges per cell
+            if( (n_e/n_tot < 1e-4) && species[s].this_species_index == e_idx) { //Force electrons to balance out the charges per celll
+
                  if(neutralize_electrons) {
                    n_tmp(s) = std::fabs(charge_imbalance);
+                   species[s].prim[j].speed = charge_momentum / n_tmp(s) ;
                  }
             }
             //if( s == e_idx) //Force electrons to balance out the charges per cell
@@ -1092,6 +1102,9 @@ void c_Sim::update_dS_jb_photochem(int cell, double dtt) {
 void c_Sim::init_highenergy_cooling_indices()
 {
     cout<<"Searching for species indices in species list.."<<endl;
+    h3plus_idx= get_species_index("H3+ H3p",1);
+    h2_idx    = get_species_index("H2",1);
+    h2o_idx   = get_species_index("H2O",1);
     hnull_idx = get_species_index("S0 H0 H ",1); 
     hplus_idx = get_species_index("S1 H+ Hp p p+",1);
     e_idx     = get_species_index("S2 e e- eh eh2",1);
@@ -1105,7 +1118,6 @@ void c_Sim::init_highenergy_cooling_indices()
     Opp_idx   = get_species_index("S9 Opp O++",1);
     O3p_idx   = get_species_index("O3p O+++",1);
     O4p_idx   = get_species_index("O4p O++++",1);
-    h3plus_idx = get_species_index("H3+ H3p",1);
 }
 
 /**
@@ -1144,10 +1156,16 @@ void  c_Sim::do_highenergy_cooling(int cell) {
         double ne = species[e_idx].prim[cell].number_density;
         double Te = species[e_idx].prim[cell].temperature;
         double dT = 1e-5;
+        double n_neutrals;          //For simplified excitation of O by H0, H2, H2O
         species[e_idx].dG(cell) = 0;
         
 	if(steps==200 && cell==100)
              cout<<" HI 200 STEPS AND 100 CELLS AND WE HAVE ELECTRONS, pos2 totalcool = "<<species[e_idx].dG(cell)<<endl;
+        
+        if(h2_idx > -1)    n_neutrals += species[h2_idx].prim[cell].number_density;
+        if(hnull_idx > -1) n_neutrals += species[hnull_idx].prim[cell].number_density;
+        if(h2o_idx > -1)   n_neutrals += species[h2o_idx].prim[cell].number_density;
+
         
         if( e_idx!=-1 && hnull_idx!=-1 && hplus_idx!=-1  ) { //If all species are there - H0, H+ and e-
             std::array<double, 3> nX = {
@@ -1193,9 +1211,11 @@ void  c_Sim::do_highenergy_cooling(int cell) {
             if(steps == 311 && cell==100) {
                 cout<<"species[O_idx].dG(cell) before assignment = "<<species[O_idx].dG(cell);
             }            
-            double no   = species[O_idx].prim[cell].number_density;
+            double no    = species[O_idx].prim[cell].number_density;
+            double n_eff = n_neutrals * 1.5e-4;
             //species[O_idx].dG(cell) = 0;
-            species[e_idx].dG(cell)   -=  no * ne * red * O_cooling(Te, ne); 
+            species[O_idx].dG(cell)   -=  no * ne * red * O_cooling(Te, ne + n_eff);
+            species[O_idx].dG(cell)   -=  no * n_eff * red * O_cooling(Te, ne + n_eff);  //Feb23rd 2025: Included simplistic neutral-excitation, see Line cooling notes and Tielens book. Cooling counted for O, as e might not exist here
             species[e_idx].dGdT(cell) -=  no * ne * red * dfdx2(O_cooling, Te, dT, ne);
             
             if(steps == 311 && cell==100) {
