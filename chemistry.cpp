@@ -296,10 +296,11 @@ void c_Sim::do_chemistry(double dt_chem) {
         Vector_t n_tmp  = Vector_t(num_species);
         
         double n_tot = 0.;
-        
+        double n_tot_new =0.;
         for(int s=0;s<num_species; s++) {
             n_tot += species[s].prim[j].number_density;
         }
+        //n_tot =1.;
         for(int s=0;s<num_species; s++) {
             n_init(s)     = species[s].prim[j].number_density / n_tot;
         }
@@ -371,6 +372,7 @@ void c_Sim::do_chemistry(double dt_chem) {
         double charge_momentum = 0;
 
         for(int s=0;s<num_species; s++) {
+                n_tot_new += species[s].prim[j].number_density;
 		if(species[s].static_charge > 0) {
          	   charge_imbalance += ((double)species[s].static_charge) * n_tmp(s);
                    charge_momentum  += ((double)species[s].static_charge) * n_tmp(s) * species[s].prim[j].speed;
