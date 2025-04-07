@@ -748,6 +748,8 @@ public:
     int num_photoreactions;
     int read_reactions_from_species_file;
     int imaxchem;
+    int output_chemistry;
+    Eigen::MatrixXd reaction_rate_table;
     std::vector<c_reaction> reactions;
     std::vector<c_photochem_reaction> photoreactions;
     
@@ -868,6 +870,10 @@ public:
     void do_highenergy_cooling(int j);
     void update_tau_s_jb(int j, int b);
     void update_opacities();
+    
+    void empty_reaction_table();
+    void save_reaction_data_for_cell(int j, double dtt, double n_tot);
+    void write_reaction_table(int outputnumber);
 
     void do_photochemistry();
     void init_highenergy_cooling_indices();

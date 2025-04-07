@@ -806,7 +806,6 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, s
             reaction_b_ptr[i]      = Vector_t(num_species);
             //LUchem_ptr[i]          = Eigen::PartialPivLU<Matrix_t>;
         }
-        //n_news          = Vector_t(num_species);
         
         for(int s = 0; s < num_species; s++) {
             species[s].update_kzz_and_gravpot(s);
@@ -1155,6 +1154,18 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, s
             
             cout<<"Misc error caught in init_chemistry."<<endl;
         }
+        
+        try{
+            reaction_rate_table = Eigen::MatrixXd::Zero(num_cells+2, num_reactions+num_photoreactions);// Eigen::Matrix<double, NUM_SPECIES,NUM_SPECIES, Eigen::RowMajor>; //Eigen::MatrixXd::Zero(num_cells+2, num_reactions);
+            empty_reaction_table();
+            output_chemistry = 0;
+        }
+        catch(int i) {
+            cout<<" Error in initializing reaction_rate_table! Check whether num_reactions > 0. "<<endl;
+        }
+               
+        //Eigen::Matrix<double, num_cells+2,num_reactions>;//::Zero(num_cells+2, num_reactions); //Eigen::VectorXd::Zero(num_cells+2, num_reactions); Eigen::Matrix<double, NUM_SPECIES,NUM_SPECIES>
+                                                                          //Eigen::Matrix<double, NUM_SPECIES,NUM_SPECIES, Eigen::RowMajor>;
         
     }
     

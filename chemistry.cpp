@@ -370,8 +370,6 @@ void c_Sim::do_chemistry(double dt_chem) {
         //
         // We accept the new, normalized number densities and convert them back to non-normalized values
         //
-        //if(switch1 + switch2 == 0) {
-         //{ cout<<" "<<n_tmp(0) * n_tot * species[0].mass_amu*amu; }
         
 	//count charges, assume quasi-neutrality for electrons
         double charge_imbalance = 0;
@@ -392,8 +390,7 @@ void c_Sim::do_chemistry(double dt_chem) {
             
             if(n_tmp(s) < chemistry_numberdens_floor)
                 n_tmp(s) = chemistry_numberdens_floor;
-
-            //if( (j < grid2_transition_i) && species[s].this_species_index == e_idx) { //Force electrons to balance out the charges per cell
+            
             if( (n_e/n_tot < 1e-4) && species[s].this_species_index == e_idx) { //Force electrons to balance out the charges per celll
 
                  if(neutralize_electrons) {
@@ -401,7 +398,6 @@ void c_Sim::do_chemistry(double dt_chem) {
                    species[s].prim[j].speed = charge_momentum / n_tmp(s) ;
                  }
             }
-            //if( s == e_idx) //Force electrons to balance out the charges per cell
 		
                 
             species[s].prim[j].number_density = n_tmp(s) * n_tot;
@@ -415,6 +411,9 @@ void c_Sim::do_chemistry(double dt_chem) {
         // the momentum and internal energy may not be updated yet, as those are quantities we are solving for. So they get updated after update_dS_jb_photochem.
         
         update_dS_jb_photochem(j, dt_chem);
+        
+        if(output_chemistry==1)  
+            save_reaction_data_for_cell(j, dt_chem, n_tot);
         
         // Upon return momentum and v are updated (with e, p to be confirmed). Now with prim.density, primt.v, primt.eint?? updated, recomputed auxilliaries
         
@@ -547,8 +546,6 @@ Vector_t c_Sim::solver_cchem_implicit_general(double dtt, int cell, int cdebug, 
             temptau = radial_optical_depth_twotemp_he(cell+1,b);
             
         double F = 0.25 * solar_heating(b) / photon_energies[b] * std::exp(-temptau) * dlognu;
-        
-        double ntot_b = 0.;
         double tau_tot_b = 0.;
     
         //
@@ -560,14 +557,10 @@ Vector_t c_Sim::solver_cchem_implicit_general(double dtt, int cell, int cdebug, 
             int ieduct = 0;
             if(photoreactions[pr].band >= b) {
                 ieduct    = photoreactions[pr].educts[0];
-                ntot_b    +=  n_olds[ieduct];
                 //tau_tot_b +=  n_olds[ieduct] * species[ieduct].opacity_twotemp(cell, b) * species[ieduct].mass_amu*amu ;
                 tau_tot_b +=  n_olds[ieduct] * photoreactions[pr].opacity_twotemp(b) * species[ieduct].mass_amu*amu ;
-                
             }
-            
         }
-        ntot_b    *= n_tot;
         tau_tot_b *= n_tot*ds; 
 
         std::vector<double> reac_e_stoch;
@@ -741,7 +734,7 @@ Vector_t c_Sim::solver_cchem_implicit_general(double dtt, int cell, int cdebug, 
             reaction_b_ptr[loc_thr](ei)  -= reaction.e_stoch[ei] * t1;           
             reaction.dndts[ei]            = -reaction.e_stoch[ei] * t1 / dtt; // Reactant momentum correction term 
             //reaction.dndts[ei]            = -reaction.e_stoch[ei] * t1 / (dtt * n_olds[ei]); // Reactant momentum correction term 
-            reaction.dndt_old            += -reaction.dndts[ei];                             // Total momentum correction term for products
+            reaction.dndt_old            += -reaction.dndts[ei];                             // Total momentum correction term for products, Apr 7th 2025: corrected sign error, so that this is <0, as dndt_old from photochem
         }
         for(int& pi : reaction.products) {
             reaction_b_ptr[loc_thr](pi)    += reaction.p_stoch[pi] * t1 ;
@@ -881,14 +874,7 @@ void c_Sim::update_dS_jb_photochem(int cell, double dtt) {
                 
                 
             }
-            
-            
-        
-            
-        
-        
         }
-        
     }
     //
     // Momentum matrix contructions here
@@ -900,13 +886,10 @@ void c_Sim::update_dS_jb_photochem(int cell, double dtt) {
             //
             int ej = reaction.educts[0]; 
             chem_momentum_matrix(ej, ej) -= dtt * reaction.dndt_old * n_tot / n_news[ej];
-            //momentum_b(ej)               += dt * reaction.dndt_old / n_news[ej];
                 
             for(int& pj : reaction.products) {
                 chem_momentum_matrix(pj, ej) += dtt * reaction.dndt_old * n_tot / n_news[ej] * species[pj].mass_amu/reaction.products_total_mass;
-                //momentum_b(pj)               -= dt * reaction.dndt_old / n_news[ej] * species[pj].mass_amu/reaction.products_total_mass  * ndot_multiplier;
-                        
-            //cout<<" from "<<species[ej].speciesname<<" to "<<species[pj].speciesname<<endl;
+            
             }
         
     }
@@ -932,13 +915,11 @@ void c_Sim::update_dS_jb_photochem(int cell, double dtt) {
         
         for(int& ej : reaction.educts) {
             chem_momentum_matrix(ej, ej) -= 1.* dtt * reaction.dndts[ej] * n_tot  / n_news[ej]; //reaction.dndt_old;
-            //momentum_b(ej)               += 1.* dt * reaction.dndts[ej]  * ndot_multiplier;
             dLbit                =  dt * reaction.dndt_old * ndot_multiplier * species[ej].cv * species[ej].mass_amu * species[ej].prim[cell].temperature;
             dLambda              += dLbit;
             species[ej].dG(cell) += dLbit;
             
         }
-        //momentum_b(ej)               += reaction.dndt_old;
         for(int& pj : reaction.products) {
             for(int& ej : reaction.educts) {
                 chem_momentum_matrix(pj, ej) += 1.* dtt * reaction.dndts[ej] * n_tot  / n_news[ej]  * species[pj].mass_amu/reaction.products_total_mass;
@@ -947,22 +928,6 @@ void c_Sim::update_dS_jb_photochem(int cell, double dtt) {
                 //cout<<" from "<<species[ej].speciesname<<" to "<<species[pj].speciesname<<endl;
             }
         }
-        
-        /*
-        for(int& ej : reaction.educts) {
-                 //   chem_momentum_matrix(ej, ej) += dt * reaction.dndts[ej];
-                //    momentum_b(ej)               += dt * reaction.dndts[ej];
-                
-                chem_momentum_matrix(ej, ej) += dt * reaction.dndt_old;
-                momentum_b(ej)               += dt * reaction.dndts(ej);
-                    
-                for(int& pj : reaction.products) {
-                        chem_momentum_matrix(ej, pj) -= dt * reaction.dndt_old * species[pj].mass_amu/reaction.products_total_mass;
-                        momentum_b(pj)               -= dt * reaction.dndt_old * species[pj].mass_amu/reaction.products_total_mass;
-                }
-        }*/
-        
-        
     }
     
     //
@@ -1085,13 +1050,83 @@ void c_Sim::update_dS_jb_photochem(int cell, double dtt) {
             
         }
         
-        
         //Update quantities. Take care particularly to update E, so that no negative pressures are later computed from high momentum, as it is p = E -0.5 * rho * u^2
         
         for(int s=0;s<num_species; s++) {
    
         }
     }
+}
+
+/***
+ * Write the reaction table for both photo and thermochemistry.
+ * Note that the reaction rates are the dn/dt values are reaction.dndts[ej], i.e. the explicit version of the implicit solution.
+ * They might therefore be different from the implicit ones by a few percent.
+ * 
+ */
+void c_Sim::save_reaction_data_for_cell(int j, double dtt, double n_tot) {
+
+    //For all radii for all reactions write table to file
+    
+    for(int rr=0; rr < num_reactions; rr++) {
+        reaction_rate_table(j, reactions[rr].reaction_number)      = +reactions[rr].dndt_old * n_tot;    
+    }
+    for(int pr=0; pr < num_photoreactions; pr++) {
+        reaction_rate_table(j, photoreactions[pr].reaction_number) = -photoreactions[pr].dndt_old * n_tot;    
+    }
+}
+
+/***
+ * Writes reaction matrix to file
+ * 
+ */
+void c_Sim::write_reaction_table(int output_number) {
+    
+    //open file
+    string filename2 ;
+    {
+        stringstream filenamedummy;
+        string truncated_name = stringsplit(simname,".")[0];
+        filenamedummy<<workingdir<<"chemistry_"<<truncated_name<<"_t"<<output_number<<".dat";
+        filename2 = filenamedummy.str() ;
+    }
+    //
+    // Delete old file if we start a new one
+    //
+    
+    //ofstream chemstream(filename2, std::ios_base::app);
+    ofstream chemstream(filename2);
+    chemstream << std::setprecision(4);
+    
+    if( chemstream.is_open() ) {
+        //Write reaction strings
+        
+        for(int rr=0; rr < num_reactions; rr++) {
+                chemstream<<cnstWidth( reactions[rr].reaction_number, 6) <<" ";
+            }
+            
+            for(int pr=0; pr < num_photoreactions; pr++) {
+                chemstream<<cnstWidth( photoreactions[pr].reaction_number, 6)<<" ";
+            }
+           chemstream<<endl;
+        
+        //For all radii for all reactions write table to file
+        for (int j = 0; j <= imaxchem; j++) {
+            
+            chemstream<<j<<" "<<x_i12[j]<<" ";
+            
+            for(int rr=0; rr < num_reactions; rr++) {
+                chemstream<<reaction_rate_table(j, reactions[rr].reaction_number)<<" ";
+            }
+            
+            for(int pr=0; pr < num_photoreactions; pr++) {
+                chemstream<<reaction_rate_table(j, photoreactions[pr].reaction_number)<<" ";
+            }
+           chemstream<<endl;
+            
+        }
+    }
+    chemstream.close();
 }
 
 /**

@@ -137,7 +137,8 @@ void c_Sim::execute() {
                 species[s].print_AOS_component_tofile((int)output_counter); 
              
              
-             output_counter+=1.; 
+             output_counter+=1.;
+             output_chemistry = 1; // Setting this switch will trigger a filling of the reaction rate table at the end of chemistry. The switch is unset afterwards
          }
          if(globalTime > monitor_counter*monitor_time) {
             print_monitor(steps);
@@ -472,6 +473,14 @@ void c_Sim::execute() {
         if(steps %prinstuff_steps==0) {    
                 print_velocity_numberdens_ratios(" Pos 3:: ", 210);
         }
+        
+        if(output_chemistry==1 &&  photochemistry_level==2) {
+            write_reaction_table(output_counter-1);
+            empty_reaction_table();
+            output_chemistry = 0;
+        }
+            
+            
         
         if(steps==0)
             cout<<"Initial sound crossing time = "<<max_snd_crs_time<<", debug = "<<debug<<endl;

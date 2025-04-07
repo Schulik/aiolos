@@ -70,18 +70,17 @@ double c_Sim::get_cfl_timestep() {
             species[s].timesteps[i]    = std::abs(species[s].prim[i].speed / dx[i]); 
             species[s].timesteps_cs[i] = species[s].prim[i].sound_speed / dx[i];
             if(s== e_idx) {
-		double f    = 1.;
+                double f    = 1.;
                 double flim = mix_p3;
                 if(solver == HydroSolver::mix) {
-	        	f = get_electron_fraction(i);
-                	f = 1.-1./std::exp( f*f/flim/flim );
-			f = std::max(f,1e-10);
-		}
-
-            	species[s].finalstep[i]    = species[s].timesteps[i] + f * species[s].timesteps_cs[i];
-	    }
-	    else
-	        species[s].finalstep[i]    = species[s].timesteps[i] + species[s].timesteps_cs[i] ;
+                    f = get_electron_fraction(i);
+                    f = 1.-1./std::exp( f*f/flim/flim );
+                    f = std::max(f,1e-10);
+                }
+                species[s].finalstep[i] = species[s].timesteps[i] + f * species[s].timesteps_cs[i];
+            }
+            else
+                species[s].finalstep[i]    = species[s].timesteps[i] + species[s].timesteps_cs[i] ;
             
             species[s].snd_crs_time += 2.* dx[i] / species[s].prim[i].sound_speed ;
             
@@ -606,3 +605,12 @@ std::string cnstWidth( int value, int width )
      results << std::setw( value < 0 ? width + 1 : width ) << value;
       return results.str();
  }
+ 
+ void c_Sim::empty_reaction_table() {
+     
+     for(int j=0; j<num_cells+2; j++) {
+         for(int r=0; r<num_reactions; r++){
+             reaction_rate_table(j,r) = 0.;
+         }
+    }
+}
