@@ -184,22 +184,31 @@ void c_Sim::init_reactions(int cdebug) {
     //////Print opacity table for photoreactions to check whether the opacities have been assigned correctly
     std::vector<double> thin_photorates_m = np_zeros(photoreactions.size());  //Compute the optically thin photorates as rough guiding numbers
     std::vector<double> thin_photorates_n = np_zeros(photoreactions.size());  //Compute the optically thin photorates as rough guiding numbers
-
-    cout<<"                                                       ";
+    double  flux_total;
+    double  flux_xuv;
+  
+    //cout<<"                                                       ";
+    cout<<"                                                ";
     for(auto r : photoreactions) { 
-	cout<<r.reaction_number<<"           ";
+	//cout<<r.reaction_number<<"           ";
+	cout<<cnstWidth(r.reaction_number,8);
     }
     cout<<endl;
     
+    //std::setprecision(2);
     for(int b=0; b<num_bands_in; b++) {
-         cout<<" lmin/lmax"<<l_i_in[b]<<"/"<<l_i_in[b+1];
-            cout<<" F = "<<solar_heating(b)<<" | ";
+         cout<<setprecision(4)<<" lmin/lmax"<<l_i_in[b]<<"/"<<l_i_in[b+1];
+         cout<<setprecision(4)<<" F = "<<solar_heating(b)<<" | ";
 
+	flux_total += solar_heating(b);
+	if(l_i_in[b+1] < 0.0911 && l_i_in[b+1] > 0.000629)
+		flux_xuv += solar_heating(b);
+	
          //for(auto r : photoreactions) {
          for(int pr=0; pr < photoreactions.size(); pr++){ 
              thin_photorates_m[pr] += photoreactions[pr].opacity_twotemp(b) * solar_heating(b)/photon_energies[b];
              thin_photorates_n[pr] += photoreactions[pr].opacity_twotemp(b) * solar_heating(b)/photon_energies[b] * species[photoreactions[pr].educts[0]].mass_amu * amu;
-	     cout<<photoreactions[pr].opacity_twotemp(b)<<" ";
+	     cout<<setprecision(1)<<photoreactions[pr].opacity_twotemp(b)<<" ";
 	     //cout<<r.opacity_twotemp(b)<<" ";
 
          }
@@ -209,21 +218,18 @@ void c_Sim::init_reactions(int cdebug) {
     //At the end pront photoreactions
     //cout<<"                                                      ";
     //cout<<endl<<" opt. thin rates:                                      ";
-    cout<<endl<<" opt. thin rates/mass:                                 ";
+    cout<<endl<<" opt. thin rates/mass:                           ";
     for(int pr=0; pr < photoreactions.size(); pr++){ 
-	  cout<<thin_photorates_m[pr]<<" ";
+	  cout<<setprecision(1)<<thin_photorates_m[pr]<<" ";
     }
     cout<<endl;
-    cout<<" opt. thin rates/part:                                 ";
+    cout<<" opt. thin rates/part:                           ";
     for(int pr=0; pr < photoreactions.size(); pr++){ 
-	  cout<<thin_photorates_n[pr]<<" ";
+	  cout<<setprecision(1)<<thin_photorates_n[pr]<<" ";
     }
     cout<<endl;
+    cout<<" Total flux = "<<flux_total<<", flux between 13.6 and 2000 eV = "<<flux_xuv<<endl;
 
-    //char a;
-    //cin>>a;
-        
-    //}
     if(cdebug)
         cout<<" Finished init chemistry."<<endl;
     
@@ -583,7 +589,9 @@ Vector_t c_Sim::solver_cchem_implicit_general(double dtt, int cell, int cdebug, 
                 reac_products   = photoreactions[pr].products;
                 double branching                 = photoreactions[pr].branching_ratio;
                 double dndt_local = 0. ;
-                
+		double x_secondary  = 1.; //Ionization factor for X-rays
+		if(l_i_in[b+1] < 0.030)
+			x_secondary = 10.;
                 //
                 // Term t1 = F/dx (1-exp(-dtau))
                 //
@@ -599,7 +607,7 @@ Vector_t c_Sim::solver_cchem_implicit_general(double dtt, int cell, int cdebug, 
                     
                     dtau    = ds*kappa*n_olds[ei]*n_tot;       //Note that dtau is not generally tau_tot_b, because optically thin photons need to be split between all absorbants
                     dfdn    = dtt*F*kappa/ n_tot * branching;  
-                    dfdn   *= (dtau * std::exp(-tau_tot_b) - expm1_tau_tot_b * (1. - dtau/tau_tot_b)  ) / tau_tot_b;
+                    dfdn   *= x_secondary * (dtau * std::exp(-tau_tot_b) - expm1_tau_tot_b * (1. - dtau/tau_tot_b)  ) / tau_tot_b;
                     
                     dfdn_po = -dfdn*n_olds[ei];  //df/dn|k * n^k
                     
@@ -833,6 +841,10 @@ void c_Sim::update_dS_jb_photochem(int cell, double dtt) {
 		dlognu = 1.;
 		double eratio = reaction.threshold_energy/photon_energies[b];
                 double eratio2 = reaction.threshold_energy/photon_energies[b+1];
+		double x_secondary  =1.; //Ionization factor for X-rays
+	        if(l_i_in[b+1] < 0.030)
+                          x_secondary = 0.1;
+
 		if(b == reaction.band) { //When we sit in the band just above the ionisation threshold, we need to check that it might be that E_lower[b] < E_ion but E_higher[b] > E_ion
 			
 			dlognu = (1. - eratio2 * std::log( 1. + 1./eratio2) );
@@ -846,7 +858,7 @@ void c_Sim::update_dS_jb_photochem(int cell, double dtt) {
                 tau_i       *= n_tot*ds;
                 
                 //Get fraction of total cell-heating
-                double fractional_dS = tau_i/tau_tot_b * dS * 1. * (1.- eratio);
+                double fractional_dS = x_secondary * tau_i/tau_tot_b * dS * 1. * (1.- eratio);
                 
                 //Distribute energy according to mass
                 for(int& pj : reaction.products) {
@@ -1167,6 +1179,7 @@ void  c_Sim::do_highenergy_cooling(int cell) {
         if(h2_idx > -1)    n_neutrals += species[h2_idx].prim[cell].number_density;
         if(hnull_idx > -1) n_neutrals += species[hnull_idx].prim[cell].number_density;
         if(h2o_idx > -1)   n_neutrals += species[h2o_idx].prim[cell].number_density;
+        if(O_idx > -1)     n_neutrals += species[O_idx].prim[cell].number_density;
 
         
         if( e_idx!=-1 && hnull_idx!=-1 && hplus_idx!=-1  ) { //If all species are there - H0, H+ and e-

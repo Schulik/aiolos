@@ -96,6 +96,7 @@ double delta_ij(int i, int j);
 double lint(double xa, int N, double* X, double* RI);
 double logint(double xa, int N, double* X, double* RI);
 const float log10ff = std::log(10.);
+std::string cnstWidth( int value, int width );
 
 inline double dfdx(const function<double(double)>& f, double x0, double dx) {
     
@@ -172,6 +173,7 @@ inline double fastexpm1_2(double x) {
   return std::expm1(x);
 //return x + 0.5*x*x;
 }
+
 
 //
 // Slope limiters

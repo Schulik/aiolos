@@ -225,15 +225,6 @@ void c_Species::update_kzz_and_gravpot(int argument) {
                 phi_s[i] = base->phi[i] * K_zzf[i];
     }
     double phicorrection = base->phi[homopause_boundary_i]*(1.-slope); //Correct for the jump in Phi at the homopause
-    if(mi < 1e-3){
-		cout<<"in electron phicorrection before:"<<phicorrection<<" homopause boundary = "<<homopause_boundary_i<<endl;
-		cout<<"current phi_s[homo_i] "<<phi_s[homopause_boundary_i]<<" +correction: "<<phi_s[homopause_boundary_i]+phicorrection<<endl;
-		cout<<"current phi_s[homo_i/2] "<<phi_s[homopause_boundary_i/2]<<" +correction: "<<phi_s[homopause_boundary_i/2]+phicorrection<<endl;
-	        //phicorrection *= -1;
-		//cout<<"phicorrection after:"<<phicorrection<<endl;
-		//double hh;
-		//cin>>hh;
-	}
 
     if(homopause_boundary_i == 0)
         phicorrection = 0;
@@ -648,8 +639,6 @@ void c_Sim::fill_alpha_basis_arrays(int j) { //Called in compute_friction() in s
  */
 void c_Sim::compute_alpha_matrix(int j) { //Called in compute_friction() and compute_radiation() in source.cpp
         
-	if(steps< 4 && j ==100)
-		cout<<steps<<" In compute_alpha_matrix j==100"<<endl;
         double alpha_local;
         double coll_b;
         //double mtot;

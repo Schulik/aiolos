@@ -597,3 +597,12 @@ double c_Sim::get_electron_fraction(int j) {
 
 	return e_press/tot_press;
 }
+
+std::string cnstWidth( int value, int width )
+ {
+      std::ostringstream results;
+      results.fill( ' ' );
+     results.setf( std::ios_base::internal, std::ios_base::adjustfield );
+     results << std::setw( value < 0 ? width + 1 : width ) << value;
+      return results.str();
+ }
