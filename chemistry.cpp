@@ -197,8 +197,8 @@ void c_Sim::init_reactions(int cdebug) {
 
          //for(auto r : photoreactions) {
          for(int pr=0; pr < photoreactions.size(); pr++){ 
-             thin_photorates_m[pr] += photoreactions[pr].opacity_twotemp(b) * solar_heating(b);
-             thin_photorates_n[pr] += photoreactions[pr].opacity_twotemp(b) * solar_heating(b) * species[photoreactions[pr].educts[0]].mass_amu * amu;
+             thin_photorates_m[pr] += photoreactions[pr].opacity_twotemp(b) * solar_heating(b)  / photon_energies[b] ;
+             thin_photorates_n[pr] += photoreactions[pr].opacity_twotemp(b) * solar_heating(b)  / photon_energies[b]  * species[photoreactions[pr].educts[0]].mass_amu * amu;
 	     cout<<photoreactions[pr].opacity_twotemp(b)<<" ";
 	     //cout<<r.opacity_twotemp(b)<<" ";
 
@@ -567,7 +567,7 @@ Vector_t c_Sim::solver_cchem_implicit_general(double dtt, int cell, int cdebug, 
                 reac_products   = photoreactions[pr].products;
                 double branching                 = photoreactions[pr].branching_ratio;
                 double dndt_local = 0. ;
-                
+                    
                 //
                 // Term t1 = F/dx (1-exp(-dtau))
                 //
@@ -813,18 +813,18 @@ void c_Sim::update_dS_jb_photochem(int cell, double dtt) {
                 //
                 // Heating terms
                 //
-		dlognu = 1.;
-		double eratio = reaction.threshold_energy/photon_energies[b];
+                dlognu = 1.;
+                double eratio = reaction.threshold_energy/photon_energies[b];
                 double eratio2 = reaction.threshold_energy/photon_energies[b+1];
-		if(b == reaction.band) { //When we sit in the band just above the ionisation threshold, we need to check that it might be that E_lower[b] < E_ion but E_higher[b] > E_ion
-			
-			dlognu = (1. - eratio2 * std::log( 1. + 1./eratio2) );
-			dlognu = std::min(dlognu,1.);
-			dlognu = std::max(dlognu,0.);
+                if(b == reaction.band) { //When we sit in the band just above the ionisation threshold, we need to check that it might be that E_lower[b] < E_ion but E_higher[b] > E_ion
+                    
+                    dlognu = (1. - eratio2 * std::log( 1. + 1./eratio2) );
+                    dlognu = std::min(dlognu,1.);
+                    dlognu = std::max(dlognu,0.);
 
-			//if(b==3)
-			//	cout<<" rnumber/ band / dlognu = "<<reaction.reaction_number<<" / "<<b<<" / "<<dlognu<<" 1-eratio, 1-eratio2 "<<1-eratio<<" / "<<1-eratio2<<" energies: thresh, elow, eup"<<reaction.threshold_energy/(ev_to_K * kb)<<" / "<<photon_energies[b]/(ev_to_K * kb)<<" / "<<photon_energies[b+1]/(ev_to_K * kb)<<endl;
-		}
+                    //if(b==3)
+                    //	cout<<" rnumber/ band / dlognu = "<<reaction.reaction_number<<" / "<<b<<" / "<<dlognu<<" 1-eratio, 1-eratio2 "<<1-eratio<<" / "<<1-eratio2<<" energies: thresh, elow, eup"<<reaction.threshold_energy/(ev_to_K * kb)<<" / "<<photon_energies[b]/(ev_to_K * kb)<<" / "<<photon_energies[b+1]/(ev_to_K * kb)<<endl;
+                }
                 double tau_i =  reaction.branching_ratio * n_olds[reaction.educts[0]] * reaction.opacity_twotemp(b) * species[reaction.educts[0]].mass_amu*amu ;
                 tau_i       *= n_tot*ds;
                 
@@ -1187,7 +1187,6 @@ void  c_Sim::do_highenergy_cooling(int cell) {
                 cout<<"species[O_idx].dG(cell) before assignment = "<<species[O_idx].dG(cell);
             }            
             double no   = species[O_idx].prim[cell].number_density;
-            //species[O_idx].dG(cell) = 0;
             species[e_idx].dG(cell)   -=  no * ne * red * O_cooling(Te, ne); 
             species[e_idx].dGdT(cell) -=  no * ne * red * dfdx2(O_cooling, Te, dT, ne);
             

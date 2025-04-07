@@ -535,8 +535,8 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
                 for(int s=0; s<num_species; s++) {
                     n_tot      += species[s].prim[j].number_density;
                     mumean_nom += species[s].prim[j].density;
-		   if(species[s].static_charge == 0)
-			n_neutrals += species[s].prim[j].number_density;
+                    if(species[s].static_charge == 0)
+                        n_neutrals += species[s].prim[j].number_density;
                 }
                 mumean = mumean_nom / n_tot;
                 
@@ -547,8 +547,8 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
                 
                 double kappa_cond = n_neutrals/n_tot * conductivity + (1. - n_neutrals/n_tot) * conductivity2; //1e-5
                 //double kappa_cond = conductivity; //1e-5
-		double vfactor1    = std::max((1. - std::fabs(species[0].prim[j-1].speed/species[0].prim[j-1].sound_speed) ), 0.);
-		double vfactor2    = std::max((1. - std::fabs(species[0].prim[j].speed/species[0].prim[j].sound_speed) ), 0.);
+                double vfactor1    = std::max((1. - std::fabs(species[0].prim[j-1].speed/species[0].prim[j-1].sound_speed) ), 0.);
+                double vfactor2    = std::max((1. - std::fabs(species[0].prim[j].speed/species[0].prim[j].sound_speed) ), 0.);
                 double c1 = kappa_cond * std::pow(T1avg, 0.7); //*n_tot
                 double c2 = kappa_cond * std::pow(T2avg, 0.7); // *n_tot
                 

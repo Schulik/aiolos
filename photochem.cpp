@@ -121,7 +121,7 @@ void init_line_cooling_data() {
 	lines_Cp.push_back( {1334*angstroem, 2.41304508E-03, 107718.1, 3.74008770E+15});
 	lines_Cpp.push_back( {1910*angstroem, 3.84223024E-10, 75460.8, 1.31478953E+9});
 	lines_Cpp.push_back( {977*angstroem, 1.79050834E-03, 147263.9, 7.17164800E+14});
-        lines_C3p.push_back( {1550*angstroem, 5.52131947E-03, 92934.39, 2.86266976e+15});
+    lines_C3p.push_back( {1550*angstroem, 5.52131947E-03, 92934.39, 2.86266976e+15});
 	lines_C4p.push_back( {6300*angstroem, 1.15685197E-14, 22830.7, 8.61213387e+0});
 }
 
@@ -196,10 +196,8 @@ double O_cooling(double Te, double ne) {
     double term = 1e-25;
     for (auto & ln : lines_O) {
         term += ln[1]*std::exp(-ln[2]/Te) / (ne*(1.+ln[3]/ne));
-	//cout<<ln[1]<<"/"<<ln[2]<<"/"<<ln[3]<<"/"<<ln[1]*std::exp(-ln[2]/Te) / (ne*(1.+ln[3]/ne))<<endl;
+	
     }
-    //for ln in lines_O:
-    //double term = 5.5e-24+1.1e-20*std::exp(-30162/Te)*(1.+std::pow(Te/0.75e4, 0.5));    
     return term;
 }
 
