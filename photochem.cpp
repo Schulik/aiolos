@@ -196,8 +196,10 @@ double O_cooling(double Te, double ne) {
     double term = 1e-25;
     for (auto & ln : lines_O) {
         term += ln[1]*std::exp(-ln[2]/Te) / (ne*(1.+ln[3]/ne));
-	
     }
+    //63 micron cooling - special treatment
+    term += 8.289e-19/ne;
+    
     return term;
 }
 

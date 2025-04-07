@@ -184,22 +184,32 @@ void c_Sim::init_reactions(int cdebug) {
     //////Print opacity table for photoreactions to check whether the opacities have been assigned correctly
     std::vector<double> thin_photorates_m = np_zeros(photoreactions.size());  //Compute the optically thin photorates as rough guiding numbers
     std::vector<double> thin_photorates_n = np_zeros(photoreactions.size());  //Compute the optically thin photorates as rough guiding numbers
-
-    cout<<"                                                       ";
+    double  flux_total;
+    double  flux_xuv;
+  
+    //cout<<"                                                       ";
+    cout<<"                                                ";
     for(auto r : photoreactions) { 
-	cout<<r.reaction_number<<"           ";
+	//cout<<r.reaction_number<<"           ";
+	cout<<cnstWidth(r.reaction_number,8);
     }
     cout<<endl;
     
+    //std::setprecision(2);
     for(int b=0; b<num_bands_in; b++) {
-         cout<<" lmin/lmax"<<l_i_in[b]<<"/"<<l_i_in[b+1];
-            cout<<" F = "<<solar_heating(b)<<" | ";
+         cout<<setprecision(4)<<" lmin/lmax"<<l_i_in[b]<<"/"<<l_i_in[b+1];
+         cout<<setprecision(4)<<" F = "<<solar_heating(b)<<" | ";
 
+	flux_total += solar_heating(b);
+	if(l_i_in[b+1] < 0.0911 && l_i_in[b+1] > 0.000629)
+		flux_xuv += solar_heating(b);
+	
          //for(auto r : photoreactions) {
          for(int pr=0; pr < photoreactions.size(); pr++){ 
-             thin_photorates_m[pr] += photoreactions[pr].opacity_twotemp(b) * solar_heating(b)  / photon_energies[b] ;
-             thin_photorates_n[pr] += photoreactions[pr].opacity_twotemp(b) * solar_heating(b)  / photon_energies[b]  * species[photoreactions[pr].educts[0]].mass_amu * amu;
-	     cout<<photoreactions[pr].opacity_twotemp(b)<<" ";
+
+             thin_photorates_m[pr] += photoreactions[pr].opacity_twotemp(b) * solar_heating(b)/photon_energies[b];
+             thin_photorates_n[pr] += photoreactions[pr].opacity_twotemp(b) * solar_heating(b)/photon_energies[b] * species[photoreactions[pr].educts[0]].mass_amu * amu;
+	     cout<<setprecision(1)<<photoreactions[pr].opacity_twotemp(b)<<" ";
 	     //cout<<r.opacity_twotemp(b)<<" ";
 
          }
@@ -209,21 +219,18 @@ void c_Sim::init_reactions(int cdebug) {
     //At the end pront photoreactions
     //cout<<"                                                      ";
     //cout<<endl<<" opt. thin rates:                                      ";
-    cout<<endl<<" opt. thin rates/mass:                                 ";
+    cout<<endl<<" opt. thin rates/mass:                           ";
     for(int pr=0; pr < photoreactions.size(); pr++){ 
-	  cout<<thin_photorates_m[pr]<<" ";
+	  cout<<setprecision(1)<<thin_photorates_m[pr]<<" ";
     }
     cout<<endl;
-    cout<<" opt. thin rates/part:                                 ";
+    cout<<" opt. thin rates/part:                           ";
     for(int pr=0; pr < photoreactions.size(); pr++){ 
-	  cout<<thin_photorates_n[pr]<<" ";
+	  cout<<setprecision(1)<<thin_photorates_n[pr]<<" ";
     }
     cout<<endl;
+    cout<<" Total flux = "<<flux_total<<", flux between 13.6 and 2000 eV = "<<flux_xuv<<endl;
 
-    //char a;
-    //cin>>a;
-        
-    //}
     if(cdebug)
         cout<<" Finished init chemistry."<<endl;
     
@@ -296,10 +303,11 @@ void c_Sim::do_chemistry(double dt_chem) {
         Vector_t n_tmp  = Vector_t(num_species);
         
         double n_tot = 0.;
-        
+        double n_tot_new =0.;
         for(int s=0;s<num_species; s++) {
             n_tot += species[s].prim[j].number_density;
         }
+        //n_tot =1.;
         for(int s=0;s<num_species; s++) {
             n_init(s)     = species[s].prim[j].number_density / n_tot;
         }
@@ -367,18 +375,33 @@ void c_Sim::do_chemistry(double dt_chem) {
         
 	//count charges, assume quasi-neutrality for electrons
         double charge_imbalance = 0;
+        double n_e = 0;
+        double charge_momentum = 0;
+
         for(int s=0;s<num_species; s++) {
-		if(species[s].static_charge > 0)
-            charge_imbalance += ((double)species[s].static_charge) * n_tmp(s);
+                n_tot_new += species[s].prim[j].number_density;
+		if(species[s].static_charge > 0) {
+         	   charge_imbalance += ((double)species[s].static_charge) * n_tmp(s);
+                   charge_momentum  += ((double)species[s].static_charge) * n_tmp(s) * species[s].prim[j].speed;
+                }
+		if(species[s].this_species_index == e_idx)
+		   n_e = species[s].prim[j].number_density;
         }
-        
+
         for(int s=0;s<num_species; s++) {
             
             if(n_tmp(s) < chemistry_numberdens_floor)
                 n_tmp(s) = chemistry_numberdens_floor;
 
-            //if( (j < grid2_transition_i) && species[s].this_species_index == e_idx) //Force electrons to balance out the charges per cell
-            //    n_tmp(s) = std::fabs(charge_imbalance);
+            //if( (j < grid2_transition_i) && species[s].this_species_index == e_idx) { //Force electrons to balance out the charges per cell
+            if( (n_e/n_tot < 1e-4) && species[s].this_species_index == e_idx) { //Force electrons to balance out the charges per celll
+
+                 if(neutralize_electrons) {
+                   n_tmp(s) = std::fabs(charge_imbalance);
+                   species[s].prim[j].speed = charge_momentum / n_tmp(s) ;
+                 }
+            }
+            //if( s == e_idx) //Force electrons to balance out the charges per cell
 		
                 
             species[s].prim[j].number_density = n_tmp(s) * n_tot;
@@ -567,7 +590,11 @@ Vector_t c_Sim::solver_cchem_implicit_general(double dtt, int cell, int cdebug, 
                 reac_products   = photoreactions[pr].products;
                 double branching                 = photoreactions[pr].branching_ratio;
                 double dndt_local = 0. ;
-                    
+
+                double x_secondary  = 1.; //Ionization factor for X-rays
+                if(l_i_in[b+1] < 0.030)
+                    x_secondary = 10.;
+
                 //
                 // Term t1 = F/dx (1-exp(-dtau))
                 //
@@ -583,7 +610,7 @@ Vector_t c_Sim::solver_cchem_implicit_general(double dtt, int cell, int cdebug, 
                     
                     dtau    = ds*kappa*n_olds[ei]*n_tot;       //Note that dtau is not generally tau_tot_b, because optically thin photons need to be split between all absorbants
                     dfdn    = dtt*F*kappa/ n_tot * branching;  
-                    dfdn   *= (dtau * std::exp(-tau_tot_b) - expm1_tau_tot_b * (1. - dtau/tau_tot_b)  ) / tau_tot_b;
+                    dfdn   *= x_secondary * (dtau * std::exp(-tau_tot_b) - expm1_tau_tot_b * (1. - dtau/tau_tot_b)  ) / tau_tot_b;
                     
                     dfdn_po = -dfdn*n_olds[ei];  //df/dn|k * n^k
                     
@@ -746,6 +773,7 @@ void c_Sim::update_dS_jb_photochem(int cell, double dtt) {
     
     Vector_t n_olds          = Vector_t(num_species);
     Vector_t n_news          = Vector_t(num_species);
+    Vector_t T_olds          = Vector_t(num_species);
     double   n_tot = 0.;
     double ndot_multiplier =1e0;
     
@@ -760,7 +788,7 @@ void c_Sim::update_dS_jb_photochem(int cell, double dtt) {
         mom[s]              = species[s].u[cell].u2;
         internalenergy_b[s] = species[s].prim[cell].internal_energy * species[s].u[cell].u1; //The r.h.s of the energy matrix equation needs to be the non-updated internal energy density
         n_news[s]           = species[s].prim[cell].number_density;
-
+        T_olds[s]           = species[s].prim[cell].temperature;
     }
     
     for(int s=0;s<num_species; s++) {
@@ -816,6 +844,11 @@ void c_Sim::update_dS_jb_photochem(int cell, double dtt) {
                 dlognu = 1.;
                 double eratio = reaction.threshold_energy/photon_energies[b];
                 double eratio2 = reaction.threshold_energy/photon_energies[b+1];
+
+                double x_secondary  =1.; //Ionization factor for X-rays
+                if(l_i_in[b+1] < 0.030)
+                          x_secondary = 0.1;
+
                 if(b == reaction.band) { //When we sit in the band just above the ionisation threshold, we need to check that it might be that E_lower[b] < E_ion but E_higher[b] > E_ion
                     
                     dlognu = (1. - eratio2 * std::log( 1. + 1./eratio2) );
@@ -829,34 +862,14 @@ void c_Sim::update_dS_jb_photochem(int cell, double dtt) {
                 tau_i       *= n_tot*ds;
                 
                 //Get fraction of total cell-heating
-                double fractional_dS = tau_i/tau_tot_b * dS * 1. * (1.- eratio);
+                double fractional_dS = x_secondary * tau_i/tau_tot_b * dS * 1. * (1.- eratio);
                 
                 //Distribute energy according to mass
                 for(int& pj : reaction.products) {
                     if(reaction.count_p == 1) {
-
-                        if(cell>5) {
-                                            species[pj].dS(cell) += 1.0 * fractional_dS;
-                                            //species[pj].dS(cell-1) += 0.3  * fractional_dS;
-                                            //species[pj].dS(cell-2) += 0.15 * fractional_dS;
-                                            //species[pj].dS(cell-3) += 0.10 * fractional_dS;
-                        } else {
-                            species[pj].dS(cell) += fractional_dS;
-                        }
-                                            
-                        
+                        species[pj].dS(cell) += fractional_dS;
                     } else {
-
-                        if(cell>5) {
-                            double heat = fractional_dS * reaction.energy_split_factor/species[pj].mass_amu;
-                                        species[pj].dS(cell)   += 1.0  * heat;
-                                        //species[pj].dS(cell+1) += 0.25 * heat;
-                                        //species[pj].dS(cell)   += 0.50 * heat;
-                                        //species[pj].dS(cell-1) += 0.25 * heat;
-                        }
-                        else {
-                                        species[pj].dS(cell) += fractional_dS * reaction.energy_split_factor/species[pj].mass_amu;
-                        }
+                        species[pj].dS(cell) += fractional_dS * reaction.energy_split_factor/species[pj].mass_amu;
                     }
                 }
                 
@@ -1033,14 +1046,16 @@ void c_Sim::update_dS_jb_photochem(int cell, double dtt) {
 
                 
                 vnew[s]                     = mom_news(s) / (n_olds[s]*n_tot*species[s].mass_amu*amu) ; //Although n_olds is called "olds", this contains the density at the advanced time and is what we need here
-                species[s].prim[cell].speed = std::min(vnew[s], 1e-3*c_light) ; //Limit to +300km/s
+                species[s].prim[cell].speed = std::min(vnew[s], 1e-4*c_light) ; //Limit to +30km/s
                 species[s].prim[cell].speed = std::max(species[s].prim[cell].speed, -1e-4*c_light); //Limit to -30km/s
                 //species[s].prim[cell].internal_energy = eint_news[s] / (n_olds[s]*n_tot*species[s].mass_amu*amu);
                 //species[s].prim[cell].temperature     = eint_news[s] /species[s].cv / (n_olds[s]*n_tot*species[s].mass_amu*amu);
                 
-                species[s].prim[cell].internal_energy += std::fabs(dEkin_s);
-                //E_new = p + 0.5 *mom_news(s)*mom_new(s)/( n_news[s]*species[s].mass_amu*amu );
+                //species[s].prim[cell].internal_energy += std::fabs(dEkin_s);
+                //species[s].prim[cell].temperature = T_olds[s];
+                //////E_new = p + 0.5 *mom_news(s)*mom_new(s)/( n_news[s]*species[s].mass_amu*amu );
                 
+                //species[s].eos->update_eint_from_T(&species[s].prim[cell], 1);
                 species[s].eos->update_p_from_eint(&species[s].prim[cell], 1);
                 species[s].eos->compute_auxillary(&species[s].prim[cell], 1);
                 species[s].eos->compute_conserved(&species[s].prim[cell], &species[s].u[cell], 1);
@@ -1085,6 +1100,9 @@ void c_Sim::update_dS_jb_photochem(int cell, double dtt) {
 void c_Sim::init_highenergy_cooling_indices()
 {
     cout<<"Searching for species indices in species list.."<<endl;
+    h3plus_idx= get_species_index("H3+ H3p",1);
+    h2_idx    = get_species_index("H2",1);
+    h2o_idx   = get_species_index("H2O",1);
     hnull_idx = get_species_index("S0 H0 H ",1); 
     hplus_idx = get_species_index("S1 H+ Hp p p+",1);
     e_idx     = get_species_index("S2 e e- eh eh2",1);
@@ -1098,7 +1116,6 @@ void c_Sim::init_highenergy_cooling_indices()
     Opp_idx   = get_species_index("S9 Opp O++",1);
     O3p_idx   = get_species_index("O3p O+++",1);
     O4p_idx   = get_species_index("O4p O++++",1);
-    h3plus_idx = get_species_index("H3+ H3p",1);
 }
 
 /**
@@ -1137,10 +1154,17 @@ void  c_Sim::do_highenergy_cooling(int cell) {
         double ne = species[e_idx].prim[cell].number_density;
         double Te = species[e_idx].prim[cell].temperature;
         double dT = 1e-5;
+        double n_neutrals;          //For simplified excitation of O by H0, H2, H2O
         species[e_idx].dG(cell) = 0;
         
 	if(steps==200 && cell==100)
              cout<<" HI 200 STEPS AND 100 CELLS AND WE HAVE ELECTRONS, pos2 totalcool = "<<species[e_idx].dG(cell)<<endl;
+        
+        if(h2_idx > -1)    n_neutrals += species[h2_idx].prim[cell].number_density;
+        if(hnull_idx > -1) n_neutrals += species[hnull_idx].prim[cell].number_density;
+        if(h2o_idx > -1)   n_neutrals += species[h2o_idx].prim[cell].number_density;
+        if(O_idx > -1)     n_neutrals += species[O_idx].prim[cell].number_density;
+
         
         if( e_idx!=-1 && hnull_idx!=-1 && hplus_idx!=-1  ) { //If all species are there - H0, H+ and e-
             std::array<double, 3> nX = {
@@ -1186,8 +1210,12 @@ void  c_Sim::do_highenergy_cooling(int cell) {
             if(steps == 311 && cell==100) {
                 cout<<"species[O_idx].dG(cell) before assignment = "<<species[O_idx].dG(cell);
             }            
-            double no   = species[O_idx].prim[cell].number_density;
-            species[e_idx].dG(cell)   -=  no * ne * red * O_cooling(Te, ne); 
+
+            double no    = species[O_idx].prim[cell].number_density;
+            double n_eff = n_neutrals * 1.5e-4;
+            
+            species[O_idx].dG(cell)   -=  no * ne    * red * O_cooling(Te, ne + n_eff);
+            species[O_idx].dG(cell)   -=  no * n_eff * red * O_cooling(Te, ne + n_eff);  //Feb23rd 2025: Included simplistic neutral-excitation, see Line cooling notes and Tielens book. Cooling counted for O, as e might not exist here
             species[e_idx].dGdT(cell) -=  no * ne * red * dfdx2(O_cooling, Te, dT, ne);
             
             if(steps == 311 && cell==100) {

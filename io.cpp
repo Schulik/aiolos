@@ -4,7 +4,7 @@
  * 
  * This file contains input/output routines.
  */
-
+ 
 #include <iomanip>
 #include <sstream>
 #include <stdexcept>
@@ -335,8 +335,8 @@ int c_Species::read_species_data(string filename, int species_index) {
                 if(wlcount > 1) {
                     (*opacity_avg)[b] /= (double)wlcount;
                 }
-                else 
-                    cout<<" Band "<<b<<" has wlcount==0! lmin/wl/lmax//opacity_data(0,0/1); = "<<lmin<<"/"<<wl<<"/"<<lmax<<"//"<<opacity_data(0,0)<<"/"<<opacity_data(0,1)<<" wlcount = "<<wlcount<<endl;
+                //else 
+                //    cout<<" Band "<<b<<" has wlcount==0! lmin/wl/lmax//opacity_data(0,0/1); = "<<lmin<<"/"<<wl<<"/"<<lmax<<"//"<<opacity_data(0,0)<<"/"<<opacity_data(0,1)<<" wlcount = "<<wlcount<<endl;
                 
                 if(debug > 1)
                     cout<<" DEBUG. Band "<<b<<" has wlcount=="<<wlcount<<". lmin/wl/lmax//opacity_data(0,0/1); = "<<lmin<<"/"<<wl<<"/"<<lmax<<"//"<<opacity_data(0,0)<<"/"<<opacity_data(0,1)<<" opa_found = "<<(*opacity_avg)[b]<<endl;
@@ -1581,10 +1581,10 @@ Eigen::VectorXd c_Sim::read_and_bin_opacityfile(string filename, int col) {
                 
                 if(wlcount > 1) {
                     (*opacity_avg)[b] /= (double)wlcount;
-                    cout<<" DEBUG. Band "<<b<<" has wlcount=="<<wlcount<<" faultycount "<<faultycount<<". lmin/wl/lmax//opacity_data(0,0/1); = "<<lmin<<"/"<<wl<<"/"<<lmax<<"//"<<opacity_data(0,0)<<"/"<<opacity_data(0,1)<<" opa_found = "<<(*opacity_avg)[b]<<endl;
+                    //cout<<" DEBUG. Band "<<b<<" has wlcount=="<<wlcount<<" faultycount "<<faultycount<<". lmin/wl/lmax//opacity_data(0,0/1); = "<<lmin<<"/"<<wl<<"/"<<lmax<<"//"<<opacity_data(0,0)<<"/"<<opacity_data(0,1)<<" opa_found = "<<(*opacity_avg)[b]<<endl;
                 }
-                else 
-                    cout<<" Band "<<b<<" has wlcount==0! lmin/wl/lmax//opacity_data(0,0/1); = "<<lmin<<"/"<<wl<<"/"<<lmax<<"//"<<opacity_data(0,0)<<"/"<<opacity_data(0,1)<<" wlcount = "<<wlcount<<endl;
+                //else 
+                //    cout<<" Band "<<b<<" has wlcount==0! lmin/wl/lmax//opacity_data(0,0/1); = "<<lmin<<"/"<<wl<<"/"<<lmax<<"//"<<opacity_data(0,0)<<"/"<<opacity_data(0,1)<<" wlcount = "<<wlcount<<endl;
                 
                 if(debug > 1)
                     cout<<" DEBUG. Band "<<b<<" has wlcount=="<<wlcount<<". lmin/wl/lmax//opacity_data(0,0/1); = "<<lmin<<"/"<<wl<<"/"<<lmax<<"//"<<opacity_data(0,0)<<"/"<<opacity_data(0,1)<<" opa_found = "<<(*opacity_avg)[b]<<endl;
@@ -1594,11 +1594,11 @@ Eigen::VectorXd c_Sim::read_and_bin_opacityfile(string filename, int col) {
                 //
                 if(lmax < opacity_data(0,0) ) {
                     (*opacity_avg)[b] = opacity_data(0,col);
-                    cout<<" Band "<<b<<", lmax "<<lmax<<"< opa_data(0,0)"<<opacity_data(0,0)<<endl;
+                    //cout<<" Band "<<b<<", lmax "<<lmax<<"< opa_data(0,0)"<<opacity_data(0,0)<<endl;
                 }
                 if(lmin > opacity_data(num_tmp_lambdas-1,0) ) {
                     (*opacity_avg)[b] = opacity_data(num_tmp_lambdas-1,col);
-                    cout<<" Band "<<b<<", lmin "<<lmin<<"< opa_data(-1,0)"<<opacity_data(num_tmp_lambdas,0)<<endl;
+                    //cout<<" Band "<<b<<", lmin "<<lmin<<"< opa_data(-1,0)"<<opacity_data(num_tmp_lambdas,0)<<endl;
                 }
                 if((*opacity_avg)[b] < 0.) {
                     

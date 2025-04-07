@@ -29,6 +29,7 @@ double c_Sim::get_cfl_timestep() {
     double maxde = 0;
     
     for(int s = 0; s < num_species; s++) {
+
         for(int i=num_cells-1; i>0; i--)  {
             species[s].de_e[i] = std::abs(species[s].primlast[i].internal_energy - species[s].prim[i].internal_energy)/species[s].prim[i].internal_energy;
             
@@ -56,13 +57,31 @@ double c_Sim::get_cfl_timestep() {
     max_snd_crs_time=0;
     for(int s=0; s < num_species; s++) {
         
+        int start = 1;
+	if(s == -100) {
+           start = ignore_electron_cfl_cell;
+           start = std::min(ignore_electron_cfl_cell, num_cells);
+        }
+
         species[s].snd_crs_time = 0;
-        for(int i=1; i<=num_cells; i++) {
+        for(int i=start; i<=num_cells; i++) {
             
             //Computing the inverse timesteps first
             species[s].timesteps[i]    = std::abs(species[s].prim[i].speed / dx[i]); 
             species[s].timesteps_cs[i] = species[s].prim[i].sound_speed / dx[i];
-            species[s].finalstep[i]    = species[s].timesteps[i] + species[s].timesteps_cs[i] ;
+            if(s== e_idx) {
+		double f    = 1.;
+                double flim = mix_p3;
+                if(solver == HydroSolver::mix) {
+	        	f = get_electron_fraction(i);
+                	f = 1.-1./std::exp( f*f/flim/flim );
+			f = std::max(f,1e-10);
+		}
+
+            	species[s].finalstep[i]    = species[s].timesteps[i] + f * species[s].timesteps_cs[i];
+	    }
+	    else
+	        species[s].finalstep[i]    = species[s].timesteps[i] + species[s].timesteps_cs[i] ;
             
             species[s].snd_crs_time += 2.* dx[i] / species[s].prim[i].sound_speed ;
             
@@ -564,3 +583,26 @@ void c_Species::init_analytic_wind_solution() {
     eos->compute_conserved(&(prim[0]), &(u[0]), num_cells);
     */
 }
+
+double c_Sim::get_electron_fraction(int j) {
+	double f =0;
+	double tot_press = 0;
+	double e_press=0;
+
+	for(int s=0; s<num_species; s++) {
+            tot_press += species[s].prim[j].pres;
+        }
+        if (e_idx > -1)
+		e_press = species[e_idx].prim[j].pres;
+
+	return e_press/tot_press;
+}
+
+std::string cnstWidth( int value, int width )
+ {
+      std::ostringstream results;
+      results.fill( ' ' );
+     results.setf( std::ios_base::internal, std::ios_base::adjustfield );
+     results << std::setw( value < 0 ? width + 1 : width ) << value;
+      return results.str();
+ }

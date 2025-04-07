@@ -435,7 +435,9 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
 
 			//if(totalheat < 1e-50) {
 			//if(use_shadow_relaxation && totalheat < ( shadow_relaxation_threshold && (x_i[j]<x_i[num_cells]/2) )) { //1e-50 is the arbitrary limit we set on the heating function throughout the code
-			if(use_shadow_relaxation && (totalheat < shadow_relaxation_threshold) && (x_i[j]<x_i[num_cells]/4) ) { //1e-50 is the arbitrary limit we set on the heating function throughout the code
+			//if(use_shadow_relaxation && (totalheat < shadow_relaxation_threshold) && (x_i[j]<x_i[num_cells]/4) ) { //1e-50 is the arbitrary limit we set on the heating function throughout the code
+			if(use_shadow_relaxation && (totalheat < shadow_relaxation_threshold) && (x_i[j]< shadow_relaxation_radius) ) { //1e-50 is the arbitrary limit we set on the heating function throughout the code
+			//if(use_shadow_relaxation && (x_i[j]< shadow_relaxation_radius) ) { //1e-50 is the arbitrary limit we set on the heating function throughout the code
                                 double fac = ddt/rt;
                                 double f1  = (1 + 1e-40) / (1 + fac + 1e-40);
                                 double f2  = (1 + 1e-40) / (1/fac + 1 + 1e-40);
@@ -520,7 +522,7 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
 // Conduction
 //
 
-     if(use_conduction) {
+     if(use_conduction && ( globalTime < do_cond_until)) {
         std::vector<double> temp_temperatures        = std::vector<double>(num_cells+1);
         std::vector<double> flux_temperatures        = std::vector<double>(num_cells+2);
 

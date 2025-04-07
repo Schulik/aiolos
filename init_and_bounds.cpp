@@ -1,6 +1,8 @@
 #include "aiolos.h"
 
 extern void init_line_cooling_data();
+extern double MonotonizedCentralSlope(double ql, double qm, double qr, double cF, double cB, double dxF, double dxB);
+extern double VanLeerSlope(double ql, double qm, double qr, double cF, double cB, double dxF, double dxB);
 
 ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -70,6 +72,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, s
         mix_p2           = read_parameter_from_file<double>(filename,"MIX_HYDROSOLVER_PAR2", debug, 1).value;
         mix_p3           = read_parameter_from_file<double>(filename,"MIX_HYDROSOLVER_PAR3", debug, 1).value;
         mix_reset_i      = read_parameter_from_file<int>(filename,"MIX_RESET_I", debug, 0).value;
+        ignore_electron_cfl_cell      = read_parameter_from_file<int>(filename,"IGNORE_ELECTRON_CFL_CELL", debug, 1).value;
         
         num_bands_in     = read_parameter_from_file<int>(filename,"PARI_NUM_BANDS", debug, 1).value; //Number of instellation bands. Low performance impact.
         num_bands_out    = read_parameter_from_file<int>(filename,"NUM_BANDS_OUT", debug, num_bands_in).value; //Number of outgoing radiation bands. Enormous performance impact.
@@ -201,16 +204,22 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, s
         use_rad_fluxes    = read_parameter_from_file<int>(filename,"PARI_USE_RADIATION", debug, 0).value;   //Switch to turn on the radiation module
         use_convective_fluxes = read_parameter_from_file<int>(filename,"USE_CONVECTION", debug, 0).value;   //Switch to turn on convective energy transport in the radiation module
         use_conduction        = read_parameter_from_file<int>(filename,"USE_CONDUCTION", debug, 0).value;   //Switch to turn on conductive energy transport in thesimple radiation module
+        neutralize_electrons  = read_parameter_from_file<int>(filename,"NEUTRALIZE_ELECTRONS", debug, 0).value;   //Switch to turn on conductive energy transport in thesimple radiation module
         conductivity          = read_parameter_from_file<double>(filename,"CONDUCTIVITY", debug, 1e-5).value;  //Value of conductivity prefactor
         conductivity2         = read_parameter_from_file<double>(filename,"CONDUCT2",     debug, conductivity).value;  //Value of conductivity prefactor
         K_zz_init = read_parameter_from_file<double>(filename,"KZZ_INIT", debug, 0.).value;                 //Initial atmospheric mixing parameter in cm^2/s
+	homopause_smoothing_rad = read_parameter_from_file<int>(filename,"HOMOPAUSE_SMOOTHING_RAD", debug, 0).value;
+	homopause_smoothing_rep = read_parameter_from_file<int>(filename,"HOMOPAUSE_SMOOTHING_REP", debug, 0).value;
         convect_boundary_strength = read_parameter_from_file<double>(filename,"CONVECT_BOUNDARY_STRENGTH", debug, 1.1).value; //Unused currently.
+        do_cond_until         = read_parameter_from_file<double>(filename,"DO_COND_UNTIL", debug, 1e99).value; //Unused currently.
+       
         
         use_collisional_heating = read_parameter_from_file<int>(filename,"PARI_USE_COLL_HEAT", debug, 1).value; //Switch on collisional energy exchange between species
-        use_drag_predictor_step = read_parameter_from_file<int>(filename, "PARI_SECONDORDER_DRAG", debug, 0).value; //Switch on drag predictor substep
+        use_drag_predictor_step = read_parameter_from_file<int>(filename, "PARI_SECONDORDER_DRAG", debug, 1).value; //Switch on drag predictor substep
         alpha_collision        = read_parameter_from_file<double>(filename,"PARI_ALPHA_COLL", debug, 1.).value; //Multiplier for collision alphas 
         alpha_collision_ions   = read_parameter_from_file<double>(filename,"PARI_ALPHA_IONS", debug, 1.).value; //Multiplier for collision alphas for ions
         max_mdot              = read_parameter_from_file<double>(filename,"MAX_MDOT", debug, -1.).value;        //Max negative mdot through outer boundary in g/s
+        couple_ions           = read_parameter_from_file<int>(filename, "COUPLE_IONS", debug, -100).value;      //All values which have NOT COUPLE_IONS charge are coupled when use_avg_v is switched on
         
         rad_energy_multiplier=read_parameter_from_file<double>(filename,"PARI_RAD_MULTIPL", debug, 1.).value; //Only for tests. Unused currently.
         collision_model   = read_parameter_from_file<char>(filename,"PARI_COLL_MODEL", debug, 'P').value;     //Collision model. P=physical collision rates (i.e. Schunk&Nagy). C=constant collision rate of value PARI_ALPHAS_COLL
@@ -218,6 +227,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, s
         use_shadow_relaxation  = read_parameter_from_file<int>(filename,"USE_SHADOW_RELAXATION", debug, 0).value; //In regions of no heating, and if thermal cooling is switched off, relax the local Temperature to const_T_space, to prevent heating spikes from wave breaking
         shadow_relaxation_time = read_parameter_from_file<double>(filename,"SHADOW_RELAXATION_TIME", debug, 1).value; //Use Newtonian cooling on timescale 
         shadow_relaxation_threshold = read_parameter_from_file<double>(filename,"SHADOW_RELAXATION_THRESHOLD", debug, 1e-50).value; //Below solar heating of <threshold> we interpret this as shadow
+        shadow_relaxation_radius    = read_parameter_from_file<double>(filename,"SHADOW_RELAXATION_RADIUS", debug, domain_max*0.25).value; //Below solar heating of <threshold> we interpret this as shadow
         wavedamp_factor             = read_parameter_from_file<double>(filename,"WAVEDAMP_FACTOR", debug, -0.5).value; //Below solar heating of <threshold> we interpret this as shadow
         use_avg_temperature = read_parameter_from_file<int>(filename,"USE_AVG_T", debug, 0).value; //Compute avg c_v rho T  and use that as T_avg
         use_avg_velocity    = read_parameter_from_file<int>(filename,"USE_AVG_V", debug, 0).value; //Compute avg c_v rho T  and use that as T_avg
@@ -249,7 +259,8 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, s
         const_opacity_planck_factor = read_parameter_from_file<double>(filename,"CONSTOPA_PLANCK_FACTOR", debug, 1.).value;  //Multiplier for all planck opacities (")
         const_opacity_solar_h2 = read_parameter_from_file<double>(filename,"CONSTOPA_SOLAR_H2", debug, 1.).value;    //Multiplier for all stellar opacities (independent of opacity model)
         const_opacity_rosseland_h2 = read_parameter_from_file<double>(filename,"CONSTOPA_ROSS_H2", debug, 1.).value; //Multiplier for all rosseland opacities (")
-        const_opacity_planck_h2 = read_parameter_from_file<double>(filename,"CONSTOPA_PLANCK_H2", debug, 1.).value;  //Multiplier for all planck opacities (")
+        const_opacity_planck_h2 = read_parameter_from_file<double>(filename,"CONSTOPA_PLANCK_H2", debug, 1e-20).value;  //Multiplier for all planck opacities (")
+        const_opacity_planck_h2o= read_parameter_from_file<double>(filename,"CONSTOPA_H2O_PLANCK", debug, 1e-20).value;  //Multiplier for all planck opacities (")
         temperature_model = read_parameter_from_file<char>(filename,"INIT_TEMPERATURE_MODEL", debug, 'P').value; //Initialize temperature as adiabatic+constant (P) or constant (C)
         friction_solver   = read_parameter_from_file<int>(filename,"FRICTION_SOLVER", debug, 0).value; //0: no friction, 1: analytic (only for two species), 2: numerical
         update_coll_frequently = read_parameter_from_file<int>(filename,"UPDATE_COLL_FREQUENTLY", debug, 1).value; //Switches on or off another update of collision rates after temperature and before temperature exchange update for rad solver==2. Important for code performance with many species
@@ -1197,6 +1208,12 @@ c_Species::c_Species(c_Sim *base_simulation, string filename, string species_fil
         
         boundary_left  = read_parameter_from_file<BoundaryType>(filename,"PARI_BOUND_TYPE_LEFT", debug, BoundaryType::fixed).value; //Which boundaries to use. See enum.h or this file, lines 1800
         boundary_right = read_parameter_from_file<BoundaryType>(filename,"PARI_BOUND_TYPE_RIGHT", debug, BoundaryType::fixed).value;
+
+	int slopelimiter = read_parameter_from_file<int>(filename,"SLOPE_LIMITER", debug, 1).value;  //0 is the central monotonic, 1 is Van leer
+	if(slopelimiter == 0)
+		reconstruct_pointer = &MonotonizedCentralSlope;
+	else
+		reconstruct_pointer = &VanLeerSlope;
 
         const_T_space  = read_parameter_from_file<double>(filename,"PARI_CONST_TEMP", debug, 1.).value; //Temperature at boundary. Use depending on INIT_TEMPERATURE_MODEL
         const_T_space2 = read_parameter_from_file<double>(filename,"CONST_TEMP2", debug, 1.).value; //Temperature at r>const_T_transition_r. 

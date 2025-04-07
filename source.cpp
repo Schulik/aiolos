@@ -225,18 +225,31 @@ void c_Species::update_kzz_and_gravpot(int argument) {
                 phi_s[i] = base->phi[i] * K_zzf[i];
     }
     double phicorrection = base->phi[homopause_boundary_i]*(1.-slope); //Correct for the jump in Phi at the homopause
-    if(mi < 1e-3){
-		cout<<"in electron phicorrection before:"<<phicorrection<<" homopause boundary = "<<homopause_boundary_i<<endl;
-		cout<<"current phi_s[homo_i] "<<phi_s[homopause_boundary_i]<<" +correction: "<<phi_s[homopause_boundary_i]+phicorrection<<endl;
-		cout<<"current phi_s[homo_i/2] "<<phi_s[homopause_boundary_i/2]<<" +correction: "<<phi_s[homopause_boundary_i/2]+phicorrection<<endl;
-	        //phicorrection *= -1;
-		//cout<<"phicorrection after:"<<phicorrection<<endl;
-		//double hh;
-		//cin>>hh;
-	}
 
     if(homopause_boundary_i == 0)
         phicorrection = 0;
+    
+    for(int i=0; i<homopause_boundary_i; i++) 
+        phi_s[i] += 1. * phicorrection;
+
+    int smoothradius = base->homopause_smoothing_rad;
+    if(homopause_boundary_i > smoothradius) {
+        int repeats = base->homopause_smoothing_rep; 
+	double tmp_phis[smoothradius*2+1];
+
+	for(int a=0; a<repeats; a++){
+		for(int k=-smoothradius; k<=smoothradius; k++) {
+			double qq = std::log10( -phi_s[homopause_boundary_i-1+k] ) + std::log10(- phi_s[homopause_boundary_i+1+k]);
+                        tmp_phis[k+smoothradius] = -std::pow(10.,0.5*qq); //phi_s[homopause_boundary_i] = -std::pow(10.,0.5*qq);
+
+		}
+
+		for(int k=-smoothradius; k<=smoothradius; k++) {
+				phi_s[homopause_boundary_i + k] = tmp_phis[k+smoothradius];
+		}
+	}
+
+    }
     /*
     if(homopause_boundary_i > 0) {
         double qq = std::log10( -phi_s[homopause_boundary_i-1] ) + std::log10(- phi_s[homopause_boundary_i+1]);
@@ -251,8 +264,6 @@ void c_Species::update_kzz_and_gravpot(int argument) {
         phi_s[homopause_boundary_i-1] = -std::pow(10.,0.5*qq);
     }*/
 
-    for(int i=0; i<homopause_boundary_i; i++) 
-        phi_s[i] += 1. * phicorrection;
     
     //cout<<"s = "<<argument<<" phicorr = "<<phicorrection<<" homopause_i = "<<homopause_boundary_i<<endl;
     //cout<<"Finished updating kzz in species "<<speciesname<<endl;
@@ -270,14 +281,14 @@ void c_Species::update_kzz_and_gravpot(int argument) {
 /**
  * Wrapper function calling the appropriate analytical or numerical functions.
  */
-void c_Sim::compute_drag_update() {
+void c_Sim::compute_drag_update(double dtt) {
 	//cout<<"In  drag_update"<<endl;
         if(friction_solver >= 0 && num_species > 1) {
             if(friction_solver == 0)
                 compute_friction_analytical();
             else{
 		//cout<<"calling friction numerical"<<endl;
-                 compute_friction_numerical();
+                 compute_friction_numerical(dtt);
 		}
         }
     }
@@ -476,7 +487,7 @@ void c_Sim::compute_friction_analytical() {
  * Friction solver 1: Compute collision coefficients, build collision matrix and solve in a fast way
  * Collision coefficients are hard-coded in compute_alpha_matrix().
  */
-void c_Sim::compute_friction_numerical() {
+void c_Sim::compute_friction_numerical(double dtt) {
     
     Eigen::internal::set_is_malloc_allowed(false) ;
          
@@ -494,8 +505,8 @@ void c_Sim::compute_friction_numerical() {
             cout<<"    rho[0] = "<<species[0].u[j].u1<<endl;
         }
         
-        friction_matrix_T = identity_matrix - friction_coefficients * dt;
-        friction_matrix_T.diagonal().noalias() += dt * (friction_coefficients * unity_vector);
+        friction_matrix_T = identity_matrix - friction_coefficients * dtt;
+        friction_matrix_T.diagonal().noalias() += dtt * (friction_coefficients * unity_vector);
         
         LU.compute(friction_matrix_T) ;
         friction_vec_output.noalias() = LU.solve(friction_vec_input);
@@ -526,8 +537,10 @@ void c_Sim::compute_friction_numerical() {
 		double avg_velocity = 0;
 
 		for(int si=0; si<num_species; si++) {
-			tot_mom += friction_vec_output(si) * species[si].prim[j].density;
-			tot_dens += species[si].prim[j].density;
+                        if(species[si].static_charge != couple_ions) { //IONCHECK
+				tot_mom += friction_vec_output(si) * species[si].prim[j].density;
+				tot_dens += species[si].prim[j].density;
+                        }
 		}
 
 		avg_velocity = tot_mom/tot_dens;
@@ -537,7 +550,10 @@ void c_Sim::compute_friction_numerical() {
 
 			if(globalTime < avg_velocity_t0) {
 				for(int si=0; si<num_species; si++) {
-					species[si].prim[j].speed = avg_velocity;
+                                        if(species[si].static_charge != couple_ions)  //IONCHECK
+    						species[si].prim[j].speed = avg_velocity;
+					else
+						species[si].prim[j].speed = friction_vec_output(si);
 				}
 
 				//if(steps%10000==0 && j==num_species/2)
@@ -553,7 +569,10 @@ void c_Sim::compute_friction_numerical() {
 				//	cout<<" In avg velocity, between t0 and t1, fac= "<<fac<<endl;
 
 				for(int si=0; si<num_species; si++) {
-                                        species[si].prim[j].speed = friction_vec_output(si) * fac + avg_velocity * (1. - fac);
+					 if(species[si].static_charge != couple_ions) //IONCHECK
+                                        	species[si].prim[j].speed = friction_vec_output(si) * fac + avg_velocity * (1. - fac);
+                                         else
+                                                species[si].prim[j].speed = friction_vec_output(si);
                                 }
 			}
 		}
@@ -575,7 +594,7 @@ void c_Sim::compute_friction_numerical() {
                 double v_end = friction_vec_output(si) - friction_vec_output(sj) ;
                 double v_half = 0.5*(v_end + friction_vec_input(si) - friction_vec_input(sj)) ; 
                                                
-                temp +=  dt * friction_coefficients(si,sj) * (species[sj].mass_amu/(species[sj].mass_amu+species[si].mass_amu)) * v_half * v_end ;
+                temp +=  dtt * friction_coefficients(si,sj) * (species[sj].mass_amu/(species[sj].mass_amu+species[si].mass_amu)) * v_half * v_end ;
                 
                 if(si==0 && sj == 1) {
                     friction_sample(j) = alphas_sample(j) * (friction_vec_input(si) - friction_vec_input(sj));
@@ -620,8 +639,6 @@ void c_Sim::fill_alpha_basis_arrays(int j) { //Called in compute_friction() in s
  */
 void c_Sim::compute_alpha_matrix(int j) { //Called in compute_friction() and compute_radiation() in source.cpp
         
-	if(steps< 4 && j ==100)
-		cout<<steps<<" In compute_alpha_matrix j==100"<<endl;
         double alpha_local;
         double coll_b;
         //double mtot;

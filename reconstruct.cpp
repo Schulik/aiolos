@@ -5,6 +5,9 @@
  */
 #include "aiolos.h"
 
+double MonotonizedCentralSlope(double ql, double qm, double qr, double cF, double cB, double dxF, double dxB);
+double VanLeerSlope(double ql, double qm, double qr, double cF, double cB, double dxF, double dxB);
+
 /**
  *  General slope limiting function based on mid, left and right values.
  */
@@ -26,6 +29,20 @@ double MonotonizedCentralSlope(double ql, double qm, double qr,
     } ;
 
     return min_mod(0.5*(dF + dB), min_mod(cF*dF, cB*dB)) ;
+    //return min_mod(dF, dB) ;
+}
+
+double VanLeerSlope(double ql, double qm, double qr, 
+                                double cF=2, double cB=2, double dxF=1, double dxB=1) {
+     double dF = (qr - qm) / dxF ;
+     double dB = (qm - ql) / dxB ;
+     double v  = dB/dF;
+
+     if (dF*dB <= 0)
+         return 0 ;
+
+      //return dF*std::max(0., std::min( 0.5*(1.+v),  std::min(cF, v*cB) )) ;
+      return dF*v*(cF*v + cB)/(v*v + v*(cF + cB -2) + 1); //Modified Van leer from Mignone+2014
 }
 
 /**
@@ -63,15 +80,27 @@ void c_Species::reconstruct_edge_states( std::vector<double>&u_mask, int orderst
     // Step 2: Add 2nd order slope-limited correction
     IntegrationType order = base->order ;
     if (order == IntegrationType::second_order && orderstep == 1) {
+    //if (order == IntegrationType::second_order && shock_switch == 1) {
         const std::vector<double>& 
             x_i = base->x_i, 
             x_iVC = base->x_iVC,
             dx = base->dx ;
        
         for (int i=1; i <= num_cells; i++) {
-            double maskmul = u_mask[i]>0.5?0.:1.; //i>num_cells/2?0.:1.; // Multiply all slopes with 1 in the nominal case, or 0 in case we get a message from above that this cell is broken
-            maskmul = 1.;
-            
+            //double maskmul = u_mask[i]>0.5?0.:1.; //i>num_cells/2?0.:1.; // Multiply all slopes with 1 in the nominal case, or 0 in case we get a message from above that this cell is broken
+            //maskmul = 1.;
+	    double maskmul_l = 1.;
+	    double maskmul_r = 1.;
+
+            double p_ratio_l = std::log10(prim[i-1].pres/prim[i].pres);
+            double p_ratio_r = std::log10(prim[i].pres/prim[i+1].pres);
+
+	    int limratio = 1;
+	    if(p_ratio_l < -limratio || p_ratio_l > limratio)
+		maskmul_l = 1.;
+	    if(p_ratio_r < -limratio || p_ratio_r > limratio)
+		maskmul_r = 1.;
+
             double dp_l = 0, dp_r = 0 ;
             if (is_gas) {
                 dp_l = 
@@ -91,35 +120,42 @@ void c_Species::reconstruct_edge_states( std::vector<double>&u_mask, int orderst
 
             // Pressure perturbation
             double slope ;
-            slope = MonotonizedCentralSlope(
-                maskmul*prim[i-1].pres -  dp_l, maskmul*prim[i].pres, prim[i+1].pres - dp_r, cF, cB, dxF, dxB) ;
+            slope = reconstruct_pointer(
+                prim[i-1].pres -  dp_l, prim[i].pres, prim[i+1].pres - dp_r, cF, cB, dxF, dxB) ;
 
+            //prim_l[i].pres += maskmul_l * slope * (x_i[i-1] - x_iVC[i]) ; 
+            //prim_r[i].pres += maskmul_r * slope * (x_i[ i ] - x_iVC[i]) ;
             prim_l[i].pres += slope * (x_i[i-1] - x_iVC[i]) ; 
             prim_r[i].pres += slope * (x_i[ i ] - x_iVC[i]) ;
 
 
-            // Density
-//             slope = MonotonizedCentralSlope(
-//                 prim[i-1].density, prim[i].density, prim[i+1].density, cF, cB, dxF, dxB) ;
+            // Density  //Changed the sloping to be in number densities in order to investigate the relative numerical particle drift (see appendix of Helium paper)
+                        //Result: that's not what's causing it, maybe its better to reinstate the sloping in mass density?
+             slope = reconstruct_pointer(
+                 prim[i-1].density, prim[i].density, prim[i+1].density, cF, cB, dxF, dxB) ;
 // 
-//             prim_l[i].density +=  maskmul *slope * (x_i[i-1] - x_iVC[i]) ; 
-//             prim_r[i].density +=  maskmul *slope * (x_i[ i ] - x_iVC[i]) ;
+             prim_l[i].density +=  slope * (x_i[i-1] - x_iVC[i]) ; 
+             prim_r[i].density +=  slope * (x_i[ i ] - x_iVC[i]) ;
 //             
-            slope = MonotonizedCentralSlope(
-                prim[i-1].number_density, prim[i].number_density, prim[i+1].number_density, cF, cB, dxF, dxB) ;
+            //slope = MonotonizedCentralSlope(
+            //    prim[i-1].number_density, prim[i].number_density, prim[i+1].number_density, cF, cB, dxF, dxB) ;
 
-            prim_l[i].number_density +=  maskmul *slope * (x_i[i-1] - x_iVC[i]) ; 
-            prim_r[i].number_density +=  maskmul *slope * (x_i[ i ] - x_iVC[i]) ;
+            //prim_l[i].number_density +=  maskmul_l * slope * (x_i[i-1] - x_iVC[i]) ; 
+            //prim_r[i].number_density +=  maskmul_r * slope * (x_i[ i ] - x_iVC[i]) ;
+            //prim_l[i].number_density += slope * (x_i[i-1] - x_iVC[i]) ; 
+            //prim_r[i].number_density += slope * (x_i[ i ] - x_iVC[i]) ;
             
-            prim_l[i].density =  prim_l[i].number_density * mass_amu*amu;
-            prim_r[i].density =  prim_r[i].number_density * mass_amu*amu;
+            //prim_l[i].density =  prim_l[i].number_density * mass_amu*amu;
+            //prim_r[i].density =  prim_r[i].number_density * mass_amu*amu;
 
             // Speed
-            slope = MonotonizedCentralSlope(
+            slope = reconstruct_pointer(
                 prim[i-1].speed, prim[i].speed, prim[i+1].speed, cF, cB, dxF, dxB) ;
 
-            prim_l[i].speed +=  maskmul *slope * (x_i[i-1] - x_iVC[i]) ; 
-            prim_r[i].speed +=  maskmul *slope * (x_i[ i ] - x_iVC[i]) ;
+            //prim_l[i].speed +=  maskmul_l *slope * (x_i[i-1] - x_iVC[i]) ; 
+            //prim_r[i].speed +=  maskmul_r *slope * (x_i[ i ] - x_iVC[i]) ;
+            prim_l[i].speed +=  slope * (x_i[i-1] - x_iVC[i]) ; 
+            prim_r[i].speed +=  slope * (x_i[ i ] - x_iVC[i]) ;
             
              if ((prim_l[i].pres < 0) || (prim_r[i].pres < 0) || 
                  (prim_l[i].density < 0) || (prim_r[i].density < 0)) {

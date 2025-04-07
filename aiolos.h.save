@@ -15,7 +15,7 @@
 #include <cmath>
 #include <ctime>
 #include <type_traits>
-//#include <gsl/gsl_sf_lambert.h>
+#include <gsl/gsl_sf_lambert.h>
 #include <Eigen/Core>
 #include <Eigen/Dense>
 #include <Eigen/LU>
@@ -96,7 +96,6 @@ double delta_ij(int i, int j);
 double lint(double xa, int N, double* X, double* RI);
 double logint(double xa, int N, double* X, double* RI);
 const float log10ff = std::log(10.);
-std::string cnstWidth( int value, int width );
 
 inline double dfdx(const function<double(double)>& f, double x0, double dx) {
     
@@ -173,11 +172,6 @@ inline double fastexpm1_2(double x) {
   return std::expm1(x);
 //return x + 0.5*x*x;
 }
-
-
-//
-// Slope limiters
-//
 
 
 //
@@ -416,9 +410,7 @@ public:
     double convect_boundary_strength;
     double start_hydro_time;
     double conductivity;
-    double conductivity2;
-    double do_cond_until;
-    int neutralize_electrons;
+    double conductivity
     ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     //
     //  Numerical
@@ -582,7 +574,6 @@ public:
     double mix_p2;
     double mix_p3;
     int mix_reset_i;
-    int ignore_electron_cfl_cell;
     //
     // Friction
     //
@@ -594,7 +585,6 @@ public:
     int use_shadow_relaxation;
     double shadow_relaxation_time;
     double shadow_relaxation_threshold;
-    double shadow_relaxation_radius;
     int use_avg_temperature;
     int use_avg_velocity;
     double avg_temperature_t0;
@@ -634,8 +624,6 @@ public:
     
     double K_zz_init;
     std::vector<double> K_zz;
-    int homopause_smoothing_rad;
-    int homopause_smoothing_rep;
     
     //
     // Radiation
@@ -660,9 +648,6 @@ public:
     double radiation_rampup_time;
     
     //Indices for highenergy cooling
-    int h3plus_idx;
-    int h2_idx;
-    int h2o_idx;
     int hnull_idx; 
     int hplus_idx;
     int e_idx;
@@ -676,6 +661,7 @@ public:
     int Opp_idx;
     int O3p_idx;
     int O4p_idx;
+    int h3plus_idx;
     
     //int radiation_solver;
     int use_planetary_temperature;
@@ -723,7 +709,6 @@ public:
     double const_opacity_solar_h2;
     double const_opacity_rosseland_h2;
     double const_opacity_planck_h2;
-    double const_opacity_planck_h2o;
     double init_J_factor;
     double init_T_temp;
     double minimum_opacity;
@@ -804,7 +789,7 @@ public:
     double alpha_collision;
     double alpha_collision_ions;
     double dust_to_gas_ratio;
-    int couple_ions;
+    
     ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     //
     // Functions
@@ -823,8 +808,7 @@ public:
     double get_max_soundspeed();
     double get_cfl_timestep();
     double get_cfl_timestep2();
-    double get_electron_fraction(int j);
-
+    
     void print_monitor(int i);
     void print_diagnostic_file(int i);
     void write_into_execution_log(string dir, string par, string spcfile);
@@ -837,8 +821,8 @@ public:
     // Friction
     //
     void compute_friction_analytical(); 
-    void compute_friction_numerical(double dt); 
-    void compute_drag_update(double dt);
+    void compute_friction_numerical(); 
+    void compute_drag_update();
     
     void fill_alpha_basis_arrays(int j);
     void fill_rad_basis_arrays(int, double, Eigen::MatrixXd &, Eigen::MatrixXd &);
@@ -1094,8 +1078,7 @@ public:
     }
 
     void reconstruct_edge_states(std::vector<double>& u_mask, int orderstep) ;
-    double (*reconstruct_pointer)(double, double, double, double, double, double, double);
-
+    
     AOS hllc_flux(int);
     AOS hllc_flux2(int, double);
     AOS laxfriedrich_flux(int j);
