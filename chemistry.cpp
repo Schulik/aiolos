@@ -570,9 +570,7 @@ Vector_t c_Sim::solver_cchem_implicit_general(double dtt, int cell, int cdebug, 
 
         //for(c_photochem_reaction& reaction : photoreactions) {
         for(int pr=0; pr < num_photoreactions; pr++) {
-            
-            //photoreactions[pr].dndt_old = 0.;
-            
+                        
             if(photoreactions[pr].band >= b) {
             
                 reac_e_stoch = photoreactions[pr].e_stoch;

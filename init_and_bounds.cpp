@@ -1159,6 +1159,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, s
             reaction_rate_table = Eigen::MatrixXd::Zero(num_cells+2, num_reactions+num_photoreactions);// Eigen::Matrix<double, NUM_SPECIES,NUM_SPECIES, Eigen::RowMajor>; //Eigen::MatrixXd::Zero(num_cells+2, num_reactions);
             empty_reaction_table();
             output_chemistry = 0;
+            cout<<setprecision(4);
         }
         catch(int i) {
             cout<<" Error in initializing reaction_rate_table! Check whether num_reactions > 0. "<<endl;
