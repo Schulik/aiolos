@@ -198,7 +198,8 @@ void c_Sim::init_reactions(int cdebug) {
     //std::setprecision(2);
     for(int b=0; b<num_bands_in; b++) {
          cout<<setprecision(4)<<" lmin/lmax"<<l_i_in[b]<<"/"<<l_i_in[b+1];
-         cout<<setprecision(4)<<" F = "<<solar_heating(b)<<" | ";
+         cout<<setprecision(4)<<" F = "<<solar_heating(b)<<"";
+         cout<<setprecision(4)<<" "<<solar_heating_final(b)<<" | ";
 
 	flux_total += solar_heating(b);
 	if(l_i_in[b+1] < 0.0911 && l_i_in[b+1] > 0.000629)
@@ -295,7 +296,7 @@ void c_Sim::do_chemistry(double dt_chem) {
     
 //#pragma omp parallel for schedule(static,5)
 //    for (int j = num_cells+1; j >= 0; j--) {
-    for (int j = imaxchem; j >= 2; j--) {  //imaxchem is num_cells+1 by default
+    for (int j = imaxchem; j >= iminchem; j--) {  //imaxchem is num_cells+1 by default; iminchem is 2 
         
         //std::vector<double> n_init = np_zeros(num_species);
         //std::vector<double> n_tmp  = np_zeros(num_species);
@@ -584,7 +585,7 @@ Vector_t c_Sim::solver_cchem_implicit_general(double dtt, int cell, int cdebug, 
 
                 double x_secondary  = 1.; //Ionization factor for X-rays
                 if(l_i_in[b+1] < 0.030)
-                    x_secondary = 10.;
+                    x_secondary = 1./secondary_ion_heating;
 
                 //
                 // Term t1 = F/dx (1-exp(-dtau))
@@ -838,7 +839,7 @@ void c_Sim::update_dS_jb_photochem(int cell, double dtt) {
 
                 double x_secondary  =1.; //Ionization factor for X-rays
                 if(l_i_in[b+1] < 0.030)
-                          x_secondary = 0.1;
+                          x_secondary = secondary_ion_heating;
 
                 if(b == reaction.band) { //When we sit in the band just above the ionisation threshold, we need to check that it might be that E_lower[b] < E_ion but E_higher[b] > E_ion
                     
@@ -853,7 +854,7 @@ void c_Sim::update_dS_jb_photochem(int cell, double dtt) {
                 tau_i       *= n_tot*ds;
                 
                 //Get fraction of total cell-heating
-                double fractional_dS = x_secondary * tau_i/tau_tot_b * dS * 1. * (1.- eratio);
+                double fractional_dS = heating_eta * x_secondary * tau_i/tau_tot_b * dS * 1. * (1.- eratio);
                 
                 //Distribute energy according to mass
                 for(int& pj : reaction.products) {
@@ -1198,8 +1199,14 @@ void  c_Sim::do_highenergy_cooling(int cell) {
         if(h2o_idx > -1)   n_neutrals += species[h2o_idx].prim[cell].number_density;
         if(O_idx > -1)     n_neutrals += species[O_idx].prim[cell].number_density;
 
+	//Free-free emission
+	for(int s=0; s<num_species; s++) {
+		if(species[s].static_charge > 0)
+			species[e_idx].dG(cell) += 1.42e-27*(species[s].static_charge*species[s].static_charge)*std::sqrt(Te)*1.3*ne*species[s].prim[cell].number_density;
+	}
         
-        if( e_idx!=-1 && hnull_idx!=-1 && hplus_idx!=-1  ) { //If all species are there - H0, H+ and e-
+       if( e_idx!=-1 && hnull_idx!=-1 && hplus_idx!=-1  ) { //If all species are there - H0, H+ and e-
+	    double Tn = species[hnull_idx].prim[cell].temperature;
             std::array<double, 3> nX = {
                         species[hnull_idx].prim[cell].number_density,
                         species[hplus_idx].prim[cell].number_density,
@@ -1207,6 +1214,8 @@ void  c_Sim::do_highenergy_cooling(int cell) {
             
             species[e_idx].dG(cell)   -= nX[2] * red * HOnly_cooling(nX, Te);
             species[e_idx].dGdT(cell) -= nX[2] * red * (HOnly_cooling(nX, Te+dT)-HOnly_cooling(nX, Te-dT))/(dT+dT);  ;
+
+	    species[e_idx].dG(cell)   -= n_neutrals * nX[0] * 7.3e-19 * 1.5e-4 * std::exp(-118400./Tn); //Simple approximation for Ly-alpha excitation by neutral collisions
         }
         
         if( C_idx!=-1 && e_idx!=-1 ) { 
@@ -1302,8 +1311,8 @@ void  c_Sim::do_highenergy_cooling(int cell) {
         
         if( h3plus_idx!=-1 && e_idx!=-1 ) { 
             double n3p   = species[h3plus_idx].prim[cell].number_density;
-            species[e_idx].dG(cell)   -=  n3p * ne * red * h3plus_cooling(Te); 
-            species[e_idx].dGdT(cell) -=  n3p * ne * red * dfdx(h3plus_cooling, Te, dT);
+            species[e_idx].dG(cell)   -=  n3p * ne * h3plus_cooling(Te); 
+            species[e_idx].dGdT(cell) -=  n3p * ne * dfdx(h3plus_cooling, Te, dT);
         }
 
 	//if(steps==200 && cell==100)

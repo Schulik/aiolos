@@ -676,7 +676,8 @@ public:
     int Opp_idx;
     int O3p_idx;
     int O4p_idx;
-    
+    double secondary_ion_heating;
+
     //int radiation_solver;
     int use_planetary_temperature;
     int closed_radiative_boundaries ;
@@ -685,6 +686,7 @@ public:
     int radiation_diffusion_test_nonlinear;
     int couple_J_into_T;
     double no_rad_trans;      // Multiplier for the div F radiation transport in the radiation solver to compare to models which don't cool thermally
+    double heating_eta;       // Multiplier for the high-energy cooling
     double CFL_break_time; //Numerical time after which cflfactor=0.9. Used in get_cfl_timestep()
     double photocooling_multiplier;
     double photocooling_expansion;
@@ -747,6 +749,7 @@ public:
     int num_reactions;
     int num_photoreactions;
     int read_reactions_from_species_file;
+    int iminchem;
     int imaxchem;
     int output_chemistry;
     Eigen::MatrixXd reaction_rate_table;
@@ -1146,6 +1149,7 @@ public:
     void user_boundary_left(std::vector<AOS>& u);
     void user_boundary_right(std::vector<AOS>& u);
     void user_opacity() ;
+    void complicated_opacity() ;
 
     void user_initial_conditions();
     void user_species_loop_function() ;

@@ -145,7 +145,7 @@ int c_Species::read_species_data(string filename, int species_index) {
         read_opacity_table(opacityinputfile);
     }
     
-    if(base->opacity_model == 'P' || base->opacity_model == 'M' || base->opacity_model == 'C' || base->opacity_model == 'K' ) {
+    if(base->opacity_model == 'P' || base->opacity_model == 'M' || base->opacity_model == 'C' || base->opacity_model == 'K' || base->opacity_model == 'U') {
         
         
         if( base->opacity_model == 'K' ) //Run the routine with one argument further on in the species list 

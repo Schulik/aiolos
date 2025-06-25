@@ -492,6 +492,11 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
                 //if(steps == 221160) {
                     cout<<" negative T in s = "<<species[s].speciesname<<" j/s = "<<j<<"/"<<s<<" eta1/eta2/J = "<<eta1[idx_s]<<"/"<<eta2[idx_s]<<"/"<<Jrad_FLD(j, 0)<<" denom/eta2*J = "<<denoms[idx_s]<<"/"<<eta2[idx_s]*Jrad_FLD(j,0)<<" t/dt/steps = "<<globalTime<<"/"<<ddt<<"/"<<steps<<endl;
                     Tswitch = 1;
+		    cout<<"tempers[s] = ";
+		    for(int ss=0; ss<num_species; ss++) { 
+                           int idx_ss = j*num_species + ss;
+                           cout<<eta1[idx_ss]/denoms[idx_ss]<<" ";
+                     }
                 }
                 
                 if(tt<temperature_floor)

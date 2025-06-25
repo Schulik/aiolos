@@ -108,7 +108,8 @@ void c_Species::update_opacities() {
 
     if (base->opacity_model == 'U') {
         // User-defined opacities
-        user_opacity() ;
+        //user_opacity() ;
+        complicated_opacity() ;
     } 
     else if(base->opacity_model == 'P') {
         
@@ -127,6 +128,7 @@ void c_Species::update_opacities() {
                     opacity(j,b)         = 1.0; //base->const_opacity_rosseland_factor * opacity_avg_rosseland(b);// * (1. + pressure_broadening_factor * pow(prim[j].pres/1e5, pressure_broadening_exponent)); 
                     opacity_planck(j,b)  = 0.; //base->const_opacity_planck_factor * opacity_avg_planck(b) * 1./(1. + 1./(prim[j].pres/pressure_broadening_factor)); //(1. + pressure_broadening_factor * pow(prim[j].pres/1e5, pressure_broadening_exponent)); 
 	            if(this_species_index == h2_idx) {
+
 			opacity_planck(j,b)  = base->const_opacity_planck_h2;
 		    }
 	            if(this_species_index == h2o_idx) {
@@ -995,4 +997,50 @@ double c_Species::interpol_tabulated_opacity(const Eigen::VectorXd& array, int b
     }
     
   	return std::pow(10., ktotal*0.33333333333333333);
+}
+
+
+void c_Species::complicated_opacity() {
+
+int h2_idx = base->h2_idx;
+    for(int j=0; j< num_cells+2; j++) {
+  
+                  for(int b=0; b<num_bands_in; b++) {
+                      opacity_twotemp(j,b) = base->const_opacity_solar_factor * opacity_avg_solar(b);// * (1. + pressure_broadening_factor * pow(prim[j].pres/1e5, pressure_broadening_exponent)); 
+                      //////commented the pressure broadening out for now, as it's eating up a lot of computing time (15% total) with 5 bands in 1 band out, for no effect
+                      //if(this_species_index == htwo_idx || this_species_index == c_idx || this_species_index == o_idx)
+                      //    opacity_twotemp(j, num_bands_in-1) = base->const_opacity_solar_h2;
+                  }
+                  for(int b=0; b<num_bands_out; b++) {
+                      opacity(j,b)         = base->minimum_opacity; //base->const_opacity_rosseland_factor * opacity_avg_rosseland(b);// * (1. + pressure_broadening_factor * pow(prim[j].pres/1e5, pressure_broadening_exponent)); 
+                      opacity_planck(j,b)  = 0.; //base->const_opacity_planck_factor * opacity_avg_planck(b) * 1./(1. + 1./(prim[j].pres/pressure_broadening_factor)); //(1. + pressure_broadening_factor * pow(prim[j].pres/$
+                      if(this_species_index == h2_idx) {
+ 
+                          double denstot = 0;
+                          double ptot    = 0;
+                          double denspartial = prim[j].density;
+                          double ppartial    = prim[j].pres;
+                          for(int s=0; s<base->num_species; s++){
+                                  denstot += base->species[s].prim[j].density;
+                                  ptot    += base->species[s].prim[j].pres;
+                          }
+ 
+                          //opacity_planck(j,b)  = base->const_opacity_planck_h2;
+                          opacity_planck(j,b)               = base->const_opacity_planck_h2    * base->opacity_semenov_malygin(0, prim[j].temperature, denspartial, ppartial, this->is_dust_like);// * denspartial/denstot;
+                          opacity(j,b)                      = base->const_opacity_rosseland_h2 * base->opacity_semenov_malygin(1, prim[j].temperature, denspartial, ppartial, this->is_dust_like);// * denspartial/denstot;
+  
+		   	 if(base->steps==630) {
+				cout<<"j = "<<j<<" k = "<< opacity_planck(j,b)<<endl;
+			}
+
+                          opacity_twotemp(j,num_bands_in-1) = base->const_opacity_solar_h2;
+ 
+                      }
+                      if(this_species_index == base->h2o_idx) {
+                          opacity_planck(j,b)  = base->const_opacity_planck_h2o;
+                      }
+                  }
+ 
+      }
+
 }
