@@ -365,17 +365,16 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
 		//cout<<"invtotalmasses = "<<inv_totmasses<<endl;
 
                 for(int si=0; si<num_species; si++) {
-		    int idx_s = j * (num_species) + si;
+                    int idx_s = j * (num_species) + si;
+                    
                     cout<<" After coll, species = "<<si<<" Tbefore/Tafter = "<<species[si].prim[j].temperature<<"/"<<coll_heat_output(si)<<" rel. difference = "<<1-coll_heat_output(si)/species[si].prim[j].temperature<<endl;
                     cout<<" +heating/+cooling/-dGdT = "<<species[si].dS(j)<<"/"<<species[si].dG(j)<<"/"<<photocooling_expansion * species[si].dGdT(j)*species[si].prim[j].temperature<<" sum = "<<(species[si].dS(j)+species[si].dG(j)-photocooling_multiplier * species[si].dGdT(j)*species[si].prim[j].temperature)/ species[si].u[j].u1 / species[si].cv<<endl;
-		    cout<<"eta1/eta2/denom = "<<eta1[idx_s]<<"/"<<eta2[idx_s]<<"/"<<denoms[idx_s]<<" alpha_ij = ";
-			for(int sj=0; sj<num_species; sj++) {
-				cout<<" "<<friction_coefficients(si,sj);
-			}
-                    cout<<endl;
+                    cout<<"eta1/eta2/denom = "<<eta1[idx_s]<<"/"<<eta2[idx_s]<<"/"<<denoms[idx_s]<<" alpha_ij = ";
                     
-                    //char a;
-                    //cin>>a;
+                    for(int sj=0; sj<num_species; sj++) {
+                        cout<<" "<<friction_coefficients(si,sj);
+                    }
+                        cout<<endl;
                 }
                 
             }
@@ -410,7 +409,7 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
 		//if(j<=4)
 		//	tt=species[si].const_T_space;                
 
-                avgT_nom +=   species[si].u[j].u1 * species[si].cv * tt;
+                avgT_nom   += species[si].u[j].u1 * species[si].cv * tt;
                 avgT_denom += species[si].u[j].u1 * species[si].cv;
 
 		
@@ -423,49 +422,42 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
             
 	     if(use_avg_temperature && globalTime < avg_temperature_t1){
 		//cout<<"using avg t..."<<endl;
-		if(globalTime < avg_temperature_t0) {
+            if(globalTime < avg_temperature_t0) {
 
-			double avgtemp    = avgT_nom/avgT_denom;
-                        double relaxtemp;
+                double avgtemp    = avgT_nom/avgT_denom;
+                double relaxtemp;
 
-                        double rt = shadow_relaxation_time; //shadowed regions temperature relaxation timescale
-                        double totalheat = 0;
-			for(int si=0; si<num_species; si++) 
-				totalheat += species[si].dS(j);
+                double rt = shadow_relaxation_time; //shadowed regions temperature relaxation timescale
+                double totalheat = 0;
+                for(int si=0; si<num_species; si++) 
+                    totalheat += species[si].dS(j);
 
-			//if(totalheat < 1e-50) {
-			//if(use_shadow_relaxation && totalheat < ( shadow_relaxation_threshold && (x_i[j]<x_i[num_cells]/2) )) { //1e-50 is the arbitrary limit we set on the heating function throughout the code
-			//if(use_shadow_relaxation && (totalheat < shadow_relaxation_threshold) && (x_i[j]<x_i[num_cells]/4) ) { //1e-50 is the arbitrary limit we set on the heating function throughout the code
-			if(use_shadow_relaxation && (totalheat < shadow_relaxation_threshold) && (x_i[j]< shadow_relaxation_radius) ) { //1e-50 is the arbitrary limit we set on the heating function throughout the code
-			//if(use_shadow_relaxation && (x_i[j]< shadow_relaxation_radius) ) { //1e-50 is the arbitrary limit we set on the heating function throughout the code
-                                double fac = ddt/rt;
-                                double f1  = (1 + 1e-40) / (1 + fac + 1e-40);
-                                double f2  = (1 + 1e-40) / (1/fac + 1 + 1e-40);
+                //if(totalheat < 1e-50) {
+                //if(use_shadow_relaxation && totalheat < ( shadow_relaxation_threshold && (x_i[j]<x_i[num_cells]/2) )) { //1e-50 is the arbitrary limit we set on the heating function throughout the code
+                //if(use_shadow_relaxation && (totalheat < shadow_relaxation_threshold) && (x_i[j]<x_i[num_cells]/4) ) { //1e-50 is the arbitrary limit we set on the heating function throughout the code
+                if(use_shadow_relaxation && (totalheat < shadow_relaxation_threshold) && (x_i[j]< shadow_relaxation_radius) ) { //1e-50 is the arbitrary limit we set on the heating function throughout the code
+                //if(use_shadow_relaxation && (x_i[j]< shadow_relaxation_radius) ) { //1e-50 is the arbitrary limit we set on the heating function throughout the code
+                    double fac = ddt/rt;
+                    double f1  = (1 + 1e-40) / (1 + fac + 1e-40);
+                    double f2  = (1 + 1e-40) / (1/fac + 1 + 1e-40);
 
-                                relaxtemp = avgtemp * f1 + species[0].const_T_space * f2;
-                        }
-                        else
-                                relaxtemp = avgtemp;
-                                
-                                
-		         //if(j==20 && (steps%1000==0))
-                         //       cout<<"reporting relaxT, steps=="<<steps<<" Trelax = "<<relaxtemp<<" Tavg "<<avgtemp<<" T0 = "<<species[0].const_T_space<<" total dS="<<totalheat<<endl;
+                    relaxtemp = avgtemp * f1 + species[0].const_T_space * f2;
+                }
+                    else
+                        relaxtemp = avgtemp;
+                                    
+                                    
 
-                   for(int si=0; si<num_species; si++) {
-		       	species[si].prim[j].temperature = relaxtemp;
-	               } 
-                      
-                  } else {
+                for(int si=0; si<num_species; si++) {
+                        species[si].prim[j].temperature = relaxtemp;
+                } 
+                        
+            } else {
                    	for(int si=0; si<num_species; si++) {
                         	 species[si].prim[j].temperature = avgT_nom/avgT_denom * (1. - globalTime/avg_temperature_t1)  + species[si].prim[j].temperature * globalTime/avg_temperature_t1;
                 	}
-		  }
-              }
-
-		//for(int si=0; si<num_species; si++) 
-		//	if( (steps==0 || steps==1) && j==300)
-                //      		cout<<"t / j /s = "<<steps<<" / "<<j<< " / "<<si<<" FINAL T = "<<species[si].prim[j].temperature<<" num_cells = "<<num_cells<<endl;
-
+                }
+        }
 
          } //end j loop
 

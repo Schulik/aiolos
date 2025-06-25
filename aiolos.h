@@ -749,6 +749,7 @@ public:
     int read_reactions_from_species_file;
     int imaxchem;
     int output_chemistry;
+    int use_secondary_ionisation;
     Eigen::MatrixXd reaction_rate_table;
     std::vector<c_reaction> reactions;
     std::vector<c_photochem_reaction> photoreactions;

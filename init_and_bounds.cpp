@@ -272,6 +272,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, s
         max_temperature   = read_parameter_from_file<double>(filename,"TEMPERATURE_MAX", debug, 9e99).value;  //Limit the temperature to a maximum
         max_temperature_time   = read_parameter_from_file<double>(filename,"MAX_T_RAMPUP_TIME", debug, 9e99).value;  //Limit the temperature to a maximum
         use_chemistry      = read_parameter_from_file<int>(filename,"DO_CHEM", debug, 0).value;               //Unused currently.
+        use_secondary_ionisation = read_parameter_from_file<int>(filename,"USE_SECONDARY_IONISATION", debug, 0).value;         // Secondary ionisation yes/no
         use_total_pressure = read_parameter_from_file<int>(filename,"USE_TOTAL_PRESSURE", debug, 0).value;    //Compute total pressure of all species? Unused currently.
         coll_rampup_time      = read_parameter_from_file<double>(filename,"COLL_RAMPUP_TIME", debug, 0.).value; //Ramp up collision rates gently from INIT_COLL_FACTOR to PARI_ALPHA_COLL in the rampup time
         init_coll_factor      = read_parameter_from_file<double>(filename,"INIT_COLL_FACTOR", debug, 0.).value;

@@ -583,7 +583,7 @@ Vector_t c_Sim::solver_cchem_implicit_general(double dtt, int cell, int cdebug, 
                 double dndt_local = 0. ;
 
                 double x_secondary  = 1.; //Ionization factor for X-rays
-                if(l_i_in[b+1] < 0.030)
+                if(l_i_in[b+1] < 0.030 && use_secondary_ionisation)
                     x_secondary = 10.;
 
                 //
@@ -837,7 +837,7 @@ void c_Sim::update_dS_jb_photochem(int cell, double dtt) {
                 double eratio2 = reaction.threshold_energy/photon_energies[b+1];
 
                 double x_secondary  =1.; //Ionization factor for X-rays
-                if(l_i_in[b+1] < 0.030)
+                if(l_i_in[b+1] < 0.030  && use_secondary_ionisation==1)
                           x_secondary = 0.1;
 
                 if(b == reaction.band) { //When we sit in the band just above the ionisation threshold, we need to check that it might be that E_lower[b] < E_ion but E_higher[b] > E_ion
