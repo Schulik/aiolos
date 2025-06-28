@@ -58,7 +58,7 @@ double c_Sim::get_cfl_timestep() {
     for(int s=0; s < num_species; s++) {
         
         int start = 1;
-	if(s == -100) {
+        if(s == -100) {
            start = ignore_electron_cfl_cell;
            start = std::min(ignore_electron_cfl_cell, num_cells);
         }

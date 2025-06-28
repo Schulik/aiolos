@@ -15,9 +15,12 @@
  * to be able to determine the sound-speed and hence the CFL factor.
  * Following are output checks and then the main code modules are executed in order.
  */
-void c_Sim::execute() { 
+void c_Sim::execute(int restartnumber) { 
     
     steps = 0;
+    //if(restartnumber != 0)
+    //    steps = 11;
+    
     double output_counter = 0;
     double monitor_counter= 0;
     const double dt_initial = dt_min_init;
@@ -59,10 +62,7 @@ void c_Sim::execute() {
     // Simulation main loop                                                    //
     //                                                                         //
     ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~////
-    for (globalTime = 0; (globalTime < t_max) && (steps < maxsteps); ) {
-
-        
-        
+    for (globalTime = restarttime; (globalTime < t_max) && (steps < maxsteps); ) {
     
           if(start_hydro_time > 0. && globalTime > start_hydro_time) {   //Comment in if a radiative equilibrium phase is desired before starting hydro
               do_hydrodynamics = 1;     
@@ -119,8 +119,10 @@ void c_Sim::execute() {
         //
         
         if(steps==0 || steps==99e99) {
-            for(int s=0; s<num_species; s++) {
-                species[s].print_AOS_component_tofile((int) output_counter);
+            if(output_counter >= restartnumber) {
+                for(int s=0; s<num_species; s++) {
+                    species[s].print_AOS_component_tofile((int) output_counter);
+                }
             }
             //print_monitor((int)monitor_counter);
             //print_diagnostic_file((int)output_counter);
@@ -133,9 +135,10 @@ void c_Sim::execute() {
                  cout<<" Globaltime is "<<globalTime<<" and comparevalue is "<<output_counter<<" "<<output_time<<endl;
              
              //print_diagnostic_file((int)output_counter);
-             for(int s=0; s<num_species; s++)
-                species[s].print_AOS_component_tofile((int)output_counter); 
-             
+             if(output_counter >= restartnumber) {
+                for(int s=0; s<num_species; s++)
+                    species[s].print_AOS_component_tofile((int)output_counter); 
+             }
              
              output_counter+=1.;
              output_chemistry = 1; // Setting this switch will trigger a filling of the reaction rate table at the end of chemistry. The switch is unset afterwards

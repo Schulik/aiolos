@@ -145,7 +145,7 @@ int c_Species::read_species_data(string filename, int species_index) {
         read_opacity_table(opacityinputfile);
     }
     
-    if(base->opacity_model == 'P' || base->opacity_model == 'M' || base->opacity_model == 'C' || base->opacity_model == 'K' ) {
+    if(base->opacity_model == 'P' || base->opacity_model == 'M' || base->opacity_model == 'C' || base->opacity_model == 'K' || base->opacity_model == 'U') {
         
         
         if( base->opacity_model == 'K' ) //Run the routine with one argument further on in the species list 
@@ -731,9 +731,13 @@ void c_Species::print_AOS_component_tofile(int timestepnumber) {
     //
     string filename ;
     {
+        string restartstring = "";
+        if(base->restartnumber != 0)
+            restartstring = "RE";
+        
         stringstream filenamedummy;
         string truncated_name = stringsplit(base->simname,".")[0];
-        filenamedummy<<base->workingdir<<"output_"<<truncated_name<<"_"<<speciesname<<"_t"<<timestepnumber<<".dat";
+        filenamedummy<<base->workingdir<<"output_"<<truncated_name<<"_"<<speciesname<<"_t"<<timestepnumber<<restartstring<<".dat";
         filename = filenamedummy.str() ;
     }
 
@@ -810,9 +814,13 @@ void c_Sim::print_diagnostic_file(int outputnumber) {
     //Only print this file once, as it contains all the info 
         string filenameDiagnostic ;
         {
+            string restartstring = "";
+            if(restartnumber != 0)
+                restartstring = "RE";
+            
             stringstream filenamedummy;
             string truncated_name = stringsplit(simname,".")[0];
-            filenamedummy<<workingdir<<"diagnostic_"<<truncated_name<<"_t"<<outputnumber<<".dat";
+            filenamedummy<<workingdir<<"diagnostic_"<<truncated_name<<"_t"<<outputnumber<<restartstring<<".dat";
             filenameDiagnostic = filenamedummy.str() ;
         }
 

@@ -27,7 +27,7 @@ extern double VanLeerSlope(double ql, double qm, double qr, double cF, double cB
  * @param[in] debug_cell Get detailed information for a specific cell (To be implemented by user..)
  * @param[in] debug_steps Get detailed information for a specific timestep (To be implemented by user..)
  */
-c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, string tintent, std::vector<int> debug_data) {
+c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, string tintent, std::vector<int> debug_data, int restartnumber) {
 
 	init_line_cooling_data();
 
@@ -45,6 +45,8 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, s
         this->intent     = tintent;
         string filename    = workingdir + filename_solo;
         parfile            = workingdir + filename_solo;
+        this->restartnumber     = restartnumber;
+        this->restarttime        = 0.;
         
         
         if(speciesfile_solo.compare("default.spc")==0)
@@ -152,6 +154,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, s
         }
         reverse_hydrostat_constrution = read_parameter_from_file<int>(filename,"REVERSE_HYDROSTAT_CONSTRUCTION", debug, 0).value; //If false, or zero, construct density from large r to small r.
 
+	iminchem          = read_parameter_from_file<int>(filename,"IMINCHEM", debug, 2).value;
 	imaxchem          = read_parameter_from_file<int>(filename,"IMAXCHEM", debug, num_cells+1).value;
                                                                                                                    //Otherwise reversed. First density is the PARI_INIT_DATA_U1parameter.
         init_wind         = read_parameter_from_file<int>(filename,"PARI_INIT_WIND", debug, 0).value; //Initialize a step in density at init_sonic_radius of variable magnitude. 
@@ -237,15 +240,17 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, s
         avg_velocity_t1  = read_parameter_from_file<double>(filename,"AVG_VELOCITY_T1", debug, 1e99).value; //All T_s remain T_s after t1. T_avg is ignored after t1
 
         cout<<" CHOSEN OPACITY MODEL = "<<opacity_model<<endl;
-        if(opacity_model == 'M')
+        if(opacity_model == 'M' || opacity_model == 'P' || opacity_model == 'U')
             init_malygin_opacities();
         if(opacity_model == 'K') {
                 cout<<" Hybrid opacities selected. NOTE! that the input file expects in this mode two file names to be given for each species, one *aiopa for kR and kP, and *opa for kS."<<endl;
         }
         
         no_rad_trans               = read_parameter_from_file<double>(filename,"NO_RAD_TRANS", debug, 1.).value; //Multiplier for strength for thermal radiative losses in radiation transport. Set to 1e-100 to emulate perfect energy-limited escape.
+        heating_eta                = read_parameter_from_file<double>(filename,"HEATING_ETA", debug, 1.).value;  //Multiplier for high-energy heating
         solve_for_j                = read_parameter_from_file<int>(filename,"SOLVE_FOR_J", debug, 1).value; //Debugging parameter. Switch to zero for decoupling of T and J in simple rad transport
         photocooling_multiplier    = read_parameter_from_file<double>(filename,"CO_COOL_MULTIPLIER", debug, 0.).value; //OLD DEPRECATED
+        secondary_ion_heating      = read_parameter_from_file<double>(filename,"SECONDARY_ETA", debug, 0.1).value; //Heating efficiency for very high energy photons
         photocooling_expansion     = read_parameter_from_file<double>(filename,"COOL_EXPANSION", debug, 0.).value; //OLD DEPRECATED
         photocooling_multiplier    = read_parameter_from_file<double>(filename,"PHOTOCOOL_MULTIPLIER", debug, photocooling_multiplier).value; //Multiplier for non-thermal cooling rates
         photocooling_expansion     = read_parameter_from_file<double>(filename,"PHOTOCOOL_EXPANSION", debug, photocooling_expansion).value; //Multiplier for non-thermal second order cooling rates
@@ -738,6 +743,16 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, s
             species.push_back(c_Species(this, filename, speciesfile, s, debug)); // Here we call the c_Species constructor
         }
         cout<<endl;
+        
+        //
+        // RESTART FUNCTIONALITY
+        //
+        if(restartnumber != 0)
+            c_Sim::restart_from_outputnumber(restartnumber);
+        
+        //
+        // END RESTART
+        //
        
 
        //Rebuild electron densities
@@ -1007,6 +1022,10 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, s
         }
         
     }
+
+	for(int b=0; b<num_bands_in; b++) {
+            solar_heating(b) = solar_heating_final(b);
+        }   
     
     cout<<"TOTAL SOLAR HEATING / Flux = "<<templumi<<" Luminosity = "<<(templumi*4.*pi*rsolar*rsolar*pi)<<" | T_irr  = "<<pow(templumi/sigma_rad,0.25) <<" T_eq = "<<pow(templumi/sigma_rad/4,0.25) <<" Teq/2**0.25 = "<<pow(templumi/sigma_rad/8,0.25)<<endl;
     
@@ -1024,8 +1043,8 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, s
     // Initialize the planet's temperature if it has not already been done:
     if (T_planet == 0 && use_planetary_temperature) {
         T_planet = sigma_rad * (T_int*T_int) * (T_int*T_int) ;
-        for (int b=0; b < num_bands_in; b++)
-            T_planet += 0.25*solar_heating(b) ;      
+        //for (int b=0; b < num_bands_in; b++)
+        //    T_planet += 0.25*solar_heating(b) ; Only add radiation reaching the surface 
         T_planet = pow(T_planet/sigma_rad, 0.25) ;
     }
 
