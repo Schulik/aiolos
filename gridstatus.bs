@@ -80,6 +80,9 @@ do
 	#It's searching for species Cpp
 	#convstring=$(grep 'written.*S1' $logfile | tail -n 4 | awk '{print($4)}' | xargs awk 'FNR==600{print($3*$1*$1*4.*3.141592)}' | awk 'BEGIN{LAST=0.}NR>1{printf("%e\n",(LAST-$1)/$1)}{LAST=$1}' | awk 'BEGIN { ORS = " " } { print } END{printf("")}')
 	#convstring=$(grep 'written.*S0' $logfile | tail -n 4 | awk '{print($4)}' | xargs awk 'FNR==450{print($3*$1*$1*4.*3.141592)}' | awk 'BEGIN{LAST=0.}NR>1{printf("%e\t",sqrt( ((LAST-$1)/$1)^2 ) )}{LAST=$1}')
+	#mdot_h2=$(grep 'written.*H2' $logfile | tail -n 4 | awk '{print($4)}' | xargs awk 'FNR==450{print($3*$1*$1*4.*3.141592)}'
+	#mdot_s0=$(grep 'written.*S0' $logfile | tail -n 4 | awk '{print($4)}' | xargs awk 'FNR==450{print($3*$1*$1*4.*3.141592)}'
+	#mdot_s1=$(grep 'written.*S1' $logfile | tail -n 4 | awk '{print($4)}' | xargs awk 'FNR==450{print($3*$1*$1*4.*3.141592)}'
 	#convstring=$(grep 'written.*Cpp' $logfile | tail -n 4 | awk '{print($4)}' | xargs awk '{prevlast=last; last=$3*$1*$1*4.*3.141592} END {print(prevlast)}' | awk 'BEGIN{LAST=0.}NR>1{printf("%e\t",sqrt( ((LAST-$1)/$1)^2 ) )}{LAST=$1}')
         convstring=$(grep 'written.*Hep' $logfile | tail -n 5 | awk '{print($4)}' | xargs awk 'BEGIN{s=1;flenght=9999999;} (NR!=FNR && s==1){s=0;flength=NR-2} FNR==flength{printf("%1.10e\n",$3*$1*$1*4.*3.141592)}' | awk 'BEGIN{LAST=0.}NR>1{printf("%e\t",sqrt( ((LAST-$1)/$1)^2 ) )}{LAST=$1}')
 
@@ -87,6 +90,7 @@ do
 	then
 		#printf "%120s | %5s/%5s | %12s | %4s %4s %4s | %1.6e %1.6e %1.6e |\n" $logfile $outnumber $lastuseful $flag $day $month $year $convstring
 		printf "%120s | %5s/%5s | %12s | %4s %4s %4s ||\n" $logfile $outnumber $lastuseful $flag $day $month $year
+		#printf "%120s | %5s/%5s | %12s | %4s %4s %4s ||\n" $logfile $outnumber $lastuseful $flag $mdot_h2 $mdot_s0 $mdot_s1
 	fi
 done
 printf "\n"

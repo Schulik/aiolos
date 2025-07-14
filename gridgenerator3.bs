@@ -1,0 +1,97 @@
+#!/bin/bash
+#based on https://unix.stackexchange.com/questions/204069/all-possible-combinations-of-characters-and-numbers
+
+nl=$'\n'; tab=$'\t'
+n=${1:-3}
+eval set -- "$2"
+
+eval "varnames=($(echo {a..z}))"
+
+for i; 
+do
+        echo $i
+done
+
+#Edit the following line so that the looping variable is only one variable entry and not the entire permutation space every time!
+#for i in "${varnames[@]:0:$n}"; do
+
+IFS=':' read -ra TMP <<< $1
+for i in "${TMP[@]}"; 
+do
+        echo "paramvalues in second loop $i"
+done
+
+
+#####################Original loop, slightly modified
+#for i in "${varnames[@]:0:$n}"; do
+#	#    header+='for '"$i"' do '
+#	echo "in code gen: ${TMP[$i]}${nl}"
+#
+#	IFS=':' read -ra TMP2 <<< $1
+#	echo $IFS
+#	echo "in code gen: TMP2[i] = $TMP2[$1]"
+#	echo "in code gen: ${TMP[$i]}${nl}"
+#	header+='for '"$i"' do '
+# 	middle+='$'"$i"
+#	traile+="done; "
+#done
+#middle+="${nl}"
+#
+#loop="${header}${nl}    printf %s \"$middle\";${nl}$traile"
+#echo "$loop"
+#eval "$loop"
+
+###############################################
+################Modified loop
+###############################################
+#VARAR=("me" "2H1" "kzz" "ocool" "FUV")
+VARAR=("me" "2H1")
+for i in "${!VARAR[@]}"; do
+        #    header+='for '"$i"' do '
+        echo "in code gen: "
+
+        #IFS=':' read -ra TMP3 <<< $1
+        echo "TMP = " "${TMP[i]}"
+        echo "VARAR = " "${VARAR[i]}"
+
+        #echo "in code gen: TMP[$i] = $TMP[$i]"
+        #echo "in code gen: ${TMP[$i]}${nl}"
+        header+='for '"${varnames[$i]}"' in'
+	
+	IFS=',' read -ra TMP3 <<< "${TMP[i]}"
+	if(( ${#TMP3[@]} != 0 )); then     #Check that argument list for that variable is non-empty
+		for j in "${TMP3[@]}"; 
+		do
+			header+=" $j"
+		done
+	fi
+	header+='; do '
+        middle+='$'"${varnames[$i]}"
+        tail+="done; "
+done
+#middle+="\n"
+
+CMD0="    cp blafile.dat blafile\$TMP4.dat${nl}"
+CMD1="    sed -i 's/VAR1.*/VAR1              '\$a' /' blafile\$TMP4.dat${nl}"
+CMD2="    sed -i 's/VAR2.*/VAR2              '\$b' /' blafile\$TMP4.dat${nl}"
+CMD3="    sed -i 's/VAR3.*/VAR3              '\$b' /' blafile\$TMP4.dat${nl}"
+CMD4="    sed -i 's/VAR4.*/VAR4              '\$b' /' blafile\$TMP4.dat${nl}"
+CMD5="    sed -i 's/VAR5.*/VAR5              '\$b' /' blafile\$TMP4.dat${nl}"
+
+TMP4=""
+TMP5=""
+loop="${header}${nl}    TMP4=\"$middle\";${nl}    echo \$TMP4${nl}    TMP5+=\"$middle\"\" \";${nl}${CMD0}${CMD1}${CMD2}${CMD3}${CMD4}${CMD5} $tail"
+#loop="${header}${nl}    printf %s' ' \"$middle\";${nl} echo \$TMP4 ${nl}$tail"
+echo "$loop"
+eval "$loop"
+
+#echo "TMP5 = ${TMP5}"
+#TMP5=(("${TMP5}"))
+#echo "TMP5 = ${TMP5}"
+#Final loop in which we can now finally perform actrual work
+#for i in "${!TMP5[@]}"; 
+#IFS=' ' read -ra TMP6 <<< "${TMP5[@]}"
+#for i in "${!TMP6[@]}"; 
+#do
+#         echo "paramvalues in final loop TMP6[$i] = ${TMP6[i]}"
+#done

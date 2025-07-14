@@ -1026,8 +1026,8 @@ int h2_idx = base->h2_idx;
                           }
  
                           //opacity_planck(j,b)  = base->const_opacity_planck_h2;
-                          opacity_planck(j,b)               = base->const_opacity_planck_h2    * base->opacity_semenov_malygin(0, prim[j].temperature, denspartial, ppartial, this->is_dust_like);// * denspartial/denstot;
-                          opacity(j,b)                      = base->const_opacity_rosseland_h2 * base->opacity_semenov_malygin(1, prim[j].temperature, denspartial, ppartial, this->is_dust_like);// * denspartial/denstot;
+                          opacity_planck(j,b)               = base->const_opacity_planck_h2    * base->opacity_semenov_malygin(0, prim[j].temperature, denstot, ptot, this->is_dust_like);// * denspartial/denstot;
+                          opacity(j,b)                      = base->const_opacity_rosseland_h2 * base->opacity_semenov_malygin(1, prim[j].temperature, denstot, ptot, this->is_dust_like);// * denspartial/denstot;
   
 		   	 if(base->steps==630) {
 				cout<<"j = "<<j<<" k = "<< opacity_planck(j,b)<<endl;

@@ -1,0 +1,25 @@
+#based on https://unix.stackexchange.com/questions/204069/all-possible-combinations-of-characters-and-numbers
+
+nl=$'\n'; tab=$'\t'
+n=${1:-3}
+eval set -- "$2"
+
+eval "varnames=($(echo {a..z}))"
+
+#Edit the following line so that the looping variable is only one variable entry and not the entire permutation space every time!
+#for i in "${varnames[@]:0:$n}"; do
+
+
+
+for i in "${varnames[@]:0:$n}"; do
+#    header+='for '"$i"' do '
+    header+='for '"$i"' do '
+    middle+='$'"$i"
+    traile+="done; "
+done
+middle+="${nl}"
+
+loop="${header}${nl}    printf %s \"$middle\";${nl}$traile"
+#echo "$loop"
+eval "$loop"
+

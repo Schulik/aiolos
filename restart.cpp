@@ -21,7 +21,7 @@ void c_Sim::restart_from_outputnumber(int restartnumber) {
     
     char a;
     cout<<" In restart, restartnumber = "<<restartnumber<<" enter a char to continue."<<endl;
-    cin>>a;
+    //cin>>a;
     
     
     

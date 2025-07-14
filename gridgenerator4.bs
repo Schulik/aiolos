@@ -1,0 +1,68 @@
+#!/bin/bash
+#based on https://unix.stackexchange.com/questions/204069/all-possible-combinations-of-characters-and-numbers
+
+#basefile="blafile.dat"
+basefile=$1
+prefix=$3
+suffix=$4
+
+nl=$'\n'; tab=$'\t'
+n=${1:-3}
+eval set -- "$2"
+
+eval "varnames=($(echo {a..z}))"
+
+IFS=':' read -ra TMP <<< $1
+for i in "${TMP[@]}"; 
+do
+        echo "paramvalues in second loop $i"
+done
+
+###############################################
+################Modified loop
+###############################################
+#VARAR=("me" "H" "kzz" "ocool" "FUV")
+VARAR=("H" "FUV")
+for i in "${!VARAR[@]}"; do
+
+	echo $i
+        header+='for '"${varnames[$i]}"' in'	
+	IFS=',' read -ra TMP3 <<< "${TMP[i]}"
+	if(( ${#TMP3[@]} != 0 )); then     #Check that argument list for that variable is non-empty
+		for j in "${TMP3[@]}"; 
+		do
+			header+=" $j"
+		done
+	fi
+	header+='; do '
+        middle+="-${VARAR[$i]}"
+        middle+='$'"${varnames[$i]}"
+        tail+="done; "
+done
+
+#CMD0="    cp "$basefile" "$prefix" \$TMP4 "$suffix".dat${nl}"
+CMD0="    cp "$basefile" blafile\$TMP4.dat${nl}"
+CMD00="   echo 'cp '"$basefile"' 'blafile'"\$TMP4"'.dat${nl}' ' ${nl}"
+CMD1="    sed -i 's/SPECIES_FILE.*/SPECIES_FILE              mix_reacs_h'\$a'_co1e0_atoms_neutralsheatingbugtest.spc /' blafile\$TMP4.dat${nl}"
+CMD2="    sed -i 's/FLUX_MULTIPLIER.*/FLUX_MULTIPLIER              '\$b' /' blafile\$TMP4.dat${nl}"
+CMD3="    sed -i 's/KZZ_INIT.*/KZZ_INIT              '\$c' /' blafile\$TMP4.dat${nl}"
+CMD4="    sed -i 's/CO_COOL_MULTIPLIER.*/CO_COOL_MULTIPLIER            '\$d' /' blafile\$TMP4.dat${nl}"
+CMD5="    sed -i 's/VAR1.*/VAR1              '\$e' /' blafile\$TMP4.dat${nl}"
+
+echo "middle ="$middle
+
+#FLUX_MULTIPLIER         1e+4
+#SPECIES_FILE            mix_reacs_h1e-8_co1e0_atoms_neutralsheatingbugtest.spc
+#PARI_TIME_TMAX          1.01e7
+#PARI_TIME_OUTPUT        1e4
+#KZZ_INIT                0e-16
+#CO_COOL_MULTIPLIER      0e0
+
+TMP4=""
+TMP5=""
+#loop="${header}${nl}    TMP4=\"$middle\";${nl}    echo 'cp '"$basefile"'  '\${3}'---'\$TMP4'.dat'${nl}    TMP5+=\"$middle\"\" \";${nl}${CMD0}${CMD00}${CMD1}${CMD2}${CMD3}${CMD4}${CMD5} $tail"
+loop="${header}${nl}    TMP4=\"$middle\";${nl}    TMP5+=\"$middle\"\" \";${nl}${CMD0}${CMD00}${CMD1}${CMD2}${CMD3}${CMD4}${CMD5} $tail"
+echo "Executing loopcode ${nl}$loop"
+eval "$loop"
+
+

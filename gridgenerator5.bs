@@ -1,0 +1,74 @@
+#!/bin/bash
+#based on https://unix.stackexchange.com/questions/204069/all-possible-combinations-of-characters-and-numbers
+#
+# Typical usage string:
+# bash gridgenerator5.bs folder/4me-basesimulation.par 1e+2,1e+0,1e-2:1e+2,1e+3,1e+4:1e-18:1.:1e4 simprefix simsuffix
+# bash gridgenerator5.bs runs_2023_co/8me_atoms_2H1e-14_kzz_cocool_FUV1e+2_hd_shortveltime5.par 1e-8,1e-10,1e-12,1e-14:1e+2,1e+3:1e-10:1:1e4 8me-atoms- autogen exe consthomo
+#
+#
+#basefile="blafile.dat"
+basefile=$1
+prefix=$3
+suffix=$4
+execution=$5
+consthomo=$6
+DIR="$(dirname "$1")" ; FILE="$(basename "$1")"
+echo "[${DIR}] [${FILE}]"
+##################################################################################################################################
+# Interpret limits and convert
+limits=("" "" "" "" "")
+IFS=':' read -ra TMP88 <<< $2
+for i in "${!TMP88[@]}"; 
+do
+	echo " In i loop: TMP88[i] = ${TMP88[i]}"
+
+	IFS=',' read -ra TMP99 <<< "${TMP88[i]}"
+        #if(( ${#TMP99[@]} != 0 )); then     #Check that argument list for that variable is non-empty
+        for j in "${!TMP99[@]}"; 
+        do
+        	#limits[i]+=" "${TMP99[j]}
+        	limits[i]="${limits[i]} ${TMP99[j]}"
+		#echo "${TMP99[j]}" ${limits[i]}"
+		#echo $i" "$j" --- "${TMP99[j]}" ${limits[i]}"
+        done
+
+	echo " after j loop"
+	echo $limits
+        #fi
+done
+
+echo "detected loop limits:"
+echo "limits[0] = ${limits[0]}"
+echo "limits[1] = ${limits[1]}"
+echo "limits[2] = ${limits[2]}"
+echo "limits[3] = ${limits[3]}"
+echo "limits[4] = ${limits[4]}"
+echo "limits[5] = ${limits[5]}"
+
+#
+# Run brute force loop
+#
+for a in ${limits[0]}; do for b in ${limits[1]}; do for c in ${limits[2]}; do for d in ${limits[3]}; do for e in ${limits[4]}; do
+	#echo $a"-"$b""
+	targetfile="${prefix}-H${a}-FUV${b}-kzz${c}-${d}cool-${e}-${suffix}.par"
+	echo "targetfile = ${DIR}/${targetfile}"
+	cp "${basefile}" "${DIR}/${targetfile}"
+    	sed -i 's/SPECIES_FILE.*/SPECIES_FILE              mix_reacs_h'"${a}"'_co1e0_atoms_neutralsheatingbugtest.spc / ' "${DIR}/${targetfile}"
+	sed -i 's/FLUX_MULTIPLIER.*/FLUX_MULTIPLIER              '"${b}"' / ' "${DIR}/${targetfile}"
+	sed -i 's/KZZ_INIT.*/KZZ_INIT                            '"${c}"' / ' "${DIR}/${targetfile}" 
+	sed -i 's/CO_COOL_MULTIPLIER.*/CO_COOL_MULTIPLIER        '"${d}"' / ' "${DIR}/${targetfile}"
+	sed -i 's/PARI_TIME_OUTPUT.*/PARI_TIME_OUTPUT            '"${e}"' / ' "${DIR}/${targetfile}"
+done; done; done; done; done;
+
+#
+# Optional execution, and logging into logfile
+#
+if [[ $execution == "exe" ]]
+then
+	echo "Executing all just generated files."
+	for a in ${limits[0]}; do for b in ${limits[1]}; do for c in ${limits[2]}; do for d in ${limits[3]}; do for e in ${limits[4]}; do
+	        targetfile="${prefix}-H${a}-FUV${b}-kzz${c}-${d}cool-${e}-${suffix}.par"
+		logfile="log-${prefix}-H${a}-FUV${b}-kzz${c}-${d}cool-${e}-${suffix}.log"
+		./aiolos -dir $DIR/ -par $targetfile > $logfile &
+	done; done; done; done; done;
+fi
