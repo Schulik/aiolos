@@ -132,7 +132,9 @@ void c_Species::update_opacities() {
 			opacity_planck(j,b)  = base->const_opacity_planck_h2;
 		    }
 	            if(this_species_index == h2o_idx) {
-			opacity_planck(j,b)  = base->const_opacity_planck_h2o;
+			opacity_planck(j,b)  = base->const_opacity_planck_h2o * (1. + pressure_broadening_factor * pow(prim[j].pres/1e5, pressure_broadening_exponent));
+                        //opacity(j,b)         = base->opacity_semenov_malygin(1, prim[j].temperature, prim[j].density, prim[j].pres, this->is_dust_like);
+                        //opacity_planck(j,b)  = base->opacity_semenov_malygin(0, prim[j].temperature, prim[j].density, prim[j].pres, this->is_dust_like);
                     }
 	            //if(this_species_index == htwo_idx || this_species_index == c_idx || this_species_index == o_idx) {
                     //    opacity(j, num_bands_out-1)        = base->const_opacity_rosseland_h2;
@@ -1029,9 +1031,6 @@ int h2_idx = base->h2_idx;
                           opacity_planck(j,b)               = base->const_opacity_planck_h2    * base->opacity_semenov_malygin(0, prim[j].temperature, denstot, ptot, this->is_dust_like);// * denspartial/denstot;
                           opacity(j,b)                      = base->const_opacity_rosseland_h2 * base->opacity_semenov_malygin(1, prim[j].temperature, denstot, ptot, this->is_dust_like);// * denspartial/denstot;
   
-		   	 if(base->steps==630) {
-				cout<<"j = "<<j<<" k = "<< opacity_planck(j,b)<<endl;
-			}
 
                           opacity_twotemp(j,num_bands_in-1) = base->const_opacity_solar_h2;
  
