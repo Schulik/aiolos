@@ -179,6 +179,8 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, s
         dt_min_init         = read_parameter_from_file<double>(filename,"DT_MIN_INIT", debug, 1e-20).value;       //Initial dt in s
         output_time = read_parameter_from_file<double>(filename,"PARI_TIME_OUTPUT", debug, 1e99).value;           //Create an output every xxx simulated seconds.
         output_time_offset = read_parameter_from_file<double>(filename,"TIME_OUTPUT_OFFSET", debug, 0.).value;    //Create outputs every PARI_TIME_OUTPUT but only starting after offset, in s
+        log_time_start     = read_parameter_from_file<int>(filename,"LOG_TIME_START", debug, -20).value;    //Create outputs every PARI_TIME_OUTPUT but only starting after offset, in s
+        log_time_factor    = read_parameter_from_file<double>(filename,"LOG_TIME_FACTOR", debug, 10.).value;    //Create outputs every PARI_TIME_OUTPUT but only starting after offset, in s
         monitor_time = read_parameter_from_file<double>(filename,"PARI_TIME_DT", debug).value;                    //Put measurements into the monitor file every xx s
         CFL_break_time = read_parameter_from_file<double>(filename,"CFL_BREAK_TIME", debug, std::numeric_limits<double>::max()).value ; //Use PARI_CFLFACTOR if t<CLF_break_time. Otherwise, set cflfactor to 0.9
         energy_epsilon = read_parameter_from_file<double>(filename,"ENERGY_EPSILON", debug, 0.01).value; //Relative allowed change of internal energy in any single grid cell. Limits timestep size additional to the CFL condition.

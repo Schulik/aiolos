@@ -25,6 +25,7 @@ void c_Sim::execute(int restartnumber) {
     double monitor_counter= 0;
     const double dt_initial = dt_min_init;
     double next_print_time  = dt_initial;
+    double next_output_time = log_time_start==-20 ? output_time : std::pow(log_time_factor, log_time_start);
     const signed long long int maxsteps = 1e12;
     
     int crashed_T = 0, crashed_J = 0;
@@ -32,6 +33,7 @@ void c_Sim::execute(int restartnumber) {
     int crash_J_imin = num_cells+2, crash_J_imax = 0, crash_J_numcells = 0;
     double crashtime, crashed_temperature, crashed_meanintensity;
     int crashtime_already_assigned = 0;
+    int logtime = log_time_start==-20 ? 0 : 1;
     
     const int prinstuff_steps = 1e6;
     
@@ -65,7 +67,7 @@ void c_Sim::execute(int restartnumber) {
     for (globalTime = restarttime; (globalTime < t_max) && (steps < maxsteps); ) {
     
           if(start_hydro_time > 0. && globalTime > start_hydro_time) {   //Comment in if a radiative equilibrium phase is desired before starting hydro
-              do_hydrodynamics = 1;     
+              do_hydrodynamics = 1;
           }
 
         if(steps==0) {
@@ -130,7 +132,8 @@ void c_Sim::execute(int restartnumber) {
             monitor_counter+=1.;
             output_counter +=1.;
          }
-         if(globalTime > output_counter*output_time + output_time_offset){
+         //if(globalTime > output_counter*output_time + output_time_offset){
+         if(globalTime > next_output_time) {
              if(debug >= 1)
                  cout<<" Globaltime is "<<globalTime<<" and comparevalue is "<<output_counter<<" "<<output_time<<endl;
              
@@ -139,8 +142,12 @@ void c_Sim::execute(int restartnumber) {
                 for(int s=0; s<num_species; s++)
                     species[s].print_AOS_component_tofile((int)output_counter); 
              }
-             
+
              output_counter+=1.;
+		
+	     if(logtime==1) { next_output_time *= log_time_factor; }
+	     else           { next_output_time = output_counter*output_time + output_time_offset; }
+             
              output_chemistry = 1; // Setting this switch will trigger a filling of the reaction rate table at the end of chemistry. The switch is unset afterwards
          }
          if(globalTime > monitor_counter*monitor_time) {

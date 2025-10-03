@@ -510,6 +510,8 @@ public:
     signed long long int steps;
     int timecount;
     int monitor_output_index;
+    int  log_time_start;
+    double log_time_factor;
 
     IntegrationType order ;
     HydroSolver solver;
