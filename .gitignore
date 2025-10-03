@@ -8,10 +8,6 @@ log*
 *par
 *.spc
 *.reac
-*.opa
-*.op2
-*.op3
-*.aiopa
 *.png
 *.pdf
 *windae*
