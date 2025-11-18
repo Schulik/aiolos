@@ -32,6 +32,7 @@ int main(int argc, char** argv)
     debug_data[0] = 0;
     int suppress_warnings_global = 0;
     int external_thread_num = 1;
+    int restartnumber = 0;
     cout<<endl<<"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"<<endl;
           cout<<"~~~ Welcome to AIOLOS! May a gentle breeze lead your way through the bugs."<<endl;
           cout<<"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"<<endl;
@@ -110,6 +111,12 @@ int main(int argc, char** argv)
             cout<<"Intent comment found as "<<tempintent<<endl;
             i++;
         }
+        
+        if(tmpstring.compare("-restart") == 0) {
+            restartnumber      = std::stoi(argv[i+1]);
+            cout<<"Restartnumber found as "<<restartnumber<<endl;
+            i++;
+        }
     }
     
     if(!parameterfile_found) {
@@ -131,13 +138,13 @@ int main(int argc, char** argv)
         cout<<endl<<"In main, construction of simulation is about to start."<<endl;
        
         //Main simulation class object, is initialized with the simulation parameters from a file
-        c_Sim simulation1(simulationname, speciesfile, workingdir, tempintent, debug_data);
+        c_Sim simulation1(simulationname, speciesfile, workingdir, tempintent, debug_data, restartnumber);
         
         simulation1.set_suppress_warnings(suppress_warnings_global);
 
         cout<<"In main, execution is about to start."<<endl;
         
-        simulation1.execute();
+        simulation1.execute(restartnumber);
     }
     catch (int err){
         

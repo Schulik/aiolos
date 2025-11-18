@@ -96,6 +96,7 @@ double delta_ij(int i, int j);
 double lint(double xa, int N, double* X, double* RI);
 double logint(double xa, int N, double* X, double* RI);
 const float log10ff = std::log(10.);
+std::string cnstWidth( int value, int width );
 
 inline double dfdx(const function<double(double)>& f, double x0, double dx) {
     
@@ -172,6 +173,11 @@ inline double fastexpm1_2(double x) {
   return std::expm1(x);
 //return x + 0.5*x*x;
 }
+
+
+//
+// Slope limiters
+//
 
 
 //
@@ -393,6 +399,8 @@ public:
 
     int problem_number;
     int debug;
+    int restartnumber;
+    double restarttime;
     int cdebug = 0;
     int debug_cell = 1e99; //default values that should never trigger debugging, if not set to sensible values
     int debug_steps = 1e99;
@@ -502,6 +510,8 @@ public:
     signed long long int steps;
     int timecount;
     int monitor_output_index;
+    int  log_time_start;
+    double log_time_factor;
 
     IntegrationType order ;
     HydroSolver solver;
@@ -576,6 +586,7 @@ public:
     double mix_p2;
     double mix_p3;
     int mix_reset_i;
+    int ignore_electron_cfl_cell;
     //
     // Friction
     //
@@ -653,6 +664,9 @@ public:
     double radiation_rampup_time;
     
     //Indices for highenergy cooling
+    int h3plus_idx;
+    int h2_idx;
+    int h2o_idx;
     int hnull_idx; 
     int hplus_idx;
     int e_idx;
@@ -666,8 +680,8 @@ public:
     int Opp_idx;
     int O3p_idx;
     int O4p_idx;
-    int h3plus_idx;
-    
+    double secondary_ion_heating;
+
     //int radiation_solver;
     int use_planetary_temperature;
     int closed_radiative_boundaries ;
@@ -676,6 +690,7 @@ public:
     int radiation_diffusion_test_nonlinear;
     int couple_J_into_T;
     double no_rad_trans;      // Multiplier for the div F radiation transport in the radiation solver to compare to models which don't cool thermally
+    double heating_eta;       // Multiplier for the high-energy cooling
     double CFL_break_time; //Numerical time after which cflfactor=0.9. Used in get_cfl_timestep()
     double photocooling_multiplier;
     double photocooling_expansion;
@@ -714,6 +729,7 @@ public:
     double const_opacity_solar_h2;
     double const_opacity_rosseland_h2;
     double const_opacity_planck_h2;
+    double const_opacity_planck_h2o;
     double init_J_factor;
     double init_T_temp;
     double minimum_opacity;
@@ -737,7 +753,11 @@ public:
     int num_reactions;
     int num_photoreactions;
     int read_reactions_from_species_file;
+    int iminchem;
     int imaxchem;
+    int output_chemistry;
+    int use_secondary_ionisation;
+    Eigen::MatrixXd reaction_rate_table;
     std::vector<c_reaction> reactions;
     std::vector<c_photochem_reaction> photoreactions;
     
@@ -813,7 +833,8 @@ public:
     double get_max_soundspeed();
     double get_cfl_timestep();
     double get_cfl_timestep2();
-    
+    double get_electron_fraction(int j);
+
     void print_monitor(int i);
     void print_diagnostic_file(int i);
     void write_into_execution_log(string dir, string par, string spcfile);
@@ -857,6 +878,10 @@ public:
     void do_highenergy_cooling(int j);
     void update_tau_s_jb(int j, int b);
     void update_opacities();
+    
+    void empty_reaction_table();
+    void save_reaction_data_for_cell(int j, double dtt, double n_tot);
+    void write_reaction_table(int outputnumber);
 
     void do_photochemistry();
     void init_highenergy_cooling_indices();
@@ -879,10 +904,11 @@ public:
 public:
     
     c_Sim() {};
-    c_Sim(string parameter_filename, string species_filename, string workingdir, string intent, std::vector<int> debug_data);
+    c_Sim(string parameter_filename, string species_filename, string workingdir, string intent, std::vector<int> debug_data, int restartnumber);
     ~c_Sim();
     
-    void execute(); //Main loop
+    void execute(int restartnumber); //Main loop
+    void restart_from_outputnumber(int restartnumber);
     
     void set_debug(int);
     void set_suppress_warnings(int j) {suppress_warnings = j;}
@@ -1083,7 +1109,8 @@ public:
     }
 
     void reconstruct_edge_states(std::vector<double>& u_mask, int orderstep) ;
-    
+    double (*reconstruct_pointer)(double, double, double, double, double, double, double);
+
     AOS hllc_flux(int);
     AOS hllc_flux2(int, double);
     AOS laxfriedrich_flux(int j);
@@ -1128,6 +1155,7 @@ public:
     void user_boundary_left(std::vector<AOS>& u);
     void user_boundary_right(std::vector<AOS>& u);
     void user_opacity() ;
+    void complicated_opacity() ;
 
     void user_initial_conditions();
     void user_species_loop_function() ;

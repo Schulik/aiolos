@@ -1,0 +1,84 @@
+#!/bin/bash
+
+function axismultiplier()
+{
+	echo ""
+}
+
+basescript="file.par"
+var="fuv"
+params=("me" "kzz" "CO" "fuv")
+parpos=-1
+
+#for all arguments
+for i; 
+do
+	echo $i
+done
+
+eval echo $(printf "%s\t" '{A..C},{0..3}'{,})
+
+#Split first argument to identify all variables which we are to run over
+IFS=',' read -ra TMP <<< $1
+for i in "${TMP[@]}"; 
+do
+	echo "Variable $i ${i}"
+done
+
+#Split some argument according to stuff
+IFS=',' read -ra TMP <<< $2
+for i in "${TMP[@]}"; 
+do
+	echo "paramvalues $i"
+done
+
+ #Split some argument according to stuff
+IFS=':' read -ra TMP <<< $2
+for i in "${TMP[@]}"; 
+do
+	echo "paramvalues in second loop $i"
+
+	IFS=',' read -ra TMP2 <<< $i
+	for j in "${TMP2[@]}";
+	do
+		echo "paramvalues in second loop, inside $i $j"
+	done
+done
+
+
+#Search the position in the predefined array identify what variable we want to vary
+for param in params; 
+do
+        if [ $1 = params[i] ]
+	then
+		echo "Found arg==$2 at position ${i}, local params = ${params[i]}"
+	else
+		echo "NOT Found arg==$2 at position ${i}, local params = ${params[i]}"
+	fi
+done
+
+
+#for a in 10 11 12 13 14; do cp runs_2023_co/4me_atoms_2H1e-${a}_kzz_cocool_FUV1e+2_hd_shortveltime5.par runs_2023_co/4me_atoms_2H1e-${a}_kzz_cocool_FUV1e+2_Cband2_shortveltime5.par; done
+#for a in 10 11 12 13 14; do sed -i 's/FLUX_FILE.*/FLUX_FILE               inputdata\/spectrum_claire2012_006GyrSun_lessCband5.dat/' runs_2023_co/4me_atoms_2H1e-${a}_kzz_cocool_FUV1e+2_Cband2_shortveltime5.par; done
+
+
+#other code
+for logfile in "$@"
+do
+        #echo $logfile
+        #month=$(ls -ltr $logfile | awk '{print($6)}')
+done
+
+if [ $(grep -c "NEGATIVE" $logfile) -ge 1 ]
+then
+	for param in vars
+	do
+		#cp basescript $varfilename_param_.par
+		#sed operations for every file
+	done
+else
+	 #Non-crashed simulations
+fi
+
+#for a in 10 11 12 13 14; do cp runs_2023_co/4me_atoms_2H1e-${a}_kzz_cocool_FUV1e+2_hd_shortveltime5.par runs_2023_co/4me_atoms_2H1e-${a}_kzz_cocool_FUV1e+2_Cband2_shortveltime5.par; done
+#for a in 10 11 12 13 14; do sed -i 's/FLUX_FILE.*/FLUX_FILE               inputdata\/spectrum_claire2012_006GyrSun_lessCband5.dat/' runs_2023_co/4me_atoms_2H1e-${a}_kzz_cocool_FUV1e+2_Cband2_shortveltime5.par; done
