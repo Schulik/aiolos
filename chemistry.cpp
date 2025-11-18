@@ -383,8 +383,7 @@ void c_Sim::do_chemistry(double dt_chem) {
                  }
             }
             //if( s == e_idx) //Force electrons to balance out the charges per cell
-		
-                
+            
             species[s].prim[j].number_density = n_tmp(s) * n_tot;
             species[s].prim[j].density        = species[s].prim[j].number_density * species[s].mass_amu*amu;
         }
