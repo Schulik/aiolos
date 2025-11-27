@@ -1716,7 +1716,7 @@ void c_Species::initialize_hydrostatic_atmosphere(string filename) {
             
             u[i+1] = AOS(temp_rhofinal, 0., cv * temp_rhofinal * T_outer);
             
-            if(debug > 2) {
+            if(debug > 3) {
             //if(i < 3) {
                 
                 char a;

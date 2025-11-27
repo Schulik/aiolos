@@ -198,7 +198,7 @@ void c_Sim::init_reactions(int cdebug) {
     //std::setprecision(2);
     for(int b=0; b<num_bands_in; b++) {
          cout<<setprecision(4)<<" lmin/lmax"<<l_i_in[b]<<"/"<<l_i_in[b+1];
-         cout<<setprecision(4)<<" F = "<<solar_heating(b)<<"";
+         cout<<setprecision(4)<<" F = "<<solar_heating(b)<<" ";
          //cout<<setprecision(4)<<" "<<solar_heating_final(b)<<" | ";
 
 	flux_total += solar_heating(b);
