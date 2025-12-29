@@ -26,8 +26,11 @@
 void c_Sim::init_grav_pot() {
 
     double rh = planet_semimajor * au * pow(planet_mass / (3.* star_mass ),0.333333333333333333);        
+    int num_bounds = 1;
+    if(order == IntegrationType::second_order)
+        num_bounds = 2;
 
-    for(int i = 1; i <= num_cells+1; i++) {
+    for(int i = num_bounds; i <= num_cells+1; i++) {
         enclosed_mass[i] = planet_mass;      //No self-gravity
         phi[i]           = get_phi_grav(x_i12[i], enclosed_mass[i]);
             
@@ -38,6 +41,8 @@ void c_Sim::init_grav_pot() {
             //phi[i] -=0.5* 3.*G*star_mass*x_i12[i]*x_i12[i]/pow(planet_semimajor*au,3.);
             
     }
+    if(order == IntegrationType::second_order)
+        phi[1]           = get_phi_grav(x_i12[2],         planet_mass); //So that there is no jump across the boundary
     phi[0]           = get_phi_grav(x_i12[1],         planet_mass);
         
     rhill = planet_semimajor*au * std::pow(planet_mass / 3. / star_mass, 0.333333333333333333333);
@@ -823,3 +828,88 @@ void c_Sim::compute_collisional_heat_exchange() {
 
 }
 
+/**
+ * Compute the duffisve source flux, including momentum and energy flux
+ * @param[in] u Conservative data in cell j
+ * @param[in] j Interface number
+ * @return    Diffusive flux for interface j
+ */
+AOS c_Species::source_diffusion_flux(int j) {
+
+    assert(j > 0 && j <= num_cells) ;
+
+    double fjm1   = std::log10(prim[j].number_density/base->total_numdens[j]);  
+    double fj     = std::log10(prim[j+1].number_density/base->total_numdens[j+1]);
+
+    double vjm1   = prim[j].speed;  
+    double vj     = prim[j+1].speed;
+
+    double dfdr             = ( fj - fjm1) / (base->x_i12[j+1] - base->x_i12[j]) ;
+    double u_diff           = - base->diffusivity * dfdr; //If diffusivity is in cm^2/s then u_diff is in cm/s
+    //double vdonor           = std::pow(  0.5* (std::log10(vj)+std::log10(vjm1)),10 );//( vj-vjm1 > 0 ) ? vjm1 : vj;
+    //double vdonor     = ( vj-vjm1 > 0 ) ? vj : vjm1;
+    //double edonor     = ( vj-vjm1 > 0 ) ? u[j+1].u3 : u[j].u3;
+
+    double vdonor       = ( u_diff > 0 ) ? vj : vjm1;
+    double rhodonor     = ( u_diff < 0 ) ? u[j+1].u1 : u[j].u1;
+    double momdonor     = ( u_diff < 0 ) ? u[j+1].u2 : u[j].u2;
+    double edonor       = ( u_diff < 0 ) ? u[j+1].u3 : u[j].u3;
+
+    //double vdonor           = logmean( vj, vjm1);
+    //double vdonor  = 0.5*( vj+vjm1) ;
+    //double nmean = prim[j+1].number_density;//base->total_press_l[j]/1e6>1e-9 ? 1. : 0.; //0.5 * (base->total_press_r[j-1] + base->total_press_l[j])/1e+6;
+    double nmean   = logmean( prim[j].number_density,  prim[j+1].number_density);
+    double rhomean = logmean( u[j].u1,  u[j+1].u1);
+    double mommean =    0.5*( u[j].u2,  u[j+1].u2);
+    double emean   = logmean( u[j].u3,  u[j+1].u3);
+
+    double pscl = 1.;
+    if(base->total_press[j]/1e6 < 1e-9) 
+        pscl = base->total_press[j] / 1e6 / 1e-9; //Scale down diffusion beyond a nanobar to increase numerical stability
+    u_diff *= pscl;
+
+    if(this->mass_amu < 0.4) //For electrons, reduce diffusion strength
+        u_diff = 0.;
+
+    //double diff             = - u_diff * nmean;
+    //return AOS(0, u.u1, u.u2) * (-1.) * ( base->omegaplus[j] * dphidr_p  + base->omegaminus[j] * dphidr_m);
+    //if(base->steps==500 && j<25)
+    //    cout<<this->speciesname<<" j/diff = "<<j<<"/"<<diff<<" "<<endl;
+    if(j<=4)
+        u_diff = 0;
+    //u_diff = 0.;
+    //return AOS( u_diff * rhomean,  u_diff * mommean * base->vdiffusivity, +1.*u_diff*emean);
+    return AOS( u_diff * rhodonor, u_diff * momdonor * base->vdiffusivity, u_diff*edonor);
+}
+
+/**
+Diffusive timestep constraint
+@param j Cell number
+@return Explicit diffusive timestep
+*/
+double c_Species::diffusive_timestep(int j) {
+    double diff_tstep = 1e+20 ;
+
+   assert(j > 0 && j <= num_cells) ;
+
+    double vjm1   = prim[j-1].number_density/base->total_numdens[j-1];  
+    double vj     = prim[j].number_density/base->total_numdens[j];
+
+    double dudr             = ( vj - vjm1) / (base->x_i12[j] - base->x_i12[j-1]) ;
+    double vdonor  = ( vj-vjm1 > 0 ) ? vjm1 : vj;
+    double pressure_scaling = 0.5 * (base->total_press_r[j-1] + base->total_press_l[j])/1e+6;
+
+    if(j>100) 
+        pressure_scaling = 0.;
+
+    double diff             = - base->diffusivity * dudr * pressure_scaling * 1e10;
+    if(j<=2)
+        diff = 0;
+
+    if(std::fabs(diff) > 1e-30) {
+        diff_tstep = 0.5 * base->dx[j] * base->dx[j] / std::fabs(diff);
+    }
+
+    return diff_tstep * 1e9 ;
+
+}

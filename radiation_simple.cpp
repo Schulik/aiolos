@@ -432,6 +432,7 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
                 for(int si=0; si<num_species; si++) 
                     totalheat += species[si].dS(j);
 
+                
                 //if(totalheat < 1e-50) {
                 //if(use_shadow_relaxation && totalheat < ( shadow_relaxation_threshold && (x_i[j]<x_i[num_cells]/2) )) { //1e-50 is the arbitrary limit we set on the heating function throughout the code
                 //if(use_shadow_relaxation && (totalheat < shadow_relaxation_threshold) && (x_i[j]<x_i[num_cells]/4) ) { //1e-50 is the arbitrary limit we set on the heating function throughout the code
@@ -445,8 +446,9 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
                 }
                     else
                         relaxtemp = avgtemp;
-                                    
-                                    
+                
+                //if(steps > 850)
+                //    cout<<" global_time < avg_temperature"<<avgtemp<<" relaxtemp = "<<relaxtemp<< "steps ="<<steps<<endl;     
 
                 for(int si=0; si<num_species; si++) {
                         species[si].prim[j].temperature = relaxtemp;
@@ -457,6 +459,8 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
                         	 species[si].prim[j].temperature = avgT_nom/avgT_denom * (1. - globalTime/avg_temperature_t1)  + species[si].prim[j].temperature * globalTime/avg_temperature_t1;
                 	}
                 }
+        } else {
+            //cout<<use_avg_temperature<<" "<<globalTime<<" "<<avg_temperature_t1<<endl;
         }
 
          } //end j loop
@@ -565,8 +569,8 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
                 
             if(j==-20 && globalTime > 1.) {
                 cout<<" temperatures before and after: "<<species[0].prim[j].temperature<<" "<<temp_temperatures[j]<<" delta = "<<(1.-species[0].prim[j].temperature/temp_temperatures[j])<<endl;
-		char aa;
-		cin>>aa;
+		        char aa;
+		        cin>>aa;
              }
                 
                 for(int s=0; s<num_species; s++) {
@@ -644,7 +648,12 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
     for(int si=0; si<num_species; si++) {
         species[si].eos->update_eint_from_T(&(species[si].prim[0]), num_cells+2);
         species[si].eos->update_p_from_eint(&(species[si].prim[0]), num_cells+2);
+
+        species[si].eos->compute_auxillary(&(species[si].prim[0]), num_cells+2);
         species[si].eos->compute_conserved(&(species[si].prim[0]), &(species[si].u[0]), num_cells+2);        
+
+        //species[si].eos->compute_primitive(&(species[si].u[0]), &(species[si].prim[0]), num_cells+2) ;    
+        
     }
 
 }

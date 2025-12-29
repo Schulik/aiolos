@@ -25,7 +25,7 @@ void c_Sim::execute(int restartnumber) {
     double monitor_counter= 0;
     const double dt_initial = dt_min_init;
     double next_print_time  = dt_initial;
-    double next_output_time = log_time_start==-20 ? output_time : std::pow(log_time_factor, log_time_start);
+    double next_output_time = log_time_start==-20 ? output_time + output_time_offset : std::pow(log_time_factor, log_time_start);
     const signed long long int maxsteps = 1e12;
     
     int crashed_T = 0, crashed_J = 0;
@@ -132,6 +132,13 @@ void c_Sim::execute(int restartnumber) {
             monitor_counter+=1.;
             output_counter +=1.;
          }
+         if(cont_output_steps > -1) {
+            if(steps%cont_output_steps == 0) {
+                for(int s=0; s<num_species; s++) {
+                        species[s].print_AOS_component_tofile(-999);
+                    }  
+            }
+         }
          //if(globalTime > output_counter*output_time + output_time_offset){
          if(globalTime > next_output_time) {
              if(debug >= 1)
@@ -166,7 +173,7 @@ void c_Sim::execute(int restartnumber) {
         // Step 0: Hydrodynamics, if so desired
         //
 
-	//if (do_hydrodynamics == 1) 
+	    //if (do_hydrodynamics == 1) 
         //    compute_drag_update(1.0*dt) ;
         compute_total_pressure();
 
@@ -181,13 +188,21 @@ void c_Sim::execute(int restartnumber) {
                 //March 19th 2024: Added get_cfl_timestep2() to sit here, to obtain the updated timestep based on the extrapolated left and right values - they can produce inconsistent fluxes with the cell-centered values, which the call of dt = get_cfl_timestep(); at the beginning of the timestep is based on;
                 //
             //dt = std::min(get_cfl_timestep2(), dt);
-            
+            //cout<<"num_sepcies = "<<num_species<<endl;
             for(int s = 0; s < num_species; s++) {
                 species[s].u_mask           = np_zeros(num_cells+2);
                 species[s].u0    = species[s].u ;
                 species[s].u_tmp = species[s].u ;
                 
-                for(int k=0; k<=0; k++) { //The k=0 run is the nominal run. k=1 is only triggered if some cells are broken
+                //cout<<"    running species "<<species[s].speciesname<<" s = "<<s<<" steps ="<<steps<<endl;
+                 //Apply implicit electron solver for electrons only if so desired. Otherwise continue as usual with all other solvers.
+                if( (solver == HydroSolver::implicitelectrons) && (s==e_idx)) {    
+
+                    species[s].implicit_incompressible(dt);
+                    //cout<<" YES IN IMPLICIT ELECTRON SOLVER and species =="<<species[s].speciesname<<endl;
+
+                } else {
+                    //cout<<" NOT IMPLICIT ELECTRON SOLVER and NOT ELECTRONS, species =="<<species[s].speciesname<<endl;
                     int ex_order = 1; //(s==e_idx)?0:1;
                     species[s].execute(species[s].u, species[s].dudt[0], species[s].u_mask, ex_order);
                     
@@ -197,21 +212,19 @@ void c_Sim::execute(int restartnumber) {
                     
                     species[s].u_mask           = np_zeros(num_cells+2);
                     int numbroken = species[s].count_broken_cells(species[s].u_tmp, species[s].u_mask);
-                   //if(numbroken > 0)
-                    //    cout<<" 1st order, steps = "<<steps<<" species "<<s<<" numbroken == "<<numbroken<<endl;
-                    //else
-                    //    cout<<" steps = "<<steps<<" species "<<s<<" numbroken == "<<numbroken<<endl;
-                    if( numbroken == 0)
-                        break;
+                    //if( numbroken == 0)
+                    //    break;
+                    
+                    species[s].fix_negative_pressures_sometimes(species[s].u_tmp, 1);
+                    
+                    //Done, now all values should be ok
+                    for(int j=0; j < num_cells+2; j++) {
+                        species[s].u[j] = species[s].u_tmp[j];
+                    }
+
                 }
-                
-                species[s].fix_negative_pressures_sometimes(species[s].u_tmp);
-                
-                //Done, now all values should be ok
-                for(int j=0; j < num_cells+2; j++) {
-                    species[s].u[j] = species[s].u_tmp[j];
-                }
-                
+                //cout<<"END running species "<<species[s].speciesname<<" s = "<<s<<" steps ="<<steps<<" num_species "<<num_species<<endl;
+
             }
         }
         
@@ -282,35 +295,42 @@ void c_Sim::execute(int restartnumber) {
                 //*********************************************Feb 1hth 2025: Anomalous electron temperatures at shocks occur here, after Pos 1.05 and are then perpetuated. Try fix with a bit of friction **//
                 //compute_drag_update(0.01*dt);
                 //compute_total_pressure();
-		//*******************************************//
+		        //*******************************************//
 
                 for(int s = 0; s < num_species; s++) {
                     species[s].u_mask           = np_zeros(num_cells+2);
                     species[s].u_tmp = species[s].u ;
                     
-                    for(int k=0; k<=0; k++) { //The k=0 run is the nominal run. k=1 is only triggered if some cells are broken
+                    //Apply implicit electron solver if wanted
+                    if(solver == HydroSolver::implicitelectrons && s==e_idx) {    
+
+                        species[s].implicit_incompressible(dt*0.5);
+
+                    } else {
+                    //for(int k=0; k<=0; k++) { //The k=0 run is the nominal run. k=1 is only triggered if some cells are broken
                         int ex_order = 1;// (s==e_idx)?0:1;
                         species[s].execute(species[s].u, species[s].dudt[1], species[s].u_mask, ex_order);
                         
                         for(int j=0; j < num_cells+2; j++) {
+                            double scale_f = 1;//species[s].prim[j].pres/total_press[j];
                             if (use_drag_predictor_step)
                                 species[s].u_tmp[j] = species[s].u0[j];// + species[s].dudt[0][j]*dt;// March28th 2024 changed this line, as u0 now contains the first-order correct, non-crashed values
                             
-                            species[s].u_tmp[j] +=  (species[s].dudt[1][j] - species[s].dudt[0][j])*dt / 2 ;  
+                            species[s].u_tmp[j] +=  (species[s].dudt[1][j] - species[s].dudt[0][j])*dt / 2  * scale_f;  
                         }
                             
                         species[s].u_mask           = np_zeros(num_cells+2);
                         int numbroken = species[s].count_broken_cells(species[s].u_tmp, species[s].u_mask);
-                        if( numbroken == 0)
-                            break;
+                        //if( numbroken == 0)
+                        //    break;
                     }
                     
-                    species[s].fix_negative_pressures_sometimes(species[s].u_tmp);
+                    species[s].fix_negative_pressures_sometimes(species[s].u_tmp, 2);
                     
                     //Done, now all values should be ok
-	            //if(s != e_idx) { //Feb18th: switch off second order update for electrons, as that seems to cause the shock problem
-	            if(s > -1) { //Feb18th: switch off second order update for electrons, as that seems to cause the shock problem
-	                for(int j=0; j < num_cells+2; j++) {
+	                //if(s != e_idx) { //Feb18th: switch off second order update for electrons, as that seems to cause the shock problem
+	                if(s > -1) { //Feb18th: switch off second order update for electrons, as that seems to cause the shock problem
+	                    for(int j=0; j < num_cells+2; j++) {
                         	species[s].u[j] = species[s].u_tmp[j];
                     	}
                     }
@@ -323,23 +343,6 @@ void c_Sim::execute(int restartnumber) {
                 
                 for(int s = 0; s < num_species; s++)
                         species[s].compute_pressure(species[s].u);
-                
-                /*
-                //debug = 2;
-                for(int s = 0; s < num_species; s++) {
-                    species[s].u_mask           = np_zeros(num_cells+2);
-                    species[s].execute(species[s].u, species[s].dudt[1],  species[s].u_mask, 1);
-                }
-                
-                for(int s = 0; s < num_species; s++){
-                    for(int j = 0; j < num_cells+2; j++) {
-                        // Need to re-compute u[j] if it was updated in the drag-predictor
-                        if (use_drag_predictor_step)
-                            species[s].u[j] = species[s].u0[j] + species[s].dudt[0][j]*dt ;
-                        
-                        species[s].u[j] += (species[s].dudt[1][j] - species[s].dudt[0][j])*dt / 2 ;  
-                    }
-                }*/
                 
                 for(int s = 0; s < num_species; s++) {
                     species[s].apply_boundary_left(species[s].u) ;
@@ -366,8 +369,13 @@ void c_Sim::execute(int restartnumber) {
                     species[s].apply_boundary_right(species[s].u) ;
                 }
             }
-        }
+        }// End of second order hydrodynamic step
+
+        if(use_inflow_damping==1)
+            apply_inflow_damping();
         
+
+        //begin other operators 
         if(steps > debug_steps && debug_cell < num_cells+1) {
                 cout<<"t="<<steps<<" Pos 1.3 T[423]_s = ";
                 for(int s = 0; s < num_species; s++) {
@@ -599,11 +607,13 @@ void c_Sim::compute_total_pressure() {
         total_press_l[i] = 0.;
         total_press_r[i] = 0.;
         total_press[i] = 0.;
+        total_numdens[i] = 0;
             
         for(int s = 0; s < num_species; s++) {
                 //total_pressure[i] += species[s].prim[i].pressure;
             //if(species[s].prim_l[i].pres > 0.) {
                 total_press[i] += species[s].prim[i].pres;
+                total_numdens[i] += species[s].prim[i].number_density ;
                 total_press_l[i] += species[s].prim_l[i].pres;
                 total_press_r[i] += species[s].prim_r[i].pres;
             //}
@@ -737,7 +747,13 @@ void c_Species::execute(std::vector<AOS>& u_in, std::vector<AOS>& dudt, std::vec
                     for(int j=0; j <= num_cells; j++) {
                         flux[j] =  hllc_flux(j);
                     }
-                    //cout<<"HLLC"<<endl;
+                    
+                    break;
+                case HydroSolver::implicitelectrons:     //Every species which makes it into this loop is not electrons, hence solved with default hllc
+                    for(int j=0; j <= num_cells; j++) {
+                        flux[j] =  hllc_flux(j);
+                    }
+                    
                     break;
                 case HydroSolver::roe:
                     for(int j=0; j < 3; j++) {
@@ -760,20 +776,20 @@ void c_Species::execute(std::vector<AOS>& u_in, std::vector<AOS>& dudt, std::vec
                         for(int j=0; j <= num_cells; j++) {
                             double flim = 1.; //previously 0.1
 
-			    if(this_species_index == 0)
-				flim = params[0];
-			     if(this_species_index == base->e_idx)
-                                flim = params[2];
-			     else {
-				if(j>base->mix_reset_i)
-	                                flim = params[1]; //1e-100; 
-				else 
-					flim = params[1];
-			     }
-			    //if(j > homopause_boundary_i)
-			    //if(j > base->grid2_transition_i)
-			    if(base->x_i12[j] > 9e99)
-			    	flim = 1e-10;
+                    if(this_species_index == 0)
+                    flim = params[0];
+                    if(this_species_index == base->e_idx)
+                                    flim = params[2];
+                    else {
+                    if(j>base->mix_reset_i)
+                                        flim = params[1]; //1e-100; 
+                    else 
+                        flim = params[1];
+                    }
+                    //if(j > homopause_boundary_i)
+                    //if(j > base->grid2_transition_i)
+                    if(base->x_i12[j] > 9e99)
+                        flim = 1e-10;
 
                             double totpress = 0.;
                             int negpresscontributions = 0;
@@ -829,11 +845,8 @@ void c_Species::execute(std::vector<AOS>& u_in, std::vector<AOS>& dudt, std::vec
             }
                     
  
-                //flux[j]          = roe_flux(j);
-                //if(j<=2) flux[j] = AOS(0,0,0);
-                //if(j>100) flux[j].u1 = 0.5*(u[j].u2+u[j+1].u2);
-                if(base->steps % 1000==1 && base->steps < -1002) {
-                    for(int j=0; j <= num_cells; j++) {
+            if(base->steps % 1000==1 && base->steps < -1002) {
+                for(int j=0; j <= num_cells; j++) {
                         AOS roe = roe_flux(j);
                         AOS hllc = hllc_flux(j);
                         AOS p =  laxwendroff_flux(j); //passivescalar_flux(j);
@@ -841,12 +854,8 @@ void c_Species::execute(std::vector<AOS>& u_in, std::vector<AOS>& dudt, std::vec
                         //cout<<this_species_index<<" "<<j<<" HLLC = "<<hllc.u1<<" "<<hllc.u2<<" "<<hllc.u3<<" passive ="<<p.u1<<" "<<p.u2<<" "<<p.u3<<" momflux = "<<u[j].u2<<endl;
                             cout<<this_species_index<<" "<<j<<" dP "<<prim_r[j].pres-prim_l[j+1].pres<<" HLLC.u1 "<<hllc.u1<<" HLLC.u1/u.u1 "<<hllc.u1/u[j].u1<<" HLLC.u1/u.u2 "<<hllc.u1/u[j].u2<< " rho "<<u[j].u1<<" HLLC.u1/cs "<<hllc.u1/prim[j].sound_speed<<endl;
                         
-                    }
                 }
-                //if(j>100) flux[j] = laxfriedrich_flux(j);
-                //if(j>100) flux[j] = laxwendroff_flux(j);
-            //}
-            
+            }
             
         }
         else {
@@ -861,6 +870,12 @@ void c_Species::execute(std::vector<AOS>& u_in, std::vector<AOS>& dudt, std::vec
             source[j]          = source_grav(u_in[j], j) * grav_prefactors[j];
             source_pressure[j] = AOS(0, -(base->source_pressure_prefactor_left[j] * prim_l[j].pres - 
                                           base->source_pressure_prefactor_right[j] * prim_r[j].pres)  ,0); 
+
+            if (this->mass_amu < 0.5)
+                source_diffusion[j]= AOS(0,0,0);
+            else
+                //source_diffusion[j]= ( source_diffusion_flux(j) * base->surf[j] * base->omegaplus[j] * (-1.) + source_diffusion_flux(j-1) * base->surf[j-1] * base->omegaminus[j]) / base->vol[j];
+                source_diffusion[j]= ( source_diffusion_flux(j) * base->surf[j] * (-1.) + source_diffusion_flux(j-1) * base->surf[j-1] ) / base->vol[j];
         }
         
         //
@@ -869,7 +884,7 @@ void c_Species::execute(std::vector<AOS>& u_in, std::vector<AOS>& dudt, std::vec
         
         
         for(int j=1; j<=num_cells; j++) {
-            dudt[j] = (flux[j-1] * base->surf[j-1] - flux[j] * base->surf[j]) / base->vol[j] + (source[j] + source_pressure[j]) ;
+            dudt[j] = (flux[j-1] * base->surf[j-1] - flux[j] * base->surf[j]) / base->vol[j] + (source[j] + source_pressure[j] + source_diffusion[j]) ;
             
             if( debug > 3) { //Or put in your own conditions
                 char alpha;
@@ -1388,7 +1403,7 @@ int c_Species::count_broken_cells(std::vector<AOS>&u, std::vector<double>&u_mask
  * The name of this function "sometimes" refers to that we should only fix negative pressures, if the causes are well understood, as we might violate energy conservation.
  * 
  */
-int c_Species::fix_negative_pressures_sometimes(std::vector<AOS>&u_temp) {
+int c_Species::fix_negative_pressures_sometimes(std::vector<AOS>&u_temp, int flag) {
     
     double ptemp = 0;
     double plast = 0;
@@ -1396,14 +1411,18 @@ int c_Species::fix_negative_pressures_sometimes(std::vector<AOS>&u_temp) {
     int fixed_cells = 0;
     double ekin = 0;
     double ekinold=0;
+    double temper=0;
     for(int j=0; j<=num_cells+1; j++) {
         ekin   = 0.5*u_temp[j].u2*u_temp[j].u2/u_temp[j].u1;
         ekinold= 0.5*u[j].u2*u[j].u2/u[j].u1;
         eratio = ekin/u_temp[j].u3;
         ptemp  = (u_temp[j].u3 - ekin) * (gamma_adiabat-1);
         plast  = prim[j].pres;
-        
+        temper = prim[j].temperature;
+
         //First check: Negative E - big problem - use last value and fix pressure in case its also negative 
+        //if(0==1){
+        //if( (u_temp[j].u3 < 0) || (ptemp < 0) || (plast < 0) || (temper < 0)) {
         if( (u_temp[j].u3 < 0) || (ptemp < 0)) {
             //u_temp[j].u3 = u[j].u3;// + (ekinold-ekin);
             
@@ -1414,15 +1433,25 @@ int c_Species::fix_negative_pressures_sometimes(std::vector<AOS>&u_temp) {
             //if(ptemp < 0 && plast > 0)
             eos->compute_primitive(&(u[j]), &(prim[j]), 1) ;    
             eos->compute_auxillary(&(prim[j]), 1);
+
+            //cout<<"Repaired E in cell/species = "<<j<<" "<<this->speciesname<<" steps "<<base->steps<<" flag "<<flag<<endl;
                 
         };
         
         //Second check: negative pressure
         //if(ptemp < 0 && plast > 0 && ( eratio > 1.)) {
         //if(ptemp < 0 && plast > 0 ) {
-        if(ptemp < 0) {
-            //u_temp[j].u3 = ekin + plast/(gamma_adiabat-1);
+        //if(0==1) {
+        if((plast < 0) || (temper < 0) || std::isnan(temper) )  {
+
+            double enew  = this->cv*kb*base->temperature_floor;
+            u_temp[j].u3 = enew + ekin;
+
+            eos->compute_primitive(&(u[j]), &(prim[j]), 1) ;    
+            eos->compute_auxillary(&(prim[j]), 1);
             //fixed_cells++;
+
+            //cout<<"Repaired T in cell/species = "<<j<<" "<<this->speciesname<<" step "<<base->steps<<" flag "<<flag<<endl;
         }
     }
     
@@ -1453,4 +1482,28 @@ void c_Sim::print_velocity_numberdens_ratios(string position, int dcell)
     }
     
     
+}
+
+
+void c_Sim::apply_inflow_damping() {
+
+    if(globalTime > 1e0) {
+        double damping_time = 1e3;
+
+        for (int s=0; s<num_species; s++) {
+            for(int j=1; j<=num_cells; j++) {
+
+                if(species[s].u[j].u2 < 0) {
+                    
+                    species[s].u[j].u2 /= (1+dt/damping_time);
+                    species[s].u[j].u3 = species[s].prim[j].pres/(species[s].gamma_adiabat-1.) + 0.5 * species[s].u[j].u2 * species[s].u[j].u2/species[s].u[j].u1;
+                }
+            }
+            //Recompute primitive variables after damping
+            species[s].compute_pressure(species[s].u);
+        }
+
+    }
+
+
 }

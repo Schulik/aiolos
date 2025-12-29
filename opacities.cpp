@@ -109,7 +109,26 @@ void c_Species::update_opacities() {
     if (base->opacity_model == 'U') {
         // User-defined opacities
         //user_opacity() ;
-        complicated_opacity() ;
+        //complicated_opacity() ;
+
+
+        
+        for(int j=0; j< num_cells+2; j++) {
+            
+            for(int b=0; b<num_bands_in; b++) {
+
+                opacity_twotemp(j,b)= base->const_opacity_solar_factor * opacity_avg_solar(b); // (1. + pressure_broadening_factor * pow(prim[j].pres/1e5, pressure_broadening_exponent)); 
+                
+            }
+            for(int b=0; b<num_bands_out; b++) {
+                opacity(j,b)        = base->const_opacity_rosseland_factor * 0.1*pow((prim[j].density/1.e-3),0.6); //Freedman scaling for Rosseland mean 0.1 for solar Z
+                //opacity(j,b)         = base->const_opacity_rosseland_factor * opacity_avg_rosseland(b);// * (1. + pressure_broadening_factor * pow(prim[j].pres/1e5, pressure_broadening_exponent)); 
+
+                opacity_planck(j,b)  = base->const_opacity_planck_factor * opacity_avg_planck(b);// * 1./(1. + 1./(prim[j].pres/pressure_broadening_factor)); //(1. + pressure_broadening_factor * pow(prim[j].pres/1e5, pressure_broadening_exponent)); 
+                
+            }
+        } 
+
     } 
     else if(base->opacity_model == 'P') {
         

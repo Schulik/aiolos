@@ -1639,9 +1639,92 @@ Eigen::VectorXd c_Sim::read_and_bin_opacityfile(string filename, int col) {
 
 
 
+/*
+    Write the reactions which have been accepted by the code and are in fact running into KROME format, for a 1:1 comparison.
+    Employs the KROME syntax for reaction networks.
+
+    @in cdebug Debug level for printing information during reaction reading
+*/
+void c_Sim::write_krome_reactions_to_file(int cdebug) {
+    
+    std::ofstream outfile(workingdir+"krome_"+ stringsplit(simname,".")[0] );  // open file for writing
+
+    if (!outfile) {
+        std::cerr << "Error opening file!" << std::endl;
+        throw 1;
+    }
+    else 
+        cout<<" Writing krome file: "<<workingdir+"krome_"+ stringsplit(simname,".")[0]<<endl;
+
+    //Step 1: Output the thermochemical reaction list which the program thinks its using
+    outfile<<"@format:idx,R,R,R,P,P,P,rate"<<endl;
+    for(c_reaction& reaction : reactions) {
+
+            outfile<<""<<reaction.reaction_number<<",";
+                int rcnt=0;
+                if(reaction.mtype_reaction) {
+                    outfile<<"H2O,";
+                    rcnt++;
+                }
+                for(int& ei : reaction.educts) {
+                    for(int i=0; i< reaction.e_stoch_i[ei]; i++) {
+                        outfile<<species[ei].speciesname<<",";
+                        rcnt++;
+                    }
+                    
+                    //if(reaction.educts.back() != ei) //Dont write ',' for the last reactant
+                    //    outfile<<",";
+                }
+                if(rcnt < 3)
+                    for(int i=0; i<3-rcnt; i++)
+                        outfile<<",";
 
 
+                rcnt=0;
+                if(reaction.mtype_reaction) {
+                    outfile<<"H2O,";
+                    rcnt++;
+                }
+                for(int& pi : reaction.products) {
+                    for(int i=0; i< reaction.p_stoch_i[pi]; i++) {
+                        outfile<<species[pi].speciesname<<",";
+                        rcnt++;
+                    }
+                    //if(reaction.products.back() != pi) //Dont write ',' for the last product
+                    //    outfile<<",";
+                }
+                if(rcnt < 3)
+                    for(int i=0; i<3-rcnt; i++)
+                        outfile<<",";
+                
+                outfile<<reaction.reac_a<<"*"<<"(Tgas)**("<<reaction.reac_b<<")*exp(-"<<reaction.reac_c<<"/Tgas)"<<endl;
+    }
 
+    //Step 2:  Output the photochemical reaction list which the program thinks its using
+    if(num_photoreactions > 0) {
+        outfile<<"@photo_start"<<endl;
+        outfile<<"@format:idx,R,P,P,rate"<<endl;
+        for(c_photochem_reaction& reaction : photoreactions) {
+
+                outfile<<reaction.reaction_number<<": ";
+                
+                for(int& ei : reaction.educts) {
+                    outfile<<species[ei].speciesname<<",";
+                }
+                for(int& pi : reaction.products) {
+                    outfile<<species[pi].speciesname;
+                    if(reaction.products.back() != pi) 
+                            outfile<<",";
+                }
+            
+                outfile<<endl;
+        }
+        outfile<<"@photo_end"<<endl;
+        outfile<<endl;
+    }
+
+    outfile.close();
+}
 
 
 //}
