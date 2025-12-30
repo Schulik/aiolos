@@ -85,6 +85,10 @@ double c_Sim::get_cfl_timestep() {
                     f = std::max(f,1e-10);
                 }
                 species[s].finalstep[i] = species[s].timesteps[i] + f * species[s].timesteps_cs[i];
+
+                if(solver == HydroSolver::implicitelectrons) {
+                    species[s].finalstep[i] = 0;
+                }
             }
             else
                 species[s].finalstep[i]    = species[s].timesteps[i] + species[s].timesteps_cs[i] ;

@@ -1765,6 +1765,9 @@ void c_Species::initialize_hydrostatic_atmosphere(string filename) {
     }
 
     u[num_cells/2].u1 *= 1e6; //Advection test initial condition
+    //u[num_cells/2+1].u1 *= 1e6; //Advection test initial condition
+    //u[num_cells/2+2].u1 *= 1e6; //Advection test initial condition
+    //u[num_cells/2+3].u1 *= 1e6; //Advection test initial condition
     //u[num_cells/2].u2  = 1e6; //Advection test initial condition
     //u[num_cells/2].u3   *= 1e6;
     
@@ -2140,8 +2143,14 @@ void c_Species::apply_boundary_right(std::vector<AOS>& u) {
             }
             break;
         case BoundaryType::fixed:  //enum type 3
-            for (int i=Ncell+ num_ghosts; i < Ncell+2*num_ghosts; i++)
-                u[i]     = SHOCK_TUBE_UR;
+            
+            for (int i=Ncell+num_ghosts; i < Ncell+2*num_ghosts; i++) {
+                if(base->problem_number==1)
+                    u[i]     = SHOCK_TUBE_UR;
+                else
+                    u[i] = 3e-8;// BACKGROUND_U.u1;
+            }
+                
             break;
         case BoundaryType::periodic:  //enum type 4
             for (int i=Ncell+num_ghosts; i < Ncell+2*num_ghosts; i++) {
