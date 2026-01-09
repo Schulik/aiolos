@@ -53,7 +53,13 @@ double c_Sim::get_cfl_timestep() {
     //  t = delta x / v = delta x / momentum / density
     //
     double minstep = 0.;
-    
+    double diffstep = 0.;
+
+    int cnstr_spc = -1;
+    int cnstr_cell= -1;
+    double max_temper = 0;
+    double max_mach = 0;
+
     max_snd_crs_time=0;
     for(int s=0; s < num_species; s++) {
         
@@ -69,6 +75,7 @@ double c_Sim::get_cfl_timestep() {
             //Computing the inverse timesteps first
             species[s].timesteps[i]    = std::abs(species[s].prim[i].speed / dx[i]); 
             species[s].timesteps_cs[i] = species[s].prim[i].sound_speed / dx[i];
+            
             if(s== e_idx) {
                 double f    = 1.;
                 double flim = mix_p3;
@@ -77,14 +84,27 @@ double c_Sim::get_cfl_timestep() {
                     f = 1.-1./std::exp( f*f/flim/flim );
                     f = std::max(f,1e-10);
                 }
-                species[s].finalstep[i] = species[s].timesteps[i] + f * species[s].timesteps_cs[i];
+                species[s].finalstep[i] = std::sqrt(species[s].timesteps[i]*species[s].timesteps[i] + f * species[s].timesteps_cs[i]*species[s].timesteps_cs[i]);
+
+                if(solver == HydroSolver::implicitelectrons) {
+                    species[s].finalstep[i] /= cflfactor_electron;
+                    //species[s].finalstep[i] = 0 ; //Naively this should be the right approach, but there are numerical imbalances
+                }
             }
             else
-                species[s].finalstep[i]    = species[s].timesteps[i] + species[s].timesteps_cs[i] ;
+                species[s].finalstep[i]    = std::sqrt(species[s].timesteps[i]*species[s].timesteps[i] + species[s].timesteps_cs[i]*species[s].timesteps_cs[i] ) ;
             
             species[s].snd_crs_time += 2.* dx[i] / species[s].prim[i].sound_speed ;
             
-            minstep = std::max(minstep, species[s].finalstep[i]) ;
+            if(species[s].finalstep[i] > minstep) {
+                minstep = species[s].finalstep[i] ;
+                cnstr_spc = s;
+                cnstr_cell= i;
+
+                max_temper = species[s].prim[i].temperature;
+                max_mach   = std::abs(species[s].prim[i].speed/species[s].prim[i].sound_speed);
+            }
+            //minstep = std::max(minstep, species[s].finalstep[i]) ;
         }
         max_snd_crs_time = std::max(max_snd_crs_time, species[s].snd_crs_time) ;
     }
@@ -95,6 +115,21 @@ double c_Sim::get_cfl_timestep() {
     
     //Invert and apply CFL secutiry factor
     cfl_step = cflfactor / minstep;
+
+    for(int s=0; s < num_species; s++) {
+            for(int i=1; i<=num_cells; i++) {
+                //Get diffusive timestep
+                diffstep = 0.1*species[s].diffusive_timestep(i);
+                //if(i==20)
+                //    cout<<" s / cfl_step / diff_step = "<<s<<" / "<<cfl_step<<" / "<<diffstep<<endl;
+                cfl_step = min(cfl_step, diffstep);
+            }
+    }
+
+    if(steps%435==0) {
+    //if(steps>350) {
+        cout<<" most constraining cfl cell: "<<cnstr_cell<<" species "<<species[cnstr_spc].speciesname<< " resulting in dt ="<<cfl_step<<" total dt "<< min(cfl_step, dt*max_timestep_change)<<" max_temper = "<<max_temper<<" max_mach "<<max_mach<<" steps "<<steps<<endl;
+    }  
     
     if(do_hydrodynamics)
         return min(cfl_step, dt*max_timestep_change);

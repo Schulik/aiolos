@@ -12,11 +12,11 @@ BFLAGS = -I. -O3 -g #or -g
 else
 CXX = g++ -std=c++17 
 CXXFLAGS = -Wall -Wextra -march=native #-flto  #-pg or -g put compiler settings here
-BFLAGS = -I. -O3 -fopenmp -g -w #or -g
+BFLAGS = -I. -O3 -fopenmp -g -pg -w #or -g
 endif
 endif
 CPPFLAGS = -I/usr/include/eigen3 -DNDEBUG # put pre-processor settings (-I, -D, etc) here
-LDFLAGS = -w -lm -fopenmp # -lgsl -lgslcblas # put linker settings here
+LDFLAGS = -g -pg -w -lm -fopenmp # -lgsl -lgslcblas # put linker settings here
 
 
 PROBLEM=default

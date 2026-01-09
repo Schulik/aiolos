@@ -26,8 +26,11 @@
 void c_Sim::init_grav_pot() {
 
     double rh = planet_semimajor * au * pow(planet_mass / (3.* star_mass ),0.333333333333333333);        
+    int num_bounds = 1;
+    if(order == IntegrationType::second_order)
+        num_bounds = 2;
 
-    for(int i = 1; i <= num_cells+1; i++) {
+    for(int i = num_bounds; i <= num_cells+1; i++) {
         enclosed_mass[i] = planet_mass;      //No self-gravity
         phi[i]           = get_phi_grav(x_i12[i], enclosed_mass[i]);
             
@@ -38,6 +41,8 @@ void c_Sim::init_grav_pot() {
             //phi[i] -=0.5* 3.*G*star_mass*x_i12[i]*x_i12[i]/pow(planet_semimajor*au,3.);
             
     }
+    if(order == IntegrationType::second_order)
+        phi[1]           = get_phi_grav(x_i12[2],         planet_mass); //So that there is no jump across the boundary
     phi[0]           = get_phi_grav(x_i12[1],         planet_mass);
         
     rhill = planet_semimajor*au * std::pow(planet_mass / 3. / star_mass, 0.333333333333333333333);
@@ -161,6 +166,15 @@ AOS c_Species::source_grav(AOS &u, int &j) {
     double dphidr_m = (phi_s[j+1] - phi_s[j]) / (base->dx[j+1] + base->dx[j]) ;
 
     return AOS(0, u.u1, u.u2) * (-1.) * ( base->omegaplus[j] * dphidr_p  + base->omegaminus[j] * dphidr_m);
+}
+
+AOS c_Species::source_grav_noconserved(AOS &u, int &j) {
+    assert(j > 0 && j <= num_cells) ;
+
+    double dphidr_p = (phi_s[j] - phi_s[j-1]) / (base->dx[j] + base->dx[j-1]) ;
+    double dphidr_m = (phi_s[j+1] - phi_s[j]) / (base->dx[j+1] + base->dx[j]) ;
+
+    return AOS(0, 1., 0.) * (-1.) * ( base->omegaplus[j] * dphidr_p  + base->omegaminus[j] * dphidr_m);
 }
 
 
@@ -493,12 +507,12 @@ void c_Sim::compute_friction_numerical(double dtt) {
          
     if(debug > 0) cout<<"in numerical, dense friction, num_species = "<<num_species<<endl;
     
-    for(int j=0; j <= num_cells+1; j++){
+    for(int j=0; j < num_cells-1; j++){
 
         fill_alpha_basis_arrays(j);
         compute_alpha_matrix(j);
                 
-        if(debug >= 2 && j==1200 && steps == 10)  {
+        if(debug >=3 && j==42 && steps == 524)  {
             cout<<"    Computed coefficient matrix ="<<endl<<friction_coefficients<<endl;
             cout<<"    velocities ="<<endl<<friction_vec_input<<endl;
             cout<<"    velocities[0] = "<<friction_vec_input(0)<<endl;
@@ -613,6 +627,10 @@ void c_Sim::compute_friction_numerical(double dtt) {
         species[si].eos->compute_conserved(&(species[si].prim[0]), &(species[si].u[0]), num_cells+2);        
     }
     
+
+    if(steps>=524)
+        cout<<"";
+
 }
 
 /**
@@ -732,14 +750,12 @@ void c_Sim::compute_alpha_matrix(int j) { //Called in compute_friction() and com
                             cout<<"    spec "<<species[si].speciesname<<" j = "<<j<<" alpha_local = "<<alpha_local<<endl;
                     }
                     
-                    // Fill alpha_ij and alpha_ji
-                    //if(si==sj)
-                   //    friction_coefficients(si,sj) = 0.;
-                    //else
+        
                     friction_coefficients(si,sj) = friction_coeff_mask(si,sj) * alpha_local;
-                    //friction_coefficients(sj,si) = friction_coeff_mask(sj,si) * alpha_local * dens_vector(si) / dens_vector(sj);
-                    //alpha_local *=  ;
-                
+                    
+                    /*if(std::isnan(alpha_local)) {
+                        cout<<"steps / j = "<<steps<<" "<<j<<" found alpha NaN for partners "<<species[si].speciesname<<" / "<<species[sj].speciesname<<" T/T/meanT "<<temperature_vector(si)<<"/"<<temperature_vector(sj)<<"/"<<meanT<<endl;
+                    }*/
             }
         }
         //char a;
@@ -789,13 +805,14 @@ void c_Sim::compute_collisional_heat_exchange() {
         cout << "in compute_collisional_heat_exchange, num_species = "
              << num_species << endl;
     
+    double ddt = dt * 1.;
     for(int j=0; j <= num_cells+0; j++){
 
         fill_alpha_basis_arrays(j);
         compute_collisional_heat_exchange_matrix(j);
 
         // Solve implicit equation for new temperature
-        friction_matrix_T = identity_matrix - friction_coefficients * dt;
+        friction_matrix_T = identity_matrix - friction_coefficients * ddt;
         
         LU.compute(friction_matrix_T) ;
         friction_vec_input.noalias() = LU.solve(temperature_vector_augment);
@@ -808,8 +825,8 @@ void c_Sim::compute_collisional_heat_exchange() {
         // Update internal energy (dE = Cv dT/dt * dt)
         //
         for(int si=0; si<num_species; si++) {
-            species[si].prim[j].internal_energy += species[si].cv*friction_vec_output(si)*dt;
-            species[si].prim[j].temperature     += friction_vec_output(si)*dt;
+            species[si].prim[j].internal_energy += species[si].cv*friction_vec_output(si)*ddt;
+            species[si].prim[j].temperature     += friction_vec_output(si)*ddt;
         }
     }
 
@@ -823,3 +840,88 @@ void c_Sim::compute_collisional_heat_exchange() {
 
 }
 
+/**
+ * Compute the duffisve source flux, including momentum and energy flux
+ * @param[in] u Conservative data in cell j
+ * @param[in] j Interface number
+ * @return    Diffusive flux for interface j
+ */
+AOS c_Species::source_diffusion_flux(int j) {
+
+    assert(j > 0 && j <= num_cells) ;
+
+    double fjm1   = std::log10(prim[j].number_density/base->total_numdens[j]);  
+    double fj     = std::log10(prim[j+1].number_density/base->total_numdens[j+1]);
+
+    double vjm1   = prim[j].speed;  
+    double vj     = prim[j+1].speed;
+
+    double dfdr             = ( fj - fjm1) / (base->x_i12[j+1] - base->x_i12[j]) ;
+    double u_diff           = - base->diffusivity * dfdr; //If diffusivity is in cm^2/s then u_diff is in cm/s
+    //double vdonor           = std::pow(  0.5* (std::log10(vj)+std::log10(vjm1)),10 );//( vj-vjm1 > 0 ) ? vjm1 : vj;
+    //double vdonor     = ( vj-vjm1 > 0 ) ? vj : vjm1;
+    //double edonor     = ( vj-vjm1 > 0 ) ? u[j+1].u3 : u[j].u3;
+
+    double vdonor       = ( u_diff > 0 ) ? vj : vjm1;
+    double rhodonor     = ( u_diff < 0 ) ? u[j+1].u1 : u[j].u1;
+    double momdonor     = ( u_diff < 0 ) ? u[j+1].u2 : u[j].u2;
+    double edonor       = ( u_diff < 0 ) ? u[j+1].u3 : u[j].u3;
+
+    //double vdonor           = logmean( vj, vjm1);
+    //double vdonor  = 0.5*( vj+vjm1) ;
+    //double nmean = prim[j+1].number_density;//base->total_press_l[j]/1e6>1e-9 ? 1. : 0.; //0.5 * (base->total_press_r[j-1] + base->total_press_l[j])/1e+6;
+    double nmean   = logmean( prim[j].number_density,  prim[j+1].number_density);
+    double rhomean = logmean( u[j].u1,  u[j+1].u1);
+    double mommean =    0.5*( u[j].u2,  u[j+1].u2);
+    double emean   = logmean( u[j].u3,  u[j+1].u3);
+
+    double pscl = 1.;
+    if(base->total_press[j]/1e6 < 1e-9) 
+        pscl = base->total_press[j] / 1e6 / 1e-9; //Scale down diffusion beyond a nanobar to increase numerical stability
+    u_diff *= pscl;
+
+    if(this->mass_amu < 0.4) //For electrons, reduce diffusion strength
+        u_diff = 0.;
+
+    //double diff             = - u_diff * nmean;
+    //return AOS(0, u.u1, u.u2) * (-1.) * ( base->omegaplus[j] * dphidr_p  + base->omegaminus[j] * dphidr_m);
+    //if(base->steps==500 && j<25)
+    //    cout<<this->speciesname<<" j/diff = "<<j<<"/"<<diff<<" "<<endl;
+    if(j<=4)
+        u_diff = 0;
+    //u_diff = 0.;
+    //return AOS( u_diff * rhomean,  u_diff * mommean * base->vdiffusivity, +1.*u_diff*emean);
+    return AOS( u_diff * rhodonor, u_diff * momdonor * base->vdiffusivity, u_diff*edonor);
+}
+
+/**
+Diffusive timestep constraint
+@param j Cell number
+@return Explicit diffusive timestep
+*/
+double c_Species::diffusive_timestep(int j) {
+    double diff_tstep = 1e+20 ;
+
+   assert(j > 0 && j <= num_cells) ;
+
+    double vjm1   = prim[j-1].number_density/base->total_numdens[j-1];  
+    double vj     = prim[j].number_density/base->total_numdens[j];
+
+    double dudr             = ( vj - vjm1) / (base->x_i12[j] - base->x_i12[j-1]) ;
+    double vdonor  = ( vj-vjm1 > 0 ) ? vjm1 : vj;
+    double pressure_scaling = 0.5 * (base->total_press_r[j-1] + base->total_press_l[j])/1e+6;
+
+    if(j>100) 
+        pressure_scaling = 0.;
+
+    double diff             = - base->diffusivity * dudr * pressure_scaling * 1e10;
+    if(j<=2)
+        diff = 0;
+
+    if(std::fabs(diff) > 1e-30) {
+        diff_tstep = 0.5 * base->dx[j] * base->dx[j] / std::fabs(diff);
+    }
+
+    return diff_tstep * 1e9 ;
+
+}

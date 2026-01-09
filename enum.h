@@ -62,7 +62,7 @@ IOS_INPUT(EOS_internal_energy_type);
 IOS_OUTPUT(EOS_internal_energy_type);
 
 enum class HydroSolver {
-    hllc = 0, roe = 1, mix = 2, laxfriedrich = 3, laxwendroff = 4
+    hllc = 0, roe = 1, mix = 2, laxfriedrich = 3, laxwendroff = 4, implicitelectrons = 5
 } ;
 IOS_INPUT(HydroSolver);
 IOS_OUTPUT(HydroSolver);

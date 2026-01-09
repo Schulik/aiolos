@@ -139,7 +139,7 @@ inline float njuffas_log10f(float a) {
 } 
 
 inline float fastpow1(float base, int exp) {
-return std::pow(base,exp);
+//return std::pow(base,exp);
     if( exp == 0)
        return 1;
     float temp = fastpow1(base, exp/2);       
@@ -172,6 +172,10 @@ inline double fastexpm1(double x) {
 inline double fastexpm1_2(double x) {
   return std::expm1(x);
 //return x + 0.5*x*x;
+}
+
+inline double logmean(double a, double b) {
+    return std::pow(10., 0.5*(std::log10(a) + std::log10(b)));
 }
 
 
@@ -419,6 +423,8 @@ public:
     double start_hydro_time;
     double conductivity;
     double conductivity2;
+    double diffusivity;
+    double vdiffusivity;
     double do_cond_until;
     int neutralize_electrons;
     ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -494,6 +500,8 @@ public:
     
     double dt;
     double cflfactor;
+    double cflfactor_electron;
+    double edamp_lim;
     double t_max;
     double max_timestep_change;
     double dt_min_init;
@@ -504,6 +512,7 @@ public:
     double globalTime;
     double output_time;
     double output_time_offset;
+    int cont_output_steps;
     double monitor_time;
     double max_snd_crs_time;
     double rad_energy_multiplier;
@@ -574,6 +583,7 @@ public:
     std::vector<double> enclosed_mass;
     std::vector<double> enclosed_mass_tmp;
     std::vector<double> total_press;
+    std::vector<double> total_numdens;
     std::vector<double> total_press_l ; // Reconstructed left/ right edges
     std::vector<double> total_press_r ;
     std::vector<double> total_adiabatic_index;
@@ -605,8 +615,9 @@ public:
     double avg_temperature_t1;
     double avg_velocity_t0;
     double avg_velocity_t1;
-
     double wavedamp_factor;
+    int use_inflow_damping;
+
     //using Matrix_t = Eigen::Matrix<double, NUM_SPECIES,NUM_SPECIES, Eigen::RowMajor>;
     //using Vector_t = Eigen::Matrix<double, NUM_SPECIES, 1>;
     Matrix_t friction_matrix_T;
@@ -739,6 +750,7 @@ public:
     Eigen::MatrixXd Jrad_FLD;
 
     BlockTriDiagSolver<Eigen::Dynamic> tridiag;
+    BlockTriDiagSolver<Eigen::Dynamic> implicit_tridiag;
     Eigen::MatrixXd Jrad_init;
     
     int rad_solver_max_iter = 1;
@@ -757,6 +769,7 @@ public:
     int imaxchem;
     int output_chemistry;
     int use_secondary_ionisation;
+    int write_krome_reactions;
     Eigen::MatrixXd reaction_rate_table;
     std::vector<c_reaction> reactions;
     std::vector<c_photochem_reaction> photoreactions;
@@ -787,14 +800,16 @@ public:
     int chem_momentum_correction;
     int chem_ekin_correction;
     void init_reactions(int cdebug);
+    void write_krome_reactions_to_file(int cdebug);
     void interpret_chem_reaction_list(string dir, string filename);
     void find_resonant_pairs(string dir, string filename);
     void do_chemistry(double timestep);
     
-       int dt_skip_ichem;
+    int dt_skip_ichem;
     double dt_skip_dchem;
+    int use_chem_reaction_floor;
     
-    Vector_t solver_cchem_implicit_general(double dt, int num_spec, int cdebug, const Vector_t& n_normalized, double ntot);
+    Vector_t solver_cchem_implicit_general(double dt, int num_spec, int cdebug, const Vector_t& n_normalized, double ntot, double mntot);
     int solver_cchem_implicit_specialized_cochem(double dt, int num_spec, int cdebug);
     
     std::vector<double> thermo_poly(double T,double a1,double a2,double a3,double a4,double a5,double a6,double a7,double a8,double a9);
@@ -856,6 +871,8 @@ public:
     void compute_collisional_heat_exchange_matrix(int j) ;
     void compute_collisional_heat_exchange(); 
     
+    void apply_inflow_damping();
+
     //Gravity
     void init_grav_pot();
     void update_mass_and_pot();
@@ -972,6 +989,7 @@ public:
     std::vector<AOS> dudt[2];        // Time derivative of u at each stage ;      
     std::vector<AOS> source;         // Gravitational source term
     std::vector<AOS> source_pressure;// Geometric source term
+    std::vector<AOS> source_diffusion;// Geometric source term
     std::vector<AOS> flux;
     std::vector<double> u_mask;   //Switches 2nd spatial order on and off, depending if a cell breaks
     std::vector<double> lconvect;
@@ -1121,8 +1139,13 @@ public:
     AOS passivescalar_flux2(int);
     AOS exact_flux(AOS u);
     AOS exact_advection_flux(AOS u);
+
+    void implicit_incompressible(double dt);
     
     AOS source_grav(AOS &u, int &j);
+    AOS source_grav_noconserved(AOS &u, int &j);
+    AOS source_diffusion_flux(int j);
+    double diffusive_timestep(int j);
     std::vector<double> phi_s;
 
     void compute_pressure(std::vector<AOS>& u) {
@@ -1135,7 +1158,7 @@ public:
     void update_opacities();
     double interpol_tabulated_opacity(const Eigen::VectorXd& array, int band, double T_gas, double pressure);
     int count_broken_cells(std::vector<AOS>&u, std::vector<double>&u_mask);
-    int fix_negative_pressures_sometimes(std::vector<AOS>&u_tmp);
+    int fix_negative_pressures_sometimes(std::vector<AOS>&u_tmp, int flag);
     
     //
     // Equations of state
