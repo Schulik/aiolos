@@ -84,14 +84,15 @@ double c_Sim::get_cfl_timestep() {
                     f = 1.-1./std::exp( f*f/flim/flim );
                     f = std::max(f,1e-10);
                 }
-                species[s].finalstep[i] = species[s].timesteps[i] + f * species[s].timesteps_cs[i];
+                species[s].finalstep[i] = std::sqrt(species[s].timesteps[i]*species[s].timesteps[i] + f * species[s].timesteps_cs[i]*species[s].timesteps_cs[i]);
 
                 if(solver == HydroSolver::implicitelectrons) {
-                    species[s].finalstep[i] = 0;
+                    species[s].finalstep[i] /= cflfactor_electron;
+                    //species[s].finalstep[i] = 0 ; //Naively this should be the right approach, but there are numerical imbalances
                 }
             }
             else
-                species[s].finalstep[i]    = species[s].timesteps[i] + species[s].timesteps_cs[i] ;
+                species[s].finalstep[i]    = std::sqrt(species[s].timesteps[i]*species[s].timesteps[i] + species[s].timesteps_cs[i]*species[s].timesteps_cs[i] ) ;
             
             species[s].snd_crs_time += 2.* dx[i] / species[s].prim[i].sound_speed ;
             

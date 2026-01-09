@@ -198,7 +198,7 @@ void c_Sim::execute(int restartnumber) {
                  //Apply implicit electron solver for electrons only if so desired. Otherwise continue as usual with all other solvers.
                 if( (solver == HydroSolver::implicitelectrons) && (s==e_idx)) {    
 
-                    species[s].implicit_incompressible(dt);
+                    species[s].implicit_incompressible(1.0*dt);
                     //cout<<" YES IN IMPLICIT ELECTRON SOLVER and species =="<<species[s].speciesname<<endl;
 
                 } else {
@@ -269,7 +269,8 @@ void c_Sim::execute(int restartnumber) {
                     compute_total_pressure();
                 
                     compute_drag_update(0.99*dt) ;
-                    if (use_collisional_heating)
+                    
+                    if (use_collisional_heating && (use_rad_fluxes==0))
                         compute_collisional_heat_exchange() ; //Disable if radiation is used?
                         
                         
@@ -304,15 +305,15 @@ void c_Sim::execute(int restartnumber) {
                     //Apply implicit electron solver if wanted
                     if(solver == HydroSolver::implicitelectrons && s==e_idx) {    
 
-                        species[s].implicit_incompressible(dt*0.5);
+                        species[s].implicit_incompressible(dt*1.0);
 
                     } else {
                     //for(int k=0; k<=0; k++) { //The k=0 run is the nominal run. k=1 is only triggered if some cells are broken
-                        int ex_order = 1;// (s==e_idx)?0:1;
+                        int ex_order = 1;//(s<=2)? 1.:0; //1;// (s==e_idx)?0:1;
                         species[s].execute(species[s].u, species[s].dudt[1], species[s].u_mask, ex_order);
                         
                         for(int j=0; j < num_cells+2; j++) {
-                            double scale_f = 1;//species[s].prim[j].pres/total_press[j];
+                            double scale_f =  1;//(s<=2)? 1.:0;//species[s].prim[j].pres/total_press[j];
                             if (use_drag_predictor_step)
                                 species[s].u_tmp[j] = species[s].u0[j];// + species[s].dudt[0][j]*dt;// March28th 2024 changed this line, as u0 now contains the first-order correct, non-crashed values
                             
@@ -387,8 +388,11 @@ void c_Sim::execute(int restartnumber) {
                 print_velocity_numberdens_ratios(" Pos 1.3:: ", 210);
         }
         
-        for(int s = 0; s < num_species; s++) 
+        for(int s = 0; s < num_species; s++) {
             species[s].compute_pressure(species[s].u);
+            species[s].fix_negative_pressures_sometimes(species[s].u_tmp, 2);
+        }
+
 
         if(steps > debug_steps && debug_cell < num_cells+1) {
                 cout<<"t="<<steps<<" Pos 1.5 T[423]_s = ";
@@ -418,7 +422,13 @@ void c_Sim::execute(int restartnumber) {
         if(steps %prinstuff_steps==0) {    
                 print_velocity_numberdens_ratios(" Pos 2:: ", 210);
         }
+
+        for(int s = 0; s < num_species; s++) {
+            //species[s].compute_pressure(species[s].u);
+            species[s].fix_negative_pressures_sometimes(species[s].u_tmp, 2);
+        }
         
+
         // If either switch is set we need to think more carefully about what should be done
         if( (photochemistry_level + use_rad_fluxes ) > 0 ) {
             
@@ -476,6 +486,11 @@ void c_Sim::execute(int restartnumber) {
                 update_fluxes_FLD_simple(dt); //'Simple' FLD solver
                 
             }
+        }
+
+        for(int s = 0; s < num_species; s++) {
+            //species[s].compute_pressure(species[s].u);
+            species[s].fix_negative_pressures_sometimes(species[s].u_tmp, 2);
         }
         
         if(steps > debug_steps) {
@@ -1413,6 +1428,7 @@ int c_Species::fix_negative_pressures_sometimes(std::vector<AOS>&u_temp, int fla
     double ekinold=0;
     double temper=0;
     for(int j=0; j<=num_cells+1; j++) {
+        int fixed = 0;
         ekin   = 0.5*u_temp[j].u2*u_temp[j].u2/u_temp[j].u1;
         ekinold= 0.5*u[j].u2*u[j].u2/u[j].u1;
         eratio = ekin/u_temp[j].u3;
@@ -1435,7 +1451,7 @@ int c_Species::fix_negative_pressures_sometimes(std::vector<AOS>&u_temp, int fla
             eos->compute_auxillary(&(prim[j]), 1);
 
             //cout<<"Repaired E in cell/species = "<<j<<" "<<this->speciesname<<" steps "<<base->steps<<" flag "<<flag<<endl;
-                
+            fixed = 1;
         };
         
         //Second check: negative pressure
@@ -1449,10 +1465,12 @@ int c_Species::fix_negative_pressures_sometimes(std::vector<AOS>&u_temp, int fla
 
             eos->compute_primitive(&(u[j]), &(prim[j]), 1) ;    
             eos->compute_auxillary(&(prim[j]), 1);
-            //fixed_cells++;
+            fixed = 1;
 
-            //cout<<"Repaired T in cell/species = "<<j<<" "<<this->speciesname<<" step "<<base->steps<<" flag "<<flag<<endl;
+            
         }
+        if(fixed ==1)
+            cout<<"Repaired T in cell/species = "<<j<<" "<<this->speciesname<<" step "<<base->steps<<" flag "<<flag<<endl;
     }
     
     return fixed_cells;

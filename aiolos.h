@@ -175,7 +175,7 @@ inline double fastexpm1_2(double x) {
 }
 
 inline double logmean(double a, double b) {
-    return std::pow(10., std::log10(a) + std::log10(b));
+    return std::pow(10., 0.5*(std::log10(a) + std::log10(b)));
 }
 
 
@@ -500,6 +500,8 @@ public:
     
     double dt;
     double cflfactor;
+    double cflfactor_electron;
+    double edamp_lim;
     double t_max;
     double max_timestep_change;
     double dt_min_init;
@@ -1141,6 +1143,7 @@ public:
     void implicit_incompressible(double dt);
     
     AOS source_grav(AOS &u, int &j);
+    AOS source_grav_noconserved(AOS &u, int &j);
     AOS source_diffusion_flux(int j);
     double diffusive_timestep(int j);
     std::vector<double> phi_s;

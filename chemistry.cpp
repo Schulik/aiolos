@@ -1213,10 +1213,6 @@ void  c_Sim::do_highenergy_cooling(int cell) {
     double mul = photocooling_multiplier;
     double red = beta * mul;
 
-    if(steps==200 && cell==100)
-	cout<<" HI 200 STEPS AND 100 CELLS pos 1"<<endl;
-	// cout<<cell<<" = j, tau ="<<tau<<" beta = "<<beta<<" red = "<<red<<" photocool_multiplier = "<<photocooling_multiplier<<endl;
-
     for(int s=0; s<num_species; s++) //Safety test: set all factors to zero
        species[s].dG(cell)=0;
     

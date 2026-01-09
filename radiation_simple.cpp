@@ -347,7 +347,7 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
                 double temp = 0;
 //                cout<<endl;
                 for(int sj=0; sj<num_species; sj++) {
-                    temp = ddt * friction_coefficients(si,sj) * 3 * kb / (species[si].cv * (mass_vector(si) + mass_vector(sj)) );
+                    temp = ddt * 1. * friction_coefficients(si,sj) * 3 * kb / (species[si].cv * (mass_vector(si) + mass_vector(sj)) );
                     diag_sum += temp;
                     coll_heat_matrix(si,sj) -= temp;
                 }
@@ -523,11 +523,11 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
 // Conduction
 //
 
-     if(use_conduction && ( globalTime < do_cond_until)) {
+    if(use_conduction && ( globalTime < do_cond_until)) {
         std::vector<double> temp_temperatures        = std::vector<double>(num_cells+1);
         std::vector<double> flux_temperatures        = std::vector<double>(num_cells+2);
 
-	temp_temperatures[1] = species[0].const_T_space;        
+	    temp_temperatures[1] = species[0].const_T_space;        
         for (int j=2; j < num_cells+numcells_offset; j++){
                 temp_temperatures[j] = species[0].prim[j].temperature;
                 

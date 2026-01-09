@@ -169,10 +169,12 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, s
             err<<"    WARNING! Something seems wrong with the number of cells required. num_cells = "<<num_cells<<endl;
             throw std::invalid_argument(err.str()) ;
         }
-            
+        
         if(debug > 0) cout<<"Init: Finished reading grid parameters."<<endl;
         
         cflfactor   = read_parameter_from_file<double>(filename,"PARI_CFLFACTOR", debug, 0.9).value;  //Multiplier on the cfl timestep length
+        cflfactor_electron   = read_parameter_from_file<double>(filename,"ELECTRON_CFLFACTOR", debug, 1.0).value;  //Multiplier on the cfl timestep length induced by electrons. Use with implicit electron solver (hydro_solver 5)
+        edamp_lim            = read_parameter_from_file<double>(filename,"ELECTRON_DAMPING_LIMIT", debug, 1e8).value;  //Sets the fraction-dependent damping timescale for electron momentum
         t_max       = read_parameter_from_file<double>(filename,"PARI_TIME_TMAX", debug, 1e0).value;  // Simulate until t=t_max in seconds.
         dt_max      = read_parameter_from_file<double>(filename,"PARI_DTMAX", debug, 1e99).value;     // Limit the largest possible timestep size in seconds.
         max_timestep_change = read_parameter_from_file<double>(filename,"MAX_TIMESTEP_CHANGE", debug, 1.1).value; //Max. change of timestep per following timestep in s.
@@ -1442,7 +1444,27 @@ c_Species::c_Species(c_Sim *base_simulation, string filename, string species_fil
         t_evap = 50.;
         latent_heat = 3.34e5*1e7/1e3; //3.34e5 J/kg
         p_sat = 1e6;
-        
+
+        //////////////////////////////////////////////////////////////////
+        /// initialize advection test //
+        //////////////////////////////////////////////////////////////////
+        if(this_species_index == -9999) {
+            double u2 = read_parameter_from_file<double>(filename,"PARI_INIT_DATA_U2", debug, 0.).value; //initial momentum. Should be 0, hence mostly irrelevant parameter.
+
+            //u[num_cells/2].u1 *= 1e0; //Advection test initial condition
+            for(int i = 0; i<=num_cells+1; i++) {
+                //if(this_species_index==1 && (i == num_cells/2))
+                    u[i].u2 = u2;
+
+                u[i].u3 = 0.5 * u[i].u2 * u[i].u2 / u[i].u1 + u[i].u1 * cv * prim[i].temperature; //Implies that T has been already initialized
+            }
+            eos->compute_primitive(&(u[0]), &(prim[0]), base->num_cells+2) ;   
+            eos->compute_auxillary(&(prim[0]), base->num_cells+2); 
+        }
+        //////////////////////////////////////////////////////////////////
+        //////////////////////////////////////////////////////////////////
+        //////////////////////////////////////////////////////////////////
+
         // Apply boundary conditions
         apply_boundary_left(u) ;
         apply_boundary_right(u) ;
@@ -1668,22 +1690,6 @@ void c_Species::initialize_hydrostatic_atmosphere(string filename) {
             //cout<<" s/i = "<<speciesname<<"/"<<i<<"   metric_inner debug: dPhi = "<<dphi<<" rhonew/rhoold = "<<temp_rhofinal<<"/"<<u[i].u1<<endl;
             
             //if(speciesname.compare("S2")==0) { //Force light electrons to be the same number as protons
-            if(mass_amu < 0.90) {    
-            //if(speciesname.compare("e-")==0 ) { //Force light electrons to be the same number as protons
-                //if(debug > -1) cout<<"        JUST BEFORE GET PROTON INDEX  AFTER READ DATA Species["<<speciesname<<"] mass = "<<mass_amu<<endl;
-
-                //int p_index = base->get_species_index("H+");
-		//cout<<"Hi i am electron, searching for proton ... "<<endl;
-                //int p_index = base->get_species_index("Hp S1 H+ p+ p", 1);
-		//cout<<"Hi i am electron, searching for p index  ... "<<p_index<<endl;
-                //if(p_index < 0) {
-                //    cout<<" IN HYDROSTAT CONSTRUCTION for e-: Protons (H+) species not found! "<<endl;
-                //}
-                //temp_rhofinal = base->species[p_index].u[i+1].u1 * initial_fraction / base->species[p_index].initial_fraction;
-
-		//cout<<"Hi i am electron, found proton ... "<<endl;
-                
-            }
             
             //////////////////////////////////////////////////////////////////////////////////////
             //double floor = base->density_floor / mass_amu * std::pow(base->x_i12[i]/base->x_i12[1], -4.);
@@ -1723,7 +1729,7 @@ void c_Species::initialize_hydrostatic_atmosphere(string filename) {
             
             //cout<<" s/i = "<<speciesname<<"/"<<i<<"   metric_inner debug: dPhi = "<<(base->phi[i+1]*K_zzf[i+1] - base->phi[i]*K_zzf[i])<<" rhonew/rhoold = "<<temp_rhofinal<<"/"<<u[i].u1<<" kzz = "<<K_zzf[i+1]<<"/"<<K_zzf[i]<<" To/Ti = "<<T_outer<<"/"<<T_inner<<endl;
             
-            u[i+1] = AOS(temp_rhofinal, 0., cv * temp_rhofinal * T_outer);
+            u[i+1] = AOS(temp_rhofinal, u[i].u2, cv * temp_rhofinal * T_outer);
             
             if(debug > 2) {
             //if(i < 3) {
@@ -1764,7 +1770,7 @@ void c_Species::initialize_hydrostatic_atmosphere(string filename) {
         //prim[0] = prim[3];
     }
 
-    u[num_cells/2].u1 *= 1e6; //Advection test initial condition
+    //u[num_cells/2].u1 *= 1e6; //Advection test initial condition
     //u[num_cells/2+1].u1 *= 1e6; //Advection test initial condition
     //u[num_cells/2+2].u1 *= 1e6; //Advection test initial condition
     //u[num_cells/2+3].u1 *= 1e6; //Advection test initial condition
@@ -1780,7 +1786,7 @@ void c_Species::initialize_hydrostatic_atmosphere(string filename) {
         
         for(int i = iter_start+1; i<num_cells+1; i++) {
             double rr = pow(base->x_i[i]/base->x_i[iter_start],5.);
-            u[i] = AOS(u[iter_start].u1 / rr, 0., cv * u[iter_start].u1 / rr * prim[i].temperature) ;
+            u[i] = AOS(u[iter_start].u1 / rr, u[i].u2, cv * u[iter_start].u1 / rr * prim[i].temperature) ;
         }
     }
     
@@ -1790,7 +1796,7 @@ void c_Species::initialize_hydrostatic_atmosphere(string filename) {
             if(u[i].u1 < floor) {
                 //floor = 1e6 * mass_amu*amu / (kb * prim[i].temperature); 
                 //cout<<"FIXING SMALL DENSITIES in i ="<<i<<" for species = "<<this_species_index<<endl;
-                u[i] = AOS(floor, 0., cv * floor * prim[i].temperature) ;
+                u[i] = AOS(floor, u[i].u2, cv * floor * prim[i].temperature) ;
             }
     }
     
@@ -1883,7 +1889,7 @@ void c_Species::initialize_exponential_atmosphere() {
         //double temp_rhofinal = u[i].u1*std::exp(-1./const_rho_scale*(base->x_i[i] - base->x_i[num_cells]));
         double temp_rhofinal = u[2].u1*std::exp(-gm/cs2 * (1/base->x_i[2] - 1/base->x_i[i]));
         
-        u[i] = AOS(temp_rhofinal, 0., cv * temp_rhofinal * prim[i].temperature) ;
+        u[i] = AOS(temp_rhofinal, u[i].u2, cv * temp_rhofinal * prim[i].temperature) ;
     }
     cout<<endl<<endl;
     cout<<"            Ended expoenential density construction for species "<<speciesname<<endl;

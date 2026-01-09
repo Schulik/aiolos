@@ -168,6 +168,15 @@ AOS c_Species::source_grav(AOS &u, int &j) {
     return AOS(0, u.u1, u.u2) * (-1.) * ( base->omegaplus[j] * dphidr_p  + base->omegaminus[j] * dphidr_m);
 }
 
+AOS c_Species::source_grav_noconserved(AOS &u, int &j) {
+    assert(j > 0 && j <= num_cells) ;
+
+    double dphidr_p = (phi_s[j] - phi_s[j-1]) / (base->dx[j] + base->dx[j-1]) ;
+    double dphidr_m = (phi_s[j+1] - phi_s[j]) / (base->dx[j+1] + base->dx[j]) ;
+
+    return AOS(0, 1., 0.) * (-1.) * ( base->omegaplus[j] * dphidr_p  + base->omegaminus[j] * dphidr_m);
+}
+
 
 /**
  * For scenarios using a changed lower atmospheric gravity field to equalize all scale heights for all species.
@@ -498,12 +507,12 @@ void c_Sim::compute_friction_numerical(double dtt) {
          
     if(debug > 0) cout<<"in numerical, dense friction, num_species = "<<num_species<<endl;
     
-    for(int j=0; j <= num_cells+1; j++){
+    for(int j=0; j < num_cells-1; j++){
 
         fill_alpha_basis_arrays(j);
         compute_alpha_matrix(j);
                 
-        if(debug >= 2 && j==1200 && steps == 10)  {
+        if(debug >=3 && j==42 && steps == 524)  {
             cout<<"    Computed coefficient matrix ="<<endl<<friction_coefficients<<endl;
             cout<<"    velocities ="<<endl<<friction_vec_input<<endl;
             cout<<"    velocities[0] = "<<friction_vec_input(0)<<endl;
@@ -618,6 +627,10 @@ void c_Sim::compute_friction_numerical(double dtt) {
         species[si].eos->compute_conserved(&(species[si].prim[0]), &(species[si].u[0]), num_cells+2);        
     }
     
+
+    if(steps>=524)
+        cout<<"";
+
 }
 
 /**
@@ -737,14 +750,12 @@ void c_Sim::compute_alpha_matrix(int j) { //Called in compute_friction() and com
                             cout<<"    spec "<<species[si].speciesname<<" j = "<<j<<" alpha_local = "<<alpha_local<<endl;
                     }
                     
-                    // Fill alpha_ij and alpha_ji
-                    //if(si==sj)
-                   //    friction_coefficients(si,sj) = 0.;
-                    //else
+        
                     friction_coefficients(si,sj) = friction_coeff_mask(si,sj) * alpha_local;
-                    //friction_coefficients(sj,si) = friction_coeff_mask(sj,si) * alpha_local * dens_vector(si) / dens_vector(sj);
-                    //alpha_local *=  ;
-                
+                    
+                    /*if(std::isnan(alpha_local)) {
+                        cout<<"steps / j = "<<steps<<" "<<j<<" found alpha NaN for partners "<<species[si].speciesname<<" / "<<species[sj].speciesname<<" T/T/meanT "<<temperature_vector(si)<<"/"<<temperature_vector(sj)<<"/"<<meanT<<endl;
+                    }*/
             }
         }
         //char a;
@@ -794,13 +805,14 @@ void c_Sim::compute_collisional_heat_exchange() {
         cout << "in compute_collisional_heat_exchange, num_species = "
              << num_species << endl;
     
+    double ddt = dt * 1.;
     for(int j=0; j <= num_cells+0; j++){
 
         fill_alpha_basis_arrays(j);
         compute_collisional_heat_exchange_matrix(j);
 
         // Solve implicit equation for new temperature
-        friction_matrix_T = identity_matrix - friction_coefficients * dt;
+        friction_matrix_T = identity_matrix - friction_coefficients * ddt;
         
         LU.compute(friction_matrix_T) ;
         friction_vec_input.noalias() = LU.solve(temperature_vector_augment);
@@ -813,8 +825,8 @@ void c_Sim::compute_collisional_heat_exchange() {
         // Update internal energy (dE = Cv dT/dt * dt)
         //
         for(int si=0; si<num_species; si++) {
-            species[si].prim[j].internal_energy += species[si].cv*friction_vec_output(si)*dt;
-            species[si].prim[j].temperature     += friction_vec_output(si)*dt;
+            species[si].prim[j].internal_energy += species[si].cv*friction_vec_output(si)*ddt;
+            species[si].prim[j].temperature     += friction_vec_output(si)*ddt;
         }
     }
 
