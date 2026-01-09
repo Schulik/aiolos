@@ -95,7 +95,7 @@ void c_Species::implicit_incompressible(double dt) {
     ////////////////////////////////////////////////////////////////////////
     // Construct implicit Matrix
     ////////////////////////////////////////////////////////////////////////
-    for (int j=0; j <= num_cells; j++) {
+    for (int j=0; j <= num_cells+1; j++) {
 
         double V   = base->vol[j];
         double S_l = base->surf[j-1];
@@ -288,13 +288,37 @@ void c_Species::implicit_incompressible(double dt) {
     }
     
     /*
-    cout<<" dd and r "<<endl;
-    for (auto i: dd)
-        std::cout << i << ' ';
+    int cnt = 0;
+    cout<<" dd :"<<endl;
+    for (auto i: dd){
+                std::cout << i << ' ';
+                cnt++;
+                if(cnt%9==0) cout<<endl;
+        }
     cout<<endl;
 
-    for (auto i: r)
+    cout<<" ll :"<<endl;
+    for (auto i: ll) {
+                std::cout << i << ' ';
+                cnt++;
+                if(cnt%9==0) cout<<endl;
+    }
+    cout<<endl;
+
+    cout<<" uu :"<<endl;
+    for (auto i: uu) {
         std::cout << i << ' ';
+        cnt++;
+        if(cnt%9==0) cout<<endl;        
+    }
+    cout<<endl;
+
+   cout<<"r :"<<endl;
+    for (auto i: r) {
+                std::cout << i << ' ';
+                cnt++;
+                if(cnt%3==0) cout<<endl;
+        }
     cout<<endl;
     */
     
