@@ -502,6 +502,7 @@ public:
     double cflfactor;
     double cflfactor_electron;
     double edamp_lim;
+    double implicit_theta;
     double t_max;
     double max_timestep_change;
     double dt_min_init;
