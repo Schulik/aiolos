@@ -83,6 +83,13 @@ void c_Species::implicit_incompressible(double dt) {
         slope_mom[j] = 1. * reconstruct_pointer(u[j-1].u2, u[j].u2, u[j+1].u2, cF, cB, dxF, dxB) ;
         slope_E[j]   = 1. * reconstruct_pointer(u[j-1].u3, u[j].u3, u[j+1].u3, cF, cB, dxF, dxB) ;
         slope_p[j]   = 1. * reconstruct_pointer(prim[j-1].pres, prim[j].pres, prim[j+1].pres, cF, cB, dxF, dxB) ;
+
+        if( std::isnan(slope_rho[j]) || std::isnan(slope_mom[j]) || std::isnan(slope_E[j]) || std::isnan(slope_p[j])) {
+            slope_rho[j] = 0;
+            slope_mom[j] = 0;
+            slope_E[j] = 0;
+            slope_p[j] = 0;
+        }
     }
 
    
@@ -344,7 +351,7 @@ void c_Species::implicit_incompressible(double dt) {
     if(base->steps >= 462e99) {
         cout<<" steps "<<base->steps;
     }
-    for (int j=0; j <= base->num_cells; j++) {
+    for (int j=0; j <= base->num_cells+1; j++) {
         int idx   = j*stride  ;
         int idx_r = j*num_vars;
 
@@ -352,7 +359,8 @@ void c_Species::implicit_incompressible(double dt) {
         double momtmp = r[j*num_vars + 1];
         double vimpl_old = u[j].u2/u[j].u1;
         double vimpl_new = momtmp/rhotmp;
-        double E_implied = 0.5*momtmp*momtmp/rhotmp + rhotmp * cv * prim[j].temperature;      //This is the old temperature
+        double T_tmp = prim[j].temperature = std::min(std::max(prim[j].temperature, base->temperature_floor), base->max_temperature);
+        double E_implied = 0.5*momtmp*momtmp/rhotmp + rhotmp * cv * T_tmp;      //This is the old temperature
         double E_floor   = 0.5*momtmp*momtmp/rhotmp + rhotmp * cv * base->temperature_floor;
         double T_pred = (u[j].u3 - 0.5*momtmp*momtmp/rhotmp ) / (rhotmp * cv);
         if(base->steps == 440 || base->steps == 2700) {
