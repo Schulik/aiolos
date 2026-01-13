@@ -641,11 +641,15 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
         
     }
         
+
     
     
     // Update energies. 
     // TODO: We should add cv * (Tf - Ti) to u to conserve energy properly.
     for(int si=0; si<num_species; si++) {
+        for(int j =num_cells-2; j<= num_cells+1; j++)
+            species[si].prim[j].temperature = std::min(std::max(species[si].prim[j].temperature, temperature_floor), max_temperature );
+
         species[si].eos->update_eint_from_T(&(species[si].prim[0]), num_cells+2);
         species[si].eos->update_p_from_eint(&(species[si].prim[0]), num_cells+2);
 

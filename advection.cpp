@@ -175,7 +175,6 @@ void c_Sim::execute(int restartnumber) {
 
 	    //if (do_hydrodynamics == 1) 
         //    compute_drag_update(1.0*dt) ;
-        compute_total_pressure();
 
         if(steps %prinstuff_steps==0) {    
                 print_velocity_numberdens_ratios(" Pos 0:: ", 210); 
@@ -228,6 +227,9 @@ void c_Sim::execute(int restartnumber) {
             }
         }
         
+        for(int s = 0; s < num_species; s++)
+            species[s].compute_pressure(species[s].u);
+
         if(steps > debug_steps && debug_cell < num_cells+1) {
             cout<<"t="<<steps<<" Pos 1 T[423]_s = ";
             for(int s = 0; s < num_species; s++) {
@@ -266,7 +268,6 @@ void c_Sim::execute(int restartnumber) {
                     
                     for(int s = 0; s < num_species; s++)
                         species[s].compute_pressure(species[s].u);
-                    compute_total_pressure();
                 
                     compute_drag_update(0.99*dt) ;
                     
@@ -1458,9 +1459,10 @@ int c_Species::fix_negative_pressures_sometimes(std::vector<AOS>&u_temp, int fla
         //if(ptemp < 0 && plast > 0 && ( eratio > 1.)) {
         //if(ptemp < 0 && plast > 0 ) {
         //if(0==1) {
-        if((plast < 0) || (temper < 0) || std::isnan(temper) )  {
+        if((plast < 0) || (temper < 0) || std::isnan(temper) || (temper > base->max_temperature) )  {
 
-            double enew  = this->cv*kb*base->temperature_floor;
+            double T_tmp = prim[j].temperature = std::min(std::max(prim[j].temperature, base->temperature_floor), base->max_temperature);
+            double enew  = this->cv*kb*T_tmp;
             u_temp[j].u3 = enew + ekin;
 
             eos->compute_primitive(&(u[j]), &(prim[j]), 1) ;    
@@ -1469,8 +1471,12 @@ int c_Species::fix_negative_pressures_sometimes(std::vector<AOS>&u_temp, int fla
 
             
         }
-        if(fixed ==1)
-            cout<<"Repaired T in cell/species = "<<j<<" "<<this->speciesname<<" step "<<base->steps<<" flag "<<flag<<endl;
+        if(fixed ==1) {
+            //cout<<"Repaired T in cell/species = "<<j<<" "<<this->speciesname<<" step "<<base->steps<<" flag "<<flag<<endl;
+        }
+
+
+        
     }
     
     return fixed_cells;
