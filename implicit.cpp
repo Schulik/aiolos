@@ -183,9 +183,11 @@ void c_Species::implicit_incompressible(double dt) {
         int sw=v_r>0? 0 : 1;
         int sgn = v_r>0 ? +1 : -1;
         ///////////////////////////////////
-        drho = -sgn * slope_rho[j+sw]  / (u[j+1].u1  - u[j].u1  + 1e-50) * (x_i[ j ] - x_iVC[j+sw]); //Note: Slope 0 reduces this to the old, first order Crank-Nicolson
-        dmom = -sgn * slope_mom[j+sw]  / (u[j+1].u2  - u[j].u2  + 1e-50) * (x_i[ j ] - x_iVC[j+sw]); 
-        dE   = -sgn * slope_E[j+sw]    / (u[j+1].u3  - u[j].u3  + 1e-50) * (x_i[ j ] - x_iVC[j+sw]); 
+	if( j < num_cells) {
+        	drho = -sgn * slope_rho[j+sw]  / (u[j+1].u1  - u[j].u1  + 1e-50) * (x_i[ j ] - x_iVC[j+sw]); //Note: Slope 0 reduces this to the old, first order Crank-Nicolson
+	        dmom = -sgn * slope_mom[j+sw]  / (u[j+1].u2  - u[j].u2  + 1e-50) * (x_i[ j ] - x_iVC[j+sw]); 
+        	dE   = -sgn * slope_E[j+sw]    / (u[j+1].u3  - u[j].u3  + 1e-50) * (x_i[ j ] - x_iVC[j+sw]); 
+	}
 
         //rho
         a = v_r<0? 1.0 + 0.5  * drho : -0.5 * drho;
@@ -234,7 +236,7 @@ void c_Species::implicit_incompressible(double dt) {
         r[idx_r]       += (1-theta) * lam_l.u1 * ( a * u[j].u1 + b * u[j-1].u1 );
         
         //momentum,
-        //       /*
+        //       
         a = v_l<0? 1.0 + 0.5  * dmom : -0.5 * dmom;
         b = v_l<0? -0.5 * dmom : 1.0 + 0.5  * dmom;
         dd[idx + 4]    -= theta     * v_l * S_l * a; //mom_j-1/2
@@ -243,7 +245,7 @@ void c_Species::implicit_incompressible(double dt) {
         if(j>pwall && j<=num_cells) {
                 r[idx_r+1]     +=  0.5 * S_l * ( prim_l[j].pres + prim_r[j-1].pres ) ; 
         }
-        // */
+        // 
         //energy
         a  = v_l<0? 1.0 + 0.5  * dE : -0.5 * dE;
         b  = v_l<0? -0.5 * dE : 1.0 + 0.5  * dE;                                                
@@ -363,7 +365,7 @@ void c_Species::implicit_incompressible(double dt) {
         double E_implied = 0.5*momtmp*momtmp/rhotmp + rhotmp * cv * T_tmp;      //This is the old temperature
         double E_floor   = 0.5*momtmp*momtmp/rhotmp + rhotmp * cv * base->temperature_floor;
         double T_pred = (u[j].u3 - 0.5*momtmp*momtmp/rhotmp ) / (rhotmp * cv);
-        if(base->steps == 440 || base->steps == 2700) {
+        if(base->steps == -1e99 || base->steps == 2700) {
             cout<<" j = "<<j<<" old/new rho  = "<<u[j].u1<<" / "<<rhotmp<<" t_damp = "<<t_damp[j]<<" corresponding f = "<<ff[j]<<endl;
             cout<<" j = "<<j<<" old/new mom  = "<<u[j].u2<<" / "<<r[j*num_vars + 1]<<" v_implied old/new = "<<vimpl_old<<"/"<<vimpl_new<<endl;
             cout<<" j = "<<j<<" old/new E    = "<<u[j].u3<<" / "<<r[j*num_vars + 2]<<endl;

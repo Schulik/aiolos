@@ -79,8 +79,8 @@ void c_Species::reconstruct_edge_states( std::vector<double>&u_mask, int orderst
 
     // Step 2: Add 2nd order slope-limited correction
     IntegrationType order = base->order ;
-    if (order == IntegrationType::second_order && orderstep == 1) {
-    //if (order == IntegrationType::second_order && shock_switch == 1) {
+    //if (order == IntegrationType::second_order && orderstep == 1) {
+    if (orderstep == 1) {
         const std::vector<double>& 
             x_i = base->x_i, 
             x_iVC = base->x_iVC,
@@ -166,6 +166,31 @@ void c_Species::reconstruct_edge_states( std::vector<double>&u_mask, int orderst
 
         }
     }
+
+//
+// 2025-01-13: Additional corrections for weird pressure gradients
+//
+	for (int i=1; i <= num_cells; i++) {
+		//Detect under/overshoots
+		for(int sw=0; sw <= 1; sw++) {
+			if( (prim[i+sw].pres > prim[i+(1-sw)].pres) && (prim_r[i+sw].pres < prim_l[i+(1-sw)].pres ) ) {
+				double pmean = 0.5*(prim_r[i].pres + prim_l[i+1].pres);
+				prim_r[i].pres   = pmean;
+				prim_l[i+1].pres = pmean;
+			}
+		}
+
+		for(int sw=0; sw <= 1; sw++) {
+                        if( (prim[i+sw].density > prim[i+(1-sw)].density) && (prim_r[i+sw].density < prim_l[i+(1-sw)].density ) ) {
+                                double dmean = 0.5*(prim_r[i].density + prim_l[i+1].density);
+                                prim_r[i].density   = dmean;
+                                prim_l[i+1].density = dmean;
+                        }
+                }
+
+		//Detect undershoot if dp/dr > 0
+	}
+
 
     // Step 3:
     //   Extra thermodynamic variables
