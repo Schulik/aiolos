@@ -246,7 +246,7 @@ void c_Species::implicit_incompressible(double dt) {
         r[idx_r]       += (1-theta) * lam_l.u1 * ( a * u[j].u1 + b * u[j-1].u1 );
         
         //momentum,
-        //       /*
+        //       
         a = v_l<0? 1.0 + 0.5  * dmom : -0.5 * dmom;
         b = v_l<0? -0.5 * dmom : 1.0 + 0.5  * dmom;
         dd[idx + 4]    -= theta     * v_l * S_l * a; //mom_j-1/2
@@ -255,7 +255,7 @@ void c_Species::implicit_incompressible(double dt) {
         if(j>pwall && j<=num_cells) {
                 r[idx_r+1]     +=  0.5 * S_l * ( prim_l[j].pres + prim_r[j-1].pres ) ; 
         }
-        // */
+        // 
         //energy
         a  = v_l<0? 1.0 + 0.5  * dE : -0.5 * dE;
         b  = v_l<0? -0.5 * dE : 1.0 + 0.5  * dE;                                                

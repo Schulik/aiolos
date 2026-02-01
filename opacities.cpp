@@ -231,11 +231,12 @@ void c_Species::update_opacities() {
                 else
                     oldp = opacity_planck(j,b);
                 double newp = base->const_opacity_planck_factor * base->opacity_semenov_malygin(0, prim[j].temperature,    prim[j].density, prim[j].pres, this->is_dust_like);
-                opacity_planck(j,b) = std::sqrt(oldp*newp);
-
-                if(this_species_index != h2_idx)
-                    opacity_planck(j,b) = 0;
-
+                
+		if(this_species_index == h2_idx)
+			opacity_planck(j,b) = std::sqrt(oldp*newp);
+		else
+			opacity_planck(j,b) = 0;
+                
                 double oldopa;
                 if(base->steps<2)
                     oldopa = base->const_opacity_rosseland_factor * base->opacity_semenov_malygin(1, prim[j].temperature, prim[j].density, prim[j].pres, this->is_dust_like); 

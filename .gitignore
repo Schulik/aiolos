@@ -21,4 +21,4 @@ tests
 .vscode
 tmp*
 *.wav
-*py
+*.py

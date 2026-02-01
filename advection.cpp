@@ -271,8 +271,10 @@ void c_Sim::execute(int restartnumber, double restarttime_cmdline) {
                          //Those values contain the fixed cells, they might not be identical to u + dudt[0]*dt
                     }
                     
-                    for(int s = 0; s < num_species; s++)
+                    for(int s = 0; s < num_species; s++) {
                         species[s].compute_pressure(species[s].u);
+			species[s].fix_negative_pressures_sometimes(species[s].u_tmp, 1);
+		    }
                 
                     compute_drag_update(0.99*dt) ;
                     
@@ -309,7 +311,7 @@ void c_Sim::execute(int restartnumber, double restarttime_cmdline) {
                         species[s].execute(species[s].u, species[s].dudt[1], species[s].u_mask, ex_order);
                         
                         for(int j=0; j < num_cells+2; j++) {
-                            double scale_f =  1;//(s<=2)? 1.:0;//species[s].prim[j].pres/total_press[j];
+                            double scale_f =  1;//species[s].prim[j].pres/total_press[j];
                             if (use_drag_predictor_step)
                                 species[s].u_tmp[j] = species[s].u0[j];// + species[s].dudt[0][j]*dt;// March28th 2024 changed this line, as u0 now contains the first-order correct, non-crashed values
                             
