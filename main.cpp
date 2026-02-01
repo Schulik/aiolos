@@ -26,13 +26,15 @@ int main(int argc, char** argv)
     string workingdir = "./";
     string tempintent = "---";
     int debug = 0;
-    int debug_cell = 40;
-    int debug_steps = 8965;
+    int debug_cell = 1e9;
+    long int debug_steps = 99999999;
     std::vector<int> debug_data = inp_somevalue(4, 1e99);
     debug_data[0] = 0;
+
     int suppress_warnings_global = 0;
     int external_thread_num = 1;
     int restartnumber = 0;
+    double restarttime_cmdline = 0;
     cout<<endl<<"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"<<endl;
           cout<<"~~~ Welcome to AIOLOS! May a gentle breeze lead your way through the bugs."<<endl;
           cout<<"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"<<endl;
@@ -117,8 +119,14 @@ int main(int argc, char** argv)
             cout<<"Restartnumber found as "<<restartnumber<<endl;
             i++;
         }
+
+        if(tmpstring.compare("-retime") == 0) {
+            restarttime_cmdline      = std::stod(argv[i+1]);
+            cout<<"Restarttime found as "<<restarttime_cmdline<<endl;
+            i++;
+        }
     }
-    
+
     if(!parameterfile_found) {
             cout<<"No simulationname found, chosing default simulationname: simulation.par"<<endl;
             simulationname = "simulation.par";
@@ -134,17 +142,21 @@ int main(int argc, char** argv)
     #endif
     
     try {
+
+        debug_data[1] = debug_cell;
+        debug_data[2] = debug_steps;
+        debug_data[3] = 0;
         
         cout<<endl<<"In main, construction of simulation is about to start."<<endl;
        
         //Main simulation class object, is initialized with the simulation parameters from a file
-        c_Sim simulation1(simulationname, speciesfile, workingdir, tempintent, debug_data, restartnumber);
+        c_Sim simulation1(simulationname, speciesfile, workingdir, tempintent, debug_data, restartnumber, restarttime_cmdline);
         
         simulation1.set_suppress_warnings(suppress_warnings_global);
 
         cout<<"In main, execution is about to start."<<endl;
         
-        simulation1.execute(restartnumber);
+        simulation1.execute(restartnumber, restarttime_cmdline);
     }
     catch (int err){
         

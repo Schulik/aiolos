@@ -100,12 +100,12 @@ std::string cnstWidth( int value, int width );
 
 inline double dfdx(const function<double(double)>& f, double x0, double dx) {
     
-    return (f(x0+dx)-f(x0-dx))/(dx+dx);
+    return (f(x0+dx)-f(x0-dx))/(2*dx);
 }
 
 inline double dfdx2(const function<double(double, double)>& f, double x0, double dx, double otherarg) {
     
-    return (f(x0+dx, otherarg)-f(x0-dx, otherarg))/(dx+dx);
+    return (f(x0+dx, otherarg)-f(x0-dx, otherarg))/(2*dx);
 }
 
 inline float __int_as_float (int32_t a) { float r; memcpy (&r, &a, sizeof r); return r;} 
@@ -209,7 +209,7 @@ struct simulation_parameter {
 };
 
 //
-// Array of strings structure, for comfortable use of 3-vectors
+// Array of strings structure, for comfortable use of 3-vectors //Jan 30th 2026: Changed to 4 vectors for 2 energy scheme
 //
 struct AOS {
  double u1;
@@ -405,6 +405,7 @@ public:
     int debug;
     int restartnumber;
     double restarttime;
+    double restarttime_cmdline;
     int cdebug = 0;
     int debug_cell = 1e99; //default values that should never trigger debugging, if not set to sensible values
     int debug_steps = 1e99;
@@ -637,6 +638,7 @@ public:
     Vector_t mass_vector;
     Vector_t temperature_vector;
     Vector_t temperature_vector_augment;
+    Vector_t temperature_old;
 
     Matrix_t radiation_matrix_T;
     Matrix_t radiation_matrix_M;
@@ -647,6 +649,14 @@ public:
     
     Eigen::VectorXd alphas_sample;
     Eigen::VectorXd friction_sample;
+
+    //Heat exchange subcycling
+    Matrix_t coll_heat_matrix;     
+    Matrix_t coll_heat_matrix_fixed;   
+    Vector_t coll_heat_b;            
+    Vector_t coll_heat_b_fixed;       
+    Vector_t coll_heat_output;      
+    Vector_t tmp_temperatures;        
     
     double K_zz_init;
     std::vector<double> K_zz;
@@ -753,6 +763,11 @@ public:
     BlockTriDiagSolver<Eigen::Dynamic> tridiag;
     BlockTriDiagSolver<Eigen::Dynamic> implicit_tridiag;
     Eigen::MatrixXd Jrad_init;
+
+    //Vector_t lhs_sc; //sc stands for subcycling - those variables are of use in the heating subcycle
+    Vector_t rhs_sc; 
+    //Vector_t denoms_sc;
+    int num_subcycles;
     
     int rad_solver_max_iter = 1;
     double epsilon_rad_min = 1e-1;  // Some convergence measure for the radiation solver, if needed
@@ -772,6 +787,7 @@ public:
     int use_secondary_ionisation;
     int write_krome_reactions;
     Eigen::MatrixXd reaction_rate_table;
+    Eigen::MatrixXd reaction_coeff_table;
     std::vector<c_reaction> reactions;
     std::vector<c_photochem_reaction> photoreactions;
     
@@ -810,7 +826,7 @@ public:
     double dt_skip_dchem;
     int use_chem_reaction_floor;
     
-    Vector_t solver_cchem_implicit_general(double dt, int num_spec, int cdebug, const Vector_t& n_normalized, double ntot, double mntot);
+    Vector_t solver_cchem_implicit_general(double dt, int num_spec, int cdebug, const Vector_t& n_normalized, const Vector_t& n_midpoint, double ntot, double mntot);
     int solver_cchem_implicit_specialized_cochem(double dt, int num_spec, int cdebug);
     
     std::vector<double> thermo_poly(double T,double a1,double a2,double a3,double a4,double a5,double a6,double a7,double a8,double a9);
@@ -879,6 +895,9 @@ public:
     void update_mass_and_pot();
     double get_phi_grav(double &r, double &mass);
     
+    //Kzz diffusion
+    void execute_separate_diffusion_step();
+
     //Opacities 
     void init_malygin_opacities();
     double opacity_semenov_malygin(int rosseland, double temperature, double rho, double pressure, int caller_is_dust) ;
@@ -893,7 +912,7 @@ public:
     void update_dS();
     void update_dS_jb(int j, int b);
     void update_dS_jb_photochem(int j, double dtt);
-    void do_highenergy_cooling(int j);
+    void do_highenergy_cooling(int j, double Te);
     void update_tau_s_jb(int j, int b);
     void update_opacities();
     
@@ -905,6 +924,7 @@ public:
     void init_highenergy_cooling_indices();
     void enforce_charge_neutrality(int cell);
     void init_highenergy_opacities();
+    void find_reactionrates_relating_to_species(int cell, string speciesname);
 
     void update_fluxes(double timestep);           //  Called from transport_radiation#   
     void update_fluxes_FLD();           //  Called from transport_radiation#
@@ -914,19 +934,21 @@ public:
     void update_temperatures(double, Eigen::MatrixXd &,Eigen::MatrixXd &,Eigen::MatrixXd &);
     double compute_planck_function_integral3(double lmin, double lmax, double temperature);
     double compute_planck_function_integral4(double lmin, double lmax, double temperature);
-    
+    void subcycle_heat_exchange(int cell, int num_cycles, int debug, double dt, double dGdT_mul=1.);
+
     //Debug functions
     
     void print_velocity_numberdens_ratios(string position, int dcell);
+    double return_total_e(int j);
     
 public:
     
     c_Sim() {};
-    c_Sim(string parameter_filename, string species_filename, string workingdir, string intent, std::vector<int> debug_data, int restartnumber);
+    c_Sim(string parameter_filename, string species_filename, string workingdir, string intent, std::vector<int> debug_data, int restartnumber, double restarttime_cmdline);
     ~c_Sim();
     
-    void execute(int restartnumber); //Main loop
-    void restart_from_outputnumber(int restartnumber);
+    void execute(int restartnumber, double restarttime); //Main loop
+    void restart_from_outputnumber(int restartnumber, double restarttime);
     
     void set_debug(int);
     void set_suppress_warnings(int j) {suppress_warnings = j;}
@@ -987,6 +1009,7 @@ public:
     double initial_fraction;
     
     std::vector<AOS> u, u0, u_tmp;          // Conserved hyperbolic variables: density, mass flux, energy density
+    std::vector<AOS> u_diff;               //Special u for the diffusion step: 3rd entry represents small e, not big E
     std::vector<AOS> dudt[2];        // Time derivative of u at each stage ;      
     std::vector<AOS> source;         // Gravitational source term
     std::vector<AOS> source_pressure;// Geometric source term
@@ -1140,12 +1163,16 @@ public:
     AOS passivescalar_flux2(int);
     AOS exact_flux(AOS u);
     AOS exact_advection_flux(AOS u);
+    void positivity_preserving_step(int j);
+    void compute_e_fluxes(int j);
+    double return_entropy_with_jump(double j);
 
     void implicit_incompressible(double dt);
     
     AOS source_grav(AOS &u, int &j);
     AOS source_grav_noconserved(AOS &u, int &j);
     AOS source_diffusion_flux(int j);
+    AOS source_diffusion_flux2(int j);
     double diffusive_timestep(int j);
     std::vector<double> phi_s;
 

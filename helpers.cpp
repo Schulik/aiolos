@@ -128,7 +128,7 @@ double c_Sim::get_cfl_timestep() {
 
     if(steps%435==0) {
     //if(steps>350) {
-        cout<<" most constraining cfl cell: "<<cnstr_cell<<" species "<<species[cnstr_spc].speciesname<< " resulting in dt ="<<cfl_step<<" total dt "<< min(cfl_step, dt*max_timestep_change)<<" max_temper = "<<max_temper<<" max_mach "<<max_mach<<" steps "<<steps<<endl;
+        cout<<" most constraining cfl cell: "<<cnstr_cell<<" species "<<species[cnstr_spc].speciesname<< " resulting in dt ="<<cfl_step<<" total dt "<< min(cfl_step, dt*max_timestep_change)<<" max_temper = "<<max_temper<<" max_mach "<<max_mach<<" steps "<<steps<<" t = "<<globalTime<<endl;
     }  
     
     if(do_hydrodynamics)
@@ -648,4 +648,47 @@ std::string cnstWidth( int value, int width )
              reaction_rate_table(j,r) = 0.;
          }
     }
+}
+
+void c_Sim::find_reactionrates_relating_to_species(int cell, string target_speciesname) {
+    
+    int found = 0;
+    int speciesindex = 0;
+    
+    for(c_reaction& reaction : reactions) {
+        int sw = 0;
+        //for(int s=0; s<num_species; s++) {
+            //double dndt_old;
+
+        for(int& ei : reaction.educts) {
+                if( species[ei].speciesname == target_speciesname) {
+                    sw = 1;
+                    found++;
+                    speciesindex = ei;
+                }
+        }
+        for(int& pi : reaction.products) {
+                if( species[pi].speciesname == target_speciesname) {
+                    sw = 1;
+                    found++;
+                    speciesindex = pi;
+                }
+        }
+        if(found==1) {
+            cout<<" n = "<<species[speciesindex].prim[cell].number_density<<" "<<species[speciesindex].speciesname;
+            found++;
+        }
+        if(sw==1) {
+            cout<<" "<<reaction.reaction_number<<" "<<reaction.dndt_old<<" ";
+        }
+            //reaction.set_reac_number(cnt);
+            //reaction.set_base_pointer(this);
+            //cnt++;
+            //num_reactions++;
+    //}
+    //for(int rr=0; rr<num_reactions; rr++) {
+    }
+    if(found > 0)
+        //cout<<endl;
+        cout<<" stp "<<steps<<endl;
 }

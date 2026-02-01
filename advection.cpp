@@ -15,7 +15,7 @@
  * to be able to determine the sound-speed and hence the CFL factor.
  * Following are output checks and then the main code modules are executed in order.
  */
-void c_Sim::execute(int restartnumber) { 
+void c_Sim::execute(int restartnumber, double restarttime_cmdline) { 
     
     steps = 0;
     //if(restartnumber != 0)
@@ -35,7 +35,7 @@ void c_Sim::execute(int restartnumber) {
     int crashtime_already_assigned = 0;
     int logtime = log_time_start==-20 ? 0 : 1;
     
-    const int prinstuff_steps = 1e6;
+    const int printstuff_steps = 0;
     
     cout<<" VERSION 0.2"<<endl;
     cout<<endl<<"Beginning main loop with num_cells="<<num_cells<<" and timestep="<<dt<<" cflfactor="<<cflfactor<<" and num_species = "<<num_species<<endl;
@@ -176,7 +176,7 @@ void c_Sim::execute(int restartnumber) {
 	    //if (do_hydrodynamics == 1) 
         //    compute_drag_update(1.0*dt) ;
 
-        if(steps %prinstuff_steps==0) {    
+        if(steps >printstuff_steps) {    
                 print_velocity_numberdens_ratios(" Pos 0:: ", 210); 
         }
         
@@ -209,47 +209,52 @@ void c_Sim::execute(int restartnumber) {
                     for(int j=0; j < num_cells+2; j++)
                         species[s].u_tmp[j] += species[s].dudt[0][j]*dt ;
                     
+                    double ekin = 0.5 * species[s].u_tmp[100].u2*species[s].u_tmp[100].u2/species[s].u_tmp[100].u1 ;
+                    double expe = ekin + species[s].u_tmp[100].u1 * species[s].cv * 1000.;
+                    double expT = (species[s].u_tmp[100].u3-ekin)/species[s].u_tmp[100].u1/species[s].cv;
+                    //cout<<species[s].speciesname<<" after +dudt * dt "<<s<<" "<<species[s].dudt[0][100].u3<<" dt = "<<dt<<" u3 = "<<species[s].u_tmp[100].u3<<" expected u3 = "<<expe<<" expected T "<<expT<<endl;
+
                     species[s].u_mask           = np_zeros(num_cells+2);
                     int numbroken = species[s].count_broken_cells(species[s].u_tmp, species[s].u_mask);
                     //if( numbroken == 0)
                     //    break;
                     
+                    //cout<<s<<" before  "<<species[s].u_tmp[100].u3<<endl;
+
                     species[s].fix_negative_pressures_sometimes(species[s].u_tmp, 1);
                     
+                    //cout<<s<<" after "<<species[s].u_tmp[100].u3<<endl;
                     //Done, now all values should be ok
                     for(int j=0; j < num_cells+2; j++) {
                         species[s].u[j] = species[s].u_tmp[j];
+                        //species[s].positivity_preserving_step(j);
                     }
 
                 }
                 //cout<<"END running species "<<species[s].speciesname<<" s = "<<s<<" steps ="<<steps<<" num_species "<<num_species<<endl;
 
             }
+        }// End of first order hydrodynamic step
+
+        if(steps >printstuff_steps) {    
+            print_velocity_numberdens_ratios(" Pos 1:: ", 210);
         }
+
+        //if(use_inflow_damping==1)
+        //    apply_inflow_damping();
+        
         
         for(int s = 0; s < num_species; s++)
             species[s].compute_pressure(species[s].u);
 
-        if(steps > debug_steps && debug_cell < num_cells+1) {
-            cout<<"t="<<steps<<" Pos 1 T[423]_s = ";
-            for(int s = 0; s < num_species; s++) {
-                cout<<" ["<<s<<"]= "<<species[s].prim[debug_cell].temperature;
-            }
-            cout<<" s1 numbers, p ="<<species[debug_species].prim[debug_cell].pres<<" eint = "<<species[debug_species].prim[debug_cell].internal_energy<<" rho = "<<species[debug_species].u[debug_cell].u1<<" mom = "<<species[debug_species].u[debug_cell].u2<<" E = "<<species[debug_species].u[debug_cell].u3;
-            cout<<" manual pressure u_in = "<<(species[debug_species].u[debug_cell].u3 - 0.5*species[debug_species].u[debug_cell].u2*species[debug_species].u[debug_cell].u2/species[debug_species].u[debug_cell].u1)<<endl;
-            cout<<" fluxes in 423 and neighbours: "<<endl;
-            for(int ll=-1; ll<=1; ll++) {
-                cout<<" "<<species[debug_species].dudt[0][debug_cell+ll].u1<<" "<<species[debug_species].dudt[0][debug_cell+ll].u2<<" "<<species[debug_species].dudt[0][debug_cell+ll].u3;
-                cout<<" rho ="<<species[debug_species].u[debug_cell+ll].u1<<" E="<<species[debug_species].u[debug_cell+ll].u3<<" p="<<(species[debug_species].u[debug_cell+ll].u3 - 0.5*species[debug_species].u[debug_cell+ll].u2*species[debug_species].u[debug_cell+ll].u2/species[debug_species].u[debug_cell+ll].u1)<<" ekin = "<<0.5*species[debug_species].u[debug_cell+ll].u2*species[debug_species].u[debug_cell+ll].u2/species[debug_species].u[debug_cell+ll].u1<<endl;
-            }
-        }
-        if(steps %prinstuff_steps==0) {    
-                print_velocity_numberdens_ratios(" Pos 1:: ", 210);
+        
+        if(steps >printstuff_steps) {    
+                print_velocity_numberdens_ratios(" Pos 1.3:: ", 210);
         }
         
         if (order == IntegrationType::first_order) {
             globalTime += dt;
-        } else if (order == IntegrationType::second_order) {
+        } else if (order == IntegrationType::second_order && (0==1)) {
             // 2nd step evaluated at t+dt
             globalTime += dt;
 
@@ -273,22 +278,12 @@ void c_Sim::execute(int restartnumber) {
                     
                     if (use_collisional_heating && (use_rad_fluxes==0))
                         compute_collisional_heat_exchange() ; //Disable if radiation is used?
-                        
-                        
-                    
+                
                 } else
                         compute_drag_update(0.99*dt); //MARCH 28 ONLY FOR DEBUGGING
                 
-                if(steps > debug_steps && debug_cell < num_cells+1) {
-                    cout<<"t="<<steps<<" Pos 1.05 T["<<debug_cell<<"]_s = ";
-                    for(int s = 0; s < num_species; s++) {
-                        cout<<" ["<<s<<"]= "<<species[s].prim[debug_cell].temperature;
-                    }
-                    cout<<" manual pressure u_in = "<<(species[debug_species].u[debug_cell].u3 - 0.5*species[debug_species].u[debug_cell].u2*species[debug_species].u[debug_cell].u2/species[debug_species].u[debug_cell].u1)<<endl;
-                }
-                
                 //if(steps > debug_steps && debug_cell < num_cells+1) {
-                if(steps %prinstuff_steps==0) {    
+                if(steps >printstuff_steps) {    
                     print_velocity_numberdens_ratios(" Pos 1.05:: ", 210);
                 }
                 
@@ -334,14 +329,10 @@ void c_Sim::execute(int restartnumber) {
 	                if(s > -1) { //Feb18th: switch off second order update for electrons, as that seems to cause the shock problem
 	                    for(int j=0; j < num_cells+2; j++) {
                         	species[s].u[j] = species[s].u_tmp[j];
+                            //species[s].positivity_preserving_step(j);
                     	}
-                    }
-                    
+                    }   
                 }
-                
-                if(steps %prinstuff_steps==0) {    
-                    print_velocity_numberdens_ratios(" Pos 1.2:: ", 210);
-                }   
                 
                 for(int s = 0; s < num_species; s++)
                         species[s].compute_pressure(species[s].u);
@@ -350,21 +341,7 @@ void c_Sim::execute(int restartnumber) {
                     species[s].apply_boundary_left(species[s].u) ;
                     species[s].apply_boundary_right(species[s].u) ;
                 }
-                
-                
-                if(steps > debug_steps && debug_cell < num_cells+1) {
-                    cout<<"t="<<steps<<" Pos 1.2 T[423]_s = ";
-                    for(int s = 0; s < num_species; s++) {
-                        cout<<" ["<<s<<"]= "<<species[s].prim[debug_cell].temperature;
-                    }
-                    cout<<" s1 numbers, p ="<<species[debug_species].prim[debug_cell].pres<<" eint = "<<species[debug_species].prim[debug_cell].internal_energy<<" rho = "<<species[debug_species].u[debug_cell].u1<<" mom = "<<species[debug_species].u[debug_cell].u2<<" E = "<<species[debug_species].u[debug_cell].u3;
-                    cout<<" manual pressure u_in = "<<(species[debug_species].u[debug_cell].u3 - 0.5*species[debug_species].u[debug_cell].u2*species[debug_species].u[debug_cell].u2/species[debug_species].u[debug_cell].u1)<<endl;
-                    cout<<" fluxes in 423 and neighbours: "<<endl;
-                    for(int ll=-1; ll<=1; ll++)
-                        cout<<" "<<species[debug_species].dudt[1][debug_cell+ll].u1<<" "<<species[debug_species].dudt[1][debug_cell+ll].u2<<" "<<species[debug_species].dudt[1][debug_cell+ll].u3<<" E="<<species[debug_species].u[debug_cell+ll].u3<<" p="<<(species[debug_species].u[debug_cell+ll].u3 - 0.5*species[debug_species].u[debug_cell+ll].u2*species[debug_species].u[debug_cell+ll].u2/species[debug_species].u[debug_cell+ll].u1)<<" ekin = "<<0.5*species[debug_species].u[debug_cell+ll].u2*species[debug_species].u[debug_cell+ll].u2/species[debug_species].u[debug_cell+ll].u1<<endl;
-                }
-                
-                
+
             } else {
                 for(int s = 0; s < num_species; s++) {
                     species[s].apply_boundary_left(species[s].u) ;
@@ -372,40 +349,31 @@ void c_Sim::execute(int restartnumber) {
                 }
             }
         }// End of second order hydrodynamic step
+        else {
+            globalTime += dt;
+        }
+
+        if(steps >printstuff_steps) {    
+                print_velocity_numberdens_ratios(" Pos 1.4:: ", 210);
+        }
 
         if(use_inflow_damping==1)
             apply_inflow_damping();
         
-
-        //begin other operators 
-        if(steps > debug_steps && debug_cell < num_cells+1) {
-                cout<<"t="<<steps<<" Pos 1.3 T[423]_s = ";
-                for(int s = 0; s < num_species; s++) {
-                    cout<<" ["<<s<<"]= "<<species[s].prim[debug_cell].temperature;
-                }
-                cout<<endl;
-        }
-        if(steps %prinstuff_steps==0) {    
-                print_velocity_numberdens_ratios(" Pos 1.3:: ", 210);
-        }
-        
+        //begin other operators
         for(int s = 0; s < num_species; s++) {
             species[s].compute_pressure(species[s].u);
-            species[s].fix_negative_pressures_sometimes(species[s].u_tmp, 2);
+            species[s].fix_negative_pressures_sometimes(species[s].u_tmp, 3);
         }
 
-
-        if(steps > debug_steps && debug_cell < num_cells+1) {
-                cout<<"t="<<steps<<" Pos 1.5 T[423]_s = ";
-                for(int s = 0; s < num_species; s++) {
-                    cout<<" ["<<s<<"]= "<<species[s].prim[debug_cell].temperature;
-                }
-                cout<<endl;
-            }
-        if(steps %prinstuff_steps==0) {    
+        if(steps >printstuff_steps) {    
                 print_velocity_numberdens_ratios(" Pos 1.5:: ", 210);
         }
-        
+
+        //Misc sources: diffusion:
+        execute_separate_diffusion_step();
+
+        //DEBUGGING: HERE IS WHERE species[14].prim[276].temperature = 1e33 at steps 12855 appears for the first time! - note E is already too high
         //Computes the velocity drag update after the new hydrodynamic state is known for each species
         if (do_hydrodynamics == 1) 
             compute_drag_update(0.99*dt) ;
@@ -420,13 +388,13 @@ void c_Sim::execute(int restartnumber) {
                 }
                 cout<<endl;
             }
-        if(steps %prinstuff_steps==0) {    
+        if(steps >printstuff_steps) {    
                 print_velocity_numberdens_ratios(" Pos 2:: ", 210);
         }
 
         for(int s = 0; s < num_species; s++) {
             //species[s].compute_pressure(species[s].u);
-            species[s].fix_negative_pressures_sometimes(species[s].u_tmp, 2);
+            species[s].fix_negative_pressures_sometimes(species[s].u_tmp, 4);
         }
         
 
@@ -491,7 +459,7 @@ void c_Sim::execute(int restartnumber) {
 
         for(int s = 0; s < num_species; s++) {
             //species[s].compute_pressure(species[s].u);
-            species[s].fix_negative_pressures_sometimes(species[s].u_tmp, 2);
+            species[s].fix_negative_pressures_sometimes(species[s].u_tmp, 5);
         }
         
         if(steps > debug_steps) {
@@ -504,7 +472,7 @@ void c_Sim::execute(int restartnumber) {
             }
             
         }
-        if(steps %prinstuff_steps==0) {    
+        if(steps >printstuff_steps) {    
                 print_velocity_numberdens_ratios(" Pos 3:: ", 210);
         }
         
@@ -754,7 +722,7 @@ void c_Species::execute(std::vector<AOS>& u_in, std::vector<AOS>& dudt, std::vec
         //
         // Step 2: Compute fluxes and sources
         //
-	std::vector<double> grav_prefactors = np_ones(num_cells+2);
+	    std::vector<double> grav_prefactors = np_ones(num_cells+2);
         if (not is_dust_like) {
             const double params[3] = {base->mix_p1, base->mix_p2, base->mix_p3};
             
@@ -766,8 +734,11 @@ void c_Species::execute(std::vector<AOS>& u_in, std::vector<AOS>& dudt, std::vec
                     
                     break;
                 case HydroSolver::implicitelectrons:     //Every species which makes it into this loop is not electrons, hence solved with default hllc
-                    for(int j=0; j <= num_cells; j++) {
-                        flux[j] =  hllc_flux(j);
+                    for(int j=0; j < 3; j++) {
+                        flux[j] = hllc_flux(j);
+                    }
+                    for(int j=3; j <= num_cells; j++) {
+                        flux[j] = roe_flux(j);
                     }
                     
                     break;
@@ -895,14 +866,31 @@ void c_Species::execute(std::vector<AOS>& u_in, std::vector<AOS>& dudt, std::vec
         }
         
         //
+        // Step 2a: Compute separate internal energy conserving fluxes for the kinetic energy dominated regime
+        //
+        //for(int j=base->num_ghosts; j<=num_cells; j++) {
+        //     u[j].u4 = prim[j].internal_energy;
+        //}
+        for(int j=base->num_ghosts; j<=num_cells; j++) {
+            compute_e_fluxes(j); //This computes e>0 and if in the kinetic regime, and E-0.5rhou^2 < 0 then it sets new_e = e and updates E, i.e. u[j].u3
+        }
+        //
         // Step 3: Add it all up to update the conserved variables
         //
-        
-        
-        for(int j=1; j<=num_cells; j++) {
+        for(int j=base->num_ghosts; j<=num_cells; j++) {
             dudt[j] = (flux[j-1] * base->surf[j-1] - flux[j] * base->surf[j]) / base->vol[j] + (source[j] + source_pressure[j] + source_diffusion[j]) ;
             
-            if( debug > 3) { //Or put in your own conditions
+            AOS newaos   = (flux[j-1] * base->surf[j-1] - flux[j] * base->surf[j]) / base->vol[j];
+            AOS sourceaos = (source[j] + source_pressure[j] + source_diffusion[j]);
+
+            if(j == -100 &&  this->speciesname=="H2" ) {
+                cout<<" flux part "<<newaos.u1<<" "<<newaos.u2<<" "<<newaos.u3<<" source part "<<sourceaos.u3<<endl;
+                char a;
+                cin>>a; 
+            }
+
+            //if( debug > 3) { //Or put in your own conditions
+            if( (base->steps >= 0) && (j==-100) && (this_species_index==18)) { //Or put in your own conditions    
                 char alpha;
                 cout<<"Debuggin fluxes in cell i= "<<j<<" for species "<<speciesname<<" at time "<<base->steps<<endl; 
                 cout<<"     fl.u1 = "<<flux[j-1].u1<<": fr.u1 = "<<flux[j].u1<<endl;
@@ -929,8 +917,9 @@ void c_Species::execute(std::vector<AOS>& u_in, std::vector<AOS>& dudt, std::vec
                 cout<<"     u2 : dudt[2] = "<<(dudt[j].u2)<<endl;
                 cout<<"     u3 : dudt[3] = "<<(dudt[j].u3)<<endl;
                 
-                cin>>alpha;
+                //cin>>alpha;
             }
+
         }
     
 } 
@@ -969,7 +958,7 @@ AOS c_Species::hllc_flux(int j)
     double El = dl*prim_r[jleft].internal_energy + 0.5*mom_l*ul ;
     double Er = dr*prim_l[jright].internal_energy + 0.5*mom_r*ur ;
 
-    if( (debug > 2) && (j>0 && j<13) ) {
+    if( (debug > 2) && (j==100) && (this->speciesname=="H2")) {
         cout<<" IN HLLC, j = "<<j<<" dl/dr = "<<dl<<"/"<<dr<<" ul/ul = "<<ul<<"/"<<ur<<" pl/pr = "<<pl<<"/"<<pr<<" El/Er = "<<El<<"/"<<Er;
     }
     
@@ -987,10 +976,6 @@ AOS c_Species::hllc_flux(int j)
     double h   = (std::sqrt(u[j].u1) * hl + std::sqrt(u[j].u1) * hr)/(std::sqrt(u[j].u1) + std::sqrt(u[j].u1));
     double c   = std::sqrt((gamma_adiabat-1.) * (h-0.5*uavg*uavg));
     double mach = (std::fabs(uavg)/c);
-    if(1==0){
-        SL = uavg-c;
-        SR = uavg+c;
-    }
     
     if ((SL <= 0) &&  (SS >= 0)) {
         AOS FL         = AOS (mom_l, mom_l * ul + pl, ul * (El + pl_e) );
@@ -1021,7 +1006,7 @@ AOS c_Species::hllc_flux(int j)
         flux = FR;
         option= 4 ;
     }
-    if((debug > 2) && (j>0 && j<13))
+    if((debug > 2) && (j==100) && (this->speciesname=="H2"))
         cout<<" opt = "<<option<<" SL/SS/SR = "<<SL<<"/"<<SS<<"/"<<SR<<" f = "<<flux.u1<<"/"<<flux.u2<<"/"<<flux.u3<<" ((f.u2-Pl)/Pl)-1 = "<<((flux.u2-pl)/pl)<<" ((f.u2-Pr)/Pr)-1 = "<<((flux.u2-pr)/pr)<<endl;
     return flux;
 }
@@ -1164,11 +1149,18 @@ AOS c_Species::laxfriedrich_flux(int j)
     double dt  = base->dt;
     double dx1 = 0.5*(base->x_i[j]-base->x_i[j-1]);
     double dx2 = 0.5*(base->x_i[j+1]-base->x_i[j]);
-    
+    //double a0  = (0.5*(dx1+dx2)/dt);
+    double am1 = std::fabs(prim[j-1].speed) + prim[j-1].sound_speed;
+    double am0 = std::fabs(prim[j].speed)   +   prim[j].sound_speed;
+    double ap1 = std::fabs(prim[j+1].speed) + prim[j+1].sound_speed;
+    double a0 = std::max(am1,std::max(am0,ap1));
     //cout<<" cell j = "<<j<<" fluxes_l ="<<flux_l.u1<<" "<<flux_l.u2<<" "<<flux_l.u3<<" "<<" fluxes_r ="<<flux_r.u1<<" "<<flux_r.u2<<" "<<flux_r.u3<<" "<<endl;
     //cout<<"             "<<" state_l ="<<state_l.u1<<" "<<state_l.u2<<" "<<state_l.u3<<" "<<" fluxes_r ="<<state_r.u1<<" "<<state_r.u2<<" "<<state_r.u3<<" "<<endl;
     
-    AOS result = ((flux_l + flux_r) * 0.5) +  ((state_l - state_r) * (0.5*(dx1+dx2)/dt)); 
+
+
+    AOS result = ((flux_l + flux_r) * 0.5) +  ((state_l - state_r) * a0); 
+    
     if(j<= 1 || j>=num_cells-1) result = (0,0,0);
     //cout<<"          result  j  "<<j<<" "<<result.u1<<" "<<result.u2<<" "<<result.u3<<endl;
     
@@ -1214,8 +1206,8 @@ AOS c_Species::laxwendroff_flux(int j)
 AOS c_Species::roe_flux(int j) 
 {
     int jleft = j, jright = j+1;
-    AOS_prim prim_l  = prim_r[jleft];
-    AOS_prim prim_r  = prim[jright];
+    AOS_prim prim_l  = this->prim_r[jleft];
+    AOS_prim prim_r  = this->prim_l[jright];
     
     AOS state_l      = AOS(prim_l.density, prim_l.speed*prim_l.density, prim_l.density*prim_l.internal_energy + 0.5*prim_l.density*prim_l.speed*prim_l.speed); //u[jleft];
     AOS state_r      = AOS(prim_r.density, prim_r.speed*prim_r.density, prim_r.density*prim_r.internal_energy + 0.5*prim_r.density*prim_r.speed*prim_r.speed); // = u[jright];
@@ -1253,7 +1245,7 @@ AOS c_Species::roe_flux(int j)
     alphas[1] = drho - dp/(c*c);
     alphas[2] = (dp + rho * c * du)/(2*c*c);
     
-    if(j==80 && base->steps<10)
+    if(j==-80 && base->steps<10)
         cout<<" alphas "<<alphas[0]<<" "<<alphas[1]<<" "<<alphas[2]<<endl;
     
     AOS ev0 = AOS(1, u-c, h - u*c);
@@ -1422,72 +1414,94 @@ int c_Species::count_broken_cells(std::vector<AOS>&u, std::vector<double>&u_mask
 int c_Species::fix_negative_pressures_sometimes(std::vector<AOS>&u_temp, int flag) {
     
     double ptemp = 0;
+    double Ttemp = 0;
     double plast = 0;
     double eratio = 0;
     int fixed_cells = 0;
     double ekin = 0;
     double ekinold=0;
     double temper=0;
+    double Tfix = 0;
     for(int j=0; j<=num_cells+1; j++) {
+
         int fixed = 0;
         ekin   = 0.5*u_temp[j].u2*u_temp[j].u2/u_temp[j].u1;
         ekinold= 0.5*u[j].u2*u[j].u2/u[j].u1;
         eratio = ekin/u_temp[j].u3;
         ptemp  = (u_temp[j].u3 - ekin) * (gamma_adiabat-1);
+        Ttemp  = (u_temp[j].u3 - ekin)/u_temp[j].u1/this->cv;
         plast  = prim[j].pres;
         temper = prim[j].temperature;
-
+        
         //First check: Negative E - big problem - use last value and fix pressure in case its also negative 
-        //if(0==1){
-        //if( (u_temp[j].u3 < 0) || (ptemp < 0) || (plast < 0) || (temper < 0)) {
-        if( (u_temp[j].u3 < 0) || (ptemp < 0)) {
+        if( (u_temp[j].u3 < 0)) {    
             //u_temp[j].u3 = u[j].u3;// + (ekinold-ekin);
+
+            //if(this->speciesname=="H2" && j==10)
+                cout<<"Repaired E in cell/species = "<<j<<" "<<this->speciesname<<" steps "<<base->steps<<" flag "<<flag<<"  Es "<<u_temp[j-1].u3<<" "<<u_temp[j].u3<<" "<<u_temp[j+1].u3<<"  rho "<<u_temp[j-1].u1<<" "<<u_temp[j].u1<<" "<<u_temp[j+1].u1<<" Ttemp "<<Ttemp<<"  v "<<u_temp[j-1].u2/u_temp[j-1].u1<<" "<<u_temp[j].u2/u_temp[j].u1<<" "<<u_temp[j+1].u2/u_temp[j+1].u1<<endl;
             
-            double etmp = 0.5*std::log10(u[j-1].u3) + 0.5*std::log10(u[j+1].u3) ;
+            double etmp = ekin;
+            if( (j>1) && (j<num_cells))
+                etmp = 0.5*std::log10(u[j-1].u3) + 0.5*std::log10(u[j+1].u3) ;
             
             u_temp[j].u3 = std::pow(10.,etmp);
             
-            //if(ptemp < 0 && plast > 0)
-            eos->compute_primitive(&(u[j]), &(prim[j]), 1) ;    
-            eos->compute_auxillary(&(prim[j]), 1);
+            //eos->compute_primitive(&(u[j]), &(prim[j]), 1) ;    
+            //eos->compute_auxillary(&(prim[j]), 1);
 
-            //cout<<"Repaired E in cell/species = "<<j<<" "<<this->speciesname<<" steps "<<base->steps<<" flag "<<flag<<endl;
             fixed = 1;
-        };
-        
+        }
         //Second check: negative pressure
-        //if(ptemp < 0 && plast > 0 && ( eratio > 1.)) {
-        //if(ptemp < 0 && plast > 0 ) {
-        //if(0==1) {
-        if((plast < 0) || (temper < 0) || std::isnan(temper) || (temper > base->max_temperature) )  {
+        if((Ttemp < 0) || (temper < 0) || (temper > base->max_temperature) )  { //|| std::isnan(temper) 
 
-            double T_tmp = prim[j].temperature = std::min(std::max(prim[j].temperature, base->temperature_floor), base->max_temperature);
-            double enew  = this->cv*kb*T_tmp;
+            //if((this->speciesname=="H2") && j==10) {
+                cout<<"Repaired T in cell/species = "<<j<<" "<<this->speciesname<<" steps "<<base->steps<<" implied temp "<<Ttemp<<" current temper "<<temper<<" dt "<<base->dt<<" maxT = "<<base->max_temperature<<endl;
+                /* cout<<"conditions "<<(Ttemp < 0)<<(temper < 0)<<std::isnan(temper) << (temper > base->max_temperature)<<endl;
+                cout<<((Ttemp < 0) || (temper < 0) || std::isnan(temper) || (temper > base->max_temperature) )<<endl;
+                if((Ttemp < 0) || (temper < 0) || std::isnan(temper) || (temper > base->max_temperature) )
+                    cout<<" total expression true "<<endl;
+                else
+                    cout<<" total expression false "<<endl;
+
+                if( 0 )
+                    cout<<" 0 expression true "<<endl;
+                else
+                    cout<<" 0 expression false "<<endl;
+            //} */
+            //cout<<"Repaired T in cell/species = "<<j<<" "<<this->speciesname<<" steps "<<base->steps<<" flag "<<flag<<"  Es "<<u_temp[j-1].u3<<" "<<u_temp[j].u3<<" "<<u_temp[j+1].u3<<"  rho "<<u_temp[j-1].u1<<" "<<u_temp[j].u1<<" "<<u_temp[j+1].u1<<" Ttemp "<<Ttemp<<"  v "<<u_temp[j-1].u2/u_temp[j-1].u1<<" "<<u_temp[j].u2/u_temp[j].u1<<" "<<u_temp[j+1].u2/u_temp[j+1].u1<<endl;
+
+            if(j>0)
+                Tfix = prim[j-1].temperature;
+            if(j<num_cells) {
+                Tfix += prim[j+1].temperature;
+                Tfix /= 2.;
+            }
+            //Tfix = const_T_space;
+
+            double T_tmp = std::min(std::max(Tfix, base->temperature_floor), base->max_temperature);
+            double enew  = u_temp[j].u1*this->cv*T_tmp;
             u_temp[j].u3 = enew + ekin;
 
-            eos->compute_primitive(&(u[j]), &(prim[j]), 1) ;    
-            eos->compute_auxillary(&(prim[j]), 1);
+            //eos->compute_primitive(&(u[j]), &(prim[j]), 1) ;    
+            //eos->compute_auxillary(&(prim[j]), 1);
             fixed = 1;
-
-            
         }
-        if(fixed ==1) {
-            //cout<<"Repaired T in cell/species = "<<j<<" "<<this->speciesname<<" step "<<base->steps<<" flag "<<flag<<endl;
+        else{
+            double M;
+            double ret = return_entropy_with_jump(M);
         }
-
-
         
     }
-    
-    return fixed_cells;
+     
+    return 0;//fixed_cells;
 }
 
 void c_Sim::print_velocity_numberdens_ratios(string position, int dcell)
 {
     if(0==1) {
-        cout<<endl<<position<<" v["<<dcell<<"]_s = "<<endl<<"           ";
+        cout<<endl<<position<<" E["<<dcell<<"]_s = "<<endl<<"           ";
                     for(int s = 0; s < num_species; s++) {
-                        cout<<" ["<<s<<"]= "<<species[s].prim[dcell].speed;
+                        cout<<" ["<<s<<"]= "<<species[s].u[dcell].u3;
                     }
         cout<<endl<<position<<" v["<<dcell<<"]_s/v_e = "<<endl<<"           ";
                         for(int s = 0; s < num_species; s++) {
@@ -1511,17 +1525,17 @@ void c_Sim::print_velocity_numberdens_ratios(string position, int dcell)
 
 void c_Sim::apply_inflow_damping() {
 
-    if(globalTime > 1e0) {
-        double damping_time = 1e3;
+    if(globalTime > 1e-10) {
+        double damping_time = 1e-2;
 
         for (int s=0; s<num_species; s++) {
-            for(int j=1; j<=num_cells; j++) {
+            for(int j=1; j<=3; j++) {
 
-                if(species[s].u[j].u2 < 0) {
+                //if(species[s].u[j].u2 < 0) {
                     
                     species[s].u[j].u2 /= (1+dt/damping_time);
                     species[s].u[j].u3 = species[s].prim[j].pres/(species[s].gamma_adiabat-1.) + 0.5 * species[s].u[j].u2 * species[s].u[j].u2/species[s].u[j].u1;
-                }
+                //}
             }
             //Recompute primitive variables after damping
             species[s].compute_pressure(species[s].u);
@@ -1530,4 +1544,107 @@ void c_Sim::apply_inflow_damping() {
     }
 
 
+}
+
+//Compute explicit fluxes for small e, to hopefully preserve positivity
+void c_Species::compute_e_fluxes(int j) { 
+
+}
+
+void c_Species::positivity_preserving_step(int j) { //From Zhang & Shu 2011
+
+    double e_pred = u[j].u3 - 0.5 * u[j].u2 * u[j].u2/u[j].u1;
+    if(e_pred < 0) {
+        double eold = prim[j].internal_energy;
+        double enew = 1;
+
+        double ul = 0.5*(prim[j-1].speed + prim[j].speed);
+        double ur = 0.5*(prim[j].speed + prim[j+1].speed);
+        double fac = base->dt * (gamma_adiabat-1.5);
+
+        enew = eold / (1 +fac * ( ul* base->surf[j-1] - ur * base->surf[j]) / base->vol[j] ) ; //Implicit, kinetic energy dominated step
+        
+        u[j].u3 = enew * u[j].u1 + 0.5 * u[j].u2 * u[j].u2/u[j].u1;
+        
+        if(enew < 0)
+            cout<<speciesname<<" j = "<<j<<" in positivity preserving step, but e<0 !"<<endl;
+    }
+}
+
+
+//
+// Returns the dominant entropy jump across from left or right cell
+//
+double c_Species::return_entropy_with_jump(double k) {
+/* 
+    double g = gamma_adiabat;
+    double dentropy[2] = {0,0};
+    double entropy_l  = prim[k-1].pres/std::pow(prim[k-1].density, g);
+    double entropy_r  = prim[k+1].pres/std::pow(prim[k+1].density, g);
+    
+    //Do both interfaces for cell k
+    for(int j=0; j<=1; j++) {
+
+        int jleft = j, jright = j+1;
+        AOS flux;
+        int option = 0;
+        
+        //Speed of gas
+        double ul = prim_r[jleft].speed;  
+        double ur = prim_l[jright].speed; 
+        
+        double pl = prim_r[jleft].pres;  
+        double pr = prim_l[jright].pres;
+        double pl_e = pl;
+        double pr_e = pr;
+        if(base->use_total_pressure) {
+                pl = base->total_press_r[jleft];
+                pr = base->total_press_l[jright];
+        }
+        
+        double dl = prim_r[jleft].density;  
+        double dr = prim_l[jright].density;
+
+        double mom_l = dl*ul ;
+        double mom_r = dr*ur ;
+
+        double El = dl*prim_r[jleft].internal_energy + 0.5*mom_l*ul ;
+        double Er = dr*prim_l[jright].internal_energy + 0.5*mom_r*ur ;
+
+        if( (debug > 2) && (j>0 && j<13) ) {
+            cout<<" IN HLLC, j = "<<j<<" dl/dr = "<<dl<<"/"<<dr<<" ul/ul = "<<ul<<"/"<<ur<<" pl/pr = "<<pl<<"/"<<pr<<" El/Er = "<<El<<"/"<<Er;
+        }
+        
+        //Speed of shocks
+        double SL = ul - prim_r[jleft].sound_speed ;
+        double SR = ur + prim_l[jright].sound_speed ;
+        
+        //Intermediate values in the star region, equations 10.30 -10.39 in Toro
+        double SS     = ( pr-pl+ mom_l*(SL - ul)-mom_r*(SR-ur) )/(dl*(SL - ul)-dr*(SR-ur) );
+        
+        double advectionfactor = 1;
+        double uavg   = (std::sqrt(u[j].u1) * ul + std::sqrt(u[j].u1) * ur )/(std::sqrt(u[j].u1) + std::sqrt(u[j].u1));
+        double hl  = (pl + u[j].u3)/u[j].u1;
+        double hr  = (pr + u[j].u3)/u[j].u1;
+        double h   = (std::sqrt(u[j].u1) * hl + std::sqrt(u[j].u1) * hr)/(std::sqrt(u[j].u1) + std::sqrt(u[j].u1));
+        double c   = std::sqrt((gamma_adiabat-1.) * (h-0.5*uavg*uavg));
+        double mach = (std::fabs(uavg)/c);
+        
+        if ((SL <= 0) &&  (SS >= 0)) {
+
+        }
+        double SL = ul - prim_r[jleft].sound_speed ;
+        double SR = ur + prim_l[jright].sound_speed ;
+
+        double u_up, c_up;
+        if( SS > 0 )
+
+        double M = std::fabs(u_up-SL)/c_up;
+
+        double nom   = 1+(2*g/(1+g))*(M*M-1);
+        double denom = std:pow((g+1)*M*M/((g-1)*M*M + 2.), g)
+        double dentropy[j] = cv*std::log(nom/denom);
+    }
+ */
+    return 0 ;
 }

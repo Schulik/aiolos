@@ -240,7 +240,7 @@ double O4p_cooling(double Te, double ne) {
     return term;
 }
 double h3plus_cooling(double Te) {
-    //cout<<"H3+ cooling active!"<<endl;
+    
     double temp = 0.;
     
     if(Te > 900)

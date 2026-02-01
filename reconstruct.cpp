@@ -79,8 +79,8 @@ void c_Species::reconstruct_edge_states( std::vector<double>&u_mask, int orderst
 
     // Step 2: Add 2nd order slope-limited correction
     IntegrationType order = base->order ;
-    if (order == IntegrationType::second_order && orderstep == 1) {
-    //if (order == IntegrationType::second_order && shock_switch == 1) {
+    //if (order == IntegrationType::second_order && orderstep == 1) {
+    if (orderstep == 1) {
         const std::vector<double>& 
             x_i = base->x_i, 
             x_iVC = base->x_iVC,
@@ -89,17 +89,17 @@ void c_Species::reconstruct_edge_states( std::vector<double>&u_mask, int orderst
         for (int i=1; i <= num_cells; i++) {
             //double maskmul = u_mask[i]>0.5?0.:1.; //i>num_cells/2?0.:1.; // Multiply all slopes with 1 in the nominal case, or 0 in case we get a message from above that this cell is broken
             //maskmul = 1.;
-	    double maskmul_l = 1.;
-	    double maskmul_r = 1.;
+            double maskmul_l = 1.;
+            double maskmul_r = 1.;
 
             double p_ratio_l = std::log10(prim[i-1].pres/prim[i].pres);
             double p_ratio_r = std::log10(prim[i].pres/prim[i+1].pres);
 
-	    int limratio = 1;
-	    if(p_ratio_l < -limratio || p_ratio_l > limratio)
-		maskmul_l = 1.;
-	    if(p_ratio_r < -limratio || p_ratio_r > limratio)
-		maskmul_r = 1.;
+            int limratio = 1;
+            if(p_ratio_l < -limratio || p_ratio_l > limratio)
+            maskmul_l = 1.;
+            if(p_ratio_r < -limratio || p_ratio_r > limratio)
+            maskmul_r = 1.;
 
             double dp_l = 0, dp_r = 0 ;
             if (is_gas) {
@@ -133,21 +133,10 @@ void c_Species::reconstruct_edge_states( std::vector<double>&u_mask, int orderst
                         //Result: that's not what's causing it, maybe its better to reinstate the sloping in mass density?
              slope = reconstruct_pointer(
                  prim[i-1].density, prim[i].density, prim[i+1].density, cF, cB, dxF, dxB) ;
-// 
+            // 
              prim_l[i].density +=  slope * (x_i[i-1] - x_iVC[i]) ; 
              prim_r[i].density +=  slope * (x_i[ i ] - x_iVC[i]) ;
-//             
-            //slope = MonotonizedCentralSlope(
-            //    prim[i-1].number_density, prim[i].number_density, prim[i+1].number_density, cF, cB, dxF, dxB) ;
-
-            //prim_l[i].number_density +=  maskmul_l * slope * (x_i[i-1] - x_iVC[i]) ; 
-            //prim_r[i].number_density +=  maskmul_r * slope * (x_i[ i ] - x_iVC[i]) ;
-            //prim_l[i].number_density += slope * (x_i[i-1] - x_iVC[i]) ; 
-            //prim_r[i].number_density += slope * (x_i[ i ] - x_iVC[i]) ;
-            
-            //prim_l[i].density =  prim_l[i].number_density * mass_amu*amu;
-            //prim_r[i].density =  prim_r[i].number_density * mass_amu*amu;
-
+            //            
             // Speed
             slope = reconstruct_pointer(
                 prim[i-1].speed, prim[i].speed, prim[i+1].speed, cF, cB, dxF, dxB) ;
@@ -162,8 +151,6 @@ void c_Species::reconstruct_edge_states( std::vector<double>&u_mask, int orderst
                      prim_l[i] = prim_r[i] = prim[i] ;
                      problematic += 1;
                  }
-                
-
         }
     }
 

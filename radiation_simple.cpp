@@ -38,6 +38,10 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
         l(size_M, 0.), d(size_M, 0.), u(size_M, 0.), r(size_r, 0.), eta1(size_etas, 0.), eta2(size_etas, 0.), denoms(size_etas, 0.) ;
      std::vector<double> arr_rhokr(size_r, 0.), arr_R(size_r, 0.), arr_D(size_r, 0.), arr_JDJ(size_r, 0.);
      std::vector<double> exchange_d_sums(num_cells+2, 0.), exchange_r_sums(num_cells+2, 0.);
+
+    //std::fill(lhs_sc.begin(), lhs_sc.end(), 0); //zero out Subcycling arrays
+    rhs_sc = Vector_t::Zero( (num_cells+2)*num_species );//  std::fill(rhs_sc.begin(), rhs_sc.end(), 0);
+    //std::fill(denoms_sc.begin(), denoms_sc.end(), 0);
     
     int numcells_offset = 1; //Nominally 1
     // Step 1: setup transport terms (J)
@@ -75,7 +79,7 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
                 d[idx+stride] = D ;
                 l[idx+stride] = -D ;
                 
-                if(debug > 3)
+                if(debug > 33)
                     cout<<" radiation part 0. t,j,b="<<steps<<","<<j<<","<<b<<" tau_inv/R/D = "<<tau_inv<<"/"<<R<<"/"<<D<<" J/J/dJ = "<<Jrad_FLD(j+1,b)<<"/"<<Jrad_FLD(j,b)<<"/"<<(Jrad_FLD(j+1,b)-Jrad_FLD(j,b))<<" flux = "<<D*(Jrad_FLD(j+1,b)-Jrad_FLD(j,b))<<endl;
             }
         }
@@ -133,7 +137,7 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
             r[idx_r] = 0 ;
         }
         
-        if(debug >= 3) {
+        if(debug >= 33) {
             
             for(int index=0; index < num_cells+2; index++) {    
 //                 /int index = (num_cells/2+1);
@@ -146,7 +150,7 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
                 //cout<<endl;
             }
             
-            if(debug > 3) {
+            if(debug > 33) {
                 char a;
                 cin>>a;
                 
@@ -183,11 +187,17 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
                     
                 double tempeta = 0;
                 
+                //Non-subcycling heating function
                 denoms[idx_s] = denom;
                 eta1[idx_s] += Ts * ( 1. + 12. * fac);
                 eta1[idx_s] += 1. * ddt * (species[s].dS(j) + species[s].dG(j) - photocooling_expansion * species[s].dGdT(j)*Ts     ) / species[s].u[j].u1 / species[s].cv;
-
                 eta2[idx_s] += 4.* pi * ddt * kappa * no_rad_trans / species[s].cv;
+
+                //Sub-cycling heating function
+                //lhs_sc[idx_s] += 0;
+                //rhs_sc(idx_s) += (species[s].dS(j) + species[s].dG(j) )/species[s].u[j].u1;
+                if(couple_J_into_T)
+                        rhs_sc(idx_s) +=  4.* pi * kappa * Jrad_FLD(j, 0);
                 
                 //if(false) {
                 if(steps == 3363e99 && j==2) {
@@ -225,7 +235,7 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
         }
     }
     
-    if(debug >= 3) {
+    if(debug >= 33) {
         
         cout<<"L ="<<endl;
         for(int i = 0; i < size_M; i++) {
@@ -296,12 +306,6 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
     
     int Tswitch = 0;
     
-    if(Tswitch == 1) {
-        
-        //char a;
-        //cin>>a;
-    }
-    
     //
     // Compute Ti-Tj terms via a separate coupling step
     //
@@ -309,61 +313,76 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
     if (use_collisional_heating && num_species > 1) {
         //compute_collisional_heat_exchange();
         
-    
-        for (int j=0; j < num_cells+numcells_offset; j++){
-            
-            Matrix_t coll_heat_matrix   = Matrix_t::Zero(num_species, num_species);
-            Vector_t coll_heat_b        = Vector_t::Zero(num_species);
-            Vector_t coll_heat_output   = Vector_t::Zero(num_species);
-            double   tau = total_opacity(j,0) * (x_i12[j+1]-x_i12[j]);
-            double security_multiplier = tau<1e3?1.:1.e-4;
-            
-            if(update_coll_frequently && j>=2) {
-                fill_alpha_basis_arrays(j);
-                compute_alpha_matrix(j);
+        for (int j=0; j < num_cells+numcells_offset; j++) {
+
+            if(j==140 && steps%1000==0) {
+                //subcycle_heat_exchange(j, 6 , dt*10, 0);
+                //subcycle_heat_exchange(j, 1 , dt*10, 0.);
+                //subcycle_heat_exchange(j, 100 , dt*10);
+                //subcycle_heat_exchange(j, 20 , dt*10);
+                //subcycle_heat_exchange(j, 10 , dt*10);
+                //subcycle_heat_exchange(j, 6 , dt*10);
+                //subcycle_heat_exchange(j, 3 , dt*10);
+                //subcycle_heat_exchange(j, 2 , debug=2 ,dt);
+                //subcycle_heat_exchange(j, 10 , dt*10);
+                //subcycle_heat_exchange(j, 100, debug=2, dt);
+                //subcycle_heat_exchange(j, 100, debug=2, dt*100);
+                //subcycle_heat_exchange(j, 100, debug=2, dt*10000);
             }
             
-            ////compute_collisional_heat_exchange_matrix(j);
+            if(0==1) {
+                Matrix_t coll_heat_matrix   = Matrix_t::Zero(num_species, num_species);
+                Vector_t coll_heat_b        = Vector_t::Zero(num_species);
+                Vector_t coll_heat_output   = Vector_t::Zero(num_species);
+                double   tau = total_opacity(j,0) * (x_i12[j+1]-x_i12[j]);
+                double security_multiplier = tau<1e3?1.:1.e-4;
+                
+                if(update_coll_frequently && j>=2) {
+                    fill_alpha_basis_arrays(j);
+                    compute_alpha_matrix(j);
+                }
+                
+                ////compute_collisional_heat_exchange_matrix(j);
 
-            for(int si=0; si<num_species; si++) {
-                
-                int idx_s = j * (num_species) + si;
-                
-                //coll_heat_matrix(si,si) += 1./ddt ;
-                //coll_heat_b(si)         += species[si].prim[j].temperature / ddt;
-                
-                //
-                // Rad equilibrium terms
-                //
-                coll_heat_matrix(si,si) += denoms[idx_s];
-                if(couple_J_into_T)
-                    coll_heat_b(si)         += eta2[idx_s]*Jrad_FLD(j,0);
-                coll_heat_b(si)         += eta1[idx_s];
-                
-                //for(int sj=0; sj<num_species; sj++) {
-                //   coll_heat_matrix(si,sj) -= security_multiplier * friction_coefficients(si,sj);
-                //}
-                double diag_sum = 0;
-                double temp = 0;
-//                cout<<endl;
-                for(int sj=0; sj<num_species; sj++) {
-                    temp = ddt * 1. * friction_coefficients(si,sj) * 3 * kb / (species[si].cv * (mass_vector(si) + mass_vector(sj)) );
-                    diag_sum += temp;
-                    coll_heat_matrix(si,sj) -= temp;
+                for(int si=0; si<num_species; si++) {
+                    
+                    int idx_s = j * (num_species) + si;
+                    
+                    //coll_heat_matrix(si,si) += 1./ddt ;
+                    //coll_heat_b(si)         += species[si].prim[j].temperature / ddt;
+                    //
+                    // Rad equilibrium terms
+                    //
+                    coll_heat_matrix(si,si) += denoms[idx_s];
+                    if(couple_J_into_T)
+                        coll_heat_b(si)         += eta2[idx_s]*Jrad_FLD(j,0);
+                    coll_heat_b(si)         += eta1[idx_s];
+                    
+                    double diag_sum = 0;
+                    double temp = 0;
+                    
+                    for(int sj=0; sj<num_species; sj++) {
+                        temp = ddt * 1. * friction_coefficients(si,sj) * 3 * kb / (species[si].cv * (mass_vector(si) + mass_vector(sj)) );
+                        diag_sum += temp;
+                        coll_heat_matrix(si,sj) -= temp;
+                    }
+
+                    coll_heat_matrix(si,si) += diag_sum;
                 }
 
-                coll_heat_matrix(si,si) += diag_sum;
-
+                double e_orig = return_total_e(j);
+                //if(steps == 1000)
+                //    cout<<j<<" total e's "<<e_orig<<" ";
+                
+                LU.compute(coll_heat_matrix) ;
+                coll_heat_output.noalias() = LU.solve(coll_heat_b);
+            
             }
-            
-            LU.compute(coll_heat_matrix) ;
-            coll_heat_output.noalias() = LU.solve(coll_heat_b);
-            
+            subcycle_heat_exchange(j, num_subcycles, debug=0 , dt);
+
+            /*
             if((steps == 0 || steps == 1) && (j==100 || j==300) && false) {
                 cout<<"j=="<<j<<", steps=="<<steps<<", Coll Matrix / b was "<<endl<<coll_heat_matrix<<endl<<coll_heat_b<<endl;
-
-		//cout<<"invtotalmasses = "<<inv_totmasses<<endl;
-
                 for(int si=0; si<num_species; si++) {
                     int idx_s = j * (num_species) + si;
                     
@@ -376,19 +395,23 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
                     }
                         cout<<endl;
                 }
-                
-            }
+            }*/
+
             double avgT_nom = 0;
             double avgT_denom = 0;
 
+            //
+            // Make checks and corrections
+            //
             for(int si=0; si<num_species; si++) {
                 
-                double tt = coll_heat_output(si);
-                
+                //double tt = coll_heat_output(si);
+                //double tt = eta1[idx_s]/denoms[idx_s] + eta2[idx_s]/denoms[idx_s]*Jrad_FLD(j, 0);
+                double tt = species[si].prim[j].temperature; // this temperature now comes freshly out of the subcycle
 
                 int idx_s = j * (num_species) + si;
-                //double tt = eta1[idx_s]/denoms[idx_s] + eta2[idx_s]/denoms[idx_s]*Jrad_FLD(j, 0);
                 
+                /*
                 if(tt < 0. && j > 0 && false) {
                     cout<<" negative T after TiTj s = "<<species[si].speciesname<<" j/s = "<<j<<"/"<<si<<" eta1/eta2/J = "<<eta1[idx_s]<<"/"<<eta2[idx_s]<<"/"<<Jrad_FLD(j, 0)<<" denom/eta2*J = "<<denoms[idx_s]<<"/"<<eta2[idx_s]*Jrad_FLD(j,0)<<" t/dt/steps = "<<globalTime<<"/"<<ddt<<"/"<<steps<<endl;
                     
@@ -399,75 +422,75 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
                     
                     if(si==1)
                         cout<<"Heating matrix Matrix / b was "<<endl<<coll_heat_matrix<<endl<<coll_heat_b<<endl;
-                }
+                }*/
                     
                 if(tt<temperature_floor)
                         tt=temperature_floor;
                     
                 if(tt> ( max_temperature + globalTime/max_temperature_time * 1e4) )
-                        tt=(max_temperature + globalTime/max_temperature_time * 1e4);
-		//if(j<=4)
-		//	tt=species[si].const_T_space;                
+                        tt=(max_temperature + globalTime/max_temperature_time * 1e4);         
 
                 avgT_nom   += species[si].u[j].u1 * species[si].cv * tt;
                 avgT_denom += species[si].u[j].u1 * species[si].cv;
 
-		
                 if(globalTime > 1e-30)
                     species[si].prim[j].temperature = tt ;
                 else
                     species[si].prim[j].temperature = species[si].const_T_space;
             }
-        
+
+            //if(steps == 1000)
+            //    cout<<(1-return_total_e(j)/e_orig)<<" ";
             
-	     if(use_avg_temperature && globalTime < avg_temperature_t1){
-		//cout<<"using avg t..."<<endl;
-            if(globalTime < avg_temperature_t0) {
-
-                double avgtemp    = avgT_nom/avgT_denom;
-                double relaxtemp;
-
-                double rt = shadow_relaxation_time; //shadowed regions temperature relaxation timescale
-                double totalheat = 0;
-                for(int si=0; si<num_species; si++) 
-                    totalheat += species[si].dS(j);
-
+            if(use_avg_temperature && globalTime < avg_temperature_t1){
                 
-                //if(totalheat < 1e-50) {
-                //if(use_shadow_relaxation && totalheat < ( shadow_relaxation_threshold && (x_i[j]<x_i[num_cells]/2) )) { //1e-50 is the arbitrary limit we set on the heating function throughout the code
-                //if(use_shadow_relaxation && (totalheat < shadow_relaxation_threshold) && (x_i[j]<x_i[num_cells]/4) ) { //1e-50 is the arbitrary limit we set on the heating function throughout the code
-                if(use_shadow_relaxation && (totalheat < shadow_relaxation_threshold) && (x_i[j]< shadow_relaxation_radius) ) { //1e-50 is the arbitrary limit we set on the heating function throughout the code
-                //if(use_shadow_relaxation && (x_i[j]< shadow_relaxation_radius) ) { //1e-50 is the arbitrary limit we set on the heating function throughout the code
-                    double fac = ddt/rt;
-                    double f1  = (1 + 1e-40) / (1 + fac + 1e-40);
-                    double f2  = (1 + 1e-40) / (1/fac + 1 + 1e-40);
+                if(globalTime < avg_temperature_t0) {
 
-                    relaxtemp = avgtemp * f1 + species[0].const_T_space * f2;
+                    double avgtemp    = avgT_nom/avgT_denom;
+                    double relaxtemp;
+
+                    double rt = shadow_relaxation_time; //shadowed regions temperature relaxation timescale
+                    double totalheat = 0;
+                    for(int si=0; si<num_species; si++) 
+                        totalheat += species[si].dS(j);
+
+                    
+                    //if(totalheat < 1e-50) {
+                    //if(use_shadow_relaxation && totalheat < ( shadow_relaxation_threshold && (x_i[j]<x_i[num_cells]/2) )) { //1e-50 is the arbitrary limit we set on the heating function throughout the code
+                    //if(use_shadow_relaxation && (totalheat < shadow_relaxation_threshold) && (x_i[j]<x_i[num_cells]/4) ) { //1e-50 is the arbitrary limit we set on the heating function throughout the code
+                    if(use_shadow_relaxation && (totalheat < shadow_relaxation_threshold) && (x_i[j]< shadow_relaxation_radius) ) { //1e-50 is the arbitrary limit we set on the heating function throughout the code
+                    //if(use_shadow_relaxation && (x_i[j]< shadow_relaxation_radius) ) { //1e-50 is the arbitrary limit we set on the heating function throughout the code
+                        double fac = ddt/rt;
+                        double f1  = (1 + 1e-40) / (1 + fac + 1e-40);
+                        double f2  = (1 + 1e-40) / (1/fac + 1 + 1e-40);
+
+                        relaxtemp = avgtemp * f1 + species[0].const_T_space * f2;
+                    }
+                        else
+                            relaxtemp = avgtemp;
+                    
+                    //if(steps > 850)
+                    //    cout<<" global_time < avg_temperature"<<avgtemp<<" relaxtemp = "<<relaxtemp<< "steps ="<<steps<<endl;     
+
+                    for(int si=0; si<num_species; si++) {
+                            species[si].prim[j].temperature = relaxtemp;
+                    } 
+                            
+                } else {
+                        for(int si=0; si<num_species; si++) {
+                                species[si].prim[j].temperature = avgT_nom/avgT_denom * (1. - globalTime/avg_temperature_t1)  + species[si].prim[j].temperature * globalTime/avg_temperature_t1;
+                        }
                 }
-                    else
-                        relaxtemp = avgtemp;
-                
-                //if(steps > 850)
-                //    cout<<" global_time < avg_temperature"<<avgtemp<<" relaxtemp = "<<relaxtemp<< "steps ="<<steps<<endl;     
-
-                for(int si=0; si<num_species; si++) {
-                        species[si].prim[j].temperature = relaxtemp;
-                } 
-                        
             } else {
-                   	for(int si=0; si<num_species; si++) {
-                        	 species[si].prim[j].temperature = avgT_nom/avgT_denom * (1. - globalTime/avg_temperature_t1)  + species[si].prim[j].temperature * globalTime/avg_temperature_t1;
-                	}
-                }
-        } else {
-            //cout<<use_avg_temperature<<" "<<globalTime<<" "<<avg_temperature_t1<<endl;
-        }
+                //cout<<use_avg_temperature<<" "<<globalTime<<" "<<avg_temperature_t1<<endl;
+            }
+            
+            //if(steps == 1000)
+            //    cout<<(1-return_total_e(j)/e_orig)<<endl;
 
-         } //end j loop
+        } //end j loop
 
-
- 
-    } else {
+    } else { //dont use coll heating or num_species !> 1
         
             
         for (int j=0; j < num_cells + numcells_offset; j++){
@@ -481,8 +504,6 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
                 if( j==2 && steps>3364 && false)
                     cout<<"t = "<<steps<<" j ="<<j<<" T = "<<tt<<" num_cells = "<<num_cells<<endl;
                 
-                //if(j==140)
-                //    cout<<"t = "<<steps<<" T = "<<tt<<endl;
                 
                 if(tt < 0. && (j<num_cells+numcells_offset)) {
                 //if(steps == 221160) {
@@ -510,7 +531,6 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
             }
         }
         
-        
         if( steps>10e99) {
             char a;
             cin>>a;
@@ -518,11 +538,9 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
        
     }
     
-
-//
-// Conduction
-//
-
+    //
+    // Conduction
+    //
     if(use_conduction && ( globalTime < do_cond_until)) {
         std::vector<double> temp_temperatures        = std::vector<double>(num_cells+1);
         std::vector<double> flux_temperatures        = std::vector<double>(num_cells+2);
@@ -660,4 +678,196 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
         
     }
 
+}
+
+
+
+double c_Sim::return_total_e(int j) {
+    double tmp = 0;
+
+    for(int si=0; si<num_species; si++) {
+        //tmp += species[si].u[j].u1 * species[si].prim[j].internal_energy;
+        tmp += species[si].u[j].u1 * species[si].cv * species[si].prim[j].temperature;
+    }
+
+    return tmp;
+}
+
+
+
+/*
+Function subcycle heat exchange
+    Splits the heat exchange and heating operator for all species into smaller substeps
+
+
+*/
+void c_Sim::subcycle_heat_exchange(int j, int num_cycles, int debug, double dt, double dGdT_mul) {
+            
+            Matrix_t coll_heat_matrix         = Matrix_t::Zero(num_species, num_species);
+            Matrix_t coll_heat_matrix_fixed   = Matrix_t::Zero(num_species, num_species);
+            Vector_t coll_heat_b              = Vector_t::Zero(num_species);
+            Vector_t coll_heat_b_fixed        = Vector_t::Zero(num_species);
+            Vector_t coll_heat_output         = Vector_t::Zero(num_species);
+            Vector_t tmp_temperatures         = Vector_t::Zero(num_species);
+
+            /*
+            coll_heat_matrix.setZero();
+            coll_heat_matrix_fixed.setZero();
+            coll_heat_b.setZero();
+            coll_heat_b_fixed.setZero();
+            coll_heat_output.setZero();
+            tmp_temperatures.setZero();*/
+
+            //int num_cycles = 3;
+            
+
+            Matrix_t documentation         = Matrix_t::Zero(num_species, num_cycles+1);
+
+            if(update_coll_frequently && j>=2) {
+                fill_alpha_basis_arrays(j);
+                compute_alpha_matrix(j);
+            }
+            
+            //********************************************************************** */
+            //********************************************************************** */
+            //Build fixed matrix which we will reuse for each cycle
+            //********************************************************************** */
+            //********************************************************************** */
+            for(int si=0; si<num_species; si++) {
+                
+                int idx_s                     = j * (num_species) + si;
+                coll_heat_b_fixed(si)         = rhs_sc(idx_s) ;//eta1[idx_s];
+                
+                double diag_sum = 0;
+                double temp = 0;
+                
+                for(int sj=0; sj<num_species; sj++) {
+                    temp      = friction_coefficients(si,sj) * 3 * kb / (mass_vector(si) + mass_vector(sj)) ;
+                    diag_sum += temp;
+                    coll_heat_matrix_fixed(si,sj) -= temp;
+                }
+
+                coll_heat_matrix_fixed(si,si) += diag_sum; 
+                coll_heat_matrix_fixed(si,si) += dGdT_mul * species[si].dGdT(j) / species[si].u[j].u1; //cooling gradient term
+                
+                
+                //Initialize temperatures 
+                tmp_temperatures(si) = species[si].prim[j].temperature;
+                documentation(si,0)  = species[si].prim[j].temperature;
+            }
+
+            //********************************************************************** */
+            //********************************************************************** */
+            // Begin subcycling
+            //********************************************************************** */
+            //********************************************************************** */
+
+            double ddt = dt/((double)num_cycles);
+
+            for(int c=0; c<num_cycles; c++) {
+                if( num_cycles==2) {
+                    if(c==0) ddt = 0.5*dt;
+                    else ddt = dt;
+                }
+                //Reset matrices for this cycle
+                coll_heat_matrix  = coll_heat_matrix_fixed;
+                coll_heat_b       = coll_heat_b_fixed;
+
+                //Recompute cooling with new temp temperatures
+                if(e_idx>-1)
+                    do_highenergy_cooling(j, tmp_temperatures(e_idx)); //TODO: Add also update for kappa_planck, to allow bolometric cooling to converge
+                
+                /*for(int si=0; si<num_species; si++)  {
+                    temperature_vector(si) =  tmp_temperatures(si); //resets the collisional vector -> better convergence inside the subcycling?
+                }
+                compute_alpha_matrix(j);*/
+
+                //
+                // Add remaining terms for this cycle 
+                //
+                for(int si=0; si<num_species; si++) {
+                    int idx_s = j * (num_species) + si;
+
+                    double Tsold = documentation(si,0);  //This should make the method second order: Tsold is on the r.h.s of the equation, while the updated fractional-step temperatures are used to estimate new gradients
+                    double Ts    = tmp_temperatures(si);
+                    double Ts3   = Ts*Ts*Ts;
+                    double kappa = species[si].opacity_planck(j, 0);
+                    //
+                    // Rad equilibrium terms
+                    //
+                    coll_heat_matrix(si,si) +=  species[si].cv/ddt     + 16 * sigma_rad * kappa * Ts3;
+                    coll_heat_b(si)         += (species[si].cv/ddt     + 12 * sigma_rad * kappa * Ts3 + dGdT_mul * species[si].dGdT(j) / species[si].u[j].u1) * Tsold ;
+                    coll_heat_b(si)         += (species[si].dS(j)      + species[si].dG(j) )/species[si].u[j].u1;
+
+                    /////////////////////////////////////////////////////////////////////
+                    /////////////////////////////////////////////////////////////////////
+                    // Coll heat matrix reintroduced, but should be put back into "fixed" part of the code
+                    /*
+                    double diag_sum = 0;
+                    double temp = 0;
+                    
+                    for(int sj=0; sj<num_species; sj++) {
+                        temp      = friction_coefficients(si,sj) * 3 * kb / (mass_vector(si) + mass_vector(sj)) ;
+                        diag_sum += temp;
+                        coll_heat_matrix(si,sj) -= temp;
+                    }
+
+                    coll_heat_matrix(si,si) += diag_sum;
+                    coll_heat_matrix(si,si) += dGdT_mul * species[si].dGdT(j) / species[si].u[j].u1;
+                    */
+                    /////////////////////////////////////////////////////////////////////
+                    /////////////////////////////////////////////////////////////////////
+                }
+
+                double e_orig = return_total_e(j);
+                //if(steps == 1000)
+                //    cout<<j<<" total e's "<<e_orig<<" ";
+                
+                LU.compute(coll_heat_matrix) ;
+                coll_heat_output.noalias() = LU.solve(coll_heat_b);
+
+                tmp_temperatures = coll_heat_output;
+
+                for(int si=0; si<num_species; si++) {
+                    documentation(si,c+1)  = coll_heat_output(si);
+                }
+                //cycle complete
+        }
+
+
+        //********************************************************************** */
+        //********************************************************************** */
+        // do checks    
+        //********************************************************************** */
+        //********************************************************************** */
+
+
+        //********************************************************************** */
+        //********************************************************************** */
+        // After checks are complete, write solution into original temperature   
+        //********************************************************************** */
+        //********************************************************************** */
+        if(debug <= 1) {
+            for(int si=0; si<num_species; si++) {
+                species[si].prim[j].temperature = tmp_temperatures(si);
+            }   
+        }
+
+
+        //********************************************************************** */
+        //********************************************************************** */
+        // Show time evolution of temperatures    
+        //********************************************************************** */
+        //********************************************************************** */
+        if(debug >= 1) {
+            cout<<endl<<"Showing time evolution over subcycles "<<endl;
+            for(int si=0; si<num_species; si++) {
+                
+                cout<<si<<" ";
+                for(int c=-1;c<num_cycles; c++)
+                    cout<<documentation(si,c+1)<<" ";
+                cout<<" dS/dG/dGdT = "<<species[si].dS(j)<<" "<<species[si].dG(j)<<" "<<species[si].dGdT(j)<<endl;
+                
+            }
+        }
 }

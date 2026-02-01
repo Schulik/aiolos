@@ -17,7 +17,7 @@
  * Searches for restart data, reads it in, and overwrites initial conditions with that data, so that the simulation can continue from the savenumber.
  * 
  */
-void c_Sim::restart_from_outputnumber(int restartnumber) {
+void c_Sim::restart_from_outputnumber(int restartnumber, double restarttime_cmdline) {
     
     char a;
     cout<<" In restart, restartnumber = "<<restartnumber<<" enter a char to continue."<<endl;
@@ -96,7 +96,13 @@ void c_Sim::restart_from_outputnumber(int restartnumber) {
     }
     
     restarttime = output_time * ((int)restartnumber);   
-    
+    if (restarttime_cmdline > 0) {
+        restarttime = restarttime_cmdline;
+        globalTime  = restarttime_cmdline;
+        cout<<" found nonzero restarttime "<<restarttime_cmdline<<endl;
+        //char a;
+        //cin>>a;
+    }
     
     
     

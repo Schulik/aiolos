@@ -27,7 +27,7 @@ extern double VanLeerSlope(double ql, double qm, double qr, double cF, double cB
  * @param[in] debug_cell Get detailed information for a specific cell (To be implemented by user..)
  * @param[in] debug_steps Get detailed information for a specific timestep (To be implemented by user..)
  */
-c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, string tintent, std::vector<int> debug_data, int restartnumber) {
+c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, string tintent, std::vector<int> debug_data, int restartnumber, double restarttime_cmdline) {
 
 	init_line_cooling_data();
 
@@ -220,13 +220,14 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, s
         diffusivity           = read_parameter_from_file<double>(filename,"DIFFUSIVITY", debug, 0.).value;  //Value of conductivity prefactor
         vdiffusivity           = read_parameter_from_file<double>(filename,"VDIFF", debug, 1.).value;  //Value of conductivity prefactor
         K_zz_init = read_parameter_from_file<double>(filename,"KZZ_INIT", debug, 0.).value;                 //Initial atmospheric mixing parameter in cm^2/s
-	homopause_smoothing_rad = read_parameter_from_file<int>(filename,"HOMOPAUSE_SMOOTHING_RAD", debug, 0).value;
-	homopause_smoothing_rep = read_parameter_from_file<int>(filename,"HOMOPAUSE_SMOOTHING_REP", debug, 0).value;
+	    homopause_smoothing_rad = read_parameter_from_file<int>(filename,"HOMOPAUSE_SMOOTHING_RAD", debug, 0).value;
+	    homopause_smoothing_rep = read_parameter_from_file<int>(filename,"HOMOPAUSE_SMOOTHING_REP", debug, 0).value;
         convect_boundary_strength = read_parameter_from_file<double>(filename,"CONVECT_BOUNDARY_STRENGTH", debug, 1.1).value; //Unused currently.
         do_cond_until         = read_parameter_from_file<double>(filename,"DO_COND_UNTIL", debug, 1e99).value; //Unused currently.
         use_inflow_damping    = read_parameter_from_file<int>(filename,"USE_INFLOW_DAMPING", debug, 0).value; //Damp negative velocities, as they frequently crash the simulation, to stimulate outflows
         
         use_collisional_heating = read_parameter_from_file<int>(filename,"PARI_USE_COLL_HEAT", debug, 1).value; //Switch on collisional energy exchange between species
+        num_subcycles           = read_parameter_from_file<int>(filename,"COLL_HEAT_SUBCYCLES", debug, 1).value; //Collisional heating will be subcycled
         use_drag_predictor_step = read_parameter_from_file<int>(filename, "PARI_SECONDORDER_DRAG", debug, 1).value; //Switch on drag predictor substep
         alpha_collision        = read_parameter_from_file<double>(filename,"PARI_ALPHA_COLL", debug, 1.).value; //Multiplier for collision alphas 
         alpha_collision_ions   = read_parameter_from_file<double>(filename,"PARI_ALPHA_IONS", debug, 1.).value; //Multiplier for collision alphas for ions
@@ -760,7 +761,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, s
         // RESTART FUNCTIONALITY
         //
         if(restartnumber != 0)
-            c_Sim::restart_from_outputnumber(restartnumber);
+            c_Sim::restart_from_outputnumber(restartnumber, restarttime_cmdline);
         
         //
         // END RESTART
@@ -819,6 +820,14 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, s
 
         if(debug > 0) cout<<"Init: Setting up friction workspace."<<endl;
         
+        coll_heat_matrix         = Matrix_t::Zero(num_species, num_species);
+        coll_heat_matrix_fixed   = Matrix_t::Zero(num_species, num_species);
+        coll_heat_b              = Vector_t::Zero(num_species);
+        coll_heat_b_fixed        = Vector_t::Zero(num_species);
+        coll_heat_output         = Vector_t::Zero(num_species);
+        tmp_temperatures         = Vector_t::Zero(num_species);
+
+
         alphas_sample   = Eigen::VectorXd::Zero(num_cells+2);
         friction_sample = Eigen::VectorXd::Zero(num_cells+2);
         
@@ -852,6 +861,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, s
             numdens_vector        = Vector_t(num_species);
             mass_vector           = Vector_t(num_species);
             temperature_vector    = Vector_t(num_species);
+            temperature_old       = Vector_t::Ones(num_cells+2);
             temperature_vector_augment    = Vector_t(num_species);
 
             identity_matrix       = Matrix_t::Identity(num_species, num_species);
@@ -895,6 +905,10 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, s
     dS_band_special=Eigen::MatrixXd::Zero(num_cells+2, num_bands_in);
     dS_band_zero  = Eigen::MatrixXd::Zero(num_cells+2, num_bands_in);
     planck_matrix = Eigen::MatrixXd::Zero(num_plancks, 2);
+
+    //    = std::vector<double>( (num_cells+2)*num_species ); //sc stands for subcycling - those variables are of use in the heating subcycle
+    rhs_sc    = Vector_t::Zero( (num_cells+2)*num_species ); 
+    //denoms_sc = std::vector<double>( (num_cells+2)*num_species );
     
     //
     // Compute Planck matrix based on loggrid and 100 K blackbody
@@ -1190,7 +1204,8 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, s
         }
         
         try{
-            reaction_rate_table = Eigen::MatrixXd::Zero(num_cells+2, num_reactions+num_photoreactions);// Eigen::Matrix<double, NUM_SPECIES,NUM_SPECIES, Eigen::RowMajor>; //Eigen::MatrixXd::Zero(num_cells+2, num_reactions);
+            reaction_rate_table      = Eigen::MatrixXd::Zero(num_cells+2, num_reactions+num_photoreactions);// Eigen::Matrix<double, NUM_SPECIES,NUM_SPECIES, Eigen::RowMajor>; //Eigen::MatrixXd::Zero(num_cells+2, num_reactions);
+            reaction_coeff_table     = Eigen::MatrixXd::Zero(num_cells+2, num_reactions+num_photoreactions);
             empty_reaction_table();
             output_chemistry = 0;
             cout<<setprecision(4);
@@ -1286,6 +1301,7 @@ c_Species::c_Species(c_Sim *base_simulation, string filename, string species_fil
         u               = init_AOS(num_cells+2); //Conserved hyperbolic variables: density, mass flux, energy density
         u0              = init_AOS(num_cells+2); //Conserved hyperbolic variables: density, mass flux, energy density
         u_tmp           = init_AOS(num_cells+2); 
+        u_diff          = init_AOS(num_cells+2); 
         u_mask          = std::vector<double>(num_cells+2);
         dudt[0]         = init_AOS(num_cells+2);
         dudt[1]         = init_AOS(num_cells+2);
@@ -1525,7 +1541,7 @@ void c_Species::initialize_hydrostatic_atmosphere(string filename) {
     //
     if(debug > -1) cout<<"        IN CONSTRUCT HYDROSTATIC  AFTER READ DATA Species["<<speciesname<<"] mass = "<<mass_amu<<endl;
 
-    for(int i=num_cells+2; i>=0; i--) {
+    for(int i=num_cells+1; i>=0; i--) {
             
         int mode;
         
@@ -2009,10 +2025,14 @@ void c_Species::apply_boundary_left(std::vector<AOS>& u) {
                 u[igh]     = u[iact]; 
                 u[igh].u2 *= -1;
                 base->phi[igh]   = base->phi[iact] ;
+                u[igh].u3 = 0.5*u[igh].u2*u[igh].u2/u[igh].u1 + u[igh].u1 * cv * const_T_space;
+
+                eos->compute_primitive(&u[igh],&(prim[igh]), 1) ;
+                eos->compute_auxillary(&(prim[igh]), 1);
             }
             break;
         case BoundaryType::fixed:  //enum type 3
-            for (int i=0; i < num_ghosts; i++) {
+                //for (int i=0; i < num_ghosts; i++) {
                 //cout<<" IN FIXED LEFT BOUNDARIES"<<endl;
                 /*double dens_wall;  
                 if(base->problem_number == 1)
@@ -2022,42 +2042,49 @@ void c_Species::apply_boundary_left(std::vector<AOS>& u) {
                 }*/
                 //double dens_wall;
                 
-                int igh =  num_ghosts-1 -i;
-                int iact = num_ghosts   +i;
-                u[igh]     = BACKGROUND_U.u1; //u[iact]; 
-                u[igh].u2 *= -1;
-                base->phi[igh]   = base->phi[iact] ;
+                for (int i=0; i < num_ghosts; i++) {
+                    int igh =  num_ghosts-1 -i;
+                    int iact = num_ghosts   +i;
+                    u[igh]     = u[iact]; 
+                    u[igh].u2  = 0;
+                    base->phi[igh]   = base->phi[iact] ;
+                }
+
+                compute_pressure(u);
 
                 if(0==1){
-                    if(base->problem_number == 1)
-                    {
-                        u[i] = SHOCK_TUBE_UL;
-                        eos->compute_primitive(&u[i],&(prim[i]), 1) ;
-                        eos->compute_auxillary(&(prim[i]), 1);
-                        
-                            //eos->compute_primitive(&(u[0]), &(prim[0]), num_cells+2) ;    
-                            //eos->compute_auxillary(&(prim[0]), num_cells+2);
-                    }
-                    else {
-                        AOS_prim prim;
-                        prim.density = BACKGROUND_U.u1;
-                        //if(this->this_species_index == base->e_idx)
-                        //    prim.density = this->prim[3].density;
+                    
+                    for (int i=0; i < num_ghosts; i++) {
+                        if(base->problem_number == 1)
+                        {
+                            u[i] = SHOCK_TUBE_UL;
+                            eos->compute_primitive(&u[i],&(prim[i]), 1) ;
+                            eos->compute_auxillary(&(prim[i]), 1);
+                            
+                                //eos->compute_primitive(&(u[0]), &(prim[0]), num_cells+2) ;    
+                                //eos->compute_auxillary(&(prim[0]), num_cells+2);
+                        } else {
+                                AOS_prim prim;
+                                prim.density = BACKGROUND_U.u1;
+                                //if(this->this_species_index == base->e_idx)
+                                //    prim.density = this->prim[3].density;
 
-                        if(this->prim[2].speed < 0)
-                            prim.speed = -0.*this->prim[2].speed * base->wavedamp_factor;
-                        else
-                            prim.speed   = 0.; //this->prim[2].speed;
-                        prim.temperature = this->prim[2].temperature;
-                        //prim.temperature = const_T_space;
-                        eos->update_eint_from_T(&(prim), 1);
-                        eos->update_p_from_eint(&(prim), 1);
-                        eos->compute_conserved(&(prim), &(u[i]), 1) ; //Ghost cell u is fixed after init, only need to update p in prim
+                                if(this->prim[2].speed < 0)
+                                    prim.speed = -0.*this->prim[2].speed * base->wavedamp_factor;
+                                else
+                                    prim.speed   = 0.; //this->prim[2].speed;
+                                prim.temperature = this->prim[2].temperature;
+                                //prim.temperature = const_T_space;
+                                eos->update_eint_from_T(&(prim), 1);
+                                eos->update_p_from_eint(&(prim), 1);
+                                eos->compute_conserved(&(prim), &(u[i]), 1) ; //Ghost cell u is fixed after init, only need to update p in prim
+                        }
+
                     }
                 }
                 
        
-            }
+            //}
             
             break;
         case BoundaryType::periodic:  //enum type 4
@@ -2096,6 +2123,8 @@ void c_Species::apply_boundary_right(std::vector<AOS>& u) {
         case BoundaryType::open:  //enum type 1
             
             for (int i=Ncell+num_ghosts; i < Ncell+2*num_ghosts; i++) {
+            //for (int i=base->num_cells; i <= base->num_cells+1; i++) {
+
                 AOS_prim primm ;
                 eos->compute_primitive(&u[i-1],&primm, 1) ;
                 
@@ -2108,13 +2137,11 @@ void c_Species::apply_boundary_right(std::vector<AOS>& u) {
                 //Older variant, should be more precise but has weird pressure slope
                 //double dphi2 = (phi_s[i] - phi_s[i-1]) / (base->dx[i-1] + base->dx[i]) ;
                 //dphi2 *= (prim.density * base->omegaplus[i]*base->dx[i] + this->prim[i].density * base->omegaminus[i-1]*base->dx[i-1]) ;
-                //prim.pres = prim.pres - dphi2 ; 
+                //prim.pres = prim.pres - dphi2 ;
 
                 primm.density     = base->right_extrap_press_multiplier * primm.density;
                 primm.temperature = std::min(std::max(prim[i-1].temperature, base->temperature_floor), base->max_temperature );
-                
-                //prim.pres = std::max( prim.pres, 1e-40) ; //TODO: Replace 1e-3 with an estimate for the max pressure jumpin a adiabatic shock
-                //prim.pres = std::max( prim.pres, 0.0) ;          //27.10.2021: Not in use anymore, due to this causing problems with negative temperatures. p=0 -> E = 0 -> T = 0  and negative after a bit of hydro
+                primm.speed       = 0.; //std::min(std::max(prim[i-1].speed, -3e6), 3e6 );
                 
                 //primm.internal_energy = primm.temperature * cv;
                 prim[i] = primm;

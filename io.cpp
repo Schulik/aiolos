@@ -789,7 +789,8 @@ void c_Species::print_AOS_component_tofile(int timestepnumber) {
         //Print right ghost stuff
         outfile<<base->x_i12[num_cells+1]<<'\t'<<u[num_cells+1].u1<<'\t'<<u[num_cells+1].u2<<'\t'<<u[num_cells+1].u3<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<prim[num_cells+1].pres<<'\t'<<u[num_cells+1].u2/u[num_cells+1].u1<<'\t'<<prim[num_cells+1].temperature<<'\t'<<'-'<<'\t'<<base->phi[num_cells+1]<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<endl;
    
-        cout<<"    Sucessfully written file "<<filename<<" for species = "<<speciesname<<" t = "<<base->globalTime<<" dt = "<<base->dt<<", cfl = "<<base->cflfactor<<" steps = "<<base->steps<<endl;
+        if(this->this_species_index==0)
+            cout<<"    Sucessfully written file "<<filename<<" for species = "<<speciesname<<" t = "<<base->globalTime<<" dt = "<<base->dt<<", cfl = "<<base->cflfactor<<" steps = "<<base->steps<<endl;
     }
     else cout << "Unable to open file" << filename << endl; 
     outfile.close();

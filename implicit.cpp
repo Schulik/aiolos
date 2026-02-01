@@ -123,6 +123,16 @@ void c_Species::implicit_incompressible(double dt) {
         //energy
         dd[idx + 8]  += V / dt ;
         r[idx_r+ 2]  += V / dt * u[j].u3;
+    }
+
+    for (int j=1; j <= num_cells+1; j++) {
+
+        double V   = base->vol[j];
+        double S_l = base->surf[j-1];
+        double S_r = base->surf[j];
+        //cout<<" writing matrix j "<<j<<endl;
+        int idx   = j*stride  ;
+        int idx_r = j*num_vars;
 
         // Face velocities (from non-advanced timestep)
         double v_l = 0.5 * (prim[j-1].speed + prim[j].speed); //(u[j-1].u2 / u[j-1].u1 + u[j].u2 / u[j].u1);
@@ -183,10 +193,12 @@ void c_Species::implicit_incompressible(double dt) {
         int sw=v_r>0? 0 : 1;
         int sgn = v_r>0 ? +1 : -1;
         ///////////////////////////////////
+        if(j<num_cells) {
         drho = -sgn * slope_rho[j+sw]  / (u[j+1].u1  - u[j].u1  + 1e-50) * (x_i[ j ] - x_iVC[j+sw]); //Note: Slope 0 reduces this to the old, first order Crank-Nicolson
         dmom = -sgn * slope_mom[j+sw]  / (u[j+1].u2  - u[j].u2  + 1e-50) * (x_i[ j ] - x_iVC[j+sw]); 
         dE   = -sgn * slope_E[j+sw]    / (u[j+1].u3  - u[j].u3  + 1e-50) * (x_i[ j ] - x_iVC[j+sw]); 
-
+        }
+        
         //rho
         a = v_r<0? 1.0 + 0.5  * drho : -0.5 * drho;
         b = v_r<0? -0.5 * drho : 1.0 + 0.5  * drho;
@@ -363,7 +375,7 @@ void c_Species::implicit_incompressible(double dt) {
         double E_implied = 0.5*momtmp*momtmp/rhotmp + rhotmp * cv * T_tmp;      //This is the old temperature
         double E_floor   = 0.5*momtmp*momtmp/rhotmp + rhotmp * cv * base->temperature_floor;
         double T_pred = (u[j].u3 - 0.5*momtmp*momtmp/rhotmp ) / (rhotmp * cv);
-        if(base->steps == 440 || base->steps == 2700) {
+        if(base->steps == -2 || base->steps == -2700) {
             cout<<" j = "<<j<<" old/new rho  = "<<u[j].u1<<" / "<<rhotmp<<" t_damp = "<<t_damp[j]<<" corresponding f = "<<ff[j]<<endl;
             cout<<" j = "<<j<<" old/new mom  = "<<u[j].u2<<" / "<<r[j*num_vars + 1]<<" v_implied old/new = "<<vimpl_old<<"/"<<vimpl_new<<endl;
             cout<<" j = "<<j<<" old/new E    = "<<u[j].u3<<" / "<<r[j*num_vars + 2]<<endl;
