@@ -373,7 +373,9 @@ void c_Sim::execute(int restartnumber, double restarttime_cmdline) {
         }
 
         //Misc sources: diffusion:
-        execute_separate_diffusion_step();
+        if(diffusivity_style >= 0) {
+            execute_separate_diffusion_step();
+        }
 
         for(int s = 0; s < num_species; s++) {
             species[s].fix_negative_pressures_sometimes(species[s].u, 31);

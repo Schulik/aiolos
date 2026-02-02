@@ -1018,7 +1018,7 @@ void c_Sim::execute_separate_diffusion_step() {
 
     //Write
     for(int s=0; s<num_species; s++) {
-        for(int j=0; j < num_cells+2; j++) {
+        for(int j=0; j < num_cells+1; j++) {
             species[s].u_diff[j] = AOS(species[s].u[j].u1, species[s].u[j].u2, species[s].prim[j].internal_energy);
         }
     }
@@ -1039,7 +1039,7 @@ void c_Sim::execute_separate_diffusion_step() {
 
     //Project back
     for(int s=0; s<num_species; s++) {
-        for(int j=0; j < num_cells+2; j++) {
+        for(int j=0; j < num_cells+1; j++) {
 
             if(species[s].u_diff[j].u3<0) { 
                 cout<<" negative energy in diffusion  "<<j<<" "<<species[s].speciesname<<" steps "<<steps<<"  Es "<<species[s].u[j-1].u3<<" "<<species[s].u[j].u3<<" "<<species[s].u[j+1].u3<<"  rho "<<species[s].u[j-1].u1<<" "<<species[s].u[j].u1<<" "<<species[s].u[j+1].u1<<" T = "<<species[s].prim[j].temperature<<endl;
