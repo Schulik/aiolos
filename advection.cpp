@@ -365,7 +365,7 @@ void c_Sim::execute(int restartnumber, double restarttime_cmdline) {
         //begin other operators
         for(int s = 0; s < num_species; s++) {
             species[s].compute_pressure(species[s].u);
-            species[s].fix_negative_pressures_sometimes(species[s].u_tmp, 3);
+            species[s].fix_negative_pressures_sometimes(species[s].u, 3);
         }
 
         if(steps >printstuff_steps) {    
@@ -375,6 +375,10 @@ void c_Sim::execute(int restartnumber, double restarttime_cmdline) {
         //Misc sources: diffusion:
         execute_separate_diffusion_step();
 
+        for(int s = 0; s < num_species; s++) {
+            species[s].fix_negative_pressures_sometimes(species[s].u, 31);
+        }
+
         //DEBUGGING: HERE IS WHERE species[14].prim[276].temperature = 1e33 at steps 12855 appears for the first time! - note E is already too high
         //Computes the velocity drag update after the new hydrodynamic state is known for each species
         if (do_hydrodynamics == 1) 
@@ -382,23 +386,10 @@ void c_Sim::execute(int restartnumber, double restarttime_cmdline) {
 
         if (do_hydrodynamics == 0 && friction_solver > 0) 
                 compute_drag_update(0.99*dt) ;
-        
-        if(steps > debug_steps && debug_cell < num_cells+1) {
-                cout<<"t="<<steps<<" Pos 2 T[423]_s = ";
-                for(int s = 0; s < num_species; s++) {
-                    cout<<" ["<<s<<"]= "<<species[s].prim[debug_cell].temperature;
-                }
-                cout<<endl;
-            }
-        if(steps >printstuff_steps) {    
-                print_velocity_numberdens_ratios(" Pos 2:: ", 210);
-        }
 
         for(int s = 0; s < num_species; s++) {
-            //species[s].compute_pressure(species[s].u);
-            species[s].fix_negative_pressures_sometimes(species[s].u_tmp, 4);
+            species[s].fix_negative_pressures_sometimes(species[s].u, 4);
         }
-        
 
         // If either switch is set we need to think more carefully about what should be done
         if( (photochemistry_level + use_rad_fluxes ) > 0 ) {
@@ -437,12 +428,21 @@ void c_Sim::execute(int restartnumber, double restarttime_cmdline) {
                     }
                 }
                     
-            }             
+            }
+            
+            for(int s = 0; s < num_species; s++) {
+                species[s].fix_negative_pressures_sometimes(species[s].u, 41);
+            }
+            
             update_dS();               //Compute low-energy dS
         
             if (do_hydrodynamics == 1) {
                 compute_drag_update(0.01*dt) ;
                 compute_total_pressure();
+            }
+
+            for(int s = 0; s < num_species; s++) {
+                species[s].fix_negative_pressures_sometimes(species[s].u, 42);
             }
 
             if(false) {
@@ -461,7 +461,7 @@ void c_Sim::execute(int restartnumber, double restarttime_cmdline) {
 
         for(int s = 0; s < num_species; s++) {
             //species[s].compute_pressure(species[s].u);
-            species[s].fix_negative_pressures_sometimes(species[s].u_tmp, 5);
+            species[s].fix_negative_pressures_sometimes(species[s].u, 5);
         }
         
         if(steps > debug_steps) {
@@ -1415,6 +1415,9 @@ int c_Species::count_broken_cells(std::vector<AOS>&u, std::vector<double>&u_mask
  */
 int c_Species::fix_negative_pressures_sometimes(std::vector<AOS>&u_temp, int flag) {
     
+    //if(this_species_index==base->e_idx)
+    //    cout<<" electron temperature, steps "<<base->steps<<" fl "<<flag<<" T ="<<prim[100].temperature<<endl; 
+
     double ptemp = 0;
     double Ttemp = 0;
     double plast = 0;
@@ -1440,7 +1443,7 @@ int c_Species::fix_negative_pressures_sometimes(std::vector<AOS>&u_temp, int fla
             //u_temp[j].u3 = u[j].u3;// + (ekinold-ekin);
 
             //if(this->speciesname=="H2" && j==10)
-                cout<<"Repaired E in cell/species = "<<j<<" "<<this->speciesname<<" steps "<<base->steps<<" flag "<<flag<<"  Es "<<u_temp[j-1].u3<<" "<<u_temp[j].u3<<" "<<u_temp[j+1].u3<<"  rho "<<u_temp[j-1].u1<<" "<<u_temp[j].u1<<" "<<u_temp[j+1].u1<<" Ttemp "<<Ttemp<<"  v "<<u_temp[j-1].u2/u_temp[j-1].u1<<" "<<u_temp[j].u2/u_temp[j].u1<<" "<<u_temp[j+1].u2/u_temp[j+1].u1<<endl;
+            //    cout<<"Repaired E in cell/species = "<<j<<" "<<this->speciesname<<" steps "<<base->steps<<" flag "<<flag<<"  Es "<<u_temp[j-1].u3<<" "<<u_temp[j].u3<<" "<<u_temp[j+1].u3<<"  rho "<<u_temp[j-1].u1<<" "<<u_temp[j].u1<<" "<<u_temp[j+1].u1<<" Ttemp "<<Ttemp<<"  v "<<u_temp[j-1].u2/u_temp[j-1].u1<<" "<<u_temp[j].u2/u_temp[j].u1<<" "<<u_temp[j+1].u2/u_temp[j+1].u1<<endl;
             
             double etmp = ekin;
             if( (j>1) && (j<num_cells))
@@ -1448,16 +1451,19 @@ int c_Species::fix_negative_pressures_sometimes(std::vector<AOS>&u_temp, int fla
             
             u_temp[j].u3 = std::pow(10.,etmp);
             
-            //eos->compute_primitive(&(u[j]), &(prim[j]), 1) ;    
-            //eos->compute_auxillary(&(prim[j]), 1);
+            eos->compute_primitive(&(u[j]), &(prim[j]), 1) ;    
+            eos->compute_auxillary(&(prim[j]), 1);
 
             fixed = 1;
         }
         //Second check: negative pressure
-        if((Ttemp < 0) || (temper < 0) || (temper > base->max_temperature) )  { //|| std::isnan(temper) 
+        if((Ttemp < 0) || (temper < 0) || (temper > base->max_temperature) || std::isnan(temper) )  { //
+            base->update_T_mean(j, flag);
+            double T_mean = base->T_mean[j];
 
             //if((this->speciesname=="H2") && j==10) {
-                cout<<"Repaired T in cell/species = "<<j<<" "<<this->speciesname<<" steps "<<base->steps<<" implied temp "<<Ttemp<<" current temper "<<temper<<" dt "<<base->dt<<" maxT = "<<base->max_temperature<<endl;
+            //if(temper > base->max_temperature)
+            //cout<<"Repaired T in cell/species = "<<j<<" "<<this->speciesname<<" steps "<<base->steps<<" implied temp "<<Ttemp<<" current temper "<<temper<<" T_mean "<<T_mean<<" dt "<<base->dt<<" maxT = "<<base->max_temperature<<endl;
                 /* cout<<"conditions "<<(Ttemp < 0)<<(temper < 0)<<std::isnan(temper) << (temper > base->max_temperature)<<endl;
                 cout<<((Ttemp < 0) || (temper < 0) || std::isnan(temper) || (temper > base->max_temperature) )<<endl;
                 if((Ttemp < 0) || (temper < 0) || std::isnan(temper) || (temper > base->max_temperature) )
@@ -1472,20 +1478,12 @@ int c_Species::fix_negative_pressures_sometimes(std::vector<AOS>&u_temp, int fla
             //} */
             //cout<<"Repaired T in cell/species = "<<j<<" "<<this->speciesname<<" steps "<<base->steps<<" flag "<<flag<<"  Es "<<u_temp[j-1].u3<<" "<<u_temp[j].u3<<" "<<u_temp[j+1].u3<<"  rho "<<u_temp[j-1].u1<<" "<<u_temp[j].u1<<" "<<u_temp[j+1].u1<<" Ttemp "<<Ttemp<<"  v "<<u_temp[j-1].u2/u_temp[j-1].u1<<" "<<u_temp[j].u2/u_temp[j].u1<<" "<<u_temp[j+1].u2/u_temp[j+1].u1<<endl;
 
-            if(j>0)
-                Tfix = prim[j-1].temperature;
-            if(j<num_cells) {
-                Tfix += prim[j+1].temperature;
-                Tfix /= 2.;
-            }
-            //Tfix = const_T_space;
-
-            double T_tmp = std::min(std::max(Tfix, base->temperature_floor), base->max_temperature);
+            double T_tmp = std::min(std::max(T_mean, base->temperature_floor), base->max_temperature);
             double enew  = u_temp[j].u1*this->cv*T_tmp;
             u_temp[j].u3 = enew + ekin;
 
-            //eos->compute_primitive(&(u[j]), &(prim[j]), 1) ;    
-            //eos->compute_auxillary(&(prim[j]), 1);
+            eos->compute_primitive(&(u[j]), &(prim[j]), 1) ;    
+            eos->compute_auxillary(&(prim[j]), 1);
             fixed = 1;
         }
         else{
@@ -1498,6 +1496,55 @@ int c_Species::fix_negative_pressures_sometimes(std::vector<AOS>&u_temp, int fla
     return 0;//fixed_cells;
 }
 
+
+
+//
+// This routine constructs a T_mean after the hydro step and is therefore using hydro variables.
+// It will be ultimately used to correct negative temperatures which can occur from the computation of E-Ekin at large mach number
+//
+void c_Sim::update_T_mean(int j, int flag) {
+
+        double avgT_nom   = 0;
+        double avgT_denom = 0;
+        for(int si=0; si<num_species; si++) {
+            double tt = species[si].u[j].u3 - 0.5 * species[si].u[j].u2*species[si].u[j].u2/species[si].u[j].u1;
+                   tt /= (species[si].u[j].u1*species[si].cv);
+            //cout<<" in update T_mean "<<si<<" "<<tt<<endl;
+
+            if( (tt>0) && (!std::isnan(tt))  ) { //Ignore broken contributions
+                avgT_nom   += species[si].u[j].u1 * species[si].cv * tt;
+                avgT_denom += species[si].u[j].u1 * species[si].cv;
+            }
+            
+        }
+        T_mean[j] = avgT_nom/avgT_denom;
+    
+        if(std::isnan(T_mean[j])) {
+            cout<<" T_mean is NaN in j= "<<j<<" steps "<<steps<<" flag "<<flag<<" ";
+            for(int si=0; si<num_species; si++) {
+                cout<<species[si].prim[j].temperature;
+                if(std::isnan(species[si].prim[j].temperature))
+                    cout<<"("<<species[si].speciesname<<")";
+                cout<<" ";
+ /*                AOS      tmp  = species[si].u[j];
+                AOS_prim tmpp = species[si].prim[j];
+                double tt = tmp.u3 - 0.5 * tmp.u2*tmp.u2/tmp.u1;
+                tt /= (tmp.u1*species[si].cv);
+                cout<<" in update T_mean "<<si<<" "<<tt<<" u = "<<tmp.u1<<" "<<tmp.u2<<" "<<tmp.u3<<" prim = "<<tmpp.internal_energy<<" "<<tmpp.temperature<<" "<<tmpp.pres<<" "<<tmpp.sound_speed<<" "<<tmpp.speed<<endl;
+                 */
+            }
+            cout<<endl;
+
+        }
+    
+
+}
+
+
+
+//
+// A routine that prints a lot of stuff
+//
 void c_Sim::print_velocity_numberdens_ratios(string position, int dcell)
 {
     if(0==1) {
@@ -1520,11 +1567,11 @@ void c_Sim::print_velocity_numberdens_ratios(string position, int dcell)
                     }
                     cout<<endl<<"_____________________________________________________"<<endl;
     }
-    
-    
 }
 
-
+//
+// Damp negative velocities under certain conditions
+//
 void c_Sim::apply_inflow_damping() {
 
     if(globalTime > 1e-10) {
@@ -1553,6 +1600,9 @@ void c_Species::compute_e_fluxes(int j) {
 
 }
 
+//
+// Dual energy hydro step for the internal energy
+//
 void c_Species::positivity_preserving_step(int j) { //From Zhang & Shu 2011
 
     double e_pred = u[j].u3 - 0.5 * u[j].u2 * u[j].u2/u[j].u1;

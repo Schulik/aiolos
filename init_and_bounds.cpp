@@ -219,6 +219,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, s
         conductivity2         = read_parameter_from_file<double>(filename,"CONDUCT2",     debug, conductivity).value;  //Value of conductivity prefactor
         diffusivity           = read_parameter_from_file<double>(filename,"DIFFUSIVITY", debug, 0.).value;  //Value of conductivity prefactor
         vdiffusivity           = read_parameter_from_file<double>(filename,"VDIFF", debug, 1.).value;  //Value of conductivity prefactor
+        diffusivity_style      = read_parameter_from_file<int>(filename,"DIFF_STYLE", debug, 0).value; //0 is donor, 1 is average
         K_zz_init = read_parameter_from_file<double>(filename,"KZZ_INIT", debug, 0.).value;                 //Initial atmospheric mixing parameter in cm^2/s
 	    homopause_smoothing_rad = read_parameter_from_file<int>(filename,"HOMOPAUSE_SMOOTHING_RAD", debug, 0).value;
 	    homopause_smoothing_rep = read_parameter_from_file<int>(filename,"HOMOPAUSE_SMOOTHING_REP", debug, 0).value;
@@ -897,6 +898,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, s
     
     previous_monitor_J = std::vector<double>(num_bands_out) ;
     previous_monitor_T = std::vector<double>(num_species) ;
+    T_mean             = std::vector<double>(num_cells+2);
     
     solar_heating = Eigen::VectorXd::Zero(num_bands_in,  1);
     solar_heating_final = Eigen::VectorXd::Zero(num_bands_in,  1);

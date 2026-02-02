@@ -295,12 +295,10 @@ void c_Species::update_kzz_and_gravpot(int argument) {
  * Wrapper function calling the appropriate analytical or numerical functions.
  */
 void c_Sim::compute_drag_update(double dtt) {
-	//cout<<"In  drag_update"<<endl;
         if(friction_solver >= 0 && num_species > 1) {
             if(friction_solver == 0)
                 compute_friction_analytical();
             else{
-		//cout<<"calling friction numerical"<<endl;
                  compute_friction_numerical(dtt);
 		}
         }
@@ -505,6 +503,17 @@ void c_Sim::compute_friction_numerical(double dtt) {
     Eigen::internal::set_is_malloc_allowed(false) ;
          
     if(debug > 0) cout<<"in numerical, dense friction, num_species = "<<num_species<<endl;
+
+    for(int si=0; si<num_species; si++) {
+        for(int j =0; j<= num_cells+0; j++) {
+            AOS      tmp  = species[si].u[j];
+            AOS_prim tmpp = species[si].prim[j];
+            double tt = tmp.u3 - 0.5 * tmp.u2*tmp.u2/tmp.u1;
+            tt /= (tmp.u1*species[si].cv);
+            if(std::isnan(tmpp.temperature) || std::isnan(tt) )
+                cout<<" before friction "<<steps<<" "<<j<<" "<<si<<" "<<tt<<" u = "<<tmp.u1<<" "<<tmp.u2<<" "<<tmp.u3<<" prim = "<<tmpp.internal_energy<<" "<<tmpp.temperature<<" "<<tmpp.pres<<" "<<tmpp.sound_speed<<" "<<tmpp.speed<<endl;                
+        }
+    }
     
     for(int j=0; j < num_cells-1; j++){
 
@@ -627,8 +636,16 @@ void c_Sim::compute_friction_numerical(double dtt) {
     }
     
 
-    if(steps>=524)
-        cout<<"";
+    for(int si=0; si<num_species; si++) {
+        for(int j =0; j<= num_cells+0; j++) {
+            AOS      tmp  = species[si].u[j];
+            AOS_prim tmpp = species[si].prim[j];
+            double tt = tmp.u3 - 0.5 * tmp.u2*tmp.u2/tmp.u1;
+            tt /= (tmp.u1*species[si].cv);
+            if(std::isnan(tmpp.temperature) || std::isnan(tt) )
+                cout<<" after friction "<<steps<<" "<<j<<" "<<si<<" "<<tt<<" u = "<<tmp.u1<<" "<<tmp.u2<<" "<<tmp.u3<<" prim = "<<tmpp.internal_energy<<" "<<tmpp.temperature<<" "<<tmpp.pres<<" "<<tmpp.sound_speed<<" "<<tmpp.speed<<endl;                
+        }
+    }
 
 }
 
@@ -991,8 +1008,10 @@ AOS c_Species::source_diffusion_flux2(int j) {
     if(j<=base->num_ghosts-1)
         u_diff = 0;
     
-    //return AOS( u_diff * rhomean,  u_diff * mommean, u_diff * emean);
-    return AOS( u_diff * rhodonor, u_diff * momdonor, u_diff * edonor); 
+    if(base->diffusivity_style==0)
+        return AOS( u_diff * rhomean,  u_diff * mommean, u_diff * emean);
+    else
+        return AOS( u_diff * rhodonor, u_diff * momdonor, u_diff * edonor); 
 }
 
 void c_Sim::execute_separate_diffusion_step() {
@@ -1024,12 +1043,12 @@ void c_Sim::execute_separate_diffusion_step() {
 
             if(species[s].u_diff[j].u3<0) { 
                 cout<<" negative energy in diffusion  "<<j<<" "<<species[s].speciesname<<" steps "<<steps<<"  Es "<<species[s].u[j-1].u3<<" "<<species[s].u[j].u3<<" "<<species[s].u[j+1].u3<<"  rho "<<species[s].u[j-1].u1<<" "<<species[s].u[j].u1<<" "<<species[s].u[j+1].u1<<" T = "<<species[s].prim[j].temperature<<endl;
-                species[s].u_diff[j].u3 = species[s].cv * species[s].prim[j].temperature;
+                species[s].u_diff[j].u3 = species[s].u_diff[j].u1 * species[s].cv * species[s].prim[j].temperature;
             }
 
             double rho = species[s].u_diff[j].u1; 
             double mom = species[s].u_diff[j].u2; 
-            double E   = 0.5*mom*mom/rho + rho * species[s].u_diff[j].u3; 
+            double E   = 0.5*mom*mom/rho + rho*species[s].u_diff[j].u3; 
             species[s].u[j] = AOS(rho, mom, E);
         }
         species[s].compute_pressure(species[s].u);

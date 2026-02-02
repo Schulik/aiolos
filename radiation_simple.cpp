@@ -18,6 +18,22 @@
  * @param[in] ddt timestep
  */
 void c_Sim::update_fluxes_FLD_simple(double ddt) {
+
+    for(int si=0; si<num_species; si++) {
+        for(int j =0; j<= num_cells; j++) {
+            AOS      tmp  = species[si].u[j];
+            AOS_prim tmpp = species[si].prim[j];
+
+            double tt = tmp.u3 - 0.5 * tmp.u2*tmp.u2/tmp.u1;
+            tt /= (tmp.u1*species[si].cv);
+
+            if(std::isnan(tmpp.temperature) || std::isnan(tt) )
+                cout<<" before T_solver "<<steps<<" "<<j<<" "<<si<<" "<<tt<<" u = "<<tmp.u1<<" "<<tmp.u2<<" "<<tmp.u3<<" prim = "<<tmpp.internal_energy<<" "<<tmpp.temperature<<" "<<tmpp.pres<<" "<<tmpp.sound_speed<<" "<<tmpp.speed<<endl;                
+        }
+    }
+    //
+    // Initial checks
+    //
     
     if(debug > 2)
         cout<<"Starting update_fluxes_FLD_simple.."<<endl;
@@ -140,7 +156,7 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
         if(debug >= 33) {
             
             for(int index=0; index < num_cells+2; index++) {    
-//                 /int index = (num_cells/2+1);
+                //                 /int index = (num_cells/2+1);
                 
                 cout<<" radiation part1, t = "<<steps<<" band["<<b<<"] cell["<<index<<"] l/d/u/r = "<<l[index]<<"/"<<d[index]<<"/"<<u[index]<<"/"<<r[index];
                 cout<<" temps = ";
@@ -378,6 +394,13 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
                 coll_heat_output.noalias() = LU.solve(coll_heat_b);
             
             }
+            /* if( (j==130) && (steps== 1259) ) {
+                subcycle_heat_exchange(j, 1, debug=2 , dt);
+                subcycle_heat_exchange(j, 2, debug=2 , dt);
+                subcycle_heat_exchange(j, 3, debug=2 , dt);
+                subcycle_heat_exchange(j, 4, debug=2 , dt);
+                subcycle_heat_exchange(j, 5, debug=2 , dt);
+            } */
             subcycle_heat_exchange(j, num_subcycles, debug=0 , dt);
 
             /*
@@ -665,8 +688,18 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
     // Update energies. 
     // TODO: We should add cv * (Tf - Ti) to u to conserve energy properly.
     for(int si=0; si<num_species; si++) {
-        for(int j =num_cells-2; j<= num_cells+1; j++)
+        for(int j =0; j<= num_cells+1; j++) {
+            /* 
+            double tt = tmp.u3 - 0.5 * tmp.u2*tmp.u2/tmp.u1;
+            tt /= (tmp.u1*species[si].cv);
+            */
+            AOS_prim tmpp = species[si].prim[j];
+            AOS      tmp  = species[si].u[j];
+
+            if(std::isnan(species[si].prim[j].temperature))
+                cout<<" @end of T_solver_simple "<<steps<<" "<<j<<" "<<si<<" "<<" u = "<<tmp.u1<<" "<<tmp.u2<<" "<<tmp.u3<<" prim = "<<tmpp.internal_energy<<" "<<tmpp.temperature<<" "<<tmpp.pres<<" "<<tmpp.sound_speed<<" "<<tmpp.speed<<endl;
             species[si].prim[j].temperature = std::min(std::max(species[si].prim[j].temperature, temperature_floor), max_temperature );
+        }
 
         species[si].eos->update_eint_from_T(&(species[si].prim[0]), num_cells+2);
         species[si].eos->update_p_from_eint(&(species[si].prim[0]), num_cells+2);
@@ -676,6 +709,18 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
 
         //species[si].eos->compute_primitive(&(species[si].u[0]), &(species[si].prim[0]), num_cells+2) ;    
         
+    }
+
+
+    for(int si=0; si<num_species; si++) {
+        for(int j =0; j<= num_cells+1; j++) {
+            AOS      tmp  = species[si].u[j];
+            AOS_prim tmpp = species[si].prim[j];
+            double tt = tmp.u3 - 0.5 * tmp.u2*tmp.u2/tmp.u1;
+            tt /= (tmp.u1*species[si].cv);
+            if(std::isnan(tmpp.temperature) || std::isnan(tt) )
+                cout<<" after T_solver "<<steps<<" "<<j<<" "<<si<<" "<<tt<<" u = "<<tmp.u1<<" "<<tmp.u2<<" "<<tmp.u3<<" prim = "<<tmpp.internal_energy<<" "<<tmpp.temperature<<" "<<tmpp.pres<<" "<<tmpp.sound_speed<<" "<<tmpp.speed<<endl;                
+        }
     }
 
 }
@@ -702,6 +747,16 @@ Function subcycle heat exchange
 
 */
 void c_Sim::subcycle_heat_exchange(int j, int num_cycles, int debug, double dt, double dGdT_mul) {
+
+            for(int si=0; si<num_species; si++) {
+                AOS      tmp  = species[si].u[j];
+                AOS_prim tmpp = species[si].prim[j];
+                double tt = tmpp.temperature; //tmp.u3 - 0.5 * tmp.u2*tmp.u2/tmp.u1;
+                
+                if(std::isnan(tt))
+                    cout<<" @start T subcycling found NaN! "<<steps<<" "<<j<<" "<<si<<" "<<tt<<" u = "<<tmp.u1<<" "<<tmp.u2<<" "<<tmp.u3<<" prim = "<<tmpp.internal_energy<<" "<<tt<<" "<<tmpp.pres<<" "<<tmpp.sound_speed<<" "<<tmpp.speed<<endl;                
+            }
+
             
             Matrix_t coll_heat_matrix         = Matrix_t::Zero(num_species, num_species);
             Matrix_t coll_heat_matrix_fixed   = Matrix_t::Zero(num_species, num_species);
@@ -775,7 +830,7 @@ void c_Sim::subcycle_heat_exchange(int j, int num_cycles, int debug, double dt, 
 
                 //Recompute cooling with new temp temperatures
                 if(e_idx>-1)
-                    do_highenergy_cooling(j, tmp_temperatures(e_idx)); //TODO: Add also update for kappa_planck, to allow bolometric cooling to converge
+                    do_highenergy_cooling(j, std::max(tmp_temperatures(e_idx), 3.) ); //TODO: Add also update for kappa_planck, to allow bolometric cooling to converge
                 
                 /*for(int si=0; si<num_species; si++)  {
                     temperature_vector(si) =  tmp_temperatures(si); //resets the collisional vector -> better convergence inside the subcycling?
@@ -870,4 +925,14 @@ void c_Sim::subcycle_heat_exchange(int j, int num_cycles, int debug, double dt, 
                 
             }
         }
+
+    
+    for(int si=0; si<num_species; si++) {
+        AOS      tmp  = species[si].u[j];
+        AOS_prim tmpp = species[si].prim[j];
+        double tt = tmpp.temperature;//tmp.u3 - 0.5 * tmp.u2*tmp.u2/tmp.u1;
+        
+        if(std::isnan(tt))
+                cout<<" @end T subcycling found NaN! "<<steps<<" "<<j<<" "<<si<<" "<<tt<<" u = "<<tmp.u1<<" "<<tmp.u2<<" "<<tmp.u3<<" prim = "<<tmpp.internal_energy<<" "<<tt<<" "<<tmpp.pres<<" "<<tmpp.sound_speed<<" "<<tmpp.speed<<endl;                
+    }
 }

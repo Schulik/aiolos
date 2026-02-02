@@ -128,7 +128,7 @@ double c_Sim::get_cfl_timestep() {
 
     if(steps%435==0) {
     //if(steps>350) {
-        cout<<" most constraining cfl cell: "<<cnstr_cell<<" species "<<species[cnstr_spc].speciesname<< " resulting in dt ="<<cfl_step<<" total dt "<< min(cfl_step, dt*max_timestep_change)<<" max_temper = "<<max_temper<<" max_mach "<<max_mach<<" steps "<<steps<<" t = "<<globalTime<<endl;
+        cout<<"       max limiting cell: "<<cnstr_cell<<" s= "<<species[cnstr_spc].speciesname<< " => dt= "<<cfl_step<<" total dt "<< min(cfl_step, dt*max_timestep_change)<<" max_T = "<<max_temper<<" max_mach "<<max_mach<<" steps= "<<steps<<" t= "<<globalTime<<endl;
     }  
     
     if(do_hydrodynamics)
@@ -520,7 +520,7 @@ double c_Sim::compute_planck_function_integral4(double lmin, double lmax, double
  * @param[in] name species name string, as read in from the *.spc file
  * @return Integer number between 0 and s-1
  */
-int c_Sim::get_species_index(const string name, const int verbose=1) {
+int c_Sim::get_species_index(const string name, const int verbose=0) {
     
     std::vector<string> stringlist = stringsplit(name," ");
     
@@ -547,15 +547,12 @@ int c_Sim::get_species_index(const string name, const int verbose=1) {
                 if(verbose)
                     cout<<" Found species index for "<<ss<<" = "<<species[s].speciesname<<endl;
                 return s;
-            }
-	    //else
-		//cout<<" Not matching: "<<ss<<" "<<species[s].speciesname;                
+            }             
         }
         
     }
     
-    if(verbose)
-        cout<<" Couldn't find species index for searchlist = "<<name<<endl;
+    cout<<" Couldn't find species index for searchlist = "<<name<<endl;
     return -1;
 }
 

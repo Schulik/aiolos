@@ -426,6 +426,7 @@ public:
     double conductivity2;
     double diffusivity;
     double vdiffusivity;
+    int diffusivity_style;
     double do_cond_until;
     int neutralize_electrons;
     ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -719,6 +720,7 @@ public:
     
     std::vector<double> previous_monitor_J;
     std::vector<double> previous_monitor_T;
+    std::vector<double> T_mean;
 
     Eigen::MatrixXd S_band;
     Eigen::MatrixXd dS_band;
@@ -915,6 +917,7 @@ public:
     void do_highenergy_cooling(int j, double Te);
     void update_tau_s_jb(int j, int b);
     void update_opacities();
+    void update_T_mean(int j, int flag);
     
     void empty_reaction_table();
     void save_reaction_data_for_cell(int j, double dtt, double n_tot);
