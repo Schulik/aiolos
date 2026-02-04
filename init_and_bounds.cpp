@@ -828,7 +828,6 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, s
         coll_heat_output         = Vector_t::Zero(num_species);
         tmp_temperatures         = Vector_t::Zero(num_species);
 
-
         alphas_sample   = Eigen::VectorXd::Zero(num_cells+2);
         friction_sample = Eigen::VectorXd::Zero(num_cells+2);
         
@@ -911,7 +910,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, s
     //    = std::vector<double>( (num_cells+2)*num_species ); //sc stands for subcycling - those variables are of use in the heating subcycle
     rhs_sc    = Vector_t::Zero( (num_cells+2)*num_species ); 
     //denoms_sc = std::vector<double>( (num_cells+2)*num_species );
-    
+
     //
     // Compute Planck matrix based on loggrid and 100 K blackbody
     //

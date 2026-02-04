@@ -127,7 +127,7 @@ void c_Species::reconstruct_edge_states( std::vector<double>&u_mask, int orderst
             //prim_r[i].pres += maskmul_r * slope * (x_i[ i ] - x_iVC[i]) ;
             prim_l[i].pres += slope * (x_i[i-1] - x_iVC[i]) ; 
             prim_r[i].pres += slope * (x_i[ i ] - x_iVC[i]) ;
-
+            
 
             // Density  //Changed the sloping to be in number densities in order to investigate the relative numerical particle drift (see appendix of Helium paper)
                         //Result: that's not what's causing it, maybe its better to reinstate the sloping in mass density?

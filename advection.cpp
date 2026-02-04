@@ -359,10 +359,13 @@ void c_Sim::execute(int restartnumber, double restarttime_cmdline) {
                 print_velocity_numberdens_ratios(" Pos 1.4:: ", 210);
         }
 
+        //Damp unphysical inflow at boundaries
         if(use_inflow_damping==1)
             apply_inflow_damping();
         
-        //begin other operators
+        //
+        // Begin other operators
+        //
         for(int s = 0; s < num_species; s++) {
             species[s].compute_pressure(species[s].u);
             species[s].fix_negative_pressures_sometimes(species[s].u, 3);
@@ -1462,6 +1465,7 @@ int c_Species::fix_negative_pressures_sometimes(std::vector<AOS>&u_temp, int fla
         if((Ttemp < 0) || (temper < 0) || (temper > base->max_temperature) || std::isnan(temper) )  { //
             base->update_T_mean(j, flag);
             double T_mean = base->T_mean[j];
+            
 
             //if((this->speciesname=="H2") && j==10) {
             //if(temper > base->max_temperature)
@@ -1508,6 +1512,8 @@ void c_Sim::update_T_mean(int j, int flag) {
 
         double avgT_nom   = 0;
         double avgT_denom = 0;
+        int sw = 0;
+        
         for(int si=0; si<num_species; si++) {
             double tt = species[si].u[j].u3 - 0.5 * species[si].u[j].u2*species[si].u[j].u2/species[si].u[j].u1;
                    tt /= (species[si].u[j].u1*species[si].cv);
@@ -1517,7 +1523,10 @@ void c_Sim::update_T_mean(int j, int flag) {
                 avgT_nom   += species[si].u[j].u1 * species[si].cv * tt;
                 avgT_denom += species[si].u[j].u1 * species[si].cv;
             }
-            
+            if( tt<0  ) { 
+                sw =1;
+            }
+
         }
         T_mean[j] = avgT_nom/avgT_denom;
     
@@ -1534,6 +1543,16 @@ void c_Sim::update_T_mean(int j, int flag) {
                 tt /= (tmp.u1*species[si].cv);
                 cout<<" in update T_mean "<<si<<" "<<tt<<" u = "<<tmp.u1<<" "<<tmp.u2<<" "<<tmp.u3<<" prim = "<<tmpp.internal_energy<<" "<<tmpp.temperature<<" "<<tmpp.pres<<" "<<tmpp.sound_speed<<" "<<tmpp.speed<<endl;
                  */
+            }
+            cout<<endl;
+        }
+        if(sw==1) {
+            cout<<" T_mean contains negatives! j= "<<j<<" steps "<<steps<<" flag "<<flag<<" ";
+            for(int si=0; si<num_species; si++) {
+                cout<<species[si].prim[j].temperature;
+                if(species[si].prim[j].temperature<0)
+                    cout<<"("<<species[si].speciesname<<")";
+                cout<<" ";
             }
             cout<<endl;
 

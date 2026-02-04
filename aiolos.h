@@ -657,7 +657,7 @@ public:
     Vector_t coll_heat_b;            
     Vector_t coll_heat_b_fixed;       
     Vector_t coll_heat_output;      
-    Vector_t tmp_temperatures;        
+    Vector_t tmp_temperatures;      
     
     double K_zz_init;
     std::vector<double> K_zz;
@@ -937,7 +937,7 @@ public:
     void update_temperatures(double, Eigen::MatrixXd &,Eigen::MatrixXd &,Eigen::MatrixXd &);
     double compute_planck_function_integral3(double lmin, double lmax, double temperature);
     double compute_planck_function_integral4(double lmin, double lmax, double temperature);
-    void subcycle_heat_exchange(int cell, int num_cycles, int debug, double dt, double dGdT_mul=1.);
+    void subcycle_heat_exchange(int cell, int num_cycles, int debug, double dt);
 
     //Debug functions
     

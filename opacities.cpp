@@ -221,6 +221,7 @@ void c_Species::update_opacities() {
         
     }
     else if (base->opacity_model == 'M') {
+        double inv_metallicity = 1e0; //Factor to approximately rescale Malygin opacities onto other species
         
         for(int j=0; j< num_cells+2; j++) {
             
@@ -232,10 +233,12 @@ void c_Species::update_opacities() {
                     oldp = opacity_planck(j,b);
                 double newp = base->const_opacity_planck_factor * base->opacity_semenov_malygin(0, prim[j].temperature,    prim[j].density, prim[j].pres, this->is_dust_like);
                 
-		if(this_species_index == h2_idx)
-			opacity_planck(j,b) = std::sqrt(oldp*newp);
-		else
-			opacity_planck(j,b) = 0;
+                if(this_species_index == h2_idx)
+                    opacity_planck(j,b) = std::sqrt(oldp*newp);
+                else if(this_species_index == h2o_idx)
+                    opacity_planck(j,b) = std::sqrt(oldp*newp)*inv_metallicity;
+                else
+                    opacity_planck(j,b) = 0.;
                 
                 double oldopa;
                 if(base->steps<2)
@@ -243,19 +246,27 @@ void c_Species::update_opacities() {
                 else
                     oldopa = opacity(j,b);
                 double newopa = base->const_opacity_rosseland_factor * base->opacity_semenov_malygin(1, prim[j].temperature, prim[j].density, prim[j].pres, this->is_dust_like); 
-                //if(j>3)
-                    //newopa = base->const_opacity_rosseland_factor * base->opacity_semenov_malygin(1, prim[j-1].temperature, prim[j].density, prim[j].pres, this->is_dust_like); 
+                
                 opacity(j,b)  = std::sqrt(oldopa*newopa);    
             }
             
-            for(int b=0; b<num_bands_in; b++) {
-                if(b == num_bands_in-1)
-                    opacity_twotemp(j,b) = base->const_opacity_solar_factor * opacity_avg_solar(b); 
-                else
-                    opacity_twotemp(j,b) = base->const_opacity_solar_factor * opacity_avg_solar(b); 
-
-                if(this_species_index != h2_idx)
-                    opacity_twotemp(j,b) = 0;
+            for(int b=0; b<num_bands_in; b++) { //Only the species carrying the malygin irradiation opacities (H2 here) has a nonzero opacity
+                opacity_twotemp(j,b) = base->minimum_opacity; //Can't be zero, nasty
+            }
+            if( (this_species_index == h2_idx))
+                    opacity_twotemp(j,num_bands_in-1) = base->const_opacity_solar_factor * opacity_avg_solar(num_bands_in-1); 
+            if( (this_species_index == h2o_idx))
+                    opacity_twotemp(j,num_bands_in-1) = base->const_opacity_solar_factor * opacity_avg_solar(num_bands_in-1) * inv_metallicity; 
+            //
+            // Print loads
+            //
+            if(j==100e99) {
+                cout<<"s= "<<speciesname<<" g =";
+                for(int b=0; b<num_bands_out; b++) {
+                    cout<<opacity_twotemp(j,num_bands_in-1)/opacity_planck(j,b)<<" ";
+                }
+                if(this_species_index==base->num_species-1)
+                    cout<<endl;
             }
         }
     }

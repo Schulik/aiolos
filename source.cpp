@@ -519,6 +519,7 @@ void c_Sim::compute_friction_numerical(double dtt) {
 
         fill_alpha_basis_arrays(j);
         compute_alpha_matrix(j);
+        update_T_mean(j, 32);
                 
         if(debug >=3 && j==42 && steps == 524)  {
             cout<<"    Computed coefficient matrix ="<<endl<<friction_coefficients<<endl;
@@ -553,70 +554,70 @@ void c_Sim::compute_friction_numerical(double dtt) {
         // Update new speed and internal energy
         //
         
-	if(use_avg_velocity) {
-		double tot_mom = 0;
-		double tot_dens= 0;
-		double avg_velocity = 0;
+	    if(use_avg_velocity) {
+            double tot_mom = 0;
+            double tot_dens= 0;
+            double avg_velocity = 0;
 
-		for(int si=0; si<num_species; si++) {
-                        if(species[si].static_charge != couple_ions) { //IONCHECK
-				tot_mom += friction_vec_output(si) * species[si].prim[j].density;
-				tot_dens += species[si].prim[j].density;
-                        }
-		}
+            for(int si=0; si<num_species; si++) {
+                            if(species[si].static_charge != couple_ions) { //IONCHECK
+                    tot_mom += friction_vec_output(si) * species[si].prim[j].density;
+                    tot_dens += species[si].prim[j].density;
+                            }
+            }
 
-		avg_velocity = tot_mom/tot_dens;
+            avg_velocity = tot_mom/tot_dens;
 
-		if(globalTime < avg_velocity_t1) {
+            if(globalTime < avg_velocity_t1) {
 
 
-			if(globalTime < avg_velocity_t0) {
-				for(int si=0; si<num_species; si++) {
-                                        if(species[si].static_charge != couple_ions)  //IONCHECK
-    						species[si].prim[j].speed = avg_velocity;
-					else
-						species[si].prim[j].speed = friction_vec_output(si);
-				}
+                if(globalTime < avg_velocity_t0) {
+                    for(int si=0; si<num_species; si++) {
+                                            if(species[si].static_charge != couple_ions)  //IONCHECK
+                                species[si].prim[j].speed = avg_velocity;
+                        else
+                            species[si].prim[j].speed = friction_vec_output(si);
+                    }
+                    //if(steps%10000==0 && j==num_species/2)
+                                    //        cout<<" In avg velocity, before t0, avg_v= "<<avg_velocity<<endl;
+                } else {
+                    alpha_collision = 1.; //Switch collision alphas to their nominal values
+                    double a = (1+ 1e-10)/(avg_velocity_t1 - avg_velocity_t0 + 1e-10);
+                    double b = (1+ 1e-10)/(1-avg_velocity_t1/avg_velocity_t0 + 1e-10);
+                    double fac = a * globalTime + b;
 
-				//if(steps%10000==0 && j==num_species/2)
-                                //        cout<<" In avg velocity, before t0, avg_v= "<<avg_velocity<<endl;
-			}
-			else {
-				alpha_collision = 1.; //Switch collision alphas to their nominal values
-				double a = (1+ 1e-10)/(avg_velocity_t1 - avg_velocity_t0 + 1e-10);
-				double b = (1+ 1e-10)/(1-avg_velocity_t1/avg_velocity_t0 + 1e-10);
-				double fac = a * globalTime + b;
+                    //if(steps%50000==0)
+                    //	cout<<" In avg velocity, between t0 and t1, fac= "<<fac<<endl;
 
-				//if(steps%50000==0)
-				//	cout<<" In avg velocity, between t0 and t1, fac= "<<fac<<endl;
-
-				for(int si=0; si<num_species; si++) {
-					 if(species[si].static_charge != couple_ions) //IONCHECK
-                                        	species[si].prim[j].speed = friction_vec_output(si) * fac + avg_velocity * (1. - fac);
-                                         else
+                    for(int si=0; si<num_species; si++) {
+                        if(species[si].static_charge != couple_ions) //IONCHECK
+                                                species[si].prim[j].speed = friction_vec_output(si) * fac + avg_velocity * (1. - fac);
+                                            else
                                                 species[si].prim[j].speed = friction_vec_output(si);
-                                }
-			}
-		}
-		else {
-			for(int si=0; si<num_species; si++)
+                                    }
+                }
+		    } else {
+			    for(int si=0; si<num_species; si++)
 		                species[si].prim[j].speed = friction_vec_output(si);
-		}
+		    }
 
-
-	} else {
+        //End use avg velocity
+	    } else {
         	for(int si=0; si<num_species; si++)
             	species[si].prim[j].speed = friction_vec_output(si);
-	}
+	    }
         
+        //
+        // After if(use avg velocity)
+        //
         for(int si=0; si<num_species; si++) {
             double temp = 0;
             
             for(int sj=0; sj<num_species; sj++) {
-                double v_end = friction_vec_output(si) - friction_vec_output(sj) ;
+                double v_end  = friction_vec_output(si) - friction_vec_output(sj) ;
                 double v_half = 0.5*(v_end + friction_vec_input(si) - friction_vec_input(sj)) ; 
                                                
-                temp +=  dtt * friction_coefficients(si,sj) * (species[sj].mass_amu/(species[sj].mass_amu+species[si].mass_amu)) * v_half * v_end ;
+                temp +=  dtt * friction_coefficients(si,sj) * (species[sj].mass_amu/(species[sj].mass_amu+species[si].mass_amu)) * std::fabs(v_half * v_end) ;
                 
                 if(si==0 && sj == 1) {
                     friction_sample(j) = alphas_sample(j) * (friction_vec_input(si) - friction_vec_input(sj));
@@ -624,6 +625,32 @@ void c_Sim::compute_friction_numerical(double dtt) {
             }
             species[si].prim[j].internal_energy += temp;
         }
+        //
+        // Put in error analysis here
+        //
+
+        //for(int j =0; j<= num_cells+0; j++) {    
+        int sw = 0;    
+        for(int si=0; si<num_species; si++) {
+            
+            AOS      tmp  = species[si].u[j];
+            AOS_prim tmpp = species[si].prim[j];
+            double tt = tmp.u3 - 0.5 * tmp.u2*tmp.u2/tmp.u1;
+            tt /= (tmp.u1*species[si].cv);
+            if(std::isnan(tmpp.temperature) || std::isnan(tt) ) { 
+                cout<<" after friction "<<steps<<" "<<j<<" "<<si<<" "<<tt<<" u = "<<tmp.u1<<" "<<tmp.u2<<" "<<tmp.u3<<" prim = "<<tmpp.internal_energy<<" "<<tmpp.temperature<<" "<<tmpp.pres<<" "<<tmpp.sound_speed<<" "<<tmpp.speed<<endl;                
+                sw = 1;
+            }
+        }
+        if(sw == 1) {
+            cout<<" After friction in cell j "<<j<<", reporting on broken matrix and RHS: "<<endl;
+            cout<<friction_vec_input<<endl<<friction_matrix_T<<" still in after friction, coefficients = "<<friction_coefficients<<endl;
+            cout<<" result vector "<<friction_vec_output<<endl;
+        }
+
+        update_T_mean(j, 33);
+
+        //}
         
     }
     
@@ -635,17 +662,9 @@ void c_Sim::compute_friction_numerical(double dtt) {
         species[si].eos->compute_conserved(&(species[si].prim[0]), &(species[si].u[0]), num_cells+2);        
     }
     
+    
+    
 
-    for(int si=0; si<num_species; si++) {
-        for(int j =0; j<= num_cells+0; j++) {
-            AOS      tmp  = species[si].u[j];
-            AOS_prim tmpp = species[si].prim[j];
-            double tt = tmp.u3 - 0.5 * tmp.u2*tmp.u2/tmp.u1;
-            tt /= (tmp.u1*species[si].cv);
-            if(std::isnan(tmpp.temperature) || std::isnan(tt) )
-                cout<<" after friction "<<steps<<" "<<j<<" "<<si<<" "<<tt<<" u = "<<tmp.u1<<" "<<tmp.u2<<" "<<tmp.u3<<" prim = "<<tmpp.internal_energy<<" "<<tmpp.temperature<<" "<<tmpp.pres<<" "<<tmpp.sound_speed<<" "<<tmpp.speed<<endl;                
-        }
-    }
 
 }
 
@@ -661,7 +680,7 @@ void c_Sim::fill_alpha_basis_arrays(int j) { //Called in compute_friction() in s
         dens_vector(si)        =  species[si].u[j].u1; 
         numdens_vector(si)     =  species[si].prim[j].number_density; 
         mass_vector(si)        =  species[si].mass_amu*amu;
-        temperature_vector(si) =  species[si].prim[j].temperature;
+        temperature_vector(si) =  std::max(species[si].prim[j].temperature, 3.);
         temperature_vector_augment(si) = species[si].prim[j].temperature - dt * (species[si].dS(j) + species[si].dG(j)) / species[si].u[j].u1 / species[si].cv;
     }
 }
@@ -969,8 +988,8 @@ AOS c_Species::source_diffusion_flux2(int j) {
 
     assert(j > 0 && j <= num_cells) ;
 
-    double fjm1   = std::log10(prim[j].number_density/base->total_numdens[j]);  
-    double fj     = std::log10(prim[j+1].number_density/base->total_numdens[j+1]);
+    double fjm1   = std::log10(prim_r[j].number_density/base->total_numdens[j]);  
+    double fj     = std::log10(prim_l[j+1].number_density/base->total_numdens[j+1]);
 
     double vjm1   = prim[j].speed;  
     double vj     = prim[j+1].speed;
@@ -980,9 +999,9 @@ AOS c_Species::source_diffusion_flux2(int j) {
     double u_diff           = - base->vdiffusivity * dfdr; //If diffusivity is in cm^2/s then u_diff is in cm/s
 
     double nmean   = logmean( prim[j].number_density,  prim[j+1].number_density);
-    double rhomean = 0.5*( u[j].u1 + u[j+1].u1);
-    double mommean = 0.5*( u[j].u2 + u[j+1].u2);
-    double emean   = 0.5*( prim[j].internal_energy,  prim[j+1].internal_energy);
+    double rhomean = 0.5*( prim_r[j].density + prim_l[j+1].density);//0.5*( u[j].u1 + u[j+1].u1); //
+    double mommean = 0.5*( prim_r[j].density*prim_r[j].speed + prim_l[j+1].density*prim_l[j+1].speed);//0.5*( u[j].u2 + u[j+1].u2); //
+    double emean   = 0.5*( prim_r[j].internal_energy,  prim_l[j+1].internal_energy);//0.5*( prim[j].internal_energy,  prim[j+1].internal_energy); //
     //prim[i].internal_energy = (prim[i].pres/prim[i].density)/_gamma_m1 ;
     double pmean   = 0.5*( prim[j].pres,  prim[j+1].pres);
     double Tmean   = 0.5*( prim[j].temperature,  prim[j+1].temperature);
