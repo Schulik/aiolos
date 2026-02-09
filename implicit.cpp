@@ -105,8 +105,6 @@ void c_Species::implicit_incompressible(double dt) {
     for (int j=0; j <= num_cells+1; j++) {
 
         double V   = base->vol[j];
-        double S_l = base->surf[j-1];
-        double S_r = base->surf[j];
         //cout<<" writing matrix j "<<j<<endl;
         int idx   = j*stride  ;
         int idx_r = j*num_vars;
@@ -137,10 +135,7 @@ void c_Species::implicit_incompressible(double dt) {
         // Face velocities (from non-advanced timestep)
         double v_l = 0.5 * (prim[j-1].speed + prim[j].speed); //(u[j-1].u2 / u[j-1].u1 + u[j].u2 / u[j].u1);
         double v_r = 0.5 * (prim[j].speed + prim[j+1].speed); // ;(u[j].u2 / u[j].u1     + u[j+1].u2 / u[j+1].u1);
-
-        //cout<<" j = "<<j<<" old rho  = "<<u[j].u1<<" / "<<" vl / vr = "<<v_l<<" / "<<v_r<<endl;
-        //cout<<" j = "<<j<<" old mom  = "<<u[j].u2<<" / "<<" vl / vr = "<<v_l<<" / "<<v_r<<endl;
-
+        
         //
         // Momentum damping at low abundances to avoid numerical noise
         //
@@ -264,10 +259,7 @@ void c_Species::implicit_incompressible(double dt) {
         r[idx_r+2]     += (1-theta) * v_l * S_l * ( a * u[j].u3        + b * u[j-1].u3);         //u grad E
         if(j>ewall && j<=num_cells)
             r[idx_r+2]     +=   0.5 * v_l * S_l * ( prim_l[j].pres + prim_r[j-1].pres ); //p div v
-
-        //cout<<" j = "<<j<<" tmp_l = "<<tmp_l<<" tmp_r "<<tmp_r<<" sum "<<tmp_l+tmp_r<<endl;
-        //cout<<" j = "<<j<<" ap = "<<ap<<" bp "<<bp<<" sum "<<ap+bp<<endl;
-
+        
         //////////////////////////////////////////////////////////////////////
         // Sources
         //////////////////////////////////////////////////////////////////////
@@ -282,64 +274,8 @@ void c_Species::implicit_incompressible(double dt) {
         //////////////////////////////////////////////////////////////////////
         // End Sources
         //////////////////////////////////////////////////////////////////////
-
-        //////////////////////////////////////////////////////////////////////
-        // Proof of concept in big, slow matrix for only advection
-        //////////////////////////////////////////////////////////////////////
-        /*
-        adv_mat(j,j) += V / dt;
-        adv_b(j)     += V / dt * u[j].u1;
-        adv_mat(j,j)   += 0.5 * lam_r.u1;
-        adv_mat(j,j-1) -= 0.5 * lam_l.u1;
-        adv_b(j)       -= 0.5 * ( lam_r.u1 * u[j].u1 - lam_l.u1 * u[j-1].u1 ) ;*/
     }
 
-    //cout<<"Boundaries"<<endl;
-    // More Boundaries:
-    // Left boundary:
-    //    Reflecting / no flux or planetary temperature
-    for (int j=0; j < base->num_ghosts; j++) {
-        //int idx   = j*stride  ;
-        //int idx_r = j*num_vars ;
-        //ll[idx] = 0 ;
-        //uu[idx] = -dd[idx] ;
-        //r[idx_r] = 0 ; 
-    }
-    
-    /*
-    int cnt = 0;
-    cout<<" dd :"<<endl;
-    for (auto i: dd){
-                std::cout << i << ' ';
-                cnt++;
-                if(cnt%9==0) cout<<endl;
-        }
-    cout<<endl;
-
-    cout<<" ll :"<<endl;
-    for (auto i: ll) {
-                std::cout << i << ' ';
-                cnt++;
-                if(cnt%9==0) cout<<endl;
-    }
-    cout<<endl;
-
-    cout<<" uu :"<<endl;
-    for (auto i: uu) {
-        std::cout << i << ' ';
-        cnt++;
-        if(cnt%9==0) cout<<endl;        
-    }
-    cout<<endl;
-
-   cout<<"r :"<<endl;
-    for (auto i: r) {
-                std::cout << i << ' ';
-                cnt++;
-                if(cnt%3==0) cout<<endl;
-        }
-    cout<<endl;
-    */
     
     //cout<<"Solving"<<endl;
     //
@@ -348,10 +284,6 @@ void c_Species::implicit_incompressible(double dt) {
 
     base->implicit_tridiag.factor_matrix(&ll[0], &dd[0], &uu[0]) ;
     base->implicit_tridiag.solve(&r[0], &r[0]) ; // Solve in place
-
-    //base->LUchem_ptr[0].compute(adv_id + adv_mat.transpose()) ;
-    //base->LUchem_ptr[0].compute(adv_id + adv_mat) ;
-    //results.noalias() = base->LUchem_ptr[0].solve(adv_b);
 
     //
     // End Solve

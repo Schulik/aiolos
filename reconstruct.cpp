@@ -36,10 +36,12 @@ double VanLeerSlope(double ql, double qm, double qr,
                                 double cF=2, double cB=2, double dxF=1, double dxB=1) {
      double dF = (qr - qm) / dxF ;
      double dB = (qm - ql) / dxB ;
-     double v  = dB/dF;
+     
 
      if (dF*dB <= 0)
          return 0 ;
+
+    double v  = dB/dF;
 
       //return dF*std::max(0., std::min( 0.5*(1.+v),  std::min(cF, v*cB) )) ;
       return dF*v*(cF*v + cB)/(v*v + v*(cF + cB -2) + 1); //Modified Van leer from Mignone+2014

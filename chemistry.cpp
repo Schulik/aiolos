@@ -302,6 +302,7 @@ void c_Sim::do_chemistry(double dt_chem) {
     
 //#pragma omp parallel for schedule(static,5)
 //    for (int j = num_cells+1; j >= 0; j--) {
+    
     for (int j = imaxchem; j >= iminchem; j--) {  //imaxchem is num_cells+1 by default; iminchem is 2 
         
         //std::vector<double> n_init = np_zeros(num_species);
@@ -434,6 +435,23 @@ void c_Sim::do_chemistry(double dt_chem) {
                 if(fabs(1.-n_tmp(s)/n_init(s)) > chemistry_precision) { //Not a convergence criterion, but precision requirement for wobbling solutions. Obvs the true solution might disobey this criterion, but we enforce higher precision for large Delta n
                     check_chem = 0;
                 }
+
+                if(std::isnan(n_tmp(s)) || (n_tmp(s) < 0.) ) {
+                    cout<<" in solve_chemistry, cell = "<<j<<" s ="<<species[s].speciesname<<" has negative or Nan solution: "<<n_tmp(s)<<" n_init "<<n_init(s)<<" and T "<<species[s].prim[j].temperature<<endl;
+                }
+            }   
+
+            //
+            // Check reaction rates, as they go into the momentum and heating correction
+            //
+            for(int r=0; r<num_reactions; r++) {
+                if(std::isnan( reactions[r].dndt_old ))
+                    cout<<" in solve_chemistry, cell = "<<j<<" r ="<<r<<" has Nan dndt: "<<reactions[r].dndt_old<<endl;
+            }
+
+            for(int r=0; r<num_photoreactions; r++) {
+                if(std::isnan( photoreactions[r].dndt_old ))
+                    cout<<" in solve_chemistry, cell = "<<j<<" r ="<<r<<" has Nan dndt: "<<photoreactions[r].dndt_old<<endl;
             }
             
             // If we survived all checks, let's go and leave
@@ -852,12 +870,12 @@ Vector_t c_Sim::solver_cchem_implicit_general(double dtt, int cell, int cdebug, 
     
     ////////////////////////////////////////////////////////////////////////////////////////////
     ////////////////////////////////////////////////////////////////////////////////////////////
-    // Rescale matrix and rhs rows
+    // Precondition matrix and rhs rows
     ////////////////////////////////////////////////////////////////////////////////////////////
     ////////////////////////////////////////////////////////////////////////////////////////////
-
-   
     Matrix_t fullmatrix = identity_matrix + reaction_matrix_ptr[loc_thr].transpose();
+    /* 
+    
 
     Vector_t rescl_x = Vector_t(num_species);
     Vector_t rescl_r = Vector_t(num_species);
@@ -886,12 +904,6 @@ Vector_t c_Sim::solver_cchem_implicit_general(double dtt, int cell, int cdebug, 
         }
         diag_r = rescl_r.asDiagonal();
 
-        /* for(int si=0; si<num_species; si++) {
-            for(int sj=0; sj<num_species; sj++) {
-                Aix(si,sj) = Aix(si,sj) * rescl_r(si) * rescl_r(si) * 
-            }
-        } */
-
         fullmatrix              = diag_r * Aix;
         reaction_b_ptr[loc_thr] = diag_r * reaction_b_ptr[loc_thr];
     }
@@ -899,7 +911,7 @@ Vector_t c_Sim::solver_cchem_implicit_general(double dtt, int cell, int cdebug, 
 
     ////////////////////////////////////////////////////////////////////////////////////////////
     ////////////////////////////////////////////////////////////////////////////////////////////
-    // End rescale
+    // End Preconditioning
     ////////////////////////////////////////////////////////////////////////////////////////////
     ////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -910,6 +922,9 @@ Vector_t c_Sim::solver_cchem_implicit_general(double dtt, int cell, int cdebug, 
 
     if(use_preconditioning)
         n_news = diag_x * n_news;
+    
+ */
+    n_news = return_preconditioned_LU_solution(fullmatrix, reaction_b_ptr[loc_thr], n_olds, LUchem_ptr[loc_thr], cell); 
     
     if(cell==-86 && steps > 100) {
         //cout<<" rescl_r = "<<rescl_r<<endl;
@@ -1325,7 +1340,7 @@ void c_Sim::init_highenergy_cooling_indices()
     h3plus_idx= get_species_index("H3+ H3p",1);
     h2_idx    = get_species_index("H2",1);
     h2o_idx   = get_species_index("H2O",1);
-    hnull_idx = get_species_index("S0 H0 H ",1); 
+    hnull_idx = get_species_index("S0 H0 H",1); 
     hplus_idx = get_species_index("S1 H+ Hp p p+",1);
     e_idx     = get_species_index("S2 e e- eh eh2",1);
     C_idx     = get_species_index("S4 C0 C",1);
@@ -1352,7 +1367,7 @@ void  c_Sim::do_highenergy_cooling(int cell, double Te) {
     // Do highenergy-cooling
     // Indices now found in init routine for indices
     
-    double tau = total_opacity(cell,0)*(x_i12[cell+1]-x_i12[cell])*1e8;
+    double tau = (total_opacity(cell,0)*(x_i12[cell+1]-x_i12[cell])   + 1e-10);
     double beta = 0.;
     if(tau < 7.) 
         beta = (1.-std::exp(-2.34*tau))/(4.68*tau);
@@ -1381,10 +1396,14 @@ void  c_Sim::do_highenergy_cooling(int cell, double Te) {
         if(h2o_idx > -1)   n_neutrals += species[h2o_idx].prim[cell].number_density;
         if(O_idx > -1)     n_neutrals += species[O_idx].prim[cell].number_density;
 
+        volatile double Te_trace = Te;
         //Free-free emission
         for(int s=0; s<num_species; s++) {
-            if(species[s].static_charge > 0)
-                species[e_idx].dG(cell) += 1.42e-27*(species[s].static_charge*species[s].static_charge)*std::sqrt(Te)*1.3*ne*species[s].prim[cell].number_density;
+            if(species[s].static_charge > 0) {
+                double g_incr = 1.42e-27*(species[s].static_charge*species[s].static_charge)*std::sqrt(Te)*1.3*ne*species[s].prim[cell].number_density;
+                species[e_idx].dG(cell)   += g_incr;
+                species[e_idx].dGdT(cell) += (1.42e-27*(species[s].static_charge*species[s].static_charge)*std::sqrt(Te+dT)*1.3*ne*species[s].prim[cell].number_density-g_incr)/dT;
+            }
         }
         
        if( e_idx!=-1 && hnull_idx!=-1 && hplus_idx!=-1  ) { //If all species are there - H0, H+ and e-
@@ -1394,40 +1413,42 @@ void  c_Sim::do_highenergy_cooling(int cell, double Te) {
                         species[hplus_idx].prim[cell].number_density,
                         species[e_idx].prim[cell].number_density};
             
-            species[e_idx].dG(cell)   -= nX[2] * red * HOnly_cooling(nX, Te);
-            species[e_idx].dGdT(cell) += nX[2] * red * (HOnly_cooling(nX, Te+dT)-HOnly_cooling(nX, Te-dT))/(dT+dT);  ;
-	        species[e_idx].dG(cell)   -= n_neutrals * nX[0] * 7.3e-19 * 1.5e-4 * std::exp(-118400./Tn); //Simple approximation for Ly-alpha excitation by neutral collisions
+            species[e_idx].dG(cell)   += nX[2] * red * HOnly_cooling(nX, Te);
+            species[e_idx].dGdT(cell) += nX[2] * red * (HOnly_cooling(nX, Te+dT)-HOnly_cooling(nX, Te-dT))/(dT+dT);  
+            double term = n_neutrals * nX[0] * 7.3e-19 * 1.5e-4 * std::exp(-118400./Tn);
+	        species[e_idx].dG(cell)   += term; //Simple approximation for Ly-alpha excitation by neutral collisions
+            species[e_idx].dGdT(cell) += (n_neutrals * nX[0] * 7.3e-19 * 1.5e-4 * std::exp(-118400./(Tn+dT)) - term )/dT;
         }
         
         if( C_idx!=-1 && e_idx!=-1 ) { 
             double nc   = species[C_idx].prim[cell].number_density;
             
-            species[e_idx].dG(cell)   -=  nc * ne * red * C_cooling(Te, ne); 
+            species[e_idx].dG(cell)   +=  nc * ne * red * C_cooling(Te, ne); 
             species[e_idx].dGdT(cell) +=  nc * ne * red * dfdx2(C_cooling, Te, dT, ne);
         }
         if( Cp_idx!=-1 && e_idx!=-1 ) { 
             double ncp  = species[Cp_idx].prim[cell].number_density;
             //species[Cp_idx].dG(cell) = 0;
-            species[e_idx].dG(cell) -= ncp * ne * red * Cp_cooling(Te, ne); 
-            species[e_idx].dG(cell) -= ncp * ne * 1.426e-27 * 1.3 * sqrt(Te) * mul  ;
+            species[e_idx].dG(cell) += ncp * ne * red * Cp_cooling(Te, ne); 
+            species[e_idx].dG(cell) += ncp * ne * 1.426e-27 * 1.3 * sqrt(Te) * mul  ;
             species[e_idx].dGdT(cell) += ncp * ne * red * dfdx2(Cp_cooling, Te, dT, ne);
             species[e_idx].dGdT(cell) += ncp * ne * 1.426e-27 * 1.3 * 0.5 /std::sqrt(Te) * mul;
         }
         if( Cpp_idx!=-1 && e_idx!=-1 && false) { 
             double ncpp = species[Cpp_idx].prim[cell].number_density;
             //species[Cpp_idx].dG(cell) = 0;
-            species[e_idx].dG(cell) -= ncpp * ne * red * Cpp_cooling(Te, ne); 
-            species[e_idx].dG(cell) -= ncpp * ne * 4 * 1.426e-27 * 1.3 * sqrt(Te) * mul;
+            species[e_idx].dG(cell) += ncpp * ne * red * Cpp_cooling(Te, ne); 
+            species[e_idx].dG(cell) += ncpp * ne * 4 * 1.426e-27 * 1.3 * sqrt(Te) * mul;
             species[e_idx].dGdT(cell) += ncpp * ne * red * dfdx2(Cpp_cooling, Te, dT, ne);
             species[e_idx].dGdT(cell) += ncpp * ne * 4 * 1.426e-27 * 1.3 * 0.5 /std::sqrt(Te) * mul;
         }
 	    if( C3p_idx!=-1 && e_idx!=-1) { 
             double nc3p = species[C3p_idx].prim[cell].number_density;
-            species[e_idx].dG(cell) -= nc3p * ne * red * C3p_cooling(Te, ne); 
+            species[e_idx].dG(cell) += nc3p * ne * red * C3p_cooling(Te, ne); 
         }
 	    if( C4p_idx!=-1 && e_idx!=-1) { 
             double nc4p = species[C4p_idx].prim[cell].number_density;
-            species[e_idx].dG(cell) -= nc4p * ne * red * C4p_cooling(Te, ne); 
+            species[e_idx].dG(cell) += nc4p * ne * red * C4p_cooling(Te, ne); 
         }
         if( O_idx!=-1 && e_idx!=-1 ) { 
             if(steps == 311 && cell==-100) {
@@ -1437,8 +1458,8 @@ void  c_Sim::do_highenergy_cooling(int cell, double Te) {
             double no    = species[O_idx].prim[cell].number_density;
             double n_eff = n_neutrals * 1.5e-4;
             
-            species[O_idx].dG(cell)   -=  no * ne    * red * O_cooling(Te, ne + n_eff);
-            species[O_idx].dG(cell)   -=  no * n_eff * red * O_cooling(Te, ne + n_eff);  //Feb23rd 2025: Included simplistic neutral-excitation, see Line cooling notes and Tielens book. Cooling counted for O, as e might not exist here
+            species[O_idx].dG(cell)   +=  no * ne    * red * O_cooling(Te, ne + n_eff);
+            species[O_idx].dG(cell)   +=  no * n_eff * red * O_cooling(Te, ne + n_eff);  //Feb23rd 2025: Included simplistic neutral-excitation, see Line cooling notes and Tielens book. Cooling counted for O, as e might not exist here
             species[O_idx].dGdT(cell) +=  no * ne    * red * dfdx2(O_cooling, Te, dT, ne + n_eff);
             species[O_idx].dGdT(cell) +=  no * n_eff * red * dfdx2(O_cooling, Te, dT, ne + n_eff);
             
@@ -1453,8 +1474,8 @@ void  c_Sim::do_highenergy_cooling(int cell, double Te) {
             
             double nop  = species[Op_idx].prim[cell].number_density;
             //species[Op_idx].dG(cell) = 0;
-            species[e_idx].dG(cell) -= nop * ne * red * Op_cooling(Te, ne); 
-            species[e_idx].dG(cell) -= nop * ne * 1.426e-27 * 1.3 * sqrt(Te) * mul;
+            species[e_idx].dG(cell) += nop * ne * red * Op_cooling(Te, ne); 
+            species[e_idx].dG(cell) += nop * ne * 1.426e-27 * 1.3 * sqrt(Te) * mul;
             species[e_idx].dGdT(cell) += nop * ne * red * dfdx2(Op_cooling, Te, dT, ne);
             species[e_idx].dGdT(cell) += nop * ne * 1.426e-27 * 1.3 * 0.5 /std::sqrt(Te) * mul;
             
@@ -1466,8 +1487,8 @@ void  c_Sim::do_highenergy_cooling(int cell, double Te) {
         if( Opp_idx!=-1 && e_idx!=-1 && false) { 
             double nopp = species[Opp_idx].prim[cell].number_density;
             //species[Opp_idx].dG(cell) = 0;
-            species[e_idx].dG(cell) -= nopp * ne * red * Opp_cooling(Te, ne);
-            species[e_idx].dG(cell) -= nopp * ne * 4 * 1.426e-27 * 1.3 * sqrt(Te) * mul;
+            species[e_idx].dG(cell) += nopp * ne * red * Opp_cooling(Te, ne);
+            species[e_idx].dG(cell) += nopp * ne * 4 * 1.426e-27 * 1.3 * sqrt(Te) * mul;
             species[e_idx].dGdT(cell) += nopp * ne * red * dfdx2(Opp_cooling, Te, dT, ne);
             species[e_idx].dGdT(cell) += nopp * ne * 4 * 1.426e-27 * 1.3 * 0.5 /std::sqrt(Te) * mul;
             
@@ -1478,11 +1499,11 @@ void  c_Sim::do_highenergy_cooling(int cell, double Te) {
         }
 	    if( O3p_idx!=-1 && e_idx!=-1) { 
             double no3p = species[O3p_idx].prim[cell].number_density;
-            species[e_idx].dG(cell) -= no3p * ne * red * O3p_cooling(Te, ne);
+            species[e_idx].dG(cell) += no3p * ne * red * O3p_cooling(Te, ne);
         }
 	    if( O4p_idx!=-1 && e_idx!=-1) { 
             double no4p = species[O4p_idx].prim[cell].number_density;
-            species[e_idx].dG(cell) -= no4p * ne * red * O4p_cooling(Te, ne);
+            species[e_idx].dG(cell) += no4p * ne * red * O4p_cooling(Te, ne);
 		if(steps == 311 && cell==-100) {
                      cout<<"species[O4p_idx].dG(cell) = "<<species[O4p_idx].dG(cell)<<" parts = "<< no4p<<"/"<<ne<<"/"<<red<<"/"<<O4p_cooling(Te,ne)<<"/"<<Te<<endl;
 		}
@@ -1493,17 +1514,12 @@ void  c_Sim::do_highenergy_cooling(int cell, double Te) {
         
         if( h3plus_idx!=-1 && e_idx!=-1 ) { 
             double n3p   = species[h3plus_idx].prim[cell].number_density;
-            species[e_idx].dG(cell)   -=  n3p * ne * h3plus_cooling(Te); 
+            species[e_idx].dG(cell)   +=  n3p * ne * h3plus_cooling(Te); 
             species[e_idx].dGdT(cell) +=  n3p * ne * dfdx(h3plus_cooling, Te, dT);
         }
 
-	    //if(steps==200 && cell==100)
-        //      cout<<" HI 200 STEPS AND 100 CELLS AND WE HAVE ELECTRONS, pos3 FINAL totalcool = "<<species[e_idx].dG(cell)<<endl;
+	    
     }
-
-
-    //if(steps==200 && cell==100)
-    //          cout<<" HI 200 STEPS AND 100 CELLS AFTER ALL COOL, pos4 dG[electrons] = "<<species[e_idx].dG(cell)<<endl;
 
     if(steps == 200 && cell==100e99) {
         for(int s=0; s<num_species; s++)
@@ -1788,11 +1804,23 @@ void c_Sim::enforce_charge_neutrality(int j) {
                 n_tmp(s)      = species[s].prim[j].number_density;
         }
 
-         double charge_imbalance = 0;
-         for(int s=0;s<num_species; s++) {
+        int int_charge_imbalance = 0; 
+        for(int s=0;s<num_species; s++) {
+             if(s != e_idx)
+                 int_charge_imbalance += species[s].static_charge;
+        }
+        if( int_charge_imbalance == 0) {
+            cout<<" FATAL ERROR: measured charge_imbalance = 0 -> cannot assign zero density to electrons!"<<endl;
+            char a;
+            cin>>a;
+        }
+
+
+        double charge_imbalance = 0;
+        for(int s=0;s<num_species; s++) {
              if(s != e_idx)
                  charge_imbalance += ((double)species[s].static_charge) * n_tmp(s);
-         }
+        }
 
          for(int s=0;s<num_species; s++) {
 

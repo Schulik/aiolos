@@ -68,7 +68,6 @@ double HOnly_cooling(const std::array<double, 3> nX, double Te) {
     // Recombination Cooling:
     double term ;
     if (x < 1e5) 
-        //term = 3.435e-30 * Te * pow(x, 1.970) / pow(1 + pow(x / 2.250, 0.376), 3.720);
         term = 3.435e-30 * Te * x*x / pow(1 + pow(x / 2.250, 0.376), 3.720);
     else 
         term = 7.562e-27 * std::pow(Te, 0.42872) ;
@@ -79,14 +78,12 @@ double HOnly_cooling(const std::array<double, 3> nX, double Te) {
     cooling += 1. *nX[0] * term;
 
     // HI Line cooling (Lyman alpha):
-    //term = 7.5e-19 * exp(-0.75 * T_HI / Te) / (1 + sqrt(Te / 1e5));
      term = 7.5e-19 * exp(-0.75 * T_HI / Te); //MC2009
-    //term = 7.5e-19 * exp(-0.75 * T_HI / 3000.); //MC2009
     cooling += 1. * nX[0] * term;
 
     // Free-Free:
-    term = 1.426e-27 * 1.3 * sqrt(Te) ;
-    cooling += 1. * nX[1] * term  ;
+    //term = 1.426e-27 * 1.3 * sqrt(Te) ; Removed as we now have a separate free-free cooling term
+    //cooling += 1. * nX[1] * term  ;
 
     return 1.*cooling;
 } // */

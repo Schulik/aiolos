@@ -219,7 +219,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, s
         conductivity2         = read_parameter_from_file<double>(filename,"CONDUCT2",     debug, conductivity).value;  //Value of conductivity prefactor
         diffusivity           = read_parameter_from_file<double>(filename,"DIFFUSIVITY", debug, 0.).value;  //Value of conductivity prefactor
         vdiffusivity           = read_parameter_from_file<double>(filename,"VDIFF", debug, 1.).value;  //Value of conductivity prefactor
-        diffusivity_style      = read_parameter_from_file<int>(filename,"DIFF_STYLE", debug, 0).value; //0 is donor, 1 is average
+        diffusivity_style      = read_parameter_from_file<int>(filename,"DIFF_STYLE", debug, -1).value; //-1 is switched off, 0 is donor, 1 is average
         K_zz_init = read_parameter_from_file<double>(filename,"KZZ_INIT", debug, 0.).value;                 //Initial atmospheric mixing parameter in cm^2/s
 	    homopause_smoothing_rad = read_parameter_from_file<int>(filename,"HOMOPAUSE_SMOOTHING_RAD", debug, 0).value;
 	    homopause_smoothing_rep = read_parameter_from_file<int>(filename,"HOMOPAUSE_SMOOTHING_REP", debug, 0).value;
@@ -771,9 +771,11 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, s
 
        //Rebuild electron densities
        init_highenergy_cooling_indices(); 
-       for(int i=0; i<num_cells+2; i++) {
-           enforce_charge_neutrality(i);
-        }
+       if(e_idx > -1) {
+            for(int i=0; i<num_cells+1; i++) {
+                enforce_charge_neutrality(i);
+                }
+            }
 
         if(use_self_gravity) {
             for(int cnt=0; cnt<50; cnt++) {
@@ -1168,14 +1170,14 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, s
 
     }
     cout<<"photochem level = "<<photochemistry_level<<endl;
-    n_init = np_zeros(num_species);
-    n_tmp  = np_zeros(num_species);
-    
+    //n_init = np_zeros(num_species);
+    //n_tmp  = np_zeros(num_species);
+    /* 
     for (int s = 0; s < num_species; s++) {
         n_init[s] = species[s].prim[num_cells-1].number_density;
         n_tmp[s]  = n_init[s];
     }
-    
+     */
     if(photochemistry_level == 2) {
         cout<<" Init chemistry."<<endl<<endl;
         
@@ -1467,13 +1469,13 @@ c_Species::c_Species(c_Sim *base_simulation, string filename, string species_fil
         //////////////////////////////////////////////////////////////////
         /// initialize advection test //
         //////////////////////////////////////////////////////////////////
-        if(this_species_index == -9999) {
+        if(this_species_index >= 1e99) {
             double u2 = read_parameter_from_file<double>(filename,"PARI_INIT_DATA_U2", debug, 0.).value; //initial momentum. Should be 0, hence mostly irrelevant parameter.
 
-            //u[num_cells/2].u1 *= 1e0; //Advection test initial condition
+            u[num_cells/2].u1 *= 1e0; //Advection test initial condition
             for(int i = 0; i<=num_cells+1; i++) {
                 //if(this_species_index==1 && (i == num_cells/2))
-                    u[i].u2 = u2;
+                    u[i].u2 = 0; //u2;
 
                 u[i].u3 = 0.5 * u[i].u2 * u[i].u2 / u[i].u1 + u[i].u1 * cv * prim[i].temperature; //Implies that T has been already initialized
             }

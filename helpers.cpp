@@ -27,23 +27,25 @@ double c_Sim::get_cfl_timestep() {
     // Compute heuristic radiative timestep
     //
     double maxde = 0;
+    double minstep = 0.;
+    double diffstep = 1e99;
+
+    int cnstr_spc = -1;
+    int cnstr_cell= -1;
+    double max_temper = 0;
+    double max_mach = 0;
     
     for(int s = 0; s < num_species; s++) {
 
         for(int i=num_cells-1; i>0; i--)  {
             species[s].de_e[i] = std::abs(species[s].primlast[i].internal_energy - species[s].prim[i].internal_energy)/species[s].prim[i].internal_energy;
             
-            species[s].timesteps_de[i] = dt / species[s].de_e[i] * energy_epsilon;
+            species[s].timesteps_de[i] = 1e-50;
+            if(species[s].de_e[i] > 0)
+                species[s].timesteps_de[i] = dt / species[s].de_e[i];
             
             maxde = std::max(species[s].de_e[i], maxde) ;
-            if(debug >= 1 && globalTime > 1e-1)
-                cout<<" steps "<<steps<<" species "<<s<<" i = "<<i<<" de/e = "<<species[s].de_e[i]<<" de/e/cflfactor = "<<species[s].de_e[i]/cflfactor<<endl;
         }
-    }
-    
-    if(debug >= 1 && globalTime > 1e-1) {
-        char a;
-        cin>>a;
     }
     
     timestep_rad2 = dt / maxde * energy_epsilon;
@@ -52,13 +54,6 @@ double c_Sim::get_cfl_timestep() {
     // Compute individual max wave crossing timesteps per cell
     //  t = delta x / v = delta x / momentum / density
     //
-    double minstep = 0.;
-    double diffstep = 0.;
-
-    int cnstr_spc = -1;
-    int cnstr_cell= -1;
-    double max_temper = 0;
-    double max_mach = 0;
 
     max_snd_crs_time=0;
     for(int s=0; s < num_species; s++) {
@@ -115,29 +110,34 @@ double c_Sim::get_cfl_timestep() {
     
     //Invert and apply CFL secutiry factor
     cfl_step = cflfactor / minstep;
-
+    
     for(int s=0; s < num_species; s++) {
             for(int i=1; i<=num_cells; i++) {
                 //Get diffusive timestep
-                diffstep = 0.1*species[s].diffusive_timestep(i);
-                //if(i==20)
                 //    cout<<" s / cfl_step / diff_step = "<<s<<" / "<<cfl_step<<" / "<<diffstep<<endl;
-                cfl_step = min(cfl_step, diffstep);
+                diffstep = std::min(diffstep, std::min(0.4*species[s].diffusive_timestep(i), 1e99 ));
             }
     }
 
-    if(steps%435==0) {
-    //if(steps>350) {
-        cout<<"       max limiting cell: "<<cnstr_cell<<" s= "<<species[cnstr_spc].speciesname<< " => dt= "<<cfl_step<<" total dt "<< min(cfl_step, dt*max_timestep_change)<<" max_T = "<<max_temper<<" max_mach "<<max_mach<<" steps= "<<steps<<" t= "<<globalTime<<endl;
-    }  
-    
-    if(do_hydrodynamics)
-        return min(cfl_step, dt*max_timestep_change);
-    else {
-        double ddt = min(timestep_rad2, dt*max_timestep_change);
-        return min(ddt, dt_max);
+      
+    double final_dt = 0;
+    if(do_hydrodynamics) {
+        final_dt = min( std::min(cfl_step, diffstep), dt*max_timestep_change);
+
+        if(steps%480==0) {
+        cout<<"       max limiting cell: "<<cnstr_cell<<" s= "<<species[cnstr_spc].speciesname<< " => dt= "<<cfl_step<<" dt_diff "<<diffstep<<" dt_energy "<<timestep_rad2<<"  "<<" total dt "<< final_dt<<" max_T = "<<max_temper<<" max_mach "<<max_mach<<" steps= "<<steps<<" t= "<<globalTime<<endl;
+        }
+        return final_dt;
+
+    } else {
+        double ddt = min(std::min(timestep_rad2, diffstep), dt*max_timestep_change);
+        final_dt = min(ddt, dt_max);
+
+        if(steps%480==0) {
+        cout<<"       max limiting cell: "<<cnstr_cell<<" s= "<<species[cnstr_spc].speciesname<<" dt_diff "<<diffstep<<" dt_energy "<<timestep_rad2<<"  "<<" total dt "<< final_dt<<" max_T = "<<max_temper<<" max_mach "<<max_mach<<" steps= "<<steps<<" t= "<<globalTime<<endl;
+        }
     }
-        
+    return final_dt;
 }
 
 
@@ -692,3 +692,237 @@ void c_Sim::find_reactionrates_relating_to_species(int cell, string target_speci
         //cout<<endl;
         cout<<" stp "<<steps<<endl;
 }
+
+
+
+////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////
+// Precondition matrix and rhs rows for num_species^2 matrices, e.g. those used in chem and heat exchange routines
+////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////
+Vector_t c_Sim::return_preconditioned_LU_solution(const Matrix_t &matrix, const Vector_t &rhs, const Vector_t &orig_vector, Eigen::PartialPivLU<Matrix_t>& LUobject, int cell ) {
+
+    Vector_t result = Vector_t(num_species);
+    result.setZero();
+    
+    ////////////////////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////////////////////
+    // Preconditioning block
+    ////////////////////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////////////////////
+    
+    
+    Matrix_t rescl_matrix = matrix;
+
+    Vector_t rescl_x   = Vector_t(num_species);
+    Vector_t rescl_r   = Vector_t(num_species);
+    Vector_t rescl_rhs = rhs;
+    Matrix_t diag_x;
+    Matrix_t diag_r;
+    Matrix_t Aix ;
+
+    int use_preconditioning = 1;
+    if(use_preconditioning) {
+        
+        for(int s=0; s<num_species; s++) {
+            rescl_x(s) = 1/orig_vector(s);
+        }
+
+        diag_x = rescl_x.asDiagonal();
+        Aix    = rescl_matrix * diag_x;
+        
+        for(int si=0; si<num_species; si++) {
+            double rowmax = 1;
+            for(int sj=0; sj<num_species; sj++) {
+                rowmax = std::max(rowmax, 1./(std::fabs(Aix(si,sj))+std::fabs(rhs(si)))   );
+            }
+            rescl_r(si) = rowmax;
+        }
+        diag_r = rescl_r.asDiagonal();
+
+        rescl_matrix      = diag_r * Aix;
+        rescl_rhs       = diag_r * rhs;
+    }
+
+    ////////////////////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////////////////////
+    // End Preconditioning
+    ////////////////////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////////////////////
+
+    //Solve and remap
+    LUobject.compute(rescl_matrix) ;
+    result.noalias() = LUobject.solve(rescl_rhs);
+    result = diag_x * result;
+
+
+    if( (steps==459) && (cell==10)){
+        //cout<<"in precondition matrix steps "<<steps<<endl<<matrix<<endl<<rhs<<endl<<result<<endl;
+    }
+
+    return result;
+
+}
+
+
+
+
+
+
+//
+// This routine constructs a T_mean after the hydro step and is therefore using hydro variables.
+// It will be ultimately used to correct negative temperatures which can occur from the computation of E-Ekin at large mach number
+//
+void c_Sim::update_T_mean(int j, int flag) {
+
+        double avgT_nom   = 0;
+        double avgT_denom = 0;
+        int sw = 0;
+
+        for(int si=0; si<num_species; si++) {
+            double tt = species[si].u[j].u3 - 0.5 * species[si].u[j].u2*species[si].u[j].u2/species[si].u[j].u1;
+                   tt /= (species[si].u[j].u1*species[si].cv);
+            //cout<<" in update T_mean "<<si<<" "<<tt<<endl;
+
+            if( (tt>0) && (!std::isnan(tt))  ) { //Ignore broken contributions
+                avgT_nom   += species[si].u[j].u1 * species[si].cv * tt;
+                avgT_denom += species[si].u[j].u1 * species[si].cv;
+            }
+            if( tt<0  ) { 
+                sw =1;
+            }
+
+        }
+        T_mean[j] = avgT_nom/avgT_denom;
+    
+        if(std::isnan(T_mean[j])) {
+            cout<<" T_mean is NaN in j= "<<j<<" steps "<<steps<<" flag "<<flag<<" ";
+            for(int si=0; si<num_species; si++) {
+                cout<<species[si].prim[j].temperature;
+                if(std::isnan(species[si].prim[j].temperature))
+                    cout<<"("<<species[si].speciesname<<")";
+                cout<<" ";
+ /*                AOS      tmp  = species[si].u[j];
+                AOS_prim tmpp = species[si].prim[j];
+                double tt = tmp.u3 - 0.5 * tmp.u2*tmp.u2/tmp.u1;
+                tt /= (tmp.u1*species[si].cv);
+                cout<<" in update T_mean "<<si<<" "<<tt<<" u = "<<tmp.u1<<" "<<tmp.u2<<" "<<tmp.u3<<" prim = "<<tmpp.internal_energy<<" "<<tmpp.temperature<<" "<<tmpp.pres<<" "<<tmpp.sound_speed<<" "<<tmpp.speed<<endl;
+                 */
+            }
+            cout<<endl;
+
+            char a;
+            cin>>a;
+        }
+        if(sw==1) {
+            cout<<" T_mean contains negatives! j= "<<j<<" steps "<<steps<<" flag "<<flag<<" ";
+            for(int si=0; si<num_species; si++) {
+                cout<<species[si].prim[j].temperature;
+                if(species[si].prim[j].temperature<0)
+                    cout<<"("<<species[si].speciesname<<")";
+                cout<<" ";
+            }
+            cout<<endl;
+
+
+            char a;
+            cin>>a;
+        }
+}
+
+//
+// Similar to update_T_mean but no debug functionality
+//
+double c_Sim::return_T_mean(int j) {
+
+    double avgT_nom   = 0;
+        double avgT_denom = 0;
+
+        for(int si=0; si<num_species; si++) {
+            double tt = species[si].prim[j].temperature;
+
+            if( (tt>0) && (!std::isnan(tt))  ) { //Ignore broken contributions
+                avgT_nom   += species[si].u[j].u1 * species[si].cv * tt;
+                avgT_denom += species[si].u[j].u1 * species[si].cv;
+            }
+
+        }
+        return avgT_nom/avgT_denom;
+}
+
+
+//
+// Similar to update_T_mean but no debug functionality
+//
+double c_Sim::return_T_mean(int j, Vector_t passed_temps) {
+
+    double avgT_nom   = 0;
+    double avgT_denom = 0;
+    int cnt=0;
+
+        for(int si=0; si<num_species; si++) {
+            double tt = passed_temps(si);
+
+            if( (tt>0) && (!std::isnan(tt))  ) { //Ignore broken contributions
+                avgT_nom   += species[si].u[j].u1 * species[si].cv * tt;
+                avgT_denom += species[si].u[j].u1 * species[si].cv;
+                cnt++;
+            }
+        }
+        if(cnt==0)
+            return -1;
+        return avgT_nom/avgT_denom;
+}
+
+
+
+
+
+//
+// Compute total internal energy in cell j
+//
+double c_Sim::return_e_total(int j) {
+
+        double avgT_nom   = 0;
+
+        for(int si=0; si<num_species; si++) {
+            double tt = species[si].prim[j].temperature;
+            if( (tt>0) && (!std::isnan(tt))  ) { //Ignore broken contributions
+                avgT_nom   += species[si].u[j].u1 * species[si].cv * tt;
+            }
+        }
+        return avgT_nom;
+}
+
+//
+// Compute total internal energy in cell j
+//
+double c_Sim::return_e_total(int j, Vector_t passed_temps) {
+
+        double avgT_nom   = 0;
+
+        for(int si=0; si<num_species; si++) {
+            double tt = passed_temps(si);
+            if( (tt>0) && (!std::isnan(tt))  ) { //Ignore broken contributions
+                avgT_nom   += species[si].u[j].u1 * species[si].cv * tt;
+            }
+        }
+        return avgT_nom;
+}
+
+
+//
+// Same function, but from a different age and forgotten
+//
+double c_Sim::return_total_e(int j) {
+    double tmp = 0;
+
+    for(int si=0; si<num_species; si++) {
+        //tmp += species[si].u[j].u1 * species[si].prim[j].internal_energy;
+        tmp += species[si].u[j].u1 * species[si].cv * species[si].prim[j].temperature;
+    }
+
+    return tmp;
+}
+
+

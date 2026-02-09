@@ -64,8 +64,14 @@ void c_Sim::execute(int restartnumber, double restarttime_cmdline) {
     // Simulation main loop                                                    //
     //                                                                         //
     ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~////
-    for (globalTime = restarttime; (globalTime < t_max) && (steps < maxsteps); ) {
     
+    
+
+    for (globalTime = restarttime; (globalTime < t_max) && (steps < maxsteps); ) {
+    /* 
+        if(steps>10)
+            feenableexcept(FE_INVALID);
+     */
           if(start_hydro_time > 0. && globalTime > start_hydro_time) {   //Comment in if a radiative equilibrium phase is desired before starting hydro
               do_hydrodynamics = 1;
           }
@@ -186,7 +192,6 @@ void c_Sim::execute(int restartnumber, double restarttime_cmdline) {
             //
                 //March 19th 2024: Added get_cfl_timestep2() to sit here, to obtain the updated timestep based on the extrapolated left and right values - they can produce inconsistent fluxes with the cell-centered values, which the call of dt = get_cfl_timestep(); at the beginning of the timestep is based on;
                 //
-            //dt = std::min(get_cfl_timestep2(), dt);
             //cout<<"num_sepcies = "<<num_species<<endl;
             for(int s = 0; s < num_species; s++) {
                 species[s].u_mask           = np_zeros(num_cells+2);
@@ -377,6 +382,14 @@ void c_Sim::execute(int restartnumber, double restarttime_cmdline) {
 
         //Misc sources: diffusion:
         if(diffusivity_style >= 0) {
+
+            if(do_hydrodynamics==0){
+
+                vector<double> dummy = {0};
+                for(int s=0;s<num_species; s++) 
+                    species[s].reconstruct_edge_states(dummy, 1);
+            }
+
             execute_separate_diffusion_step();
         }
 
@@ -416,8 +429,7 @@ void c_Sim::execute(int restartnumber, double restarttime_cmdline) {
                     cout<<"After photochem dS_UV = "<<dS_band(num_cells-10,0)<<endl;
                 }
                 
-            }
-            else if(photochemistry_level == 2) { //Linearized time-dependent general chemistry scheme
+            } else if(photochemistry_level == 2) { //Linearized time-dependent general chemistry scheme
                 if(steps > 2) {
                     
                     if(steps % dt_skip_ichem == 0) {
@@ -706,6 +718,7 @@ void c_Species::execute(std::vector<AOS>& u_in, std::vector<AOS>& dudt, std::vec
         if(debug >= 2)
             cout<<"Done. Starting edge-states."<<endl;
         
+
         reconstruct_edge_states(u_mask, orderstep) ;
         
         if(debug >= 2)
@@ -1443,8 +1456,25 @@ int c_Species::fix_negative_pressures_sometimes(std::vector<AOS>&u_temp, int fla
         plast  = prim[j].pres;
         temper = prim[j].temperature;
         
+
+        if( (u_temp[j].u1 < 0)) {    
+            double rtmp = prim[j].density;
+            if( (j>1) && (j<num_cells))
+                rtmp = 0.5*std::log10(u[j-1].u1) + 0.5*std::log10(u[j+1].u1) ;
+            
+            u_temp[j].u1 = std::pow(10.,rtmp);
+            u_temp[j].u2 = prim[j].speed * u_temp[j].u1;
+            ekin = 0.5*u_temp[j].u2*u_temp[j].u2/u_temp[j].u1;
+            u_temp[j].u3 = ekin + u_temp[j].u1 * prim[j].internal_energy;
+
+            
+            eos->compute_primitive(&(u_temp[j]), &(prim[j]), 1) ;    
+            eos->compute_auxillary(&(prim[j]), 1);
+
+            fixed = 1;
+        }
         //First check: Negative E - big problem - use last value and fix pressure in case its also negative 
-        if( (u_temp[j].u3 < 0)) {    
+        if( 1==0) {    
             //u_temp[j].u3 = u[j].u3;// + (ekinold-ekin);
 
             //if(this->speciesname=="H2" && j==10)
@@ -1456,16 +1486,17 @@ int c_Species::fix_negative_pressures_sometimes(std::vector<AOS>&u_temp, int fla
             
             u_temp[j].u3 = std::pow(10.,etmp);
             
-            eos->compute_primitive(&(u[j]), &(prim[j]), 1) ;    
+            eos->compute_primitive(&(u_temp[j]), &(prim[j]), 1) ;    
             eos->compute_auxillary(&(prim[j]), 1);
 
             fixed = 1;
         }
         //Second check: negative pressure
-        if((Ttemp < 0) || (temper < 0) || (temper > base->max_temperature) || std::isnan(temper) )  { //
+        if((Ttemp < 0) || (temper < 0) || (temper > base->max_temperature) || std::isnan(temper)  ||  (u_temp[j].u3 < 0) )  { //
             base->update_T_mean(j, flag);
             double T_mean = base->T_mean[j];
-            
+            if(std::isnan(T_mean) || (T_mean<0))
+                cout<<" in repair T, T_mean is "<<T_mean<<endl;
 
             //if((this->speciesname=="H2") && j==10) {
             //if(temper > base->max_temperature)
@@ -1485,10 +1516,10 @@ int c_Species::fix_negative_pressures_sometimes(std::vector<AOS>&u_temp, int fla
             //cout<<"Repaired T in cell/species = "<<j<<" "<<this->speciesname<<" steps "<<base->steps<<" flag "<<flag<<"  Es "<<u_temp[j-1].u3<<" "<<u_temp[j].u3<<" "<<u_temp[j+1].u3<<"  rho "<<u_temp[j-1].u1<<" "<<u_temp[j].u1<<" "<<u_temp[j+1].u1<<" Ttemp "<<Ttemp<<"  v "<<u_temp[j-1].u2/u_temp[j-1].u1<<" "<<u_temp[j].u2/u_temp[j].u1<<" "<<u_temp[j+1].u2/u_temp[j+1].u1<<endl;
 
             double T_tmp = std::min(std::max(T_mean, base->temperature_floor), base->max_temperature);
-            double enew  = u_temp[j].u1*this->cv*T_tmp;
+            volatile double enew  = u_temp[j].u1*this->cv*T_tmp;
             u_temp[j].u3 = enew + ekin;
 
-            eos->compute_primitive(&(u[j]), &(prim[j]), 1) ;    
+            eos->compute_primitive(&(u_temp[j]), &(prim[j]), 1) ;    
             eos->compute_auxillary(&(prim[j]), 1);
             fixed = 1;
         }
@@ -1503,63 +1534,6 @@ int c_Species::fix_negative_pressures_sometimes(std::vector<AOS>&u_temp, int fla
 }
 
 
-
-//
-// This routine constructs a T_mean after the hydro step and is therefore using hydro variables.
-// It will be ultimately used to correct negative temperatures which can occur from the computation of E-Ekin at large mach number
-//
-void c_Sim::update_T_mean(int j, int flag) {
-
-        double avgT_nom   = 0;
-        double avgT_denom = 0;
-        int sw = 0;
-        
-        for(int si=0; si<num_species; si++) {
-            double tt = species[si].u[j].u3 - 0.5 * species[si].u[j].u2*species[si].u[j].u2/species[si].u[j].u1;
-                   tt /= (species[si].u[j].u1*species[si].cv);
-            //cout<<" in update T_mean "<<si<<" "<<tt<<endl;
-
-            if( (tt>0) && (!std::isnan(tt))  ) { //Ignore broken contributions
-                avgT_nom   += species[si].u[j].u1 * species[si].cv * tt;
-                avgT_denom += species[si].u[j].u1 * species[si].cv;
-            }
-            if( tt<0  ) { 
-                sw =1;
-            }
-
-        }
-        T_mean[j] = avgT_nom/avgT_denom;
-    
-        if(std::isnan(T_mean[j])) {
-            cout<<" T_mean is NaN in j= "<<j<<" steps "<<steps<<" flag "<<flag<<" ";
-            for(int si=0; si<num_species; si++) {
-                cout<<species[si].prim[j].temperature;
-                if(std::isnan(species[si].prim[j].temperature))
-                    cout<<"("<<species[si].speciesname<<")";
-                cout<<" ";
- /*                AOS      tmp  = species[si].u[j];
-                AOS_prim tmpp = species[si].prim[j];
-                double tt = tmp.u3 - 0.5 * tmp.u2*tmp.u2/tmp.u1;
-                tt /= (tmp.u1*species[si].cv);
-                cout<<" in update T_mean "<<si<<" "<<tt<<" u = "<<tmp.u1<<" "<<tmp.u2<<" "<<tmp.u3<<" prim = "<<tmpp.internal_energy<<" "<<tmpp.temperature<<" "<<tmpp.pres<<" "<<tmpp.sound_speed<<" "<<tmpp.speed<<endl;
-                 */
-            }
-            cout<<endl;
-        }
-        if(sw==1) {
-            cout<<" T_mean contains negatives! j= "<<j<<" steps "<<steps<<" flag "<<flag<<" ";
-            for(int si=0; si<num_species; si++) {
-                cout<<species[si].prim[j].temperature;
-                if(species[si].prim[j].temperature<0)
-                    cout<<"("<<species[si].speciesname<<")";
-                cout<<" ";
-            }
-            cout<<endl;
-
-        }
-    
-
-}
 
 
 

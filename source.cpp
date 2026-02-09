@@ -109,8 +109,11 @@ void c_Sim::update_mass_and_pot() {
             
     }
     
-    if(debug >= 1)
+    if(debug >= 1) {
         cout<<"Done in update mass and pot. "<<endl;
+        char a;
+        cin>>a;
+    }
 }
 
 //
@@ -188,7 +191,9 @@ AOS c_Species::source_grav_noconserved(AOS &u, int &j) {
 void c_Species::update_kzz_and_gravpot(int argument) {
     
     homopause_boundary_i = 0;
-    double mu = base->species[0].mass_amu;
+    double mu = 1;
+    if(this->this_species_index > 0)
+        base->species[0].mass_amu;
     double mi = this->mass_amu;
     double slope = 1;
     
@@ -661,10 +666,6 @@ void c_Sim::compute_friction_numerical(double dtt) {
         species[si].eos->update_p_from_eint(&(species[si].prim[0]), num_cells+2);
         species[si].eos->compute_conserved(&(species[si].prim[0]), &(species[si].u[0]), num_cells+2);        
     }
-    
-    
-    
-
 
 }
 
@@ -703,15 +704,21 @@ void c_Sim::compute_alpha_matrix(int j) { //Called in compute_friction() and com
                     if(collision_model == 'C') { //Constant drag law
                         alpha_local = alpha_collision;
                         if (si > sj) alpha_local *= dens_vector(sj) / dens_vector(si) ;
+
                     } else {
+
                         if(si==sj) {
-                        alpha_local = 0.; 
+                            alpha_local = 0.; 
                         } else {                      // Physical drag laws
                             //mtot = mass_vector(si) + mass_vector(sj);
-                            mumass = mass_vector(si) * mass_vector(sj) * inv_totmasses(si,sj); /// (mass_vector(si) + mass_vector(sj));
+                            mumass     = mass_vector(si) * mass_vector(sj) * inv_totmasses(si,sj); /// (mass_vector(si) + mass_vector(sj));
                             mumass_amu = mumass/amu;
-                            meanT  = (mass_vector(sj)*temperature_vector(si) + mass_vector(si)*temperature_vector(sj)) * inv_totmasses(si,sj); // / (mass_vector(si) + mass_vector(sj)); //Mean collisional mu and T from Schunk 1980
+                            meanT      = (mass_vector(sj)*temperature_vector(si) + mass_vector(si)*temperature_vector(sj)) * inv_totmasses(si,sj); // / (mass_vector(si) + mass_vector(sj)); //Mean collisional mu and T from Schunk 1980
                             
+
+                            ////////////////////////////////////////////////////////
+                            //// Dust-Gas drag
+                            ////////////////////////////////////////////////////////
                             if (species[si].is_dust_like || species[sj].is_dust_like) { //One of the collision partners is dust
                                 // Use Epstein drag law (Hard sphere model)
                                 double RHO_DUST = 1;
@@ -725,44 +732,64 @@ void c_Sim::compute_alpha_matrix(int j) { //Called in compute_friction() and com
                                 double v_th = std::sqrt(8*kb*meanT/(M_PI * mumass)) ;
 
                                 alpha_local = 4/3. * dens_vector(sj) * v_th * A * inv_totmasses(si,sj) ;
-                            } else { // Gas-gas collisions. Used binary diffusion coefficient                        
+                            } else {
 
+                                ////////////////////////////////////////////////////////
+                                //// Gas-gas drag
+                                ////////////////////////////////////////////////////////
                                 int ci = (int)(species[si].static_charge*1.01);
                                 int cj = (int)(species[sj].static_charge*1.01);
                                 double qn = (std::fabs(species[si].static_charge) + std::fabs(species[sj].static_charge));
                                 //string ccase = ""; //Debug string to make sure the cases are picked right
                                 
-                                if(std::abs(ci) + std::abs(cj) == 0) { //n-n collision
+                                int ccase = 0;
+                                string castring = "---";
+                                if( (ci==0) && (cj==0) )
+                                    ccase = 1;
+                                else if( ((ci!=0) && (cj==0))  ||  ((ci==0) && (cj!=1))  )
+                                    ccase = 2;
+                                else if( (ci!=0) && (cj!=0) )
+                                    ccase =3;
+
+
+                                if(ccase==1 || ccase==0) { //n-n collision
                                     coll_b      = 5.0e17 * std::sqrt(std::sqrt(meanT*meanT*meanT)) ;     //std::pow(meanT, 0.75) // from Zahnle & Kasting 1986 Tab. 1
                                     alpha_local = kb * meanT * numdens_vector(sj) * species[si].inv_mass / coll_b ; // From Burgers book, or Schunk & Nagy.
-                                    //ccase = " n-n ";
+                                    castring = "nn";
                                 }
-                                else if(std::abs(ci) == 0 || std::abs(cj) == 0) {//i-n collision
+                                else if(ccase==2) {//i-n collision
                                     
                                     if(species[si].mass_amu < 1.1 && species[sj].mass_amu < 1.1) {  //Resonant H,H+ collisions
-                                        alpha_local = 2.65e-10 * numdens_vector(sj) * std::sqrt(meanT) * std::pow((1. - 0.083 * std::log10(meanT)), 2.);
-                                        
-                                        //ccase = "resonant H-p+ ";
-                                        
-                                    } else {
+                                        alpha_local = 2.65e-10 * numdens_vector(sj) * std::sqrt(meanT) * std::pow(  (1. - 0.083 * std::log10(meanT)), 2.);
+                                        castring = "res in";
+                                    } else { //Nonresonant i-n
 
                                         alpha_local = 1*2.21 * 3.141592 * numdens_vector(sj) * mass_vector(sj) * inv_totmasses(si,sj); //   /(mass_vector(sj)+mass_vector(si));
                                         alpha_local *= std::sqrt(0.66 / mumass ) * 1e-12 * qn * elm_charge; //0.66 is the polarizability of neutral atomic H                                        
                                         alpha_local *= resonant_pair_matrix(si,sj); //Crude way to emulate resonant collision cross-sections: pairs are multiplied by 10, everything else by 1
-                                        
-                                        //ccase = "resonant or nonresonant i-n ";
+                                        castring = "nonres in";
                                     }
                                 }
-                                else { //i-i collision
-                                    alpha_local = alpha_collision_ions * 1.27 * species[si].static_charge * species[si].static_charge * species[sj].static_charge * species[sj].static_charge * std::sqrt(mumass_amu) * amu * species[si].inv_mass; //  / mass_vector(si);
+                                else if (ccase==3){ //i-i collision
+                                    alpha_local = alpha_collision_ions * 1.27 * ci*ci*cj*cj * std::sqrt(mumass_amu) * amu * species[si].inv_mass; //  / mass_vector(si);
                                     alpha_local *= numdens_vector(sj) / std::sqrt(meanT*meanT*meanT);
-                                    
-                                    //ccase = " i-i ";
+
+                                    castring = "ii";
+                                }
+
+                                ////////////////////////////////////////////////////////
+                                // Finished gas drag
+                                ////////////////////////////////////////////////////////
+                                if(steps==456e99) {
+                                    cout<<" reporting collission rate details, alpha_local = "<<alpha_local<<" species "<<species[si].speciesname<<"-"<<species[sj].speciesname<<" q = "<<ci<<" "<<cj<<" case "<<ccase<<" castring: "<<castring<<endl;
                                 }
                                 
                                 if(si!=sj && debug>3)
                                     cout<<"cell "<<j<<" colliding "<<species[si].speciesname<<" q="<<species[si].static_charge<<" with "<<species[sj].speciesname<<" q="<<species[sj].static_charge<<" ccase = "<<" alpha/n = "<<alpha_local/ numdens_vector(sj)<<" n_sj = "<<numdens_vector(sj)<<endl;
                                 
+                                ///////////////////////////////////////////////////////////
+                                // Optional linear ramp-up or ramp-down of collision coeffs: alpha_collision is the external parameter
+                                ///////////////////////////////////////////////////////////
                                 double alpha_temp = alpha_collision;
                                 if(globalTime < coll_rampup_time) { //Ramp up the friction factors linearly, if so desired
                                     
@@ -943,38 +970,58 @@ Diffusive timestep constraint
 */
 double c_Species::diffusive_timestep(int j) {
     double diff_tstep = 1e+20 ;
+    assert(j > 0 && j <= num_cells) ;
 
-   assert(j > 0 && j <= num_cells) ;
+    double ntotmean   = 0.5*( base->total_numdens[j] + base->total_numdens[j+1]);
+ 
+   /*  double fjm1_log   = std::log10(prim_r[j].number_density/base->total_numdens[j]);  
+    double fj_log     = std::log10(prim_l[j+1].number_density/base->total_numdens[j+1]);
+    */
+    double fs_log        = (std::log10(prim[j+1].number_density)-std::log10(prim[j].number_density))/(base->x_i12[j+1] - base->x_i12[j]) ;;  
+    double fmean_log     = (std::log10(base->total_numdens[j+1])-std::log10(base->total_numdens[j]))/(base->x_i12[j+1] - base->x_i12[j]) ;;  
 
-    double fjm1   = std::log10(prim[j].number_density/base->total_numdens[j]);  
-    double fj     = std::log10(prim[j+1].number_density/base->total_numdens[j+1]);
+    double fjm1   = -(prim[j].number_density/base->total_numdens[j]);  
+    double fj     = -(prim[j+1].number_density/base->total_numdens[j+1]);  
+    double discr_factor = 1;//1e4;
+
+    double rhomean = 0.5*( u[j].u1 + u[j+1].u1); //
+    double mommean = 0.5*( u[j].u2 + u[j+1].u2); //
+    double emean   = 0.5*( prim[j].internal_energy + prim[j+1].internal_energy); //
 
     double vjm1   = prim[j].speed;  
     double vj     = prim[j+1].speed;
-    double pp     = base->total_press[j];
+    double p_bar  = base->total_press[j]/1e6; //cgs to bar
 
-    double dfdr             = ( fj - fjm1) / (base->x_i12[j+1] - base->x_i12[j]) ;
-    double u_diff           = - base->diffusivity * dfdr; //If diffusivity is in cm^2/s then u_diff is in cm/s
+    double dfdr         = ( fj - fjm1) / (base->x_i12[j+1] - base->x_i12[j]) ;
+    double kzz          = std::min(( 6e5 / p_bar), base->vdiffusivity);
+    double u_diff       = kzz * ntotmean * (fs_log-fmean_log); //If diffusivity is in cm^2/s then u_diff is in cm/s
 
+    if( (base->steps == 100 ) && (this_species_index<=1) && ( (j==5) || (j==20) || (j==12) || (j==13) )   )  
+        cout<<"s: "<<speciesname<<" j: "<<j<<" in duffisve step, udiff  "<<u_diff<<endl;
+
+    double nmean   = 0.5*( prim[j].number_density + prim[j+1].number_density);
+    double pmean   = 0.5*( prim[j].pres +  prim[j+1].pres);
+    double Tmean   = 0.5*( prim[j].temperature +  prim[j+1].temperature);
+    double Emean   = 0.5*mommean*mommean/rhomean + rhomean*cv*Tmean;
+    
     double pscl = 1.;
-    if(base->total_press[j]/1e6 < 1e-9) 
-        pscl = base->total_press[j] / 1e6 / 1e-9; //Scale down diffusion beyond a nanobar to increase numerical stability
+    double plimit = 1e-9; //
+    //if(base->total_press[j]/1e6 < plimit) 
+    //    pscl = base->total_press[j] / 1e6 / plimit; //Scale down diffusion beyond a nanobar to increase numerical stability
     u_diff *= pscl;
 
     if(this->mass_amu < 0.4) //For electrons, reduce diffusion strength
         u_diff = 0.;
 
-    if(j<=base->num_ghosts-1)
+    if(j<=3)
         u_diff = 0;
-    
-    //if(std::fabs(diff) > 1e-30) {
-    //    diff_tstep = 0.5 * base->dx[j] * base->dx[j] / std::fabs(diff);
-    //}
 
-    diff_tstep = 0.25 * base->dx[j] * base->dx[j] / std::fabs(u_diff);
+    //diff_tstep = 0.25 * base->dx[j] * base->dx[j] / std::fabs( std::max( std::max(base->diffusivity, base->vdiffusivity), 1e-20)  );
+    diff_tstep = 0.25 * base->dx[j] / std::fabs(u_diff);
 
+    if( std::fabs(u_diff) < 1e-10 )
+        return 1e99;
     return diff_tstep ;
-
 }
 
 
@@ -988,25 +1035,41 @@ AOS c_Species::source_diffusion_flux2(int j) {
 
     assert(j > 0 && j <= num_cells) ;
 
-    double fjm1   = std::log10(prim_r[j].number_density/base->total_numdens[j]);  
-    double fj     = std::log10(prim_l[j+1].number_density/base->total_numdens[j+1]);
+    double ntotmean   = 0.5*( base->total_numdens[j] + base->total_numdens[j+1]);
+ 
+   /*  double fjm1_log   = std::log10(prim_r[j].number_density/base->total_numdens[j]);  
+    double fj_log     = std::log10(prim_l[j+1].number_density/base->total_numdens[j+1]);
+    */
+    double fs_log        = (std::log10(prim[j+1].number_density)-std::log10(prim[j].number_density))/(base->x_i12[j+1] - base->x_i12[j]) ;;  
+    double fmean_log     = (std::log10(base->total_numdens[j+1])-std::log10(base->total_numdens[j]))/(base->x_i12[j+1] - base->x_i12[j]) ;;  
+
+    double fjm1   = -(prim[j].number_density/base->total_numdens[j]);  
+    double fj     = -(prim[j+1].number_density/base->total_numdens[j+1]);  
+    double discr_factor = 1;//1e4;
+
+    double rhomean = 0.5*( u[j].u1 + u[j+1].u1); //
+    double mommean = 0.5*( u[j].u2 + u[j+1].u2); //
+    double emean   = 0.5*( prim[j].internal_energy + prim[j+1].internal_energy); //
 
     double vjm1   = prim[j].speed;  
     double vj     = prim[j+1].speed;
-    double pp     = base->total_press[j];
+    double p_bar  = base->total_press[j]/1e6; //cgs to bar
 
-    double dfdr             = ( fj - fjm1) / (base->x_i12[j+1] - base->x_i12[j]) ;
-    double u_diff           = - base->vdiffusivity * dfdr; //If diffusivity is in cm^2/s then u_diff is in cm/s
+    double dfdr         = ( fj - fjm1) / (base->x_i12[j+1] - base->x_i12[j]) ;
+    double kzz          = std::min(( 6e5 / p_bar), base->vdiffusivity);
+    double u_diff       = kzz * ntotmean * (fs_log-fmean_log); //If diffusivity is in cm^2/s then u_diff is in cm/s
 
-    double nmean   = logmean( prim[j].number_density,  prim[j+1].number_density);
-    double rhomean = 0.5*( prim_r[j].density + prim_l[j+1].density);//0.5*( u[j].u1 + u[j+1].u1); //
+    if( ( (base->steps == 100)  || ((base->steps == 200 )) ) && (this_species_index<=1) && ( (j==5) || (j==20) || (j==12) || (j==13) || (j==150) )   )  
+        cout<<"s: "<<speciesname<<" j: "<<j<<" in diffusion, udiff  "<<u_diff<<" ddf "<< (fs_log-fmean_log)<<" pbar / kzz "<<p_bar<<" "<<kzz<<endl;
+
+    double nmean   = 0.5*( prim[j].number_density + prim[j+1].number_density);
+    /* double rhomean = 0.5*( prim_r[j].density + prim_l[j+1].density);//0.5*( u[j].u1 + u[j+1].u1); //
     double mommean = 0.5*( prim_r[j].density*prim_r[j].speed + prim_l[j+1].density*prim_l[j+1].speed);//0.5*( u[j].u2 + u[j+1].u2); //
     double emean   = 0.5*( prim_r[j].internal_energy,  prim_l[j+1].internal_energy);//0.5*( prim[j].internal_energy,  prim[j+1].internal_energy); //
-    //prim[i].internal_energy = (prim[i].pres/prim[i].density)/_gamma_m1 ;
-    double pmean   = 0.5*( prim[j].pres,  prim[j+1].pres);
-    double Tmean   = 0.5*( prim[j].temperature,  prim[j+1].temperature);
-    //double Emean   = 0.5*mommean*mommean/rhomean + rhomean*emean;
-    //double Emean   = 0.5*mommean*mommean/rhomean + rhomean*pmean/(gamma_adiabat-1.);
+ */
+
+    double pmean   = 0.5*( prim[j].pres +  prim[j+1].pres);
+    double Tmean   = 0.5*( prim[j].temperature +  prim[j+1].temperature);
     double Emean   = 0.5*mommean*mommean/rhomean + rhomean*cv*Tmean;
 
 
@@ -1017,28 +1080,32 @@ AOS c_Species::source_diffusion_flux2(int j) {
     double edonor       = ( u_diff < 0 ) ? prim[j+1].internal_energy : prim[j].internal_energy;
 
     double pscl = 1.;
-    //if(base->total_press[j]/1e6 < 1e-9) 
-    //    pscl = base->total_press[j] / 1e6 / 1e-9; //Scale down diffusion beyond a nanobar to increase numerical stability
+    double plimit = 1e-9; //
+    //if(base->total_press[j]/1e6 < plimit) 
+    //    pscl = base->total_press[j] / 1e6 / plimit; //Scale down diffusion beyond a nanobar to increase numerical stability
     u_diff *= pscl;
 
-    if(this->mass_amu < 0.4) //For electrons, reduce diffusion strength
-        u_diff = 0.;
-
-    if(j<=base->num_ghosts-1)
+    if(j<=3)//if(j<=base->num_ghosts)
         u_diff = 0;
     
     if(base->diffusivity_style==0)
-        return AOS( u_diff * rhomean,  u_diff * mommean, u_diff * emean);
+        return AOS( u_diff * rhomean, 0.* u_diff * mommean, 0. * u_diff * emean);
     else
-        return AOS( u_diff * rhodonor, u_diff * momdonor, u_diff * edonor); 
+        return AOS( u_diff * rhodonor, 0.* u_diff * momdonor, 0. * u_diff * edonor); 
 }
 
+
+//
+// Apply diffusive flux to each cell
+//
 void c_Sim::execute_separate_diffusion_step() {
 
     //Write
     for(int s=0; s<num_species; s++) {
         for(int j=0; j < num_cells+1; j++) {
+            double entropy = std::log(species[s].prim[j].pres/ std::pow(species[s].prim[j].density, species[s].gamma_adiabat ));
             species[s].u_diff[j] = AOS(species[s].u[j].u1, species[s].u[j].u2, species[s].prim[j].internal_energy);
+            //species[s].u_diff[j] = AOS(species[s].u[j].u1, species[s].u[j].u2, entropy);
         }
     }
 
@@ -1056,20 +1123,71 @@ void c_Sim::execute_separate_diffusion_step() {
         }
     }
 
+    
     //Project back
     for(int s=0; s<num_species; s++) {
         for(int j=0; j < num_cells+1; j++) {
 
             if(species[s].u_diff[j].u3<0) { 
-                cout<<" negative energy in diffusion  "<<j<<" "<<species[s].speciesname<<" steps "<<steps<<"  Es "<<species[s].u[j-1].u3<<" "<<species[s].u[j].u3<<" "<<species[s].u[j+1].u3<<"  rho "<<species[s].u[j-1].u1<<" "<<species[s].u[j].u1<<" "<<species[s].u[j+1].u1<<" T = "<<species[s].prim[j].temperature<<endl;
-                species[s].u_diff[j].u3 = species[s].u_diff[j].u1 * species[s].cv * species[s].prim[j].temperature;
+                cout<<" negative energy in diffusion  "<<j<<" "<<species[s].speciesname<<" steps "<<steps<<"  Es "<<species[s].u_diff[j-1].u3<<" "<<species[s].u_diff[j].u3<<" "<<species[s].u_diff[j+1].u3<<"  rho_sol "<<species[s].u_diff[j-1].u1<<" "<<species[s].u_diff[j].u1<<" "<<species[s].u_diff[j+1].u1<<" T = "<<species[s].prim[j].temperature<<endl;
+                species[s].u_diff[j].u3 = species[s].cv * species[s].prim[j].temperature;
             }
 
+            if(species[s].u_diff[j].u1<0) { 
+                double dupdate = ( species[s].source_diffusion_flux2(j).u1 * surf[j] * (-1.) + species[s].source_diffusion_flux2(j-1).u1 * surf[j-1] ) / vol[j] * dt;
+                cout<<" negative density in diffusion  "<<j<<" "<<species[s].speciesname<<" steps "<<steps<<"  rho fluxes "<<species[s].source_diffusion_flux2(j-1).u1<<" "<<species[s].source_diffusion_flux2(j-1).u1<<" dupdate= "<<dupdate<<" dt = "<<dt<<"  rho_sol "<<species[s].u_diff[j-1].u1<<" "<<species[s].u_diff[j].u1<<" "<<species[s].u_diff[j+1].u1<<" T = "<<species[s].prim[j].temperature<<endl;
+                species[s].u_diff[j].u3 = species[s].cv * species[s].prim[j].temperature;
+            }
+
+            if((j==45) && (steps == -544)) { //For debugging 
+                double implied_T = species[s].u_diff[j].u3 / species[s].cv;
+                cout<<" future negative energy in diffusion  "<<j<<" "<<species[s].speciesname<<" steps "<<steps<<"  Es "<<species[s].u_diff[j-1].u3<<" "<<species[s].u_diff[j].u3<<" "<<species[s].u_diff[j+1].u3<<"  rho "<<species[s].u_diff[j-1].u1<<" "<<species[s].u_diff[j].u1<<" "<<species[s].u_diff[j+1].u1<<" T = "<<species[s].prim[j].temperature<<" T_implied = "<<implied_T<<endl;
+            }
+
+            double p_from_entropy = std::pow(species[s].prim[j].density, species[s].gamma_adiabat ) * std::exp(species[s].u_diff[j].u3);
             double rho = species[s].u_diff[j].u1; 
-            double mom = species[s].u_diff[j].u2; 
-            double E   = 0.5*mom*mom/rho + rho*species[s].u_diff[j].u3; 
+            double mom = species[s].u[j].u2; // ignore diffusive momentum update //species[s].u_diff[j].u2; 
+            double E   = 0.5*mom*mom/rho + rho*species[s].cv*species[s].prim[j].temperature; //Ignore energy update effectively
             species[s].u[j] = AOS(rho, mom, E);
         }
         species[s].compute_pressure(species[s].u);
     }
-}
+
+
+
+ 
+/* 
+    for(int s=0; s<num_species; s++) {
+        cout<<" species u1 "<<s;
+        for(int j=3; j < num_cells; j++) {
+            cout<<" "<<species[s].u[j].u1;
+        }
+        cout<<endl;
+    }
+       for(int s=0; s<num_species; s++) {
+        cout<<" species u2 "<<s;
+        for(int j=3; j < num_cells; j++) {
+            cout<<" "<<species[s].u[j].u2;
+        }
+        cout<<endl;
+    }
+       for(int s=0; s<num_species; s++) {
+        cout<<" species u3 "<<s;
+        for(int j=3; j < num_cells; j++) {
+            cout<<" "<<species[s].u[j].u3;
+        }
+        cout<<endl;
+    }
+
+    for(int s=0; s<num_species; s++) {
+        cout<<" species press"<<s;
+        for(int j=3; j < num_cells; j++) {
+            cout<<" "<<species[s].prim[j].pres;
+        }
+        cout<<endl;
+    }
+
+    char a;
+    cin>>a;
+*/
+} 

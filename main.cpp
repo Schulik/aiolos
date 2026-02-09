@@ -21,6 +21,7 @@
  */
 int main(int argc, char** argv)
 {
+
     string simulationname;
     string speciesfile;
     string workingdir = "./";

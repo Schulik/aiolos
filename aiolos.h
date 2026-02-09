@@ -25,6 +25,11 @@
 #include "enum.h"
 #include "eos.h"
 
+//NaN stuff
+#include <cfenv>
+#pragma STDC FENV_ACCESS ON
+//Nan stuff
+
 #ifndef NUM_SPECIES
 #define NUM_SPECIES Eigen::Dynamic
 #endif
@@ -797,8 +802,8 @@ public:
     Vector_t momentum_b;
     //Vector_t n_olds;
     //Vector_t n_news;
-    std::vector<double> n_init;
-    std::vector<double> n_tmp;
+    //std::vector<double> n_init;
+    //std::vector<double> n_tmp;
     Matrix_t reaction_matrix;
     Eigen::MatrixXd *reaction_matrix_ptr;
     Eigen::VectorXd *reaction_b_ptr;
@@ -834,6 +839,7 @@ public:
     std::vector<double> thermo_poly(double T,double a1,double a2,double a3,double a4,double a5,double a6,double a7,double a8,double a9);
     std::vector<double> get_thermo_variables(double T,string species_string);
     
+    Vector_t return_preconditioned_LU_solution(const Matrix_t &matrix, const Vector_t &rhs, const Vector_t &orig_vector, Eigen::PartialPivLU<Matrix_t>& LUobject, int cell );
     
     ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     //
@@ -917,8 +923,12 @@ public:
     void do_highenergy_cooling(int j, double Te);
     void update_tau_s_jb(int j, int b);
     void update_opacities();
-    void update_T_mean(int j, int flag);
-    
+    void update_T_mean(int j, int flag); //similar to return_T_mean but with debug functionality
+    double return_T_mean(int j); //computes t_mean from saved temperatures
+    double return_T_mean(int j, Vector_t temperatures); //computes t_mean from passed temperatures
+    double return_e_total(int j); //computes t_mean from saved temperatures
+    double return_e_total(int j, Vector_t temperatures); //computes t_mean from passed temperatures
+
     void empty_reaction_table();
     void save_reaction_data_for_cell(int j, double dtt, double n_tot);
     void write_reaction_table(int outputnumber);
@@ -937,7 +947,7 @@ public:
     void update_temperatures(double, Eigen::MatrixXd &,Eigen::MatrixXd &,Eigen::MatrixXd &);
     double compute_planck_function_integral3(double lmin, double lmax, double temperature);
     double compute_planck_function_integral4(double lmin, double lmax, double temperature);
-    void subcycle_heat_exchange(int cell, int num_cycles, int debug, double dt);
+    int subcycle_heat_exchange(int cell, int num_cycles, int debug, double dt);
 
     //Debug functions
     
