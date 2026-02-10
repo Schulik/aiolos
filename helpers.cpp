@@ -111,12 +111,14 @@ double c_Sim::get_cfl_timestep() {
     //Invert and apply CFL secutiry factor
     cfl_step = cflfactor / minstep;
     
-    for(int s=0; s < num_species; s++) {
-            for(int i=1; i<=num_cells; i++) {
-                //Get diffusive timestep
-                //    cout<<" s / cfl_step / diff_step = "<<s<<" / "<<cfl_step<<" / "<<diffstep<<endl;
-                diffstep = std::min(diffstep, std::min(0.4*species[s].diffusive_timestep(i), 1e99 ));
-            }
+    if(diffusivity_style > -1) {
+        for(int s=0; s < num_species; s++) {
+                for(int i=1; i<=num_cells; i++) {
+                    //Get diffusive timestep
+                    //    cout<<" s / cfl_step / diff_step = "<<s<<" / "<<cfl_step<<" / "<<diffstep<<endl;
+                    diffstep = std::min(diffstep, std::min(0.4*species[s].diffusive_timestep(i), 1e99 ));
+                }
+        }
     }
 
       
