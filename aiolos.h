@@ -431,6 +431,11 @@ public:
     double conductivity2;
     double diffusivity;
     double vdiffusivity;
+    double kzz_zero;
+    double kzz_alpha;
+    double kzz_beta;
+    double kzz_max;
+    double kzz_pmax;
     int diffusivity_style;
     double do_cond_until;
     int neutralize_electrons;
@@ -904,7 +909,8 @@ public:
     double get_phi_grav(double &r, double &mass);
     
     //Kzz diffusion
-    void execute_separate_diffusion_step();
+    void   execute_separate_diffusion_step();
+    double get_kzz(double pressure);
 
     //Opacities 
     void init_malygin_opacities();
@@ -1181,6 +1187,8 @@ public:
     double return_entropy_with_jump(double j);
 
     void implicit_incompressible(double dt);
+    void implicit_incompressible2(double dt);
+    void implicit_incompressible_J(double dt);
     
     AOS source_grav(AOS &u, int &j);
     AOS source_grav_noconserved(AOS &u, int &j);

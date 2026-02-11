@@ -126,7 +126,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, s
         if(debug > 0) cout<<"Using integration order "<<order<<" while second order would be "<<IntegrationType::second_order<<endl;
         
         if (order == IntegrationType::first_order)
-            num_ghosts = 1 ;
+            num_ghosts = 2 ;
         else 
             num_ghosts = 2 ;
 
@@ -227,6 +227,12 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, s
         do_cond_until         = read_parameter_from_file<double>(filename,"DO_COND_UNTIL", debug, 1e99).value; //Unused currently.
         use_inflow_damping    = read_parameter_from_file<int>(filename,"USE_INFLOW_DAMPING", debug, 0).value; //Damp negative velocities, as they frequently crash the simulation, to stimulate outflows
         
+        kzz_zero  =read_parameter_from_file<double>(filename,"KZZ_ZERO", debug, 0.).value;
+        kzz_alpha =read_parameter_from_file<double>(filename,"KZZ_ALPHA", debug, 6e5).value;
+        kzz_beta  =read_parameter_from_file<double>(filename,"KZZ_BETA", debug, -1.).value;
+        kzz_max   =read_parameter_from_file<double>(filename,"KZZ_MAX", debug, 1e5).value;
+        kzz_pmax  =read_parameter_from_file<double>(filename,"KZZ_PMAX", debug, 1e-12).value;
+
         use_collisional_heating = read_parameter_from_file<int>(filename,"PARI_USE_COLL_HEAT", debug, 1).value; //Switch on collisional energy exchange between species
         num_subcycles           = read_parameter_from_file<int>(filename,"COLL_HEAT_SUBCYCLES", debug, 1).value; //Collisional heating will be subcycled
         use_drag_predictor_step = read_parameter_from_file<int>(filename, "PARI_SECONDORDER_DRAG", debug, 1).value; //Switch on drag predictor substep
@@ -489,6 +495,9 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, s
         // Assign high and low energy band switches. Those will later decide about the computation of dS and ionization
         // Low-energy bands directly input solar radiation into the thermal energy. High-energy bands ionize and are therefore more complicated to treat.
         //
+        num_photoreactions = 0;
+        num_reactions = 0;
+
         num_he_bands = 0;
         for(int b=0; b<num_bands_in; b++) {
             BAND_IS_HIGHENERGY[b] = 0;

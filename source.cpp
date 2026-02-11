@@ -59,10 +59,10 @@ void c_Sim::update_mass_and_pot() {
     if(debug >= 1)
         cout<<"In update mass. "<<endl;
     
-    enclosed_mass[0] = planet_mass;
-    enclosed_mass[1] = planet_mass; //Ghosts
+    for(int i=0; i<num_ghosts; i++)
+        enclosed_mass[i] = planet_mass;
     
-    for(int i = 2; i <= num_cells; i++) {
+    for(int i = num_ghosts; i <= num_cells; i++) {
         
         //Loop over all species densities
         species_dens_sum = 0.;
@@ -991,7 +991,7 @@ double c_Species::diffusive_timestep(int j) {
     double p_bar  = base->total_press[j]/1e6; //cgs to bar
 
     double dfdr         = ( fj - fjm1) / (base->x_i12[j+1] - base->x_i12[j]) ;
-    double kzz          = std::min(( 6e5 / p_bar), base->vdiffusivity);
+    double kzz          = base->get_kzz(p_bar);//std::min(( 6e5 / p_bar), base->vdiffusivity);
     double u_diff       = kzz * (fs_log-fmean_log); //If diffusivity is in cm^2/s then u_diff is in cm/s
 
     if( (base->steps == 100 ) && (this_species_index<=1) && ( (j==5) || (j==20) || (j==12) || (j==13) )   )  
@@ -1054,9 +1054,9 @@ AOS c_Species::source_diffusion_flux2(int j) {
     double p_bar  = base->total_press[j]/1e6; //cgs to bar
 
     double dfdr         = ( fj - fjm1) / (base->x_i12[j+1] - base->x_i12[j]) ;
-    double kzz          = std::min(( 6e5 / p_bar), base->vdiffusivity);
+    double kzz          = base->get_kzz(p_bar);//std::min(( 6e5 / p_bar), base->vdiffusivity);
     double u_diff       = kzz * (fs_log-fmean_log); //If diffusivity is in cm^2/s then u_diff is in cm/s
-    
+
     double nmean   = 0.5*( prim[j].number_density + prim[j+1].number_density);
     /* double rhomean = 0.5*( prim_r[j].density + prim_l[j+1].density);//0.5*( u[j].u1 + u[j+1].u1); //
     double mommean = 0.5*( prim_r[j].density*prim_r[j].speed + prim_l[j+1].density*prim_l[j+1].speed);//0.5*( u[j].u2 + u[j+1].u2); //
@@ -1153,3 +1153,14 @@ void c_Sim::execute_separate_diffusion_step() {
         species[s].compute_pressure(species[s].u);
     }
 } 
+
+//
+// Simple prescribed kzz powerlaw model with upper and lower cutoff
+//
+double c_Sim::get_kzz(double pressure_in_bar) {
+
+    double tmp_kzz = kzz_alpha * std::pow(pressure_in_bar, kzz_beta) + kzz_zero;
+    if(pressure_in_bar < kzz_pmax)
+        return kzz_max;
+    return  tmp_kzz;
+}

@@ -83,8 +83,10 @@ double c_Sim::get_cfl_timestep() {
 
                 if(solver == HydroSolver::implicitelectrons) {
                     species[s].finalstep[i] /= cflfactor_electron;
-                    //species[s].finalstep[i] = 0 ; //Naively this should be the right approach, but there are numerical imbalances
+                    //species[s].finalstep[i] = 1e-20 ; //Naively this should be the right approach, but there are numerical imbalances
                 }
+
+                species[s].finalstep[num_cells] = 1e-20;
             }
             else
                 species[s].finalstep[i]    = std::sqrt(species[s].timesteps[i]*species[s].timesteps[i] + species[s].timesteps_cs[i]*species[s].timesteps_cs[i] ) ;
@@ -813,8 +815,8 @@ void c_Sim::update_T_mean(int j, int flag) {
             }
             cout<<endl;
 
-            char a;
-            cin>>a;
+         /*    char a;
+            cin>>a; */
         }
         if(sw==1) {
             cout<<" T_mean contains negatives! j= "<<j<<" steps "<<steps<<" flag "<<flag<<" ";
@@ -827,8 +829,8 @@ void c_Sim::update_T_mean(int j, int flag) {
             cout<<endl;
 
 
-            char a;
-            cin>>a;
+/*             char a;
+            cin>>a; */
         }
 }
 

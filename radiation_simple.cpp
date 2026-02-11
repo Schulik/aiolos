@@ -431,10 +431,7 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
 
             int dd = 0;
             if((steps>=10000) && (j==122) && (steps <= 10010)){
-                dd=1;
-                //subcycle_heat_exchange(j, num_subcycles, 2, dt);
-                //subcycle_heat_exchange(j, 3, debug=2, dt);
-                //subcycle_heat_exchange(j, 4, debug=2, dt);
+                dd=0;
             }
             int found_solution=0;
             int num_cycles = num_subcycles;
@@ -748,10 +745,6 @@ int c_Sim::subcycle_heat_exchange(int j, int num_cycles, int debug, double dt) {
             double scl_fac = 1 ;
             double dgdt_mul = 0;
 
-            if((j==100) &&  (steps==100)) {
-                cout<<" checking on temperatures "<<species[0].prim[j].temperature<<" e- : "<<species[e_idx].prim[j].temperature<<endl;
-            }
-
             for(int si=0; si<num_species; si++) {
                 AOS      tmp  = species[si].u[j];
                 AOS_prim tmpp = species[si].prim[j];
@@ -1039,7 +1032,7 @@ int c_Sim::subcycle_heat_exchange(int j, int num_cycles, int debug, double dt) {
                     species[si].prim[j].temperature = documentation(si, num_cycles-1);//coll_heat_output(si); //ignore last computation
         }   
         
-        if(debug >= 1)
+        if( (debug >= 1) && (e_idx > -1))
             cout<<" Found temperature solution with num_cycles="<<num_cycles<<", returning. FInal electron temperature ="<<species[e_idx].prim[j].temperature<<endl;
     }
     return 1; //allgood

@@ -201,8 +201,11 @@ void c_Sim::execute(int restartnumber, double restarttime_cmdline) {
                 //cout<<"    running species "<<species[s].speciesname<<" s = "<<s<<" steps ="<<steps<<endl;
                  //Apply implicit electron solver for electrons only if so desired. Otherwise continue as usual with all other solvers.
                 if( (solver == HydroSolver::implicitelectrons) && (s==e_idx)) {    
+                    double ff = 1.0;
+                    if(order == IntegrationType::second_order )
+                        ff = 0.5;
 
-                    species[s].implicit_incompressible(1.0*dt);
+                    species[s].implicit_incompressible_J(ff*dt);
                     //cout<<" YES IN IMPLICIT ELECTRON SOLVER and species =="<<species[s].speciesname<<endl;
 
                 } else {
@@ -259,7 +262,7 @@ void c_Sim::execute(int restartnumber, double restarttime_cmdline) {
         
         if (order == IntegrationType::first_order) {
             globalTime += dt;
-        } else if (order == IntegrationType::second_order && (0==1)) {
+        } else if (order == IntegrationType::second_order && (1==1)) {
             // 2nd step evaluated at t+dt
             globalTime += dt;
 
@@ -278,8 +281,8 @@ void c_Sim::execute(int restartnumber, double restarttime_cmdline) {
                     
                     for(int s = 0; s < num_species; s++) {
                         species[s].compute_pressure(species[s].u);
-			species[s].fix_negative_pressures_sometimes(species[s].u_tmp, 1);
-		    }
+			            species[s].fix_negative_pressures_sometimes(species[s].u_tmp, 1);
+		            }
                 
                     compute_drag_update(0.99*dt) ;
                     
@@ -308,7 +311,7 @@ void c_Sim::execute(int restartnumber, double restarttime_cmdline) {
                     //Apply implicit electron solver if wanted
                     if(solver == HydroSolver::implicitelectrons && s==e_idx) {    
 
-                        species[s].implicit_incompressible(dt*1.0);
+                        species[s].implicit_incompressible(0.5*dt);
 
                     } else {
                     //for(int k=0; k<=0; k++) { //The k=0 run is the nominal run. k=1 is only triggered if some cells are broken
@@ -397,7 +400,6 @@ void c_Sim::execute(int restartnumber, double restarttime_cmdline) {
             species[s].fix_negative_pressures_sometimes(species[s].u, 31);
         }
 
-        //DEBUGGING: HERE IS WHERE species[14].prim[276].temperature = 1e33 at steps 12855 appears for the first time! - note E is already too high
         //Computes the velocity drag update after the new hydrodynamic state is known for each species
         if (do_hydrodynamics == 1) 
             compute_drag_update(0.99*dt) ;
