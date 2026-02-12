@@ -162,7 +162,7 @@ double c_Sim::get_phi_grav(double &r, double &mass) {
  * @param[in] j Interface number
  * @return    The well-balanced potential difference in cell j
  */
-AOS c_Species::source_grav(AOS &u, int &j) {
+AOS c_Species::(AOS &u, int &j) {
     assert(j > 0 && j <= num_cells) ;
 
     double dphidr_p = (phi_s[j] - phi_s[j-1]) / (base->dx[j] + base->dx[j-1]) ;

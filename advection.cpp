@@ -205,7 +205,10 @@ void c_Sim::execute(int restartnumber, double restarttime_cmdline) {
                     if(order == IntegrationType::second_order )
                         ff = 0.5;
 
-                    species[s].implicit_incompressible_J(ff*dt);
+                    for(int ii=0; ii<num_implicit_substeps; ii++) {
+                        species[s].implicit_incompressible(ff/((double)num_implicit_substeps)*dt);
+                    }
+                    
                     //cout<<" YES IN IMPLICIT ELECTRON SOLVER and species =="<<species[s].speciesname<<endl;
 
                 } else {
@@ -311,7 +314,11 @@ void c_Sim::execute(int restartnumber, double restarttime_cmdline) {
                     //Apply implicit electron solver if wanted
                     if(solver == HydroSolver::implicitelectrons && s==e_idx) {    
 
-                        species[s].implicit_incompressible(0.5*dt);
+                        //species[s].implicit_incompressible(0.5*dt);
+
+                        for(int ii=0; ii<num_implicit_substeps; ii++) {
+                            species[s].implicit_incompressible(0.5/((double)num_implicit_substeps)*dt);
+                        }
 
                     } else {
                     //for(int k=0; k<=0; k++) { //The k=0 run is the nominal run. k=1 is only triggered if some cells are broken

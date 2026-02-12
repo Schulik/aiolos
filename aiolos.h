@@ -515,6 +515,7 @@ public:
     double cflfactor_electron;
     double edamp_lim;
     double implicit_theta;
+    int num_implicit_substeps;
     double t_max;
     double max_timestep_change;
     double dt_min_init;
@@ -1189,6 +1190,11 @@ public:
     void implicit_incompressible(double dt);
     void implicit_incompressible2(double dt);
     void implicit_incompressible_J(double dt);
+    //std::vector<double> get_hydro_jacobian(int jleft, int jright);
+    std::vector<double> get_hydro_jacobian_df3(int jleft, int jright);
+    std::vector<double> get_hydro_jacobian_E(int jleft, int jright);
+    std::vector<double> get_hydro_jacobian_P(int jleft, int jright);
+    std::vector<double> get_hydro_jacobian_P(int jleft, int jright, double a, double b);
     
     AOS source_grav(AOS &u, int &j);
     AOS source_grav_noconserved(AOS &u, int &j);

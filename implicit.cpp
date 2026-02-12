@@ -554,7 +554,7 @@ void c_Species::implicit_incompressible2(double dt) {
         uu[idx + 4]    += theta     * lam_r  * a;
         r[idx_r+1]       -= (1-theta) * lam_r  * ( a * u[j+1].u2 + b * u[j].u2);
         if(j>pwall && j<num_cells) {
-            r[idx_r+1]       -=  0.5 * S_r * (prim_l[j+1].pres + prim_r[j].pres )   ; //momentum,
+            r[idx_r+1]       -=  1.0 * S_r * (a*prim_l[j+1].pres + b*prim_r[j].pres )   ; //momentum,
         }
                                                      
         //        */
@@ -597,7 +597,7 @@ void c_Species::implicit_incompressible2(double dt) {
         ll[idx + 4]    -= theta     * lam_l * b;
         r[idx_r+1]     += (1-theta) * lam_l * ( a * u[j].u2 + b * u[j-1].u2) ;
         if(j>pwall && j<=num_cells) {
-                r[idx_r+1]     +=  0.5 * S_l * ( prim_l[j].pres + prim_r[j-1].pres ) ; 
+                r[idx_r+1]     +=  1.0 * S_l * ( a*prim_l[j].pres + b*prim_r[j-1].pres ) ; 
         }
         // 
         //energy
@@ -737,6 +737,7 @@ void c_Species::implicit_incompressible_J(double dt) {
     std::vector<double> slope_mom(num_cells+2, 0.0);
     std::vector<double> slope_E(num_cells+2, 0.0);
     std::vector<double> slope_p(num_cells+2, 0.0);
+    std::vector<double> slope_v(num_cells+2, 0.0);
 
     const std::vector<double>& 
             x_i = base->x_i, 
@@ -756,6 +757,7 @@ void c_Species::implicit_incompressible_J(double dt) {
         slope_mom[j] = 1. * reconstruct_pointer(u[j-1].u2, u[j].u2, u[j+1].u2, cF, cB, dxF, dxB) ;
         slope_E[j]   = 1. * reconstruct_pointer(u[j-1].u3, u[j].u3, u[j+1].u3, cF, cB, dxF, dxB) ;
         slope_p[j]   = 1. * reconstruct_pointer(prim[j-1].pres, prim[j].pres, prim[j+1].pres, cF, cB, dxF, dxB) ;
+        slope_v[j]   = 1. * reconstruct_pointer(prim[j-1].speed, prim[j].speed, prim[j+1].speed, cF, cB, dxF, dxB) ;
 
         if( std::isnan(slope_rho[j]) || std::isnan(slope_mom[j]) || std::isnan(slope_E[j]) || std::isnan(slope_p[j])) {
             slope_rho[j] = 0;
@@ -805,9 +807,22 @@ void c_Species::implicit_incompressible_J(double dt) {
         int idx   = j*stride  ;
         int idx_r = j*num_vars;
 
+        double theta = base->implicit_theta; //Regulates the balance between implicit and explicit terms in Crank-Nicolson scheme
+        double drho  = 0, dmom = 0, dp = 0, dE=0, a=0, b=0, ap=0, bp=0;
+        double tmp_r = 0, tmp_l=0;
+        double gad = gamma_adiabat;
+
+        double gsrc    = source_grav(u[j], j).u2;
+        double gsrc3   = source_grav(u[j], j).u3;
+        double gsrc_no = source_grav_noconserved(u[j], j).u2;
+        double psrc    =  -(base->source_pressure_prefactor_left[j] * prim_l[j].pres - 
+                                          base->source_pressure_prefactor_right[j] * prim_r[j].pres);
+        
+        //
         // Face velocities (from non-advanced timestep)
-        double v_l = 0.5 * (prim_r[j-1].speed + prim_l[j].speed); //(u[j-1].u2 / u[j-1].u1 + u[j].u2 / u[j].u1);
-        double v_r = 0.5 * (prim_r[j].speed + prim_l[j+1].speed); // ;(u[j].u2 / u[j].u1     + u[j+1].u2 / u[j+1].u1);
+        //
+        double v_r = 0.5 * (prim_r[j].speed + prim_l[j+1].speed); 
+        double v_l = 0.5 * (prim_r[j-1].speed + prim_l[j].speed); 
         
         //
         // Momentum damping at low abundances to avoid numerical noise
@@ -838,12 +853,6 @@ void c_Species::implicit_incompressible_J(double dt) {
             v_l = v_r = 0;
         }
         
-        double gsrc    = source_grav(u[j], j).u2;
-        double gsrc3   = source_grav(u[j], j).u3;
-        double gsrc_no = source_grav_noconserved(u[j], j).u2;
-        double psrc    =  -(base->source_pressure_prefactor_left[j] * prim_l[j].pres - 
-                                          base->source_pressure_prefactor_right[j] * prim_r[j].pres);
-        
         //if(base->steps==430)                                          
         //    cout<<" j = "<<j<<" pl  = "<<prim_l[j].pres<<" pr "<<prim_r[j].pres<<" pc "<<prim[j].pres<<" src "<<psrc<<endl;                               
         //General left and right fluxes, flux = lam * density
@@ -852,19 +861,23 @@ void c_Species::implicit_incompressible_J(double dt) {
         AOS lam_l_ex;
         AOS lam_r_ex;
 
-        double theta = base->implicit_theta; //Regulates the balance between implicit and explicit terms in Crank-Nicolson scheme
-        double drho  = 0, dmom = 0, dp = 0, dE=0, a=0, b=0, ap=0, bp=0;
-        double tmp_r = 0, tmp_l=0;
         ////////////////////////////////////////////////////////////////////////
         // Right face
         ////////////////////////////////////////////////////////////////////////
-        int sw=v_r>0? 0 : 1;
+        int sw  = v_r>0? 0 : 1;
         int sgn = v_r>0 ? +1 : -1;
         ///////////////////////////////////
         //Jacobian entries
         double dg_dm   = 2*v_r;
         double dg_drho = -v_r*v_r;
-
+        //cout<<j<<" <<dEdu[0]<<" "<<dEdu[1]<<" "<<dEdu[2]<<" "<<dPdu[0]<<" "<<dPdu[1]<<" "<<dPdu[2]<<endl;
+        /* double dE_d1 = -gad*
+        double dE_d2 =
+        double dE_d3 =
+        double dP_d1 =
+        double dP_d2 =
+        double dP_d3 =
+ */
         ///////////////////////////////////
         if(j<num_cells) {
         drho = -sgn * slope_rho[j+sw]  / (u[j+1].u1  - u[j].u1  + 1e-50) * (x_i[ j ] - x_iVC[j+sw]); //Note: Slope 0 reduces this to the old, first order Crank-Nicolson
@@ -874,40 +887,70 @@ void c_Species::implicit_incompressible_J(double dt) {
         //rho
         a = v_r<0? 1.0 + 0.5  * drho : -0.5 * drho;
         b = v_r<0? -0.5 * drho : 1.0 + 0.5  * drho;
-        dd[idx + 0]    += theta     * lam_r.u1 * b;
-        uu[idx + 0]    += theta     * lam_r.u1 * a;
+        //dd[idx + 0]    += theta     * lam_r.u1 * b;
+        //uu[idx + 0]    += theta     * lam_r.u1 * a;
+        /* if(v_r > 0)
+            dd[idx + 1]    += theta     * S_r;
+        else
+            uu[idx + 1]    += theta     * S_r; */
+
+        dd[idx + 1]    += theta * b * S_r;
+        uu[idx + 1]    += theta * a * S_r;
         r[idx_r]       -= (1-theta) * lam_r.u1 * ( a * u[j+1].u1 + b * u[j].u1 );
 
         //momentum,
         //       /*
         a = v_r<0? 1.0 + 0.5  * dmom : -0.5 * dmom;
         b = v_r<0? -0.5 * dmom : 1.0 + 0.5  * dmom;
-        dd[idx + 4]    +=     dg_dm * S_r * b; //mom_j+1/2
-        uu[idx + 4]    +=     dg_dm * S_r * a;
-        //Jacobian entries
-        dd[idx + 3]    +=     dg_drho * S_r * b; //mom_j+1/2
-        uu[idx + 3]    +=     dg_drho * S_r * a;
 
-        //End Jacobian
-        r[idx_r+1]       += S_r * dg_dm *   ( a * u[j+1].u2 + b * u[j].u2);
-        r[idx_r+1]       += S_r * dg_drho * ( a * u[j+1].u1 + b * u[j].u1);
+        std::vector<double> dPdu  = get_hydro_jacobian_P(j, j+1, a, b);
+        std::vector<double> avgus = {b * u[j+1].u1 + a * u[j].u1, b * u[j+1].u2 + a * u[j].u2, b * u[j+1].u3 + a * u[j].u3};
+
+        dd[idx + 3]    +=     dg_drho * S_r * b; //mom_j+1/2 + derivatives of mom^2/rho
+        uu[idx + 3]    +=     dg_drho * S_r * a;
+        dd[idx + 4]    +=     dg_dm * S_r * b; //mom_j+1/2, derivatives of mom^2/rho
+        uu[idx + 4]    +=     dg_dm * S_r * a; 
+      
+        dd[idx + 3]    +=          S_r * b * dPdu[0]; //v dP_drho * rhp
+        uu[idx + 3]    +=          S_r * a * dPdu[0];
+        dd[idx + 4]    +=          S_r * b * dPdu[1]; //v dP_dmom * mom
+        uu[idx + 4]    +=          S_r * a * dPdu[1];
+        dd[idx + 5]    +=          S_r * b * dPdu[2]; //v dP_dE * E
+        uu[idx + 5]    +=          S_r * a * dPdu[2];
+
+        r[idx_r+1]       += S_r * dg_dm *   ( a * u[j+1].u2 + b * u[j].u2); //derivatives of mom^2/rho
+        r[idx_r+1]       += S_r * dg_drho * ( a * u[j+1].u1 + b * u[j].u1); //
         r[idx_r+1]       -= S_r *           ( a * u[j+1].u2*u[j+1].u2/u[j+1].u1 + b * u[j].u2*u[j].u2/u[j].u1);
 
         if(j>pwall && j<num_cells) {
-            r[idx_r+1]       -=  0.5 * S_r * (prim_l[j+1].pres + prim_r[j].pres )   ; //momentum,
+            r[idx_r+1]      -=   S_r * (a * prim_l[j+1].pres + b * prim_r[j].pres )   ; //momentum,
+            r[idx_r+1]      +=   S_r * (dPdu[0]*avgus[0] + dPdu[1]*avgus[1] + dPdu[2]*avgus[2]); //p div v
         }
-        
                                                      
-        //        */
+        //   */
         //Energy
         a  = v_r<0? 1.0 + 0.5  * dE : -0.5 * dE;
         b  = v_r<0? -0.5 * dE : 1.0 + 0.5  * dE;
-        dd[idx + 8]    += theta     * v_r * S_r * b; //E_j+1/2
-        uu[idx + 8]    += theta     * v_r * S_r * a;
-        r[idx_r+ 2]    -= (1-theta) * v_r * S_r * ( a * u[j+1].u3        + b * u[j].u3);
+
+        dPdu  = get_hydro_jacobian_P(j, j+1, b, a);
+        avgus = {a * u[j+1].u1 + b * u[j].u1, a * u[j+1].u2 + b * u[j].u2, a * u[j+1].u3 + b * u[j].u3};
+
+        dd[idx + 8]    +=          v_r * S_r * b; //E_j+1/2
+        uu[idx + 8]    +=          v_r * S_r * a;
+        dd[idx + 8]    +=          v_r * S_r * b * dPdu[2]; //v dP_dE * E
+        uu[idx + 8]    +=          v_r * S_r * a * dPdu[2];
+
+        dd[idx + 7]    +=          v_r * S_r * b * dPdu[1]; //v dP_dmom * mom
+        uu[idx + 7]    +=          v_r * S_r * a * dPdu[1];
+        dd[idx + 6]    +=          v_r * S_r * b * dPdu[0]; //v dP_drho * rhp
+        uu[idx + 6]    +=          v_r * S_r * a * dPdu[0];
+
+        //r[idx_r+ 2]    -= (1-theta) * v_r * S_r * ( a * u[j+1].u3        + b * u[j].u3);
         if(j>=ewall && j<num_cells) {
-            //r[idx_r+ 2]    -=   0.5 * v_r * S_r * ( prim_l[j+1].pres + prim_r[j].pres ); //p div v
-            r[idx_r+ 2]    +=           v_r * S_r * (a* prim_l[j+1].pres + b*prim_r[j].pres ); //p div v
+            //r[idx_r+ 2]    -=   0.5 * v_r * S_r * ( prim_l[j+1].pres + prim_r[j].pres ); //p div v + dPdu[0]*
+            //r[idx_r+ 2]    +=           v_r * S_r * (a* prim_l[j+1].pres + b*prim_r[j].pres ); //p div v
+            r[idx_r+ 2]    -=           v_r * S_r * (a* prim_l[j+1].pres + b*prim_r[j].pres ); //p div v
+            r[idx_r+ 2]    +=           v_r * S_r * (dPdu[0]*avgus[0] + dPdu[1]*avgus[1] + dPdu[2]*avgus[2]); //p div v
         }
 
         //////////////////////////////////////////////////////////////////////
@@ -928,36 +971,69 @@ void c_Species::implicit_incompressible_J(double dt) {
         //rho
         a = v_l<0? 1.0 + 0.5  * drho : -0.5 * drho;
         b = v_l<0? -0.5 * drho : 1.0 + 0.5  * drho;
-        dd[idx + 0]    -= theta     * lam_l.u1 * a;
-        ll[idx + 0]    -= theta     * lam_l.u1 * b;
+        //dd[idx + 0]    -= theta     * lam_l.u1 * a;
+        //ll[idx + 0]    -= theta     * lam_l.u1 * b;
+        /* 
+        if(v_l > 0)
+            ll[idx + 1]    -= theta     * S_l;
+        else
+            dd[idx + 1]    -= theta     * S_l;
+         */
+        ll[idx + 1]    -=  theta * b * S_l;
+        dd[idx + 1]    -=  theta * a * S_l;
         r[idx_r]       += (1-theta) * lam_l.u1 * ( a * u[j].u1 + b * u[j-1].u1 );
         
         //momentum,
         //       
         a = v_l<0? 1.0 + 0.5  * dmom : -0.5 * dmom;
         b = v_l<0? -0.5 * dmom : 1.0 + 0.5  * dmom;
+
+        dPdu  = get_hydro_jacobian_P(j, j-1, a, b);
+        avgus = {b * u[j-1].u1 + a * u[j].u1, b * u[j-1].u2 + a * u[j].u2, b * u[j-1].u3 + a * u[j].u3};
+
         dd[idx + 4]    -= dg_dm      * S_l * a; //mom_j-1/2
         ll[idx + 4]    -= dg_dm      * S_l * b;
-        dd[idx + 3]    -= dg_drho    * S_l * a; //density derivatives in momentum equation
+        dd[idx + 3]    -= dg_drho    * S_l * a; //+ Jacobian entries
         ll[idx + 3]    -= dg_drho    * S_l * b;
+
+        dd[idx + 3]    -=          S_l * a * dPdu[0]; //v dP_drho * rhp
+        ll[idx + 3]    -=          S_l * b * dPdu[0];
+        dd[idx + 4]    -=          S_l * a * dPdu[1]; //v dP_dmom * mom
+        ll[idx + 4]    -=          S_l * b * dPdu[1];
+        dd[idx + 5]    -=          S_l * a * dPdu[2]; //v dP_dE * E
+        ll[idx + 5]    -=          S_l * b * dPdu[2];
 
         r[idx_r+1]     -=  S_l * dg_drho * ( a * u[j].u1 + b * u[j-1].u1) ;
         r[idx_r+1]     -=  S_l * dg_dm *   ( a * u[j].u2 + b * u[j-1].u2) ;
         r[idx_r+1]     +=  S_l *           ( a * u[j].u2*u[j].u2/u[j].u1 + b * u[j-1].u2*u[j-1].u2/u[j-1].u1);
 
         if(j>pwall && j<=num_cells) {
-                r[idx_r+1]     +=  0.5 * S_l * ( prim_l[j].pres + prim_r[j-1].pres ) ; 
+                r[idx_r+1]    +=  S_l * ( a * prim_l[j].pres + b * prim_r[j-1].pres ) ; 
+                r[idx_r+1]    -=  S_l * (dPdu[0]*avgus[0] + dPdu[1]*avgus[1] + dPdu[2]*avgus[2]); //p div v
         }
         // 
         //energy
         a  = v_l<0? 1.0 + 0.5  * dE : -0.5 * dE;
-        b  = v_l<0? -0.5 * dE : 1.0 + 0.5  * dE;                                                
+        b  = v_l<0? -0.5 * dE : 1.0 + 0.5  * dE;          
+
+        dPdu  = get_hydro_jacobian_P(j, j-1, a, b);
+        avgus = {b * u[j-1].u1 + a * u[j].u1, b * u[j-1].u2 + a * u[j].u2, b * u[j-1].u3 + a * u[j].u3};
+
         dd[idx + 8]    -= theta     * v_l * S_l * a; //E_j-1/2
         ll[idx + 8]    -= theta     * v_l * S_l * b;
+        dd[idx + 8]    -= theta     * v_l * S_l * a * dPdu[2]; //v dP_dE * E
+        ll[idx + 8]    -= theta     * v_l * S_l * b * dPdu[2];
+
+        dd[idx + 7]    -= theta     * v_l * S_l * a * dPdu[1]; //v dP_dmom * mom
+        ll[idx + 7]    -= theta     * v_l * S_l * b * dPdu[1];
+        dd[idx + 6]    -= theta     * v_l * S_l * a * dPdu[0]; //v dP_drho * rho
+        ll[idx + 6]    -= theta     * v_l * S_l * b * dPdu[0];
+
         r[idx_r+2]     += (1-theta) * v_l * S_l * ( a * u[j].u3        + b * u[j-1].u3);         //u grad E
         if(j>ewall && j<=num_cells) {
             //r[idx_r+2]     +=   0.5 * v_l * S_l * ( prim_l[j].pres + prim_r[j-1].pres ); //p div v
-            r[idx_r+2]     -=           v_l * S_l * (a* prim_l[j].pres + b * prim_r[j-1].pres ); //p div v
+            r[idx_r+2]     +=           v_l * S_l * (a* prim_l[j].pres + b * prim_r[j-1].pres ); //p div v
+            r[idx_r+2]     -=           v_l * S_l * (dPdu[0]*avgus[0] + dPdu[1]*avgus[1] + dPdu[2]*avgus[2]); //p div v
         }
         
         //////////////////////////////////////////////////////////////////////
@@ -1045,4 +1121,58 @@ void c_Species::implicit_incompressible_J(double dt) {
     eos->compute_primitive(&(u[0]), &(prim[0]), base->num_cells+2) ;   
     eos->compute_auxillary(&(prim[0]), base->num_cells+2);
 
+}
+
+
+
+//std::vector<double> c_Species::get_hydro_jacobian(int jleft, int jright)
+
+//
+// Computes the derivatives of the E flux (i.e. third flux component) w.r.t the other conservative hydro variables at an interface
+//
+std::vector<double> c_Species::get_hydro_jacobian_df3(int jleft, int jright) {
+    double g = gamma_adiabat;
+    double m1 = 0.5*(u[jleft].u1+u[jright].u1);
+    double m2 = 0.5*(u[jleft].u2+u[jright].u2);
+    double m3 = 0.5*(u[jleft].u3+u[jright].u3);
+    double mv = m2/m1;
+
+    return  {-g*m2*m3/m1+(g-1)*mv*mv*mv,  g*m3/m1-1.5*(g-1)*mv*mv,  g*m2/m1};
+}
+
+
+//
+// Computes the derivatives of E (i.e. third hydro vector component) w.r.t the other conservative hydro variables at an interface
+//
+std::vector<double> c_Species::get_hydro_jacobian_E(int jleft, int jright) {
+    double g = gamma_adiabat;
+    double m1 = 0.5*(u[jleft].u1+u[jright].u1);
+    double m2 = 0.5*(u[jleft].u2+u[jright].u2);
+    double m3 = 0.5*(u[jleft].u3+u[jright].u3);
+    double mv = m2/m1;
+
+    return  {(g-1)/2*(mv*mv), - (g-1)*mv,  1};
+}
+
+//
+// Computes the derivatives of P w.r.t the other conservative hydro variables at an interface
+//
+std::vector<double> c_Species::get_hydro_jacobian_P(int jleft, int jright) {
+    double g = gamma_adiabat;
+    double m1 = 0.5*(u[jleft].u1+u[jright].u1);
+    double m2 = 0.5*(u[jleft].u2+u[jright].u2);
+    double m3 = 0.5*(u[jleft].u3+u[jright].u3);
+    double mv = m2/m1;
+
+    return  {(g-1)/2*(mv*mv), - (g-1)*mv,  (g-1)};
+}
+
+std::vector<double> c_Species::get_hydro_jacobian_P(int jleft, int jright, double a, double b) {
+    double g = gamma_adiabat;
+    double m1 = 0.5*(a*u[jleft].u1+b*u[jright].u1);
+    double m2 = 0.5*(a*u[jleft].u2+b*u[jright].u2);
+    double m3 = 0.5*(a*u[jleft].u3+b*u[jright].u3);
+    double mv = m2/m1;
+
+    return  {(g-1)/2*(mv*mv)*0., - 0.*(g-1)*mv, (g-1)};
 }

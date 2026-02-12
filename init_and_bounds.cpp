@@ -176,6 +176,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, s
         cflfactor_electron   = read_parameter_from_file<double>(filename,"ELECTRON_CFLFACTOR", debug, 1.0).value;  //Multiplier on the cfl timestep length induced by electrons. Use with implicit electron solver (hydro_solver 5)
         edamp_lim            = read_parameter_from_file<double>(filename,"ELECTRON_DAMPING_LIMIT", debug, 1e8).value;  //Sets the fraction-dependent damping timescale for electron momentum
         implicit_theta            = read_parameter_from_file<double>(filename,"IMPLICIT_THETA", debug, 0.55).value;  //Sets Crank-Nicholson factor, weighing implicit and explicit parts in the implicit evo equation
+        num_implicit_substeps  = read_parameter_from_file<int>(filename,"NUM_IMPLICIT_SUBSTEPS", debug, 1).value;  
 
         t_max       = read_parameter_from_file<double>(filename,"PARI_TIME_TMAX", debug, 1e0).value;  // Simulate until t=t_max in seconds.
         dt_max      = read_parameter_from_file<double>(filename,"PARI_DTMAX", debug, 1e99).value;     // Limit the largest possible timestep size in seconds.
