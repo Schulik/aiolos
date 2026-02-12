@@ -1199,7 +1199,7 @@ public:
     AOS source_grav(AOS &u, int &j);
     AOS source_grav_noconserved(AOS &u, int &j);
     AOS source_diffusion_flux(int j);
-    AOS source_diffusion_flux2(int j);
+    AOS source_diffusion_flux2(int j, bool get_v);
     double diffusive_timestep(int j);
     std::vector<double> phi_s;
 

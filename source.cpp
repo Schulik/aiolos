@@ -162,7 +162,7 @@ double c_Sim::get_phi_grav(double &r, double &mass) {
  * @param[in] j Interface number
  * @return    The well-balanced potential difference in cell j
  */
-AOS c_Species::(AOS &u, int &j) {
+AOS c_Species::source_grav(AOS &u, int &j) {
     assert(j > 0 && j <= num_cells) ;
 
     double dphidr_p = (phi_s[j] - phi_s[j-1]) / (base->dx[j] + base->dx[j-1]) ;
@@ -969,12 +969,8 @@ Diffusive timestep constraint
 double c_Species::diffusive_timestep(int j) {
     double diff_tstep = 1e+20 ;
     assert(j > 0 && j <= num_cells) ;
-
+/* 
     double ntotmean   = 0.5*( base->total_numdens[j] + base->total_numdens[j+1]);
- 
-   /*  double fjm1_log   = std::log10(prim_r[j].number_density/base->total_numdens[j]);  
-    double fj_log     = std::log10(prim_l[j+1].number_density/base->total_numdens[j+1]);
-    */
     double fs_log        = (std::log10(prim[j+1].number_density)-std::log10(prim[j].number_density))/(base->x_i12[j+1] - base->x_i12[j]) ;;  
     double fmean_log     = (std::log10(base->total_numdens[j+1])-std::log10(base->total_numdens[j]))/(base->x_i12[j+1] - base->x_i12[j]) ;;  
 
@@ -1013,9 +1009,13 @@ double c_Species::diffusive_timestep(int j) {
 
     if(j<=3)
         u_diff = 0;
-
+ */
     //diff_tstep = 0.25 * base->dx[j] * base->dx[j] / std::fabs( std::max( std::max(base->diffusivity, base->vdiffusivity), 1e-20)  );
-    diff_tstep = 0.25 * base->dx[j] / std::fabs(u_diff);
+
+
+    AOS flux = source_diffusion_flux2(j, true);
+    double u_diff = flux.u1;
+    diff_tstep = base->dx[j] / std::fabs(u_diff);
 
     if( std::fabs(u_diff) < 1e-10 )
         return 1e99;
@@ -1029,22 +1029,18 @@ double c_Species::diffusive_timestep(int j) {
  * @param[in] j Interface number
  * @return    Diffusive flux for interface j
  */
-AOS c_Species::source_diffusion_flux2(int j) {
+AOS c_Species::source_diffusion_flux2(int j, bool get_v=false) {
 
     assert(j > 0 && j <= num_cells) ;
 
-    double ntotmean   = 0.5*( base->total_numdens[j] + base->total_numdens[j+1]);
- 
-   /*  double fjm1_log   = std::log10(prim_r[j].number_density/base->total_numdens[j]);  
-    double fj_log     = std::log10(prim_l[j+1].number_density/base->total_numdens[j+1]);
-    */
-    double fs_log        = (std::log10(prim[j].number_density)-std::log10(prim[j+1].number_density))/(base->x_i12[j+1] - base->x_i12[j]) ;;  
-    double fmean_log     = (std::log10(base->total_numdens[j])-std::log10(base->total_numdens[j+1]))/(base->x_i12[j+1] - base->x_i12[j]) ;;  
+    double fs_log        = (std::log10(prim[j].number_density  /base->total_numdens[j]))  /(base->x_i12[j+1] - base->x_i12[j]) ;
+    double fmean_log     = (std::log10(prim[j+1].number_density/base->total_numdens[j+1]))/(base->x_i12[j+1] - base->x_i12[j]) ;
 
-    double fjm1   = -(prim[j].number_density/base->total_numdens[j]);  
-    double fj     = -(prim[j+1].number_density/base->total_numdens[j+1]);  
+    double fjm1   = (prim[j].number_density/base->total_numdens[j]);  
+    double fj     = (prim[j+1].number_density/base->total_numdens[j+1]);  
     double discr_factor = 1;//1e4;
 
+    double ntotmean = 0.5*( base->total_numdens[j] + base->total_numdens[j+1]);
     double rhomean = 0.5*( u[j].u1 + u[j+1].u1); //
     double mommean = 0.5*( u[j].u2 + u[j+1].u2); //
     double emean   = 0.5*( prim[j].internal_energy + prim[j+1].internal_energy); //
@@ -1053,44 +1049,41 @@ AOS c_Species::source_diffusion_flux2(int j) {
     double vj     = prim[j+1].speed;
     double p_bar  = base->total_press[j]/1e6; //cgs to bar
 
-    double dfdr         = ( fj - fjm1) / (base->x_i12[j+1] - base->x_i12[j]) ;
+    double dfdr         = -( fj - fjm1) / (base->x_i12[j+1] - base->x_i12[j]) ;
     double kzz          = base->get_kzz(p_bar);//std::min(( 6e5 / p_bar), base->vdiffusivity);
     double u_diff       = kzz * (fs_log-fmean_log); //If diffusivity is in cm^2/s then u_diff is in cm/s
 
     double nmean   = 0.5*( prim[j].number_density + prim[j+1].number_density);
-    /* double rhomean = 0.5*( prim_r[j].density + prim_l[j+1].density);//0.5*( u[j].u1 + u[j+1].u1); //
-    double mommean = 0.5*( prim_r[j].density*prim_r[j].speed + prim_l[j+1].density*prim_l[j+1].speed);//0.5*( u[j].u2 + u[j+1].u2); //
-    double emean   = 0.5*( prim_r[j].internal_energy,  prim_l[j+1].internal_energy);//0.5*( prim[j].internal_energy,  prim[j+1].internal_energy); //
- */
-
     double pmean   = 0.5*( prim[j].pres +  prim[j+1].pres);
     double Tmean   = 0.5*( prim[j].temperature +  prim[j+1].temperature);
     double Emean   = 0.5*mommean*mommean/rhomean + rhomean*cv*Tmean;
     
     double vdonor       = ( u_diff > 0 ) ? vj : vjm1;
     double rhodonor     = ( u_diff < 0 ) ? u[j+1].u1 : u[j].u1;
+    double ndonor       = ( u_diff < 0 ) ? prim[j+1].number_density : prim[j].number_density;
     double momdonor     = ( u_diff < 0 ) ? u[j+1].u2 : u[j].u2;
     double Edonor       = ( u_diff < 0 ) ? u[j+1].u3 : u[j].u3;
     double edonor       = ( u_diff < 0 ) ? prim[j+1].internal_energy : prim[j].internal_energy;
 
     double pscl = 1.;
     double plimit = 1e-9; //
-    //if(base->total_press[j]/1e6 < plimit) 
-    //    pscl = base->total_press[j] / 1e6 / plimit; //Scale down diffusion beyond a nanobar to increase numerical stability
+    if(base->total_press[j]/1e6 < plimit) 
+        pscl = base->total_press[j] / 1e6 / plimit; //Scale down diffusion beyond a nanobar to increase numerical stability
     u_diff *= pscl;
 
     if(j<=2)//if(j<=base->num_ghosts)
         u_diff = 0;
 
-    //if( ( (base->steps == 100)  || ((base->steps == 200 )) ) && (this_species_index<=1) && ( (j==5) || (j==20) || (j==12) || (j==13) || (j==150) )   )  
     if( ( (base->steps == 100)  || ((base->steps == 200 )) ) && (this_species_index<=1) && ( (j==2) || (j==3) || (j==4) || (j==5) || (j==1) )   )  
         cout<<"s: "<<speciesname<<" j: "<<j<<" in diffusion, udiff  "<<u_diff<<" ddf "<< (fs_log-fmean_log)<<" pbar / kzz "<<p_bar<<" "<<kzz<<endl;
 
+    if(get_v)
+        return AOS( u_diff, 0., 0.);
     
     if(base->diffusivity_style==0)
-        return AOS( u_diff * rhomean, 0.* u_diff * mommean, 0. * u_diff * emean);
+        return AOS( u_diff * nmean, 0., 0.);
     else
-        return AOS( u_diff * rhodonor, 0.* u_diff * momdonor, 0. * u_diff * edonor); 
+        return AOS( u_diff * ndonor, 0., 0.); 
 }
 
 
@@ -1099,12 +1092,11 @@ AOS c_Species::source_diffusion_flux2(int j) {
 //
 void c_Sim::execute_separate_diffusion_step() {
 
-    //Write
+    //Write into u_diff - this variable is an AOS object, but does not have to be mass, momentum and total Energy
     for(int s=0; s<num_species; s++) {
         for(int j=0; j < num_cells+1; j++) {
             double entropy = std::log(species[s].prim[j].pres/ std::pow(species[s].prim[j].density, species[s].gamma_adiabat ));
-            species[s].u_diff[j] = AOS(species[s].u[j].u1, species[s].u[j].u2, species[s].prim[j].internal_energy);
-            //species[s].u_diff[j] = AOS(species[s].u[j].u1, species[s].u[j].u2, entropy);
+            species[s].u_diff[j] = AOS(species[s].prim[j].number_density, species[s].u[j].u2, species[s].prim[j].internal_energy);
         }
     }
 
@@ -1114,12 +1106,9 @@ void c_Sim::execute_separate_diffusion_step() {
             AOS source_diffusion = AOS(0,0,0);
                 
             if (species[s].mass_amu > 0.5)
-                //source_diffusion[j]= ( source_diffusion_flux(j) * base->surf[j] * base->omegaplus[j] * (-1.) + source_diffusion_flux(j-1) * base->surf[j-1] * base->omegaminus[j]) / base->vol[j];
-                //source_diffusion = ( species[s].source_diffusion_flux2(j) * surf[j] * (-1.) + species[s].source_diffusion_flux2(j-1) * surf[j-1] ) / vol[j];
                 source_diffusion = ( species[s].source_diffusion_flux2(j) * surf[j] * (-1.) + species[s].source_diffusion_flux2(j-1) * surf[j-1] ) / vol[j];
 
             species[s].u_diff[j] += source_diffusion * dt;
-            //species[s].u_tmp[j] += source_diffusion[j] * dt;
         }
     }
 
@@ -1136,7 +1125,7 @@ void c_Sim::execute_separate_diffusion_step() {
             if(species[s].u_diff[j].u1<0) { 
                 double dupdate = ( species[s].source_diffusion_flux2(j).u1 * surf[j] * (-1.) + species[s].source_diffusion_flux2(j-1).u1 * surf[j-1] ) / vol[j] * dt;
                 cout<<" negative density in diffusion  "<<j<<" "<<species[s].speciesname<<" steps "<<steps<<"  rho fluxes "<<species[s].source_diffusion_flux2(j-1).u1<<" "<<species[s].source_diffusion_flux2(j-1).u1<<" dupdate= "<<dupdate<<" dt = "<<dt<<"  rho_sol "<<species[s].u_diff[j-1].u1<<" "<<species[s].u_diff[j].u1<<" "<<species[s].u_diff[j+1].u1<<" T = "<<species[s].prim[j].temperature<<endl;
-                species[s].u_diff[j].u1 = species[s].prim[j].density;
+                species[s].u_diff[j].u1 = species[s].prim[j].number_density;
             }
 
             if((j==45) && (steps == -544)) { //For debugging 
@@ -1145,9 +1134,9 @@ void c_Sim::execute_separate_diffusion_step() {
             }
 
             double p_from_entropy = std::pow(species[s].prim[j].density, species[s].gamma_adiabat ) * std::exp(species[s].u_diff[j].u3);
-            double rho = species[s].u_diff[j].u1; 
-            double mom = species[s].u[j].u1*species[s].prim[j].speed; // ignore diffusive momentum update //species[s].u_diff[j].u2; 
-            double E   = 0.5*mom*mom/rho + rho*species[s].cv*species[s].prim[j].temperature; //Ignore energy update effectively
+            double rho = species[s].u_diff[j].u1 * species[s].mass_amu * amu; 
+            double mom = rho*species[s].prim[j].speed; // ignore diffusive momentum update //species[s].u_diff[j].u2; 
+            double E   = 0.5*mom*mom/rho + rho*species[s].cv*species[s].prim[j].temperature; //Ignore diffusive energy update 
             species[s].u[j] = AOS(rho, mom, E);
         }
         species[s].compute_pressure(species[s].u);

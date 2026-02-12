@@ -87,6 +87,7 @@ double c_Sim::get_cfl_timestep() {
                 }
 
                 species[s].finalstep[num_cells] = 1e-20;
+                
             }
             else
                 species[s].finalstep[i]    = std::sqrt(species[s].timesteps[i]*species[s].timesteps[i] + species[s].timesteps_cs[i]*species[s].timesteps_cs[i] ) ;
@@ -118,6 +119,23 @@ double c_Sim::get_cfl_timestep() {
                 for(int i=1; i<=num_cells; i++) {
                     //Get diffusive timestep
                     //    cout<<" s / cfl_step / diff_step = "<<s<<" / "<<cfl_step<<" / "<<diffstep<<endl;
+                    //if( (s==1) && (i==1) )
+                    //    cout<<" s / cfl_step / diff_step = "<<s<<" / "<<cfl_step<<" / "<<species[s].diffusive_timestep(i)<<" "<<species[s].diffusive_timestep(i)<<endl;
+                    
+                    double tmpstep = std::min(0.4*species[s].diffusive_timestep(i), 1e99);
+                    if(tmpstep < diffstep) {
+                        diffstep = tmpstep;
+
+                        if(diffstep < cfl_step) {
+                            cnstr_spc = s;
+                            cnstr_cell= i;
+
+                            max_temper = species[s].prim[i].temperature;
+                            max_mach   = std::abs(species[s].prim[i].speed/species[s].prim[i].sound_speed);
+                        }
+
+                    }
+
                     diffstep = std::min(diffstep, std::min(0.4*species[s].diffusive_timestep(i), 1e99 ));
                 }
         }
@@ -129,7 +147,7 @@ double c_Sim::get_cfl_timestep() {
         final_dt = min( std::min(cfl_step, diffstep), dt*max_timestep_change);
 
         if(steps%480==0) {
-        cout<<"       max limiting cell: "<<cnstr_cell<<" s= "<<species[cnstr_spc].speciesname<< " => dt= "<<cfl_step<<" dt_diff "<<diffstep<<" dt_energy "<<timestep_rad2<<"  "<<" total dt "<< final_dt<<" max_T = "<<max_temper<<" max_mach "<<max_mach<<" steps= "<<steps<<" t= "<<globalTime<<endl;
+        cout<<"       max limiting cell: "<<cnstr_cell<<" s= "<<species[cnstr_spc].speciesname<< " => dt_cfl: "<<cfl_step<<" dt_diff: "<<diffstep<<" dt_energy: "<<timestep_rad2<<"  "<<" total dt "<< final_dt<<" max_T = "<<max_temper<<" max_mach "<<max_mach<<" steps= "<<steps<<" t= "<<globalTime<<endl;
         }
         return final_dt;
 
@@ -138,7 +156,7 @@ double c_Sim::get_cfl_timestep() {
         final_dt = min(ddt, dt_max);
 
         if(steps%480==0) {
-        cout<<"       max limiting cell: "<<cnstr_cell<<" s= "<<species[cnstr_spc].speciesname<<" dt_diff "<<diffstep<<" dt_energy "<<timestep_rad2<<"  "<<" total dt "<< final_dt<<" max_T = "<<max_temper<<" max_mach "<<max_mach<<" steps= "<<steps<<" t= "<<globalTime<<endl;
+        cout<<"       max limiting cell: "<<cnstr_cell<<" s= "<<species[cnstr_spc].speciesname<<" dt_diff: "<<diffstep<<" dt_energy: "<<timestep_rad2<<"  "<<" total dt "<< final_dt<<" max_T = "<<max_temper<<" max_mach "<<max_mach<<" steps= "<<steps<<" t= "<<globalTime<<endl;
         }
     }
     return final_dt;
