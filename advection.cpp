@@ -757,7 +757,8 @@ void c_Species::execute(std::vector<AOS>& u_in, std::vector<AOS>& dudt, std::vec
             switch(base->solver) {
                 case HydroSolver::hllc:
                     for(int j=0; j <= num_cells; j++) {
-                        flux[j] =  hllc_flux(j);
+                        flux[j] =  get_hlle_flux2(j); //hllc_flux(j);
+                        
                     }
                     
                     break;
@@ -1307,7 +1308,6 @@ AOS c_Species::get_roe_averages(int j) {
     double c   = std::sqrt((gamma_adiabat-1.) * (h-0.5*u*u));
 
     return AOS(rho, u, h);
-
 }
 
 /**
@@ -1385,6 +1385,18 @@ AOS c_Species::exact_flux(AOS u)
     double flux2 = (press + u.u2*speed);
     double flux3 = (speed*(u.u3 + press));
     AOS result = AOS(u.u2, flux2, flux3);
+    
+    return result;
+}
+
+Vector3d c_Species::exact_flux_as_vector(int j) 
+{
+    AOS uu = this->u[j];
+    double speed = uu.u2/uu.u1;
+    double press = (gamma_adiabat - 1.) *(uu.u3 - 0.5 * uu.u2 * speed);
+    double flux2 = (press + uu.u2*speed);
+    double flux3 = (speed*(uu.u3 + press));
+    Vector3d result(uu.u2, flux2, flux3);
     
     return result;
 }
@@ -1560,10 +1572,6 @@ int c_Species::fix_negative_pressures_sometimes(std::vector<AOS>&u_temp, int fla
     return 0;//fixed_cells;
 }
 
-
-
-
-
 //
 // A routine that prints a lot of stuff
 //
@@ -1725,93 +1733,159 @@ double c_Species::return_entropy_with_jump(double k) {
 
 
 /**
+ * Core function for the HLLE approach - feeds wave speed estimates and left and right states into both explicit and implicit routines.
+ */
+void c_Species::write_hlle_wavespeeds(AOS_prim prim_l_in, AOS_prim prim_r_in, AOS &state_l_out, AOS &state_r_out, double &SL_out, double &SR_out) {
+
+    AOS_prim prim_l  = prim_l_in;
+    AOS_prim prim_r  = prim_r_in;
+    
+    //Speed of gas
+    double ul = prim_l.speed;  
+    double ur = prim_r.speed; 
+    double cl = prim_l.sound_speed;  
+    double cr = prim_r.sound_speed;
+    double pl = prim_l.pres;  
+    double pr = prim_r.pres;
+    double pl_e = pl;
+    double pr_e = pr;
+    double dl = prim_l.density;  
+    double dr = prim_r.density;
+    double mom_l = dl*ul ;
+    double mom_r = dr*ur ;
+    double El = dl*prim_l.internal_energy + 0.5*mom_l*ul ;
+    double Er = dr*prim_r.internal_energy + 0.5*mom_r*ur ;
+
+    AOS state_l      = AOS(prim_l.density, mom_l, El); //u[jleft];
+    AOS state_r      = AOS(prim_r.density, mom_r, Er); // = u[jright];
+
+    //Roe averages
+    double denom = (std::sqrt(dl) + std::sqrt(dr));
+    double rho   = std::sqrt(dl*dr);
+    double v     = (std::sqrt(dl) * ul + std::sqrt(dr) * ur )/denom;
+    double hl    = (pl + state_l.u3)/dl;
+    double hr    = (pr + state_r.u3)/dr;
+    double h     = (std::sqrt(dl) * hl + std::sqrt(dr) * hr)/denom;
+    double c     = std::sqrt((gamma_adiabat-1.) * (h-0.5*v*v));
+    
+    //Davis estimates
+    /* SL_out = std::min(ul - cl, ur-cr) ;
+    SR_out = std::max(ul + cl, ur+cr) ; */
+    /*
+    SL_out = v - c ;
+    SR_out = v + c ;
+    */
+    /* 
+    //Einfeld estimates
+    double eta2 = 0.5*(std::sqrt(dl*dr)/(denom*denom));
+    double dbar = (std::sqrt(dl) * cl*cl + std::sqrt(dr) * cr*cr )/denom + eta2 * (ur-ul)*(ur-ul);
+    SL_out = v - dbar;
+    SR_out = v + dbar;
+ */
+    SL_out = v - c ;
+    SR_out = v + c ; //Those occasionally violate the consistency condition F_num(U,U) = F_exact(U)
+    SL_out = std::min(ul - cl, ur-cr) ;
+    SR_out = std::max(ul + cl, ur+cr) ; 
+
+    double eta2 = 0.5*(std::sqrt(dl*dr)/(denom*denom));
+    double dbar = (std::sqrt(dl) * cl*cl + std::sqrt(dr) * cr*cr )/denom + eta2 * (ur-ul)*(ur-ul);
+    SL_out = v - dbar;
+    SR_out = v + dbar;
+
+    state_l_out = state_l;
+    state_r_out = state_r;
+}
+
+/**
  * The HLLE Riemann solver with pressure-based wave-speed estimate, according to Toro(2007) and references therein.
+ * 
+ * @param[in] j cell interface number at which to compute the flux. 
+ * @return flux at cell interface j
+ */
+AOS c_Species::get_hlle_flux2(int j) 
+{
+    int jleft = j, jright = j+1;
+
+    //if(base->steps>100)
+    //    jright = 1;
+
+    AOS flux, state_l, state_r;
+    int option = 0;
+    double SL, SR, denom;
+    AOS_prim prim_l  = this->prim_r[jleft];
+    AOS_prim prim_r  = this->prim_l[jright];
+
+    write_hlle_wavespeeds(prim_l, prim_r, state_l, state_r, SL, SR); //in, in, out,out,out,out
+    AOS FL = exact_flux(state_l);
+    AOS FR = exact_flux(state_r);
+    denom = (SR-SL);
+
+    if ((SL <= 0) &&  (SR >= 0)) {
+        flux = (FL * SR - FR * SL + (state_r - state_l)*SL*SR)/denom;
+        option = 1;
+    } else if (SL >= 0) {
+        flux = FL;
+        option = 2;
+    } else {
+        flux = FR;
+        option= 3 ;
+    }
+    
+    //if(base->steps>100)
+    //    cout<<" checking consistency, f_numeric(U,U) =  "<<flux.u1<<" "<<flux.u2<<" "<<flux.u3<<" "<<" f_exact(U) = "<< FL.u1<<" "<< FL.u2<<" "<< FL.u3<<" "<<endl;
+
+    return flux;
+}
+
+/*
+* Write Jacobian matrices consistent with our HLLE implementation
+*/
+void c_Species::write_hlle_jacobians(Matrix3d &left_m, Matrix3d &right_m, int j) {
+
+    int jleft = j, jright = j+1;
+    AOS flux, state_l, state_r;
+    int option = 0;
+    double SL, SR, denom;
+    AOS_prim prim_l  = this->prim_r[jleft];
+    AOS_prim prim_r  = this->prim_l[jright];
+
+    write_hlle_wavespeeds(prim_l, prim_r, state_l, state_r, SL, SR); //in, in, out,out,out,out
+    AOS FL = exact_flux(state_l);
+    AOS FR = exact_flux(state_r);
+    denom = (SR-SL);
+
+    Matrix3d A_left  = get_exact_Jacobian(state_l);
+    Matrix3d A_right = get_exact_Jacobian(state_r);
+
+    Matrix3d uni;
+    uni<<1,0,0,  0,1,0, 0,0,1;
+    Matrix3d A_tilda   = uni*(SL*SR/denom);
+    //cout<<" returnting Atilda and Atilda2: "<<endl<<A_tilda<<endl<<endl<<A_tilda2<<endl;
+ 
+    left_m  = A_left * (SR/denom) - A_tilda;
+    right_m = A_right*(-SL/denom) + A_tilda;
+ 
+    //left_m  = A_left;
+    //right_m = A_right;
+}
+
+
+/**
+ * A wrapper for he HLLE Riemann solver with pressure-based wave-speed estimate, according to Toro(2007) and references therein.
  * 
  * @param[in] j cell interface number at which to compute the flux. 
  * @return flux at cell interface j
  */
 Vector3d c_Species::get_hlle_flux(int j) 
 {
-    int jleft = j, jright = j+1;
-    AOS flux;
-    int option = 0;
-    
-    //Speed of gas
-    double ul = prim_r[jleft].speed;  
-    double ur = prim_l[jright].speed; 
-    
-    double pl = prim_r[jleft].pres;  
-    double pr = prim_l[jright].pres;
-    double pl_e = pl;
-    double pr_e = pr;
-    double dl = prim_r[jleft].density;  
-    double dr = prim_l[jright].density;
-    double mom_l = dl*ul ;
-    double mom_r = dr*ur ;
-    double El = dl*prim_r[jleft].internal_energy + 0.5*mom_l*ul ;
-    double Er = dr*prim_l[jright].internal_energy + 0.5*mom_r*ur ;
-    //Speed of shocks
-    double SL = ul - prim_r[jleft].sound_speed ;
-    double SR = ur + prim_l[jright].sound_speed ;
-    
-    double denom = (SR-SL + 1e-30);
-    
-    AOS FL = AOS (mom_l, mom_l * ul + pl, ul * (El + pl_e) );
-    AOS FR = AOS(mom_r, mom_r * ur + pr, ur * (Er + pr_e) );
-
-    if ((SL <= 0) &&  (SR >= 0)) {
-        flux = (FL * SR - FR * SL + (u[jright] - u[jleft])*SL*SR)/denom;
-        option = 1;
-    }
-    else if (SL >= 0) {
-        flux = FL;
-        option = 2;
-    }
-    else if (SR <= 0) {
-        flux = FR;
-        option= 3 ;
-    }
-    
+    AOS flux = get_hlle_flux2(j) ;
     Vector3d vflux;
     vflux << flux.u1, flux.u2, flux.u3;
     return vflux;
 }
 
 
-void c_Species::write_hlle_jacobians(Matrix3d &left_m, Matrix3d &right_m, int j) {
-    int jleft = j, jright = j+1;
-    AOS flux;
-    int option = 0;
-    
-    //Speed of gas
-    double ul = prim_r[jleft].speed;  
-    double ur = prim_l[jright].speed; 
-    double pl = prim_r[jleft].pres;  
-    double pr = prim_l[jright].pres;
-    double pl_e = pl;
-    double pr_e = pr;
-    double dl = prim_r[jleft].density;  
-    double dr = prim_l[jright].density;
-    double mom_l = dl*ul ;
-    double mom_r = dr*ur ;
-    double El = dl*prim_r[jleft].internal_energy + 0.5*mom_l*ul ;
-    double Er = dr*prim_l[jright].internal_energy + 0.5*mom_r*ur ;
-    //Speed of shocks
-    double SL = ul - prim_r[jleft].sound_speed ;
-    double SR = ur + prim_l[jright].sound_speed ;
-
-    double denom = (SR-SL);
-
-    Matrix3d  A_left = get_exact_Jacobian(u[jleft]);
-    Matrix3d A_right = get_exact_Jacobian(u[jright]);
-
-    Matrix3d uni;
-    uni<<1,0,0,  0,1,0, 0,0,1;
-    Matrix3d A_tilda   = uni*(SL*SR/denom);
-    
-    //cout<<" returnting Atilda and Atilda2: "<<endl<<A_tilda<<endl<<endl<<A_tilda2<<endl;
-
-    left_m  = A_left * (SR/denom) - A_tilda;
-    right_m = A_right*(-SL/denom) + A_tilda;
-
+void c_Species::write_exact_jacobians(Matrix3d &left_m, Matrix3d &right_m, int j) {
+    left_m  = get_exact_Jacobian(u[j]);
+    right_m = get_exact_Jacobian(u[j+1]);
 }

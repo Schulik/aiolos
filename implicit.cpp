@@ -448,6 +448,10 @@ void c_Species::implicit_incompressible2(double dt) {
 
     //cout<<" Hi i am species "<<speciesname<<" and i am attempting to be solved implicitly."<<endl;
 
+    ////////////////////////////////////////////////////////////////////////
+    // Construct implicit Matrix
+    ////////////////////////////////////////////////////////////////////////
+
     //Boundaries
     this->apply_boundary_left(this->u) ;
     this->apply_boundary_right(this->u) ;
@@ -457,12 +461,6 @@ void c_Species::implicit_incompressible2(double dt) {
 
     std::vector<double> t_damp = np_zeros(num_cells+2); 
     std::vector<double> ff     = np_zeros(num_cells+2); 
-    /*
-    Matrix_t adv_mat      = Matrix_t::Zero(num_cells+2, num_cells+2);
-    Matrix_t adv_id       = Matrix_t::Identity(num_cells+2, num_cells+2);
-    Vector_t adv_b        = Vector_t(num_cells+2);
-    Vector_t results      = Vector_t(num_cells+2); 
-    */
 
     //Allocate matrices
     int num_vars = 3; // + num_species
@@ -501,12 +499,11 @@ void c_Species::implicit_incompressible2(double dt) {
     }
 
     //////////////////////////////////////////////////////////////////////////
-    // Precompute Jabobians interface by interface
+    // Precompute Jabobians interface by interface, define flux function pointer
     //////////////////////////////////////////////////////////////////////////
 
     for (int j=1; j <= num_cells; j++) { //Going interface by interface - interface j is between cell j and j+1. Ignore interface 0, that's just excess memory to get the index shifted by 1
-        //write_roe_jacobians(base->roe_differentials_left[j], base->roe_differentials_right[j], j);  //interface j sits at position j-1 in memory
-        write_hlle_jacobians(base->roe_differentials_left[j], base->roe_differentials_right[j], j);
+        (this->*write_jacobians)(base->impl_jacobian_left[j], base->impl_jacobian_right[j], j);
     }
 
     int impl_debug = 0;
@@ -564,13 +561,13 @@ void c_Species::implicit_incompressible2(double dt) {
         
         Vector3d ul             = u_to_vec(j);
         Vector3d ur             = u_to_vec(j+1);
-        Matrix3d Jl = base->roe_differentials_left[j];
-        Matrix3d Jr = base->roe_differentials_right[j];
+        Matrix3d Jl             = base->impl_jacobian_left[j];
+        Matrix3d Jr             = base->impl_jacobian_right[j];
         Vector3d dul            = Jl * ul;
         Vector3d dur            = Jr * ur;
-        Vector3d f_last         = get_hlle_flux(j);//roe_flux_vec(j);
+        Vector3d f_last         = (this->*flux_pointer)(j);
 
-        if(impl_debug)                                {
+        if(impl_debug) {
             cout<<" in implicit roe solver Jl and Jr ="<<endl<<Jl<<endl<<endl<<Jr<<endl;
             cout<<" left and right states: "<<endl<<ul<<endl<<ur<<endl;
         }
@@ -598,11 +595,11 @@ void c_Species::implicit_incompressible2(double dt) {
         
         ul             = u_to_vec(j-1);
         ur             = u_to_vec(j);
-        Jl = base->roe_differentials_left[j-1];
-        Jr = base->roe_differentials_right[j-1];
+        Jl             = base->impl_jacobian_left[j-1];
+        Jr             = base->impl_jacobian_right[j-1];
         dul            = Jl * ul;
         dur            = Jr * ur;
-        f_last         = get_hlle_flux(j-1);//roe_flux_vec(j-1);
+        f_last         = (this->*flux_pointer)(j-1);
 
         //Write L.H.S components
         for(int ii=0; ii<3; ii++) {
@@ -826,6 +823,7 @@ void c_Species::write_roe_jacobians(Matrix3d &left_m, Matrix3d &right_m, int int
 //
 Matrix3d c_Species::get_roe_matrix_abs(int j) 
 {
+    
     int jleft = j, jright = j+1;
     AOS_prim prim_l  = this->prim[jleft];
     AOS_prim prim_r  = this->prim[jright];
@@ -849,11 +847,16 @@ Matrix3d c_Species::get_roe_matrix_abs(int j)
     double c   = std::sqrt((gamma_adiabat-1.) * (h-0.5*u*u));
  
     double lambdas[3] = {std::fabs(u-c), std::fabs(u), std::fabs(u+c) };
-
-    double delta = 0.8*c;
+    
     //HH-Entropy fix
-    if(lambdas[1] < delta)
-        lambdas[1] = (lambdas[1]*lambdas[1] + delta*delta)/(2.*delta); 
+    double delta = 0.999*c;
+    for(int k=0; k<=2; k+=1) {
+        if(lambdas[k]<delta) {
+            //lambdas[k] = 0.5*(lambdas[k]*lambdas[k]/eps+eps); 
+            //lambdas[k] = 0.5*(lambdas[k]*lambdas[k]/(delta)+delta);
+            lambdas[k] = (lambdas[k]*lambdas[k] + delta*delta)/(2.*delta); 
+        }
+    }
 
     double d[3] = {drho, state_r.u2 - state_l.u2, state_r.u3 - state_l.u3};
     double alphas[3];

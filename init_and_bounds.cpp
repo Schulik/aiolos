@@ -70,6 +70,8 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, s
         geometry         = read_parameter_from_file<Geometry>(filename, "PARI_GEOMETRY", debug, Geometry::cartesian).value; //Cartesian, Polar, Spherical. Determines differentials. More in enum.h
         order            = read_parameter_from_file<IntegrationType>(filename, "PARI_ORDER", debug, IntegrationType::second_order).value; //Spatial order of differentials.
         solver           = read_parameter_from_file<HydroSolver>(filename, "HYDRO_SOLVER", debug, HydroSolver::hllc).value; //Spatial order of differentials.
+        implicit_hydro_solver  = read_parameter_from_file<int>(filename, "IMPLICIT_HYDRO_SOL", debug, 0).value; //Spatial order of differentials.
+        
         mix_p1           = read_parameter_from_file<double>(filename,"MIX_HYDROSOLVER_PAR1", debug, 1).value;
         mix_p2           = read_parameter_from_file<double>(filename,"MIX_HYDROSOLVER_PAR2", debug, 1).value;
         mix_p3           = read_parameter_from_file<double>(filename,"MIX_HYDROSOLVER_PAR3", debug, 1).value;
@@ -862,12 +864,12 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, s
         }
 
         if(solver == HydroSolver::implicitelectrons) {
-            roe_differentials_left = new Matrix3d[num_cells+2];
-            roe_differentials_right= new Matrix3d[num_cells+2]; //Add one interface too much to get index shift right
+            impl_jacobian_left = new Matrix3d[num_cells+2];
+            impl_jacobian_right= new Matrix3d[num_cells+2]; //Add one interface too much to get index shift right
 
             for(int i =0; i<num_cells+2; i++) {
-                roe_differentials_left[i].setZero();
-                roe_differentials_right[i].setZero();
+                impl_jacobian_left[i].setZero();
+                impl_jacobian_right[i].setZero();
             }
         }
         
@@ -1303,6 +1305,29 @@ c_Species::c_Species(c_Sim *base_simulation, string filename, string species_fil
 		reconstruct_pointer = &MonotonizedCentralSlope;
 	else
 		reconstruct_pointer = &VanLeerSlope;
+
+
+        ////////////////////////////////////////////////////////////////////////
+        // Set flux and jacobian pointers, this is set for all species, so that we can in principle run the solver on other species safely
+        ////////////////////////////////////////////////////////////////////////
+
+        if(base->solver == HydroSolver::implicitelectrons) {
+            if(base->implicit_hydro_solver == 1) {
+                flux_pointer         = &c_Species::get_hlle_flux;
+                write_jacobians      = &c_Species::write_hlle_jacobians;
+                cout<<" solving electrons implicitly and pointing towards HLLE fluxes.  "<<endl;
+            } else if (base->implicit_hydro_solver == 0) {
+                flux_pointer         = &c_Species::roe_flux_vec;
+                write_jacobians      = &c_Species::write_roe_jacobians;
+                cout<<" solving electrons implicitly and pointing towards Roe fluxes.  "<<endl;
+            } else {
+                flux_pointer         = &c_Species::exact_flux_as_vector;
+                write_jacobians      = &c_Species::write_exact_jacobians;
+                cout<<" solving electrons implicitly and pointing towards Exact fluxes.  "<<endl;
+
+            }
+
+        }
 
         const_T_space  = read_parameter_from_file<double>(filename,"PARI_CONST_TEMP", debug, 1.).value; //Temperature at boundary. Use depending on INIT_TEMPERATURE_MODEL
         const_T_space2 = read_parameter_from_file<double>(filename,"CONST_TEMP2", debug, 1.).value; //Temperature at r>const_T_transition_r. 

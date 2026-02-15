@@ -616,8 +616,9 @@ public:
     int ignore_electron_cfl_cell;
     int force_solving_with_implicit; //for tests
 
-    Matrix3d *roe_differentials_left;
-    Matrix3d *roe_differentials_right;
+    int implicit_hydro_solver;
+    Matrix3d *impl_jacobian_left;
+    Matrix3d *impl_jacobian_right;
     AOS get_roe_averages(int j);
     //
     // Friction
@@ -1185,11 +1186,14 @@ public:
     AOS hllc_flux2(int, double);
     AOS laxfriedrich_flux(int j);
     AOS laxwendroff_flux(int j);
-    AOS roe_flux(int j);
-    Vector3d roe_flux_vec(int j);
-    Vector3d u_to_vec(int j);
+    AOS roe_flux(int j);    
     AOS get_roe_averages(int j);
     Vector3d get_hlle_flux(int j) ;
+    AOS get_hlle_flux2(int j) ;
+
+    Vector3d roe_flux_vec(int j);
+    Vector3d u_to_vec(int j);
+    Vector3d exact_flux_as_vector(int j);
 
     AOS dust_flux(int);
     AOS passivescalar_flux(int);
@@ -1209,11 +1213,16 @@ public:
     std::vector<double> get_hydro_jacobian_P(int jleft, int jright);
     std::vector<double> get_hydro_jacobian_P(int jleft, int jright, double a, double b);
 
+    Vector3d (c_Species::*flux_pointer)(int);
+    void (c_Species::*write_jacobians)(Matrix3d &, Matrix3d &, int);
+
     //AOS get_roe_averages(int j);
     Matrix3d get_roe_matrix_abs(int j);
     Matrix3d get_exact_Jacobian(AOS u);
     void write_roe_jacobians(Matrix3d &left_m, Matrix3d &right_m, int interface);
     void write_hlle_jacobians(Matrix3d &left_m, Matrix3d &right_m, int j);
+    void write_exact_jacobians(Matrix3d &left_m, Matrix3d &right_m, int j);
+    void write_hlle_wavespeeds(AOS_prim prim_l_in, AOS_prim prim_r_in, AOS &state_l_out, AOS &state_r_out, double &SL_out, double &SR_out);
     
     AOS source_grav(AOS &u, int &j);
     AOS source_grav_noconserved(AOS &u, int &j);
