@@ -14,6 +14,7 @@
 #include <math.h>
 #include <cmath>
 #include <ctime>
+#include <limits>
 #include <type_traits>
 //#include <gsl/gsl_sf_lambert.h>
 #include <Eigen/Core>
@@ -45,7 +46,9 @@ inline omp_int_t omp_get_max_threads() { return 1;}
 using namespace std;
 
 using Matrix_t = Eigen::Matrix<double, NUM_SPECIES,NUM_SPECIES, Eigen::RowMajor>;
+using Matrix3d = Eigen::Matrix<double, 3, 3, Eigen::RowMajor>;
 using Vector_t = Eigen::Matrix<double, NUM_SPECIES, 1>;
+using Vector3d = Eigen::Matrix<double, 3, 1>;
 
 
 //Basic physics quantities
@@ -611,6 +614,11 @@ public:
     double mix_p3;
     int mix_reset_i;
     int ignore_electron_cfl_cell;
+    int force_solving_with_implicit; //for tests
+
+    Matrix3d *roe_differentials_left;
+    Matrix3d *roe_differentials_right;
+    AOS get_roe_averages(int j);
     //
     // Friction
     //
@@ -838,7 +846,7 @@ public:
     int dt_skip_ichem;
     double dt_skip_dchem;
     int use_chem_reaction_floor;
-    
+
     Vector_t solver_cchem_implicit_general(double dt, int num_spec, int cdebug, const Vector_t& n_normalized, const Vector_t& n_midpoint, double ntot, double mntot);
     int solver_cchem_implicit_specialized_cochem(double dt, int num_spec, int cdebug);
     
@@ -1178,6 +1186,11 @@ public:
     AOS laxfriedrich_flux(int j);
     AOS laxwendroff_flux(int j);
     AOS roe_flux(int j);
+    Vector3d roe_flux_vec(int j);
+    Vector3d u_to_vec(int j);
+    AOS get_roe_averages(int j);
+    Vector3d get_hlle_flux(int j) ;
+
     AOS dust_flux(int);
     AOS passivescalar_flux(int);
     AOS passivescalar_flux2(int);
@@ -1189,12 +1202,18 @@ public:
 
     void implicit_incompressible(double dt);
     void implicit_incompressible2(double dt);
-    void implicit_incompressible_J(double dt);
     //std::vector<double> get_hydro_jacobian(int jleft, int jright);
     std::vector<double> get_hydro_jacobian_df3(int jleft, int jright);
     std::vector<double> get_hydro_jacobian_E(int jleft, int jright);
+    std::vector<double> get_hydro_jacobian_P(int j);
     std::vector<double> get_hydro_jacobian_P(int jleft, int jright);
     std::vector<double> get_hydro_jacobian_P(int jleft, int jright, double a, double b);
+
+    //AOS get_roe_averages(int j);
+    Matrix3d get_roe_matrix_abs(int j);
+    Matrix3d get_exact_Jacobian(AOS u);
+    void write_roe_jacobians(Matrix3d &left_m, Matrix3d &right_m, int interface);
+    void write_hlle_jacobians(Matrix3d &left_m, Matrix3d &right_m, int j);
     
     AOS source_grav(AOS &u, int &j);
     AOS source_grav_noconserved(AOS &u, int &j);

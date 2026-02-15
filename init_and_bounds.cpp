@@ -29,7 +29,7 @@ extern double VanLeerSlope(double ql, double qm, double qr, double cF, double cB
  */
 c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, string tintent, std::vector<int> debug_data, int restartnumber, double restarttime_cmdline) {
 
-	init_line_cooling_data();
+        //feenableexcept(FE_INVALID);
 
         if(debug > 0) cout<<"Init position 0."<<endl;
         
@@ -315,6 +315,8 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, s
         dt_skip_ichem                = read_parameter_from_file<int>(filename,"CHEM_DT_SKIP", debug, 1).value;            //Skip chemistry update every xxx timesteps in main loop. Accumulate timesteps until next chem solver call. Currently buggy.
         write_krome_reactions     = read_parameter_from_file<int>(filename,"WRITE_KROME_REACTIONS", debug, 0).value;      //Write the actual reaction rates in KROME format for comparisons
 
+        force_solving_with_implicit = read_parameter_from_file<int>(filename,"FORCE_IMPLICIT_SOLVE", debug, 0).value; //Use implicit hydro solver, even if we are not having electrons. For tests
+
         right_extrap_press_multiplier =read_parameter_from_file<double>(filename,"BOUND_EXTRAP_MUL", debug, 1.0).value; //Hydrodynamic pressure extrapolation into ghost cell multiplier
         dt_skip_dchem = 0.; 
         
@@ -323,6 +325,9 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, s
         bond_albedo       = read_parameter_from_file<double>(filename,"BOND_ALBEDO", debug, 0.).value; //Bond albedo, Number between 0. and 1.
         use_init_discont_smoothing = read_parameter_from_file<int>(filename,"INIT_DISCONT_SMOOTHING", debug, 0).value;  //Smooths out discontinuities in the initial density profiles with a powerlaw. Applied before init_wind discontinuity is put in.
         
+        if(photochemistry_level > 0)
+            init_line_cooling_data();
+
         if(problem_number == 2)
             monitor_output_index = num_cells/2; 
         else
@@ -854,6 +859,16 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, s
             reaction_matrix_ptr[i] = Matrix_t::Zero(num_species, num_species);
             reaction_b_ptr[i]      = Vector_t(num_species);
             //LUchem_ptr[i]          = Eigen::PartialPivLU<Matrix_t>;
+        }
+
+        if(solver == HydroSolver::implicitelectrons) {
+            roe_differentials_left = new Matrix3d[num_cells+2];
+            roe_differentials_right= new Matrix3d[num_cells+2]; //Add one interface too much to get index shift right
+
+            for(int i =0; i<num_cells+2; i++) {
+                roe_differentials_left[i].setZero();
+                roe_differentials_right[i].setZero();
+            }
         }
         
         for(int s = 0; s < num_species; s++) {
@@ -1661,8 +1676,12 @@ void c_Species::initialize_hydrostatic_atmosphere(string filename) {
             u[i] = AOS(temp_rhofinal, 0., cv * temp_rhofinal * T_inner);
             
             if(temp_rhofinal < 0) {
+
+                if(temp_rhofinal < 0.) {
+                    temp_rhofinal = u[i+1].u1;
+                }
                 
-                char a;
+                
                 cout.precision(16);
                 cout<<"NEGATIVE DENSITY IN INIT HYDROSTATIC i="<<i<<"/"<<num_cells<<endl;
                 if((factor_inner - metric_inner) < 0) {
@@ -1684,7 +1703,7 @@ void c_Species::initialize_hydrostatic_atmosphere(string filename) {
                 cout<<"     Ratio of pressures inner/outer = "<<cv * temp_rhofinal * T_inner /u[i+1].u3<<endl;
                 cout<<"     Resulting density == "<<temp_rhofinal<<endl;
                 cout<<"     density before "<<u[i+1].u1<<endl;
-                cin>>a;
+                
             }
         }
         
@@ -1727,8 +1746,12 @@ void c_Species::initialize_hydrostatic_atmosphere(string filename) {
             
             double floor          = base->density_floor * std::pow(base->x_i12[i]/base->x_i12[1], -4.) * initial_fraction;
             //double lastval_scaled = u[i].u1 * std::pow(base->x_i12[i]/base->x_i12[i+1], 8.);
-            double lastval_scaled = u[i].u1 * u[i].u1/u[i-1].u1;
+            double lastval_scaled = u[i].u1; // * u[i].u1/u[i-1].u1;
             
+            if(lastval_scaled < floor)
+                lastval_scaled = floor;
+
+
             if(temp_rhofinal < 0.) {
                 
                 if(lastval_scaled > floor && base->use_init_discont_smoothing)
@@ -1795,23 +1818,8 @@ void c_Species::initialize_hydrostatic_atmosphere(string filename) {
         if(negdens) 
             cout<<" Negative densities in init_hydrostatic. Check conditions for hydrostatic construction and/or debug."<<endl;
         
-        //u[1] = AOS(u[2].u1 , 0., u[2].u3);
-        //u[0] = AOS(u[3].u1 , 0., u[3].u3);
-        //prim[1] = prim[2];
-        //prim[0] = prim[3];
     }
 
-    //u[num_cells/2].u1 *= 1e6; //Advection test initial condition
-    //u[num_cells/2+1].u1 *= 1e6; //Advection test initial condition
-    //u[num_cells/2+2].u1 *= 1e6; //Advection test initial condition
-    //u[num_cells/2+3].u1 *= 1e6; //Advection test initial condition
-    //u[num_cells/2].u2  = 1e6; //Advection test initial condition
-    //u[num_cells/2].u3   *= 1e6;
-    
-    //cout<<" POS2 dens[2] = "<<u[2].u1<<" temp[2] = "<<prim[2].temperature<<" rhoe1, rhoe2 = "<<u[1].u3<<"/"<<u[2].u3<<" cv ="<<cv<<endl;
-    //cout<<"Assigned densities in num_cell-1 = "<<u[num_cells-1].u1<<endl;
-    //cout<<"Assigned densities in num_cell = "<<  u[num_cells].u1<<endl;
-    //cout<<"Assigned densities in num_cell+1 = "<<u[num_cells+1].u1<<endl;
     
     if(base->type_of_grid == -2) {
         
@@ -1830,26 +1838,6 @@ void c_Species::initialize_hydrostatic_atmosphere(string filename) {
                 u[i] = AOS(floor, u[i].u2, cv * floor * prim[i].temperature) ;
             }
     }
-    
-    if(base->init_T_temp > 2.7) {
-        
-            if(this_species_index == 0)
-                cout<<" In INIT: Overwriting T with user-defined temperature:"<<base->init_T_temp;
-                
-            for(int i=num_cells; i>=0; i--)  {
-                
-                if(base->x_i12[i]>1.0e10) {
-                    
-                    //double temprho = u[i].u1;
-                
-                    //u[i] = AOS(temprho, 0., cv * temprho * base->init_T_temp) ;
-                }
-                
-                //prim[i].temperature = base->init_T_temp;
-            }
-        }
-        //else
-        //    cout<<" In INIT: Did NOT overwrite T, because init_T_temp < 2.7= = "<<base->init_T_temp;
     
     
     if(u[2].u1 > 1e40) {
@@ -2045,57 +2033,27 @@ void c_Species::apply_boundary_left(std::vector<AOS>& u) {
             }
             break;
         case BoundaryType::fixed:  //enum type 3
-                //for (int i=0; i < num_ghosts; i++) {
-                //cout<<" IN FIXED LEFT BOUNDARIES"<<endl;
-                /*double dens_wall;  
-                if(base->problem_number == 1)
-                    dens_wall = SHOCK_TUBE_UL.u1 * mass_amu;
-                else {
-                    dens_wall = BACKGROUND_U.u1 *  mass_amu;
-                }*/
-                //double dens_wall;
-                
+               
                 for (int i=0; i < num_ghosts; i++) {
                     int igh =  num_ghosts-1 -i;
                     int iact = num_ghosts   +i;
-                    u[igh]     = u[iact]; 
-                    u[igh].u2  = 0;
-                    base->phi[igh]   = base->phi[iact] ;
-                }
 
-                compute_pressure(u);
-
-                if(0==1){
-                    
-                    for (int i=0; i < num_ghosts; i++) {
-                        if(base->problem_number == 1)
-                        {
-                            u[i] = SHOCK_TUBE_UL;
-                            eos->compute_primitive(&u[i],&(prim[i]), 1) ;
-                            eos->compute_auxillary(&(prim[i]), 1);
-                            
-                                //eos->compute_primitive(&(u[0]), &(prim[0]), num_cells+2) ;    
-                                //eos->compute_auxillary(&(prim[0]), num_cells+2);
-                        } else {
-                                AOS_prim prim;
-                                prim.density = BACKGROUND_U.u1;
-                                //if(this->this_species_index == base->e_idx)
-                                //    prim.density = this->prim[3].density;
-
-                                if(this->prim[2].speed < 0)
-                                    prim.speed = -0.*this->prim[2].speed * base->wavedamp_factor;
-                                else
-                                    prim.speed   = 0.; //this->prim[2].speed;
-                                prim.temperature = this->prim[2].temperature;
-                                //prim.temperature = const_T_space;
-                                eos->update_eint_from_T(&(prim), 1);
-                                eos->update_p_from_eint(&(prim), 1);
-                                eos->compute_conserved(&(prim), &(u[i]), 1) ; //Ghost cell u is fixed after init, only need to update p in prim
-                        }
-
+                    AOS wall;  
+                    if(base->problem_number == 1)
+                        wall = AOS(SHOCK_TUBE_UL.u1, SHOCK_TUBE_UL.u2, SHOCK_TUBE_UL.u3 );
+                    else {
+                        wall = BACKGROUND_U; 
                     }
+                    u[igh]     = wall;
+                    u[igh].u3 = 0.5*wall.u2*wall.u2/wall.u1  + wall.u1 * cv * this->prim[iact].temperature;
+
+                    base->phi[igh]   = base->phi[iact] ;
+
+                    eos->compute_primitive(&u[igh],&(prim[igh]), 1) ;
+                    eos->compute_auxillary(&(prim[igh]), 1);
                 }
-                
+
+                compute_pressure(u);                
        
             //}
             
@@ -2181,7 +2139,7 @@ void c_Species::apply_boundary_right(std::vector<AOS>& u) {
                 if(base->problem_number==1)
                     u[i]     = SHOCK_TUBE_UR;
                 else
-                    u[i] = 3e-8;// BACKGROUND_U.u1;
+                    u[i] = BACKGROUND_U.u1;
             }
                 
             break;

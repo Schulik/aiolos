@@ -48,14 +48,14 @@ void c_Sim::execute(int restartnumber, double restarttime_cmdline) {
     
     scale_cs = std::sqrt(species[0].gamma_adiabat * (species[0].gamma_adiabat - 1.) * species[0].cv * species[0].prim[num_cells].temperature); // cm/s
     scale_rb = G*planet_mass / scale_cs / scale_cs; 
-    scale_rh = planet_semimajor * au * pow(planet_mass / (3.* star_mass ),0.333333333333333333);
+    scale_rh = planet_semimajor * au * pow(planet_mass / (3.* (star_mass+1e-10) ),0.333333333333333333);
     
     scale_vk = std::sqrt(G*star_mass/(au*planet_semimajor));
     scale_time = scale_rb/scale_cs;
     
     cout<<"    Reporting base physical scales for selected problem in cgs units or other units that make sense;"<<endl;
     cout<<"    bondi_radius: "<<scale_rb<<" cm = "<<scale_rb/au<<" au\n" ;
-    cout<<"    hill radius: " <<scale_rh << "cm = "<< scale_rh/au <<" au = "<<scale_rh/scale_rb<< " rb" << endl;
+    cout<<"    hill radius: " <<scale_rh << "cm = "<< scale_rh/au <<" au = "<<scale_rh/(scale_rb+1e-10)<< " rb" << endl;
     cout<<"    velocities: vk = "<<scale_vk<<" cm/s, vk/cs = "<<scale_vk/scale_cs<<", cs = "<<scale_cs<< "cm/s" << endl;
     cout<<"    times, rb/cs/yr = "<<scale_time/year<<" rh/cs/yr"<<scale_rh/scale_cs/year<<endl;
     
@@ -68,10 +68,10 @@ void c_Sim::execute(int restartnumber, double restarttime_cmdline) {
     
 
     for (globalTime = restarttime; (globalTime < t_max) && (steps < maxsteps); ) {
-    /* 
-        if(steps>10)
-            feenableexcept(FE_INVALID);
-     */
+     
+        //if(steps>10)
+        //feenableexcept(FE_INVALID);
+     
           if(start_hydro_time > 0. && globalTime > start_hydro_time) {   //Comment in if a radiative equilibrium phase is desired before starting hydro
               do_hydrodynamics = 1;
           }
@@ -200,19 +200,17 @@ void c_Sim::execute(int restartnumber, double restarttime_cmdline) {
                 
                 //cout<<"    running species "<<species[s].speciesname<<" s = "<<s<<" steps ="<<steps<<endl;
                  //Apply implicit electron solver for electrons only if so desired. Otherwise continue as usual with all other solvers.
-                if( (solver == HydroSolver::implicitelectrons) && (s==e_idx)) {    
+                if( (solver == HydroSolver::implicitelectrons && s==e_idx)  ||   (solver == HydroSolver::implicitelectrons && problem_number==1)  ||  ( (solver == HydroSolver::implicitelectrons) && force_solving_with_implicit)   ) {    
                     double ff = 1.0;
                     if(order == IntegrationType::second_order )
                         ff = 0.5;
 
                     for(int ii=0; ii<num_implicit_substeps; ii++) {
-                        species[s].implicit_incompressible(ff/((double)num_implicit_substeps)*dt);
+                        species[s].implicit_incompressible2(ff/((double)num_implicit_substeps)*dt);
                     }
-                    
-                    //cout<<" YES IN IMPLICIT ELECTRON SOLVER and species =="<<species[s].speciesname<<endl;
 
                 } else {
-                    //cout<<" NOT IMPLICIT ELECTRON SOLVER and NOT ELECTRONS, species =="<<species[s].speciesname<<endl;
+                    
                     int ex_order = 1; //(s==e_idx)?0:1;
                     species[s].execute(species[s].u, species[s].dudt[0], species[s].u_mask, ex_order);
                     
@@ -311,17 +309,17 @@ void c_Sim::execute(int restartnumber, double restarttime_cmdline) {
                     species[s].u_mask           = np_zeros(num_cells+2);
                     species[s].u_tmp = species[s].u ;
                     
-                    //Apply implicit electron solver if wanted
-                    if(solver == HydroSolver::implicitelectrons && s==e_idx) {    
-
-                        //species[s].implicit_incompressible(0.5*dt);
+                    //Apply implicit electron solver if wanted: either for electrons in applications or for shock tubes
+                    if( (solver == HydroSolver::implicitelectrons && s==e_idx)  ||   (solver == HydroSolver::implicitelectrons && problem_number==1)  ||  ( (solver == HydroSolver::implicitelectrons) && force_solving_with_implicit)   ) {    
 
                         for(int ii=0; ii<num_implicit_substeps; ii++) {
-                            species[s].implicit_incompressible(0.5/((double)num_implicit_substeps)*dt);
+                            species[s].implicit_incompressible2(0.5/((double)num_implicit_substeps)*dt);
                         }
+                        
 
                     } else {
                     //for(int k=0; k<=0; k++) { //The k=0 run is the nominal run. k=1 is only triggered if some cells are broken
+                        
                         int ex_order = 1;//(s<=2)? 1.:0; //1;// (s==e_idx)?0:1;
                         species[s].execute(species[s].u, species[s].dudt[1], species[s].u_mask, ex_order);
                         
@@ -604,7 +602,8 @@ void c_Sim::execute(int restartnumber, double restarttime_cmdline) {
     
     for(int s=0; s<num_species; s++) 
         species[s].print_AOS_component_tofile(-1);
-    print_diagnostic_file(-1);
+    if(use_rad_fluxes)
+        print_diagnostic_file(-1);
     print_monitor(-1);
         
 }
@@ -1071,25 +1070,12 @@ AOS c_Species::hllc_flux2(int j, double f)
     if( (debug > 2) && (j>0 && j<13) ) {
         cout<<" IN HLLC, j = "<<j<<" dl/dr = "<<dl<<"/"<<dr<<" ul/ul = "<<ul<<"/"<<ur<<" pl/pr = "<<pl<<"/"<<pr<<" El/Er = "<<El<<"/"<<Er;
     }
-    
     //Speed of shocks
     double SL = ul - prim_r[jleft].sound_speed ;
     double SR = ur + prim_l[jright].sound_speed ;
     
     //Intermediate values in the star region, equations 10.30 -10.39 in Toro
     double SS     = ( pr-pl+ mom_l*(SL - ul)-mom_r*(SR-ur) )/(dl*(SL - ul)-dr*(SR-ur) );
-    
-    double advectionfactor = 1;
-    double uavg   = (std::sqrt(u[j].u1) * ul + std::sqrt(u[j].u1) * ur )/(std::sqrt(u[j].u1) + std::sqrt(u[j].u1));
-    double hl  = (pl + u[j].u3)/u[j].u1;
-    double hr  = (pr + u[j].u3)/u[j].u1;
-    double h   = (std::sqrt(u[j].u1) * hl + std::sqrt(u[j].u1) * hr)/(std::sqrt(u[j].u1) + std::sqrt(u[j].u1));
-    double c   = std::sqrt((gamma_adiabat-1.) * (h-0.5*uavg*uavg));
-    double mach = (std::fabs(uavg)/c);
-    if(1==0){
-        SL = uavg-c;
-        SR = uavg+c;
-    }
     
     if ((SL <= 0) &&  (SS >= 0)) {
         AOS FL         = AOS (mom_l, mom_l * ul + pl, ul * (El + pl_e) );
@@ -1266,9 +1252,6 @@ AOS c_Species::roe_flux(int j)
     
     double d[3] = {drho, state_r.u2 - state_l.u2, state_r.u3 - state_l.u3};
     double alphas[3];
-    //alphas[1] = (d[0]*(h-u*u) + d[1]*u - d[2] )*(gamma_adiabat-1)/(c*c);
-    //alphas[0] = (d[0]*(u+c) - d[1] - c *alphas[1])/(2*c);
-    //alphas[2] = d[0] - (alphas[0] + alphas[1]);
     
     alphas[0] = (dp - rho * c * du)/(2*c*c);
     alphas[1] = drho - dp/(c*c);
@@ -1283,13 +1266,48 @@ AOS c_Species::roe_flux(int j)
     
     AOS result = (flux_l + flux_r) * 0.5 - ( (ev0*(alphas[0]*lambdas[0]))  + (ev1*(alphas[1]*lambdas[1])) + (ev2*(alphas[2]*lambdas[2]))) * 0.5;
     
-    //if(j<= 1 || j>=num_cells-1) result = (0,0,0);
-    //if(j<= 1) result = (0,0,0);
-    //cout<<" cell j = "<<j<<" fluxes_l ="<<flux_l.u1<<" "<<flux_l.u2<<" "<<flux_l.u3<<" "<<" fluxes_r ="<<flux_r.u1<<" "<<flux_r.u2<<" "<<flux_r.u3<<" "<<endl;
-    //cout<<"             "<<" state_l ="<<state_l.u1<<" "<<state_l.u2<<" "<<state_l.u3<<" "<<" fluxes_r ="<<state_r.u1<<" "<<state_r.u2<<" "<<state_r.u3<<" "<<endl;
-    //cout<<"         LW result  j  "<<j<<" "<<result.u1<<" "<<result.u2<<" "<<result.u3<<endl;
-    
     return result;
+}
+
+Vector3d c_Species::roe_flux_vec(int j) {
+    AOS tmp    = roe_flux(j);
+
+    return Vector3d(tmp.u1, tmp.u2, tmp.u3);
+}
+
+Vector3d c_Species::u_to_vec(int j) {
+    Vector3d v = {u[j].u1, u[j].u2, u[j].u3}; 
+    return v;
+}
+
+//
+// returns Roe averages at interface j - sits between cell j and j+1
+//
+AOS c_Species::get_roe_averages(int j) {
+ int jleft = j, jright = j+1;
+    AOS_prim prim_l  = this->prim[jleft];
+    AOS_prim prim_r  = this->prim[jright];
+    
+    AOS state_l      = AOS(prim_l.density, prim_l.speed*prim_l.density, prim_l.density*prim_l.internal_energy + 0.5*prim_l.density*prim_l.speed*prim_l.speed); //u[jleft];
+    AOS state_r      = AOS(prim_r.density, prim_r.speed*prim_r.density, prim_r.density*prim_r.internal_energy + 0.5*prim_r.density*prim_r.speed*prim_r.speed); // = u[jright];
+    
+    AOS flux_l       = exact_flux(state_l);
+    AOS flux_r       = exact_flux(state_r);
+    
+    double drho = state_r.u1 - state_l.u1;
+    double dp   = prim_r.pres - prim_l.pres;
+    double du   = prim_r.speed - prim_l.speed;
+    
+    //Roe averages
+    double rho = std::sqrt(state_l.u1*state_r.u1);
+    double u   = (std::sqrt(state_l.u1) * prim_l.speed + std::sqrt(state_r.u1) * prim_r.speed )/(std::sqrt(state_l.u1) + std::sqrt(state_r.u1));
+    double hl  = (prim_l.pres + state_l.u3)/state_l.u1;
+    double hr  = (prim_r.pres + state_r.u3)/state_r.u1;
+    double h   = (std::sqrt(state_l.u1) * hl + std::sqrt(state_r.u1) * hr)/(std::sqrt(state_l.u1) + std::sqrt(state_r.u1));
+    double c   = std::sqrt((gamma_adiabat-1.) * (h-0.5*u*u));
+
+    return AOS(rho, u, h);
+
 }
 
 /**
@@ -1703,4 +1721,97 @@ double c_Species::return_entropy_with_jump(double k) {
     }
  */
     return 0 ;
+}
+
+
+/**
+ * The HLLE Riemann solver with pressure-based wave-speed estimate, according to Toro(2007) and references therein.
+ * 
+ * @param[in] j cell interface number at which to compute the flux. 
+ * @return flux at cell interface j
+ */
+Vector3d c_Species::get_hlle_flux(int j) 
+{
+    int jleft = j, jright = j+1;
+    AOS flux;
+    int option = 0;
+    
+    //Speed of gas
+    double ul = prim_r[jleft].speed;  
+    double ur = prim_l[jright].speed; 
+    
+    double pl = prim_r[jleft].pres;  
+    double pr = prim_l[jright].pres;
+    double pl_e = pl;
+    double pr_e = pr;
+    double dl = prim_r[jleft].density;  
+    double dr = prim_l[jright].density;
+    double mom_l = dl*ul ;
+    double mom_r = dr*ur ;
+    double El = dl*prim_r[jleft].internal_energy + 0.5*mom_l*ul ;
+    double Er = dr*prim_l[jright].internal_energy + 0.5*mom_r*ur ;
+    //Speed of shocks
+    double SL = ul - prim_r[jleft].sound_speed ;
+    double SR = ur + prim_l[jright].sound_speed ;
+    
+    double denom = (SR-SL + 1e-30);
+    
+    AOS FL = AOS (mom_l, mom_l * ul + pl, ul * (El + pl_e) );
+    AOS FR = AOS(mom_r, mom_r * ur + pr, ur * (Er + pr_e) );
+
+    if ((SL <= 0) &&  (SR >= 0)) {
+        flux = (FL * SR - FR * SL + (u[jright] - u[jleft])*SL*SR)/denom;
+        option = 1;
+    }
+    else if (SL >= 0) {
+        flux = FL;
+        option = 2;
+    }
+    else if (SR <= 0) {
+        flux = FR;
+        option= 3 ;
+    }
+    
+    Vector3d vflux;
+    vflux << flux.u1, flux.u2, flux.u3;
+    return vflux;
+}
+
+
+void c_Species::write_hlle_jacobians(Matrix3d &left_m, Matrix3d &right_m, int j) {
+    int jleft = j, jright = j+1;
+    AOS flux;
+    int option = 0;
+    
+    //Speed of gas
+    double ul = prim_r[jleft].speed;  
+    double ur = prim_l[jright].speed; 
+    double pl = prim_r[jleft].pres;  
+    double pr = prim_l[jright].pres;
+    double pl_e = pl;
+    double pr_e = pr;
+    double dl = prim_r[jleft].density;  
+    double dr = prim_l[jright].density;
+    double mom_l = dl*ul ;
+    double mom_r = dr*ur ;
+    double El = dl*prim_r[jleft].internal_energy + 0.5*mom_l*ul ;
+    double Er = dr*prim_l[jright].internal_energy + 0.5*mom_r*ur ;
+    //Speed of shocks
+    double SL = ul - prim_r[jleft].sound_speed ;
+    double SR = ur + prim_l[jright].sound_speed ;
+
+    double denom = (SR-SL);
+
+    Matrix3d  A_left = get_exact_Jacobian(u[jleft]);
+    Matrix3d A_right = get_exact_Jacobian(u[jright]);
+
+    Matrix3d uni;
+    uni<<1,0,0,  0,1,0, 0,0,1;
+    Matrix3d A_tilda   = uni*(SL*SR/denom);
+    
+    //cout<<" returnting Atilda and Atilda2: "<<endl<<A_tilda<<endl<<endl<<A_tilda2<<endl;
+
+    left_m  = A_left * (SR/denom) - A_tilda;
+    right_m = A_right*(-SL/denom) + A_tilda;
+
 }

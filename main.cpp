@@ -21,6 +21,7 @@
  */
 int main(int argc, char** argv)
 {
+    //feenableexcept(FE_INVALID);
 
     string simulationname;
     string speciesfile;
@@ -29,7 +30,7 @@ int main(int argc, char** argv)
     int debug = 0;
     int debug_cell = 1e9;
     long int debug_steps = 99999999;
-    std::vector<int> debug_data = inp_somevalue(4, 1e99);
+    std::vector<int> debug_data = std::vector<int>(4, std::numeric_limits<int>::max());//inp_somevalue(4, 1e10);
     debug_data[0] = 0;
 
     int suppress_warnings_global = 0;
@@ -39,7 +40,7 @@ int main(int argc, char** argv)
     cout<<endl<<"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"<<endl;
           cout<<"~~~ Welcome to AIOLOS! May a gentle breeze lead your way through the bugs."<<endl;
           cout<<"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"<<endl;
-std::cout <<"Eigen version: "<< EIGEN_WORLD_VERSION << "." << EIGEN_MAJOR_VERSION << "." << EIGEN_MINOR_VERSION << "\n";    
+    std::cout <<"Eigen version: "<< EIGEN_WORLD_VERSION << "." << EIGEN_MAJOR_VERSION << "." << EIGEN_MINOR_VERSION << "\n";    
     //
     // Loop through all args, in order to find the name of the parameter file (KEY), debug options etc.
     //
@@ -133,7 +134,7 @@ std::cout <<"Eigen version: "<< EIGEN_WORLD_VERSION << "." << EIGEN_MAJOR_VERSIO
             simulationname = "simulation.par";
     }
     if(!speciesfile_found) {
-            cout<<"No speciesfile found on command line, chosing default speciesfile until parameterfile tells us otherwise: default.spc"<<endl;
+            cout<<"No speciesfile found on command line."<<endl;
             speciesfile = "default.spc";
     }
         

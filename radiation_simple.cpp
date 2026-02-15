@@ -59,7 +59,7 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
     rhs_sc = Vector_t::Zero( (num_cells+2)*num_species );//  std::fill(rhs_sc.begin(), rhs_sc.end(), 0);
     //std::fill(denoms_sc.begin(), denoms_sc.end(), 0);
     
-    int numcells_offset = 1; //Nominally 1
+    int numcells_offset = 2; //Nominally 1
     // Step 1: setup transport terms (J)
     for(int b=0; b<num_bands_out; b++) {
         for (int j=0; j < num_cells + numcells_offset; j++) {
@@ -71,7 +71,7 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
             r[idx_r] += (vol[j] / (c_light * ddt)) * Jrad_FLD(j, b) ;
 
             // Flux across right boundary
-            if (j > 0 && j < num_cells + numcells_offset) {
+            if (j > 0 && j < num_cells + numcells_offset-1) {
                 double dx      = (x_i12[j+1]-x_i12[j]) ;                
                 double rhokr   = 0;
                 
@@ -571,14 +571,14 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
     //
     if(use_conduction && ( globalTime < do_cond_until)) {
         std::vector<double> temp_temperatures        = std::vector<double>(num_cells+1);
-        std::vector<double> flux_temperatures        = std::vector<double>(num_cells+2);
+        //std::vector<double> flux_temperatures        = std::vector<double>(num_cells+2);
 
 	    temp_temperatures[1] = species[0].const_T_space;        
-        for (int j=2; j < num_cells+numcells_offset; j++){
+        for (int j=2; j < num_cells+numcells_offset-1; j++){
                 temp_temperatures[j] = species[0].prim[j].temperature;
                 
                 double n_tot = 0;
-		double n_neutrals =0;
+		        double n_neutrals =0;
                 double mumean = 1.;
                 double mumean_nom = 0.;
                 for(int s=0; s<num_species; s++) {
@@ -1030,7 +1030,7 @@ int c_Sim::subcycle_heat_exchange(int j, int num_cycles, int debug, double dt) {
 
         for(int si=0; si<num_species; si++) {
                     species[si].prim[j].temperature = documentation(si, num_cycles-1);//coll_heat_output(si); //ignore last computation
-        }   
+        }
         
         if( (debug >= 1) && (e_idx > -1))
             cout<<" Found temperature solution with num_cycles="<<num_cycles<<", returning. FInal electron temperature ="<<species[e_idx].prim[j].temperature<<endl;

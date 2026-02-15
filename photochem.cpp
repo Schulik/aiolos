@@ -87,7 +87,7 @@ double HOnly_cooling(const std::array<double, 3> nX, double Te) {
 
     return 1.*cooling;
 } // */
-//std::vector<double[4]> lines_O;
+
 std::vector<std::array<double, 4>> lines_O;
 std::vector<std::array<double, 4>> lines_Op;
 std::vector<std::array<double, 4>> lines_Opp;

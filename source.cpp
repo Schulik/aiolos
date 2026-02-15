@@ -1031,7 +1031,7 @@ double c_Species::diffusive_timestep(int j) {
  */
 AOS c_Species::source_diffusion_flux2(int j, bool get_v=false) {
 
-    assert(j > 0 && j <= num_cells) ;
+    assert(j > base->num_ghosts && j <= num_cells) ;
 
     double fs_log        = (std::log10(prim[j].number_density  /base->total_numdens[j]))  /(base->x_i12[j+1] - base->x_i12[j]) ;
     double fmean_log     = (std::log10(prim[j+1].number_density/base->total_numdens[j+1]))/(base->x_i12[j+1] - base->x_i12[j]) ;
@@ -1051,7 +1051,9 @@ AOS c_Species::source_diffusion_flux2(int j, bool get_v=false) {
 
     double dfdr         = -( fj - fjm1) / (base->x_i12[j+1] - base->x_i12[j]) ;
     double kzz          = base->get_kzz(p_bar);//std::min(( 6e5 / p_bar), base->vdiffusivity);
-    double u_diff       = kzz * (fs_log-fmean_log); //If diffusivity is in cm^2/s then u_diff is in cm/s
+    double u_diff       = 0;
+    if(j>base->num_ghosts)
+            u_diff = kzz * (fs_log-fmean_log); //If diffusivity is in cm^2/s then u_diff is in cm/s
 
     double nmean   = 0.5*( prim[j].number_density + prim[j+1].number_density);
     double pmean   = 0.5*( prim[j].pres +  prim[j+1].pres);
@@ -1148,7 +1150,7 @@ void c_Sim::execute_separate_diffusion_step() {
 //
 double c_Sim::get_kzz(double pressure_in_bar) {
 
-    double tmp_kzz = kzz_alpha * std::pow(pressure_in_bar, kzz_beta) + kzz_zero;
+    double tmp_kzz = kzz_alpha * std::pow( (pressure_in_bar+1e-20), kzz_beta) + kzz_zero;
     if(pressure_in_bar < kzz_pmax)
         return kzz_max;
     return  tmp_kzz;

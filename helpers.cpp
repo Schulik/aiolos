@@ -37,7 +37,7 @@ double c_Sim::get_cfl_timestep() {
     
     for(int s = 0; s < num_species; s++) {
 
-        for(int i=num_cells-1; i>0; i--)  {
+        for(int i=num_cells-1; i>num_ghosts; i--)  {
             species[s].de_e[i] = std::abs(species[s].primlast[i].internal_energy - species[s].prim[i].internal_energy)/species[s].prim[i].internal_energy;
             
             species[s].timesteps_de[i] = 1e-50;
@@ -91,7 +91,7 @@ double c_Sim::get_cfl_timestep() {
             }
             else
                 species[s].finalstep[i]    = std::sqrt(species[s].timesteps[i]*species[s].timesteps[i] + species[s].timesteps_cs[i]*species[s].timesteps_cs[i] ) ;
-            
+
             species[s].snd_crs_time += 2.* dx[i] / species[s].prim[i].sound_speed ;
             
             if(species[s].finalstep[i] > minstep) {
@@ -146,7 +146,7 @@ double c_Sim::get_cfl_timestep() {
     if(do_hydrodynamics) {
         final_dt = min( std::min(cfl_step, diffstep), dt*max_timestep_change);
 
-        if(steps%480==0) {
+        if(steps%10000==0) {
         cout<<"       max limiting cell: "<<cnstr_cell<<" s= "<<species[cnstr_spc].speciesname<< " => dt_cfl: "<<cfl_step<<" dt_diff: "<<diffstep<<" dt_energy: "<<timestep_rad2<<"  "<<" total dt "<< final_dt<<" max_T = "<<max_temper<<" max_mach "<<max_mach<<" steps= "<<steps<<" t= "<<globalTime<<endl;
         }
         return final_dt;
@@ -155,7 +155,7 @@ double c_Sim::get_cfl_timestep() {
         double ddt = min(std::min(timestep_rad2, diffstep), dt*max_timestep_change);
         final_dt = min(ddt, dt_max);
 
-        if(steps%480==0) {
+        if(steps%10000==0) {
         cout<<"       max limiting cell: "<<cnstr_cell<<" s= "<<species[cnstr_spc].speciesname<<" dt_diff: "<<diffstep<<" dt_energy: "<<timestep_rad2<<"  "<<" total dt "<< final_dt<<" max_T = "<<max_temper<<" max_mach "<<max_mach<<" steps= "<<steps<<" t= "<<globalTime<<endl;
         }
     }
@@ -858,7 +858,7 @@ void c_Sim::update_T_mean(int j, int flag) {
 double c_Sim::return_T_mean(int j) {
 
     double avgT_nom   = 0;
-        double avgT_denom = 0;
+    double avgT_denom = 0;
 
         for(int si=0; si<num_species; si++) {
             double tt = species[si].prim[j].temperature;
