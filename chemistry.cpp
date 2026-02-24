@@ -303,7 +303,7 @@ void c_Sim::do_chemistry(double dt_chem) {
 //#pragma omp parallel for schedule(static,5)
 //    for (int j = num_cells+1; j >= 0; j--) {
     
-    for (int j = imaxchem; j >= iminchem; j--) {  //imaxchem is num_cells+1 by default; iminchem is 2 
+    for (int j = imaxchem-1; j >= iminchem; j--) {  //imaxchem is num_cells+1 by default; iminchem is 2 
         
         //std::vector<double> n_init = np_zeros(num_species);
         //std::vector<double> n_tmp  = np_zeros(num_species);
@@ -311,7 +311,7 @@ void c_Sim::do_chemistry(double dt_chem) {
         Vector_t n_tmp   = Vector_t(num_species);
         Vector_t n_tmp2  = Vector_t(num_species);
         Vector_t n_tmp3  = Vector_t(num_species);
-        Vector_t n_tmpf  = Vector_t(num_species);
+        //Vector_t n_tmpf  = Vector_t(num_species);
         
         double n_tot = 0.;
         double n_tot_new =0.;
@@ -874,6 +874,7 @@ Vector_t c_Sim::solver_cchem_implicit_general(double dtt, int cell, int cdebug, 
     ////////////////////////////////////////////////////////////////////////////////////////////
     ////////////////////////////////////////////////////////////////////////////////////////////
     Matrix_t fullmatrix = identity_matrix + reaction_matrix_ptr[loc_thr].transpose();
+    n_news = return_preconditioned_LU_solution(fullmatrix, reaction_b_ptr[loc_thr], n_olds, LUchem_ptr[loc_thr], cell); 
     /* 
     
 
@@ -924,7 +925,7 @@ Vector_t c_Sim::solver_cchem_implicit_general(double dtt, int cell, int cdebug, 
         n_news = diag_x * n_news;
     
  */
-    n_news = return_preconditioned_LU_solution(fullmatrix, reaction_b_ptr[loc_thr], n_olds, LUchem_ptr[loc_thr], cell); 
+    
     
     if(cell==-86 && steps > 100) {
         //cout<<" rescl_r = "<<rescl_r<<endl;
@@ -984,6 +985,8 @@ void c_Sim::update_dS_jb_photochem(int cell, double dtt) {
         n_news[s]           = species[s].prim[cell].number_density;
         T_olds[s]           = species[s].prim[cell].temperature;
     }
+    //Feb23rd 2026: Check if the velocity bug is coming from here:
+    n_tot = 1;
     
     for(int s=0;s<num_species; s++) {
         n_olds[s]     = species[s].prim[cell].number_density / n_tot; //TODO: Eliminate this double use of normalized and non-normalized variables
@@ -1157,31 +1160,11 @@ void c_Sim::update_dS_jb_photochem(int cell, double dtt) {
         Vector_t mom_news  = Vector_t(num_species);
         Vector_t eint_news = Vector_t(num_species);
         LUchem_mom.compute(identity_matrix + chem_momentum_matrix) ;
-        //LUchem_mom.compute(chem_momentum_matrix.transpose()) ;
-        mom_news.noalias() = LUchem_mom.solve(momentum_b);
-        eint_news.noalias()= LUchem_mom.solve(internalenergy_b);
+        
+        mom_news.noalias() = LUchem_mom.solve(momentum_b); 
+        eint_news.noalias()= LUchem_mom.solve(internalenergy_b); //Can reuse same n-dot matrix for e
         
         double dmom_tot = 0.;
-        
-        if(false) { //As a reminder
-            
-            std::array<double, 3> nX = { species[0].prim[cell].number_density, species[1].prim[cell].number_density, species[2].prim[cell].number_density};
-            //std::array<double, 3> vX = { species[0].prim[cell].speed, species[1].prim[cell].speed, species[2].prim[cell].speed};
-            std::array<double, 3> mX = { species[0].mass_amu * amu, species[1].mass_amu * amu, species[2].mass_amu * amu};
-            //std::array<double, 3> mom = { species[0].u[cell].u2, species[1].u[cell].u2, species[2].u[cell].u2 } ;
-            
-            //double ne = nX_bar[2], nH = nX_bar[0] ;
-            double dn_R = reactions[0].dndt_old * dt; //(ion.R + ion.B*ne)*ne*ne*dt ;
-            double dn_I = photoreactions[0].dndt_old * dt ;// * nX[0];// (ion.C*ne + ion.photoionization_rate(x_bar))*nH*dt ;
-
-            double fe = 1/(1 + mX[2]/mX[1]), fp = 1/(1 + mX[1]/mX[2]) ;
-            double f = nX[0] + dn_I - dn_I*dn_R*(fp/(nX[1]+dn_R) + fe/(nX[2] + dn_R)) ;
-            
-            mom_news(0) = (mom[0] + dn_R*(mom[1]/(nX[1]+dn_R) + mom[2]/(nX[2]+dn_R))) / f ;
-            mom_news(1) = (mom[1] + dn_I*mom_news(0)*fp)/(nX[1]+dn_R) ;
-            mom_news(2) = (mom[2] + dn_I*mom_news(0)*fe)/(nX[2]+dn_R) ;
-            //dmom_tot += mom_news(s)-mom[s];
-        }
         
         //
         //
@@ -1252,11 +1235,7 @@ void c_Sim::update_dS_jb_photochem(int cell, double dtt) {
             
         }
         
-        //Update quantities. Take care particularly to update E, so that no negative pressures are later computed from high momentum, as it is p = E -0.5 * rho * u^2
-        
-        for(int s=0;s<num_species; s++) {
-   
-        }
+       
     }
 }
 

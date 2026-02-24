@@ -619,7 +619,7 @@ public:
     int implicit_hydro_solver;
     Matrix3d *impl_jacobian_left;
     Matrix3d *impl_jacobian_right;
-    AOS get_roe_averages(int j);
+    AOS get_roe_averages(AOS&, AOS&);
     //
     // Friction
     //
@@ -1182,50 +1182,60 @@ public:
     void reconstruct_edge_states(std::vector<double>& u_mask, int orderstep) ;
     double (*reconstruct_pointer)(double, double, double, double, double, double, double);
 
+    AOS prim_to_u(const AOS_prim &);
+
     AOS hllc_flux(int);
     AOS hllc_flux2(int, double);
     AOS laxfriedrich_flux(int j);
     AOS laxwendroff_flux(int j);
-    AOS roe_flux(int j);    
-    AOS get_roe_averages(int j);
-    Vector3d get_hlle_flux(int j) ;
-    AOS get_hlle_flux2(int j) ;
+    AOS roe_flux(const AOS&, const AOS&);    
+    AOS roe_flux(const AOS&, const AOS&, int);    
+    AOS get_roe_averages(const AOS&, const AOS&);
+    Vector3d get_hlle_flux(const AOS&, const AOS&) ;
+    AOS get_hlle_flux2(const AOS&, const AOS&) ;
 
-    Vector3d roe_flux_vec(int j);
-    Vector3d u_to_vec(int j);
-    Vector3d exact_flux_as_vector(int j);
+    Vector3d roe_flux_vec(const AOS&, const AOS&);
+    Vector3d u_to_vec(const AOS&);
+    Vector3d exact_flux_difference(const AOS&, const AOS&);
 
     AOS dust_flux(int);
     AOS passivescalar_flux(int);
     AOS passivescalar_flux2(int);
-    AOS exact_flux(AOS u);
+    AOS exact_flux(const AOS &u);
     AOS exact_advection_flux(AOS u);
     void positivity_preserving_step(int j);
     void compute_e_fluxes(int j);
     double return_entropy_with_jump(double j);
+    double eint(const AOS &);
+    double eintemp(const AOS &);
 
     void implicit_incompressible(double dt);
     void implicit_incompressible2(double dt);
+    void implicit_iterative(double dt);
+    double compute_hydro_residual(std::vector<AOS> &u_tmp, std::vector<double> &res);
     //std::vector<double> get_hydro_jacobian(int jleft, int jright);
     std::vector<double> get_hydro_jacobian_df3(int jleft, int jright);
     std::vector<double> get_hydro_jacobian_E(int jleft, int jright);
-    std::vector<double> get_hydro_jacobian_P(int j);
+    std::vector<double> get_hydro_jacobian_P(const AOS&);
     std::vector<double> get_hydro_jacobian_P(int jleft, int jright);
     std::vector<double> get_hydro_jacobian_P(int jleft, int jright, double a, double b);
 
-    Vector3d (c_Species::*flux_pointer)(int);
-    void (c_Species::*write_jacobians)(Matrix3d &, Matrix3d &, int);
+    Vector3d (c_Species::*flux_pointer)(const AOS &, const AOS &);                        //Flux evaluation consistent with the Jacobians
+    void (c_Species::*write_jacobians)(Matrix3d &, Matrix3d &, const AOS &, const AOS &); //Evaluate Jacobian along one cell interface
 
     //AOS get_roe_averages(int j);
-    Matrix3d get_roe_matrix_abs(int j);
-    Matrix3d get_exact_Jacobian(AOS u);
-    void write_roe_jacobians(Matrix3d &left_m, Matrix3d &right_m, int interface);
-    void write_hlle_jacobians(Matrix3d &left_m, Matrix3d &right_m, int j);
-    void write_exact_jacobians(Matrix3d &left_m, Matrix3d &right_m, int j);
-    void write_hlle_wavespeeds(AOS_prim prim_l_in, AOS_prim prim_r_in, AOS &state_l_out, AOS &state_r_out, double &SL_out, double &SR_out);
+    Matrix3d get_roe_matrix_abs(const AOS &,const AOS &);
+    Matrix3d get_exact_Jacobian(const AOS &u);
+    void write_roe_jacobians(Matrix3d &left_m, Matrix3d &right_m,const AOS &,const AOS &);
+    void write_hlle_jacobians(Matrix3d &left_m, Matrix3d &right_m,const AOS &,const AOS &);
+    void write_exact_jacobians(Matrix3d &left_m, Matrix3d &right_m,const AOS &,const AOS &);
+    void write_hlle_wavespeeds(const AOS &, const AOS &, double &SL_out, double &SR_out);
+    
+    Matrix3d get_advection_Jacobian(const AOS &u);
+    void write_advection_jacobians(Matrix3d &left_m, Matrix3d &right_m,const AOS &,const AOS &);
     
     AOS source_grav(AOS &u, int &j);
-    AOS source_grav_noconserved(AOS &u, int &j);
+    AOS source_grav_noconserved(int &j);
     AOS source_diffusion_flux(int j);
     AOS source_diffusion_flux2(int j, bool get_v);
     double diffusive_timestep(int j);

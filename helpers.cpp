@@ -59,10 +59,6 @@ double c_Sim::get_cfl_timestep() {
     for(int s=0; s < num_species; s++) {
         
         int start = 1;
-        if(s == -100) {
-           start = ignore_electron_cfl_cell;
-           start = std::min(ignore_electron_cfl_cell, num_cells);
-        }
 
         species[s].snd_crs_time = 0;
         for(int i=start; i<=num_cells; i++) {
@@ -144,10 +140,14 @@ double c_Sim::get_cfl_timestep() {
       
     double final_dt = 0;
     if(do_hydrodynamics) {
-        final_dt = min( std::min(cfl_step, diffstep), dt*max_timestep_change);
 
-        if(steps%10000==0) {
-        cout<<"       max limiting cell: "<<cnstr_cell<<" s= "<<species[cnstr_spc].speciesname<< " => dt_cfl: "<<cfl_step<<" dt_diff: "<<diffstep<<" dt_energy: "<<timestep_rad2<<"  "<<" total dt "<< final_dt<<" max_T = "<<max_temper<<" max_mach "<<max_mach<<" steps= "<<steps<<" t= "<<globalTime<<endl;
+        if(globalTime<1e2)
+            final_dt = min( std::min(cfl_step, diffstep), dt*max_timestep_change);
+        else
+            final_dt = min( std::min(cfl_step, diffstep), timestep_rad2);
+
+        if(steps%cont_output_steps==0) {
+        cout<<"    t= "<<globalTime<<" max limiting cell: "<<cnstr_cell<<" s= "<<species[cnstr_spc].speciesname<< " => dt_cfl: "<<cfl_step<<" dt_diff: "<<diffstep<<" dt_energy: "<<timestep_rad2<<"  "<<" total dt "<< final_dt<<" max_T = "<<max_temper<<" max_mach "<<max_mach<<" steps= "<<steps<<endl;
         }
         return final_dt;
 
@@ -156,7 +156,7 @@ double c_Sim::get_cfl_timestep() {
         final_dt = min(ddt, dt_max);
 
         if(steps%10000==0) {
-        cout<<"       max limiting cell: "<<cnstr_cell<<" s= "<<species[cnstr_spc].speciesname<<" dt_diff: "<<diffstep<<" dt_energy: "<<timestep_rad2<<"  "<<" total dt "<< final_dt<<" max_T = "<<max_temper<<" max_mach "<<max_mach<<" steps= "<<steps<<" t= "<<globalTime<<endl;
+        cout<<"    t= "<<globalTime<<" max limiting cell: "<<cnstr_cell<<" s= "<<species[cnstr_spc].speciesname<<" dt_diff: "<<diffstep<<" dt_energy: "<<timestep_rad2<<"  "<<" total dt "<< final_dt<<" max_T = "<<max_temper<<" max_mach "<<max_mach<<" steps= "<<steps<<" t= "<<globalTime<<endl;
         }
     }
     return final_dt;
@@ -746,8 +746,11 @@ Vector_t c_Sim::return_preconditioned_LU_solution(const Matrix_t &matrix, const 
     int use_preconditioning = 1;
     if(use_preconditioning) {
         
-        for(int s=0; s<num_species; s++) {
-            rescl_x(s) = 1/orig_vector(s);
+        for(int si=0; si<num_species; si++) {
+            if( std::fabs(orig_vector(si)) > 0. )
+                rescl_x(si) = 1/orig_vector(si);
+            else
+                rescl_x(si) = 1.;
         }
 
         diag_x = rescl_x.asDiagonal();
@@ -756,7 +759,11 @@ Vector_t c_Sim::return_preconditioned_LU_solution(const Matrix_t &matrix, const 
         for(int si=0; si<num_species; si++) {
             double rowmax = 1;
             for(int sj=0; sj<num_species; sj++) {
-                rowmax = std::max(rowmax, 1./(std::fabs(Aix(si,sj))+std::fabs(rhs(si)))   );
+                double denom = (std::fabs(Aix(si,sj))+std::fabs(rhs(si)));
+                if(denom > 0.)
+                    rowmax = std::max(rowmax, 1./ denom   );
+                else 
+                    rowmax = std::max(rowmax, 1.);;
             }
             rescl_r(si) = rowmax;
         }
@@ -824,7 +831,7 @@ void c_Sim::update_T_mean(int j, int flag) {
                 if(std::isnan(species[si].prim[j].temperature))
                     cout<<"("<<species[si].speciesname<<")";
                 cout<<" ";
- /*                AOS      tmp  = species[si].u[j];
+                /* AOS      tmp  = species[si].u[j];
                 AOS_prim tmpp = species[si].prim[j];
                 double tt = tmp.u3 - 0.5 * tmp.u2*tmp.u2/tmp.u1;
                 tt /= (tmp.u1*species[si].cv);
@@ -846,9 +853,6 @@ void c_Sim::update_T_mean(int j, int flag) {
             }
             cout<<endl;
 
-
-/*             char a;
-            cin>>a; */
         }
 }
 

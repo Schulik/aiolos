@@ -174,7 +174,7 @@ void c_Species::implicit_incompressible(double dt) {
         
         double gsrc    = source_grav(u[j], j).u2;
         double gsrc3   = source_grav(u[j], j).u3;
-        double gsrc_no = source_grav_noconserved(u[j], j).u2;
+        double gsrc_no = source_grav_noconserved( j).u2;
         double psrc    =  -(base->source_pressure_prefactor_left[j] * prim_l[j].pres - 
                                           base->source_pressure_prefactor_right[j] * prim_r[j].pres);
         
@@ -448,9 +448,9 @@ void c_Species::implicit_incompressible2(double dt) {
 
     //cout<<" Hi i am species "<<speciesname<<" and i am attempting to be solved implicitly."<<endl;
 
-    ////////////////////////////////////////////////////////////////////////
-    // Construct implicit Matrix
-    ////////////////////////////////////////////////////////////////////////
+    //@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+    // Construct implicit Matrix 2 - better, faster, more jacobians. Also with '@'s as decorators
+    //@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 
     //Boundaries
     this->apply_boundary_left(this->u) ;
@@ -474,9 +474,9 @@ void c_Species::implicit_incompressible2(double dt) {
     std::vector<double> 
         ll(size_M, 0.), dd(size_M, 0.), uu(size_M, 0.), r(size_r, 0.) ;
     
-    ////////////////////////////////////////////////////////////////////////
+    //@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
     // Construct implicit Matrix
-    ////////////////////////////////////////////////////////////////////////
+    //@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
     for (int j=0; j <= num_cells+1; j++) {
 
         double V   = base->vol[j];
@@ -498,19 +498,19 @@ void c_Species::implicit_incompressible2(double dt) {
         r[idx_r+ 2]  += V / dt * u[j].u3;
     }
 
-    //////////////////////////////////////////////////////////////////////////
+    //@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
     // Precompute Jabobians interface by interface, define flux function pointer
-    //////////////////////////////////////////////////////////////////////////
+    //@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 
     for (int j=1; j <= num_cells; j++) { //Going interface by interface - interface j is between cell j and j+1. Ignore interface 0, that's just excess memory to get the index shifted by 1
-        (this->*write_jacobians)(base->impl_jacobian_left[j], base->impl_jacobian_right[j], j);
+        (this->*write_jacobians)(base->impl_jacobian_left[j], base->impl_jacobian_right[j], prim_to_u(prim_r[j]),prim_to_u(prim_l[j+1])); //u[j], u[j+1]
     }
 
     int impl_debug = 0;
 
-    //////////////////////////////////////////////////////////////////////////
+    //@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
     // 
-    //////////////////////////////////////////////////////////////////////////
+    //@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 
     double geometry_f =0.;
     if(base->geometry==Geometry::spherical) {
@@ -521,8 +521,24 @@ void c_Species::implicit_incompressible2(double dt) {
 
     //cout<<" starting timestep "<<base->steps<<" with dt = "<<dt<<endl;
 
-    for (int j=1; j <= num_cells; j++) {  //Reminder: cell 1 is boundaed by interface 0 (left) and 1 (right), cell 2 by 1 and 2
+    int imin = base->ignore_electron_cfl_cell; // default is 1, default for ignore_electron_cfl_cell is also 1
+    //determine imin based on minimum mixing ratio, to avoid instabilities of electrons at low densities
+    double f =0;
+    for (int j=1; j <= num_cells; j++) {  
+        f = prim[j].number_density/base->total_numdens[j];
+        imin = j;
+        if(f > base->mix_p3)
+            break;
+    }
 
+    //if(base->steps%1000==0)
+    //    cout<<" limiting cell in implicit solver found as "<<imin<<endl;
+
+    //@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+    // Start building nontrivial entries
+    //@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+    for (int j=imin; j <= num_cells; j++) {  //Going cell by cell. Reminder: cell 1 is boundaed by interface 0 (left) and 1 (right), cell 2 by 1 and 2
+        
         double V   = base->vol[j];
         double S_l = base->surf[j-1];
         double S_r = base->surf[j];
@@ -536,7 +552,7 @@ void c_Species::implicit_incompressible2(double dt) {
         //
         double f      =  prim[j].pres/base->total_press[j];
         double f_lim  = base->edamp_lim;
-        ff[j] = f;
+        ff[j]         = f;
 
         t_damp[j] = std::max(f*f_lim, 1e-10);
         if(j>= num_cells-1)
@@ -547,36 +563,31 @@ void c_Species::implicit_incompressible2(double dt) {
             dd[idx + 4]      += V / t_damp[j] ; //Momentum damping
         }
         
-        double gsrc    = source_grav(u[j], j).u2;
-        double gsrc3   = source_grav(u[j], j).u3;
-        double gsrc_no = source_grav_noconserved(u[j], j).u2;
-        double psrc    =  -(base->source_pressure_prefactor_left[j] * prim_l[j].pres - 
-                                          base->source_pressure_prefactor_right[j] * prim_r[j].pres);
-        
         if(impl_debug)                                
             cout<<"starting cell j = "<<j<<" steps "<<base->steps<<endl;
-        ////////////////////////////////////////////////////////////////////////
+        //@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
         // Right face
-        ////////////////////////////////////////////////////////////////////////
+        //@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
         
-        Vector3d ul             = u_to_vec(j);
-        Vector3d ur             = u_to_vec(j+1);
+        Vector3d ul             = u_to_vec(prim_to_u(prim_r[j]));
+        Vector3d ur             = u_to_vec(prim_to_u(prim_l[j+1]));
         Matrix3d Jl             = base->impl_jacobian_left[j];
         Matrix3d Jr             = base->impl_jacobian_right[j];
         Vector3d dul            = Jl * ul;
         Vector3d dur            = Jr * ur;
-        Vector3d f_last         = (this->*flux_pointer)(j);
-
+        Vector3d f_last         = (this->*flux_pointer)(prim_to_u(prim_r[j]),prim_to_u(prim_l[j+1]));
+        
         if(impl_debug) {
             cout<<" in implicit roe solver Jl and Jr ="<<endl<<Jl<<endl<<endl<<Jr<<endl;
             cout<<" left and right states: "<<endl<<ul<<endl<<ur<<endl;
+            cout<<" f_last "<<f_last<<endl;
         }
         //Write R.H.S components
         for(int ii=0; ii<3; ii++) {
             r[idx_r + ii] +=  S_r * (- f_last(ii) + dul(ii) + dur(ii));
 
-            if(impl_debug)                                
-                cout<<" was writing into ii = "<<ii<<" r elms, f_roe = "<<f_last(ii) <<" dul+dur = "<<dul(ii) + dur(ii)<<endl;
+            //if(impl_debug)                                
+            //    cout<<" was writing into ii = "<<ii<<" r elms, f_roe = "<<f_last(ii) <<" dul+dur = "<<dul(ii) + dur(ii)<<endl;
 
             for(int jj=0; jj<3; jj++) {        
                 int ci = ii*3 + jj;
@@ -589,17 +600,17 @@ void c_Species::implicit_incompressible2(double dt) {
             }
         }
 
-        //////////////////////////////////////////////////////////////////////
+        //@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
         // Left face
-        //////////////////////////////////////////////////////////////////////
+        //@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
         
-        ul             = u_to_vec(j-1);
-        ur             = u_to_vec(j);
+        ul             = u_to_vec(prim_to_u(prim_r[j-1]));
+        ur             = u_to_vec(prim_to_u(prim_l[j]));
         Jl             = base->impl_jacobian_left[j-1];
         Jr             = base->impl_jacobian_right[j-1];
         dul            = Jl * ul;
         dur            = Jr * ur;
-        f_last         = (this->*flux_pointer)(j-1);
+        f_last         = (this->*flux_pointer)(prim_to_u(prim_r[j-1]),prim_to_u(prim_l[j]));
 
         //Write L.H.S components
         for(int ii=0; ii<3; ii++) {
@@ -614,31 +625,29 @@ void c_Species::implicit_incompressible2(double dt) {
             }
         }
         
-        //////////////////////////////////////////////////////////////////////
+        //@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
         // Sources
-        //////////////////////////////////////////////////////////////////////
+        //@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 
-        //Source terms //2P/r    2 * S_l * base->x_i[j];
+        //Source terms //2P/r
         if(base->geometry!=Geometry::cartesian) {
-            std::vector<double> diff = get_hydro_jacobian_P(j);
+            std::vector<double> diff = get_hydro_jacobian_P(u[j]);
             double prsc_total = (diff[0]*u[j].u1 + diff[1]*u[j].u2 + diff[2]*u[j].u3);
-
-            double rm1 = (S_r-S_l)/V;
-                    //rm1 = 2./base->x_iVC[j];
+            double p_tmp      = (u[j].u3-0.5*u[j].u2*u[j].u2/u[j].u1)*(gamma_adiabat-1);
             
-            double v2r = + 1.0 * V * rm1;
+            double v2r = + 2*V/base->x_iVC[j];
             dd[idx + 3]    -= v2r * diff[0]; 
             dd[idx + 4]    -= v2r * diff[1];  
             dd[idx + 5]    -= v2r * diff[2]; 
-            //r[idx_r+ 1]    += v2r * (prim[j].pres - prsc_total) ;
-            //r[idx_r+ 1]    += v2r * ( - prsc_total) + V * psrc;
-            r[idx_r+ 1]    += v2r * (prim[j].pres - prsc_total);
+            r[idx_r+ 1]    += v2r * ( p_tmp - prsc_total);
         }
         if(j>pwall && j<num_cells) {
-            r[idx_r+1]       += 1.0 * V * (gsrc );   //Grav and geometric source
-            r[idx_r+2]       += 1.0 * V * (gsrc3);              //Grav and geometric source
+            double gsrc_no = source_grav_noconserved(j).u2; //Grav source term S_g
+
+            dd[idx + 3]    -= V * gsrc_no;             //  dS_g/drho * rho in momentum equation
+            dd[idx + 7]    -= V * gsrc_no;             //  dS_g/dmom in energy equation
         }
-        ////////////////////////////////////////////psrc//////////////////////////
+        //@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
         // End Sources
         //////////////////////////////////////////////////////////////////////
     }
@@ -647,24 +656,11 @@ void c_Species::implicit_incompressible2(double dt) {
     //
     // Solve!
     //
-/* 
-    cout<<"r: ";
-    for (auto i : r)
-        cout<<i<<endl;
-    cout<<"dd: ";
-    for (auto i : dd)
-        cout<<i<<endl;
-    cout<<"uu: ";
-    for (auto i : uu)
-        cout<<i<<endl;
-    cout<<"ll: ";
-    for (auto i : ll)
-        cout<<i<<endl;
+    /* cout<<" r side "<<endl;
+    for(auto rr: r)
+        cout<<rr<<endl;
+    cout<<endl; */
 
-    char a;
-    cin>>a;
- */
-    //cout<<"before solve"<<endl;
 
     base->implicit_tridiag.factor_matrix(&ll[0], &dd[0], &uu[0]) ;
     base->implicit_tridiag.solve(&r[0], &r[0]) ; // Solve in place
@@ -680,13 +676,14 @@ void c_Species::implicit_incompressible2(double dt) {
     if(base->steps >= 462e99) {
         cout<<" steps "<<base->steps;
     }
+    
     for (int j=0; j <= base->num_cells; j++) {
         int idx   = j*stride  ;
         int idx_r = j*num_vars;
 
         double rhotmp = std::max(r[idx_r + 0], 1e-60 );
-        double momtmp = r[j*num_vars + 1];
-        double Etmp   = r[j*num_vars + 2];
+        double momtmp = r[idx_r + 1];
+        double Etmp   = r[idx_r + 2];
         double Ekin = 0.5*momtmp*momtmp/rhotmp;
 
         double T_tmp = prim[j].temperature = std::min(std::max(prim[j].temperature, base->temperature_floor), base->max_temperature);
@@ -701,7 +698,7 @@ void c_Species::implicit_incompressible2(double dt) {
             //cout<<" j = "<<j<<" old/new E    = "<<u[j].u3<<" / "<<r[j*num_vars + 2]<<endl;
             cout<<" j = "<<j<<" predicted T  = "<<rhoe_implied/cv<<" current T "<<prim[j].temperature<<" u1/u2/u3: "<<rhotmp<<" / "<<momtmp<<" / "<<r[j*num_vars + 2]<<" E_implied "<<E_implied<<endl;
         }
-
+        
         if(base->steps>2) {
             double rhonew = std::max(r[idx_r + 0], 1e-60 );//std::max(results(j), 1e-20 ); //std::max(r[idx_r + 0], 1e-20 );//r[idx_r + 0];
             double momnew = r[idx_r + 1];
@@ -717,9 +714,17 @@ void c_Species::implicit_incompressible2(double dt) {
             u[j].u3 = Enew;
         }
     }
+    
     // Update primitives. 
-    eos->compute_primitive(&(u[0]), &(prim[0]), base->num_cells+1) ;   
-    eos->compute_auxillary(&(prim[0]), base->num_cells+1);
+    eos->compute_primitive(&(u[0]), &(prim[0]), base->num_cells) ;   
+    eos->compute_auxillary(&(prim[0]), base->num_cells); 
+
+    //Check electron temperatures and throw flag if Nans or < 0;
+    for (int j=1; j <= base->num_cells; j++) {
+        //base->update_T_mean(j, 17);
+    }
+
+    
 
 }
 
@@ -759,12 +764,9 @@ std::vector<double> c_Species::get_hydro_jacobian_E(int jleft, int jright) {
 // Computes the derivatives of P w.r.t the other conservative hydro variables at an interface
 //
 
-std::vector<double> c_Species::get_hydro_jacobian_P(int j) {
+std::vector<double> c_Species::get_hydro_jacobian_P(const AOS& uu) {
     double g = gamma_adiabat;
-    double m1 = u[j].u1;
-    double m2 = u[j].u2;
-    double m3 = u[j].u3;
-    double mv = m2/m1;
+    double mv = uu.u2/uu.u1;
 
     return  {(g-1)/2*(mv*mv), - (g-1)*mv,  (g-1)};
 }
@@ -789,29 +791,27 @@ std::vector<double> c_Species::get_hydro_jacobian_P(int jleft, int jright, doubl
     return  {(g-1)/2*(mv*mv), -(g-1)*mv, (g-1)};
 }
 
-Matrix3d c_Species::get_exact_Jacobian(AOS u) {
+Matrix3d c_Species::get_exact_Jacobian(const AOS& u) {
     double g = gamma_adiabat;
     double v = u.u2/u.u1;
-
     Matrix_t m(3,3);
-    //m<< 0,1,0,   0, 1*v,  0.,  \
-                0.,  0.,   1*v;
-
+    
     m<< 0,1,0,   -0.5*(g-3)*v*v, (3-g)*v,  (g-1),  \
     -g*u.u2*u.u3/(u.u1*u.u1)+(g-1)*v*v*v,  g*u.u3/u.u1-1.5*(g-1)*v*v,  g*v;
 
     return m;
 }
 
-void c_Species::write_roe_jacobians(Matrix3d &left_m, Matrix3d &right_m, int interface) {
+void c_Species::write_roe_jacobians(Matrix3d &left_m, Matrix3d &right_m, const AOS &uleft, const AOS &uright ) {
 
-    AOS ravg = get_roe_averages(interface);
+    AOS ravg = get_roe_averages(uleft, uright);
 
-    //Matrix3d A_tilda = get_roe_matrix_abs(ravg);
-    Matrix3d A_tilda2 = get_roe_matrix_abs(interface);
-    Matrix3d  A_left = get_exact_Jacobian(u[interface]);
-    Matrix3d A_right = get_exact_Jacobian(u[interface+1]);
-
+    Matrix3d A_tilda2 = get_roe_matrix_abs(uleft, uright);
+    Matrix3d  A_left = get_exact_Jacobian(uleft);
+    Matrix3d A_right = get_exact_Jacobian(uright);
+ 
+    Matrix3d unity;
+    unity << 1,0,0, 0,1,0, 0,0,1;
     //cout<<" returnting Atilda and Atilda2: "<<endl<<A_tilda<<endl<<endl<<A_tilda2<<endl;
     left_m  = A_left  * 0.5 + A_tilda2 * 0.5;
     right_m = A_right * 0.5 - A_tilda2 * 0.5;
@@ -821,18 +821,29 @@ void c_Species::write_roe_jacobians(Matrix3d &left_m, Matrix3d &right_m, int int
 // Takes an AOS object, assuming the Roe-averaged states q_tilde, u_tilde, H_tilde are written into them
 // Returns the absolute value of the Roe matrix for this interface.
 //
-Matrix3d c_Species::get_roe_matrix_abs(int j) 
+Matrix3d c_Species::get_roe_matrix_abs(const AOS& uleft, const AOS& uright) 
 {
+    //int jleft = j, jright = j+1;
+    AOS_prim prim_l;//  = this->prim[jleft];
+    AOS_prim prim_r;//  = this->prim[jright];
+
+    double ekin_l = 0.5* uleft.u2*uleft.u2/uleft.u1;
+    double ekin_r = 0.5* uright.u2*uright.u2/uright.u1;
+
+    prim_l.density = uleft.u1;
+    prim_r.density = uright.u1;
+
+    prim_l.speed = uleft.u2/uleft.u1;
+    prim_r.speed = uright.u2/uright.u1;
+
+    prim_l.pres = (uleft.u3-ekin_l)*(gamma_adiabat-1);
+    prim_r.pres = (uright.u3-ekin_r)*(gamma_adiabat-1);
+
+    AOS state_l      = uleft; //AOS(prim_l.density, prim_l.speed*prim_l.density, prim_l.density*prim_l.internal_energy + 0.5*prim_l.density*prim_l.speed*prim_l.speed); //u[jleft];
+    AOS state_r      = uright; //AOS(prim_r.density, prim_r.speed*prim_r.density, prim_r.density*prim_r.internal_energy + 0.5*prim_r.density*prim_r.speed*prim_r.speed); // = u[jright];
     
-    int jleft = j, jright = j+1;
-    AOS_prim prim_l  = this->prim[jleft];
-    AOS_prim prim_r  = this->prim[jright];
-    
-    AOS state_l      = AOS(prim_l.density, prim_l.speed*prim_l.density, prim_l.density*prim_l.internal_energy + 0.5*prim_l.density*prim_l.speed*prim_l.speed); //u[jleft];
-    AOS state_r      = AOS(prim_r.density, prim_r.speed*prim_r.density, prim_r.density*prim_r.internal_energy + 0.5*prim_r.density*prim_r.speed*prim_r.speed); // = u[jright];
-    
-    AOS flux_l       = exact_flux(state_l);
-    AOS flux_r       = exact_flux(state_r);
+    //AOS flux_l       = exact_flux(state_l);
+    //AOS flux_r       = exact_flux(state_r);
     
     double drho = state_r.u1 - state_l.u1;
     double dp   = prim_r.pres - prim_l.pres;
@@ -847,14 +858,15 @@ Matrix3d c_Species::get_roe_matrix_abs(int j)
     double c   = std::sqrt((gamma_adiabat-1.) * (h-0.5*u*u));
  
     double lambdas[3] = {std::fabs(u-c), std::fabs(u), std::fabs(u+c) };
-    
+
     //HH-Entropy fix
-    double delta = 0.999*c;
-    for(int k=0; k<=2; k+=1) {
+    double delta = 0.9*c;
+    for(int k=1; k<=1; k+=1) {
         if(lambdas[k]<delta) {
             //lambdas[k] = 0.5*(lambdas[k]*lambdas[k]/eps+eps); 
-            //lambdas[k] = 0.5*(lambdas[k]*lambdas[k]/(delta)+delta);
-            lambdas[k] = (lambdas[k]*lambdas[k] + delta*delta)/(2.*delta); 
+            lambdas[k] = 0.5*(lambdas[k]*lambdas[k]/(delta)+delta);
+            //lambdas[k] = (lambdas[k]*lambdas[k] + delta*delta)/(2.*delta); 
+            
         }
     }
 

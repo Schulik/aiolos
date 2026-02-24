@@ -72,9 +72,9 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, s
         solver           = read_parameter_from_file<HydroSolver>(filename, "HYDRO_SOLVER", debug, HydroSolver::hllc).value; //Spatial order of differentials.
         implicit_hydro_solver  = read_parameter_from_file<int>(filename, "IMPLICIT_HYDRO_SOL", debug, 0).value; //Spatial order of differentials.
         
-        mix_p1           = read_parameter_from_file<double>(filename,"MIX_HYDROSOLVER_PAR1", debug, 1).value;
-        mix_p2           = read_parameter_from_file<double>(filename,"MIX_HYDROSOLVER_PAR2", debug, 1).value;
-        mix_p3           = read_parameter_from_file<double>(filename,"MIX_HYDROSOLVER_PAR3", debug, 1).value;
+        mix_p1           = read_parameter_from_file<double>(filename,"MIX_HYDROSOLVER_PAR1", debug, 1e-10).value;
+        mix_p2           = read_parameter_from_file<double>(filename,"MIX_HYDROSOLVER_PAR2", debug, 1e-10).value;
+        mix_p3           = read_parameter_from_file<double>(filename,"MIX_HYDROSOLVER_PAR3", debug, 1e-4).value;
         mix_reset_i      = read_parameter_from_file<int>(filename,"MIX_RESET_I", debug, 0).value;
         ignore_electron_cfl_cell      = read_parameter_from_file<int>(filename,"IGNORE_ELECTRON_CFL_CELL", debug, 1).value;
         
@@ -292,6 +292,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, s
         do_hydrodynamics  = read_parameter_from_file<int>(filename,"DO_HYDRO", debug, 1).value;  //Switch hydrodynamics, including its CFL condition on/off
         start_hydro_time  = read_parameter_from_file<double>(filename,"START_HYDRO_TIME", debug, -1.).value; //Hydro is started once globalTime > start_hydro_time and do_hydro == 1
         photochemistry_level = read_parameter_from_file<int>(filename,"PHOTOCHEM_LEVEL", debug, 0).value; //1==C2Ray solver, 2==general photo and thermochemistry solver
+        output_chemistry = 0;
         dust_to_gas_ratio = read_parameter_from_file<double>(filename,"DUST_TO_GAS", debug, 0.).value;    //dust-to-gas ratio for Semenov/Malygin opacities
         temperature_floor = read_parameter_from_file<double>(filename,"TEMPERATURE_FLOOR", debug, 0.).value;  //Limit the temperature to a minimum in radiation solver (negative T crashes can still occur due to negative pressures, whichever is found first)
         max_temperature   = read_parameter_from_file<double>(filename,"TEMPERATURE_MAX", debug, 9e99).value;  //Limit the temperature to a maximum
@@ -826,7 +827,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, s
         ///////////////////////////////////////////////////////////////////////// 
         /////////////////////////////////////////////////////////////////////////
         /////////////////////////////////////////////////////////////////////////
-        
+        compute_total_pressure();
         for(int s = 0; s < num_species; s++)
             species[s].compute_pressure(species[s].u);
         
@@ -1310,6 +1311,8 @@ c_Species::c_Species(c_Sim *base_simulation, string filename, string species_fil
         ////////////////////////////////////////////////////////////////////////
         // Set flux and jacobian pointers, this is set for all species, so that we can in principle run the solver on other species safely
         ////////////////////////////////////////////////////////////////////////
+        //The flux functions shall return intercell fluxes, not intracell fluxes.
+        // The Jacobians need to be returned separately for left and right side
 
         if(base->solver == HydroSolver::implicitelectrons) {
             if(base->implicit_hydro_solver == 1) {
@@ -1321,12 +1324,10 @@ c_Species::c_Species(c_Sim *base_simulation, string filename, string species_fil
                 write_jacobians      = &c_Species::write_roe_jacobians;
                 cout<<" solving electrons implicitly and pointing towards Roe fluxes.  "<<endl;
             } else {
-                flux_pointer         = &c_Species::exact_flux_as_vector;
+                flux_pointer         = &c_Species::exact_flux_difference;
                 write_jacobians      = &c_Species::write_exact_jacobians;
                 cout<<" solving electrons implicitly and pointing towards Exact fluxes.  "<<endl;
-
             }
-
         }
 
         const_T_space  = read_parameter_from_file<double>(filename,"PARI_CONST_TEMP", debug, 1.).value; //Temperature at boundary. Use depending on INIT_TEMPERATURE_MODEL
@@ -1759,8 +1760,13 @@ void c_Species::initialize_hydrostatic_atmosphere(string filename) {
             
             temp_rhofinal = u[i].u1 *  (factor_inner - metric_inner)/(factor_outer + metric_outer);
             
-            if(dphi < 0.)
-                temp_rhofinal = u[i].u1;
+            double grav = G*base->planet_mass/(base->x_i12[i]*base->x_i12[i]); //use intercell radius
+            double scaleH = kb * T_inner / (mass_amu*amu*grav);
+            if((dphi < 0.) || (temp_rhofinal<0)) {
+                temp_rhofinal = u[i].u1 * std::exp(- (base->x_iVC[i+1] - base->x_iVC[i] )/scaleH);//use cell-centered radius
+            }
+
+                
             
             //cout<<" s/i = "<<speciesname<<"/"<<i<<"   metric_inner debug: dPhi = "<<dphi<<" rhonew/rhoold = "<<temp_rhofinal<<"/"<<u[i].u1<<endl;
             
@@ -1769,37 +1775,14 @@ void c_Species::initialize_hydrostatic_atmosphere(string filename) {
             //////////////////////////////////////////////////////////////////////////////////////
             //double floor = base->density_floor / mass_amu * std::pow(base->x_i12[i]/base->x_i12[1], -4.);
             
-            double floor          = base->density_floor * std::pow(base->x_i12[i]/base->x_i12[1], -4.) * initial_fraction;
+            double lastval_scaled          = base->density_floor * std::pow(base->x_i12[i]/base->x_i12[1], -4.) * initial_fraction;
             //double lastval_scaled = u[i].u1 * std::pow(base->x_i12[i]/base->x_i12[i+1], 8.);
-            double lastval_scaled = u[i].u1; // * u[i].u1/u[i-1].u1;
-            
-            if(lastval_scaled < floor)
-                lastval_scaled = floor;
-
-
-            if(temp_rhofinal < 0.) {
-                
-                if(lastval_scaled > floor && base->use_init_discont_smoothing)
-                    temp_rhofinal = lastval_scaled;
-                else
-                    temp_rhofinal = lastval_scaled; //this was formerly triggered when  //if( (temp_rhofinal < floor) || ( base->x_i12[i] > 0.5*base->rhill  && base->use_tides == 2       ) ) {
-                
-                negdens = 1;
-            }
-            /*
-            if(base->use_init_discont_smoothing && temp_rhofinal < 0. && temp_rhofinal > floor) {
-                //if(temp_rhofinal < lastval_scaled)
-                    temp_rhofinal = lastval_scaled;
-            }
-            
-            //if( (temp_rhofinal < floor) || ( base->x_i12[i] > 0.5*base->rhill  && base->use_tides == 2       ) ) {
-            if(false){
-                
-                if(temp_rhofinal < 0.)
-                    negdens = 1;
-                
+            double floor = 0.5 * u[i].u1 * std::exp(-(base->x_iVC[i+1] - base->x_iVC[i] )/scaleH); // * u[i].u1/u[i-1].u1;
+            int floorcorrected= 0;
+            if( (temp_rhofinal < floor) || std::isnan(temp_rhofinal) || std::isinf(temp_rhofinal)) {                         
                 temp_rhofinal = floor;
-            }*/
+                floorcorrected = 1;
+            }
             //////////////////////////////////////////////////////////////////////////////////////
             
             //if(this_species_index == 2) {

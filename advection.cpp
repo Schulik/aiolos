@@ -71,12 +71,13 @@ void c_Sim::execute(int restartnumber, double restarttime_cmdline) {
      
         //if(steps>10)
         //feenableexcept(FE_INVALID);
+        //feenableexcept(fegetexcept()|FE_DIVBYZERO|FE_INVALID|FE_OVERFLOW|FE_UNDERFLOW);
      
           if(start_hydro_time > 0. && globalTime > start_hydro_time) {   //Comment in if a radiative equilibrium phase is desired before starting hydro
               do_hydrodynamics = 1;
           }
 
-        if(steps==0) {
+        if(steps<10) {
             for(int s = 0; s < num_species; s++)
                 species[s].compute_pressure(species[s].u);
             compute_total_pressure();
@@ -87,10 +88,6 @@ void c_Sim::execute(int restartnumber, double restarttime_cmdline) {
         dt = std::min(dt, t_max - globalTime);
         if(steps == 0)
             dt = std::min(dt, dt_initial);
-        //if(steps > 400) {
-	//    cout<<" steps  = "<<steps<<" shrinking dt = "<<dt<<endl;
-	//    dt = dt * 0.5;
-        //}
 
         if( globalTime > next_print_time) {
             cout<<" Beginning step "<<steps<<" @ globalTime "<<globalTime<<" dt "<<dt;
@@ -179,26 +176,20 @@ void c_Sim::execute(int restartnumber, double restarttime_cmdline) {
         // Step 0: Hydrodynamics, if so desired
         //
 
-	    //if (do_hydrodynamics == 1) 
-        //    compute_drag_update(1.0*dt) ;
-
         if(steps >printstuff_steps) {    
                 print_velocity_numberdens_ratios(" Pos 0:: ", 210); 
         }
         
         if (do_hydrodynamics == 1) {
         
-            //int cnt_broken_cells = 0;
-            //
                 //March 19th 2024: Added get_cfl_timestep2() to sit here, to obtain the updated timestep based on the extrapolated left and right values - they can produce inconsistent fluxes with the cell-centered values, which the call of dt = get_cfl_timestep(); at the beginning of the timestep is based on;
                 //
-            //cout<<"num_sepcies = "<<num_species<<endl;
+            
             for(int s = 0; s < num_species; s++) {
                 species[s].u_mask           = np_zeros(num_cells+2);
                 species[s].u0    = species[s].u ;
                 species[s].u_tmp = species[s].u ;
                 
-                //cout<<"    running species "<<species[s].speciesname<<" s = "<<s<<" steps ="<<steps<<endl;
                  //Apply implicit electron solver for electrons only if so desired. Otherwise continue as usual with all other solvers.
                 if( (solver == HydroSolver::implicitelectrons && s==e_idx)  ||   (solver == HydroSolver::implicitelectrons && problem_number==1)  ||  ( (solver == HydroSolver::implicitelectrons) && force_solving_with_implicit)   ) {    
                     double ff = 1.0;
@@ -207,32 +198,23 @@ void c_Sim::execute(int restartnumber, double restarttime_cmdline) {
 
                     for(int ii=0; ii<num_implicit_substeps; ii++) {
                         species[s].implicit_incompressible2(ff/((double)num_implicit_substeps)*dt);
+                        //species[s].implicit_iterative(ff/((double)num_implicit_substeps)*dt);
                     }
 
                 } else {
                     
-                    int ex_order = 1; //(s==e_idx)?0:1;
+                    int ex_order = 1;
                     species[s].execute(species[s].u, species[s].dudt[0], species[s].u_mask, ex_order);
                     
                     //species[s].u0 = species[s].u ;
                     for(int j=0; j < num_cells+2; j++)
                         species[s].u_tmp[j] += species[s].dudt[0][j]*dt ;
-                    
-                    double ekin = 0.5 * species[s].u_tmp[100].u2*species[s].u_tmp[100].u2/species[s].u_tmp[100].u1 ;
-                    double expe = ekin + species[s].u_tmp[100].u1 * species[s].cv * 1000.;
-                    double expT = (species[s].u_tmp[100].u3-ekin)/species[s].u_tmp[100].u1/species[s].cv;
-                    //cout<<species[s].speciesname<<" after +dudt * dt "<<s<<" "<<species[s].dudt[0][100].u3<<" dt = "<<dt<<" u3 = "<<species[s].u_tmp[100].u3<<" expected u3 = "<<expe<<" expected T "<<expT<<endl;
 
                     species[s].u_mask           = np_zeros(num_cells+2);
                     int numbroken = species[s].count_broken_cells(species[s].u_tmp, species[s].u_mask);
-                    //if( numbroken == 0)
-                    //    break;
-                    
-                    //cout<<s<<" before  "<<species[s].u_tmp[100].u3<<endl;
 
                     species[s].fix_negative_pressures_sometimes(species[s].u_tmp, 1);
                     
-                    //cout<<s<<" after "<<species[s].u_tmp[100].u3<<endl;
                     //Done, now all values should be ok
                     for(int j=0; j < num_cells+2; j++) {
                         species[s].u[j] = species[s].u_tmp[j];
@@ -240,8 +222,6 @@ void c_Sim::execute(int restartnumber, double restarttime_cmdline) {
                     }
 
                 }
-                //cout<<"END running species "<<species[s].speciesname<<" s = "<<s<<" steps ="<<steps<<" num_species "<<num_species<<endl;
-
             }
         }// End of first order hydrodynamic step
 
@@ -293,7 +273,6 @@ void c_Sim::execute(int restartnumber, double restarttime_cmdline) {
                 } else
                         compute_drag_update(0.99*dt); //MARCH 28 ONLY FOR DEBUGGING
                 
-                //if(steps > debug_steps && debug_cell < num_cells+1) {
                 if(steps >printstuff_steps) {    
                     print_velocity_numberdens_ratios(" Pos 1.05:: ", 210);
                 }
@@ -311,14 +290,15 @@ void c_Sim::execute(int restartnumber, double restarttime_cmdline) {
                     
                     //Apply implicit electron solver if wanted: either for electrons in applications or for shock tubes
                     if( (solver == HydroSolver::implicitelectrons && s==e_idx)  ||   (solver == HydroSolver::implicitelectrons && problem_number==1)  ||  ( (solver == HydroSolver::implicitelectrons) && force_solving_with_implicit)   ) {    
-
+                        
                         for(int ii=0; ii<num_implicit_substeps; ii++) {
                             species[s].implicit_incompressible2(0.5/((double)num_implicit_substeps)*dt);
+                            //species[s].implicit_iterative(0.5/((double)num_implicit_substeps)*dt);
                         }
                         
 
                     } else {
-                    //for(int k=0; k<=0; k++) { //The k=0 run is the nominal run. k=1 is only triggered if some cells are broken
+                    
                         
                         int ex_order = 1;//(s<=2)? 1.:0; //1;// (s==e_idx)?0:1;
                         species[s].execute(species[s].u, species[s].dudt[1], species[s].u_mask, ex_order);
@@ -333,20 +313,17 @@ void c_Sim::execute(int restartnumber, double restarttime_cmdline) {
                             
                         species[s].u_mask           = np_zeros(num_cells+2);
                         int numbroken = species[s].count_broken_cells(species[s].u_tmp, species[s].u_mask);
-                        //if( numbroken == 0)
-                        //    break;
+                        
                     }
                     
                     species[s].fix_negative_pressures_sometimes(species[s].u_tmp, 2);
                     
                     //Done, now all values should be ok
-	                //if(s != e_idx) { //Feb18th: switch off second order update for electrons, as that seems to cause the shock problem
-	                if(s > -1) { //Feb18th: switch off second order update for electrons, as that seems to cause the shock problem
-	                    for(int j=0; j < num_cells+2; j++) {
-                        	species[s].u[j] = species[s].u_tmp[j];
-                            //species[s].positivity_preserving_step(j);
-                    	}
-                    }   
+	                //if(s > -1) { //Feb18th: switch off second order update for electrons, as that seems to cause the shock problem
+	                for(int j=0; j < num_cells+2; j++) {
+                        species[s].u[j] = species[s].u_tmp[j];
+                    }
+                    //}   
                 }
                 
                 for(int s = 0; s < num_species; s++)
@@ -379,6 +356,7 @@ void c_Sim::execute(int restartnumber, double restarttime_cmdline) {
         //
         // Begin other operators
         //
+        compute_total_pressure();
         for(int s = 0; s < num_species; s++) {
             species[s].compute_pressure(species[s].u);
             species[s].fix_negative_pressures_sometimes(species[s].u, 3);
@@ -397,7 +375,7 @@ void c_Sim::execute(int restartnumber, double restarttime_cmdline) {
                 for(int s=0;s<num_species; s++) 
                     species[s].reconstruct_edge_states(dummy, 1);
             }
-
+            
             execute_separate_diffusion_step();
         }
 
@@ -612,7 +590,7 @@ void c_Sim::execute(int restartnumber, double restarttime_cmdline) {
  * Compute the total left and right cell extrapolated cell-pressure of all species. Currently unused function.
  */
 void c_Sim::compute_total_pressure() {
-    
+
     for(int i=num_cells+1; i>=0; i--)  {
             
         total_press_l[i] = 0.;
@@ -632,7 +610,7 @@ void c_Sim::compute_total_pressure() {
             //if(i<5) cout<<" i/s = "<<i<<"/"<<s<<" pl/pr = "<<species[s].prim_l[i].pres<<"/"<<species[s].prim_r[i].pres<<" dens = "<<species[s].prim_l[i].density<<endl;
         }
             
-        //cout<<"total pressure, cell "<<i<<" pl/pr = "<<total_press_l[i]<<"/"<<total_press_r[i]<<endl;
+        //cout<<"total quantities, cell "<<i<<" n/p = "<<total_numdens[i]<<"/"<<total_press[i]<<endl;
             
     }
 }
@@ -757,7 +735,7 @@ void c_Species::execute(std::vector<AOS>& u_in, std::vector<AOS>& dudt, std::vec
             switch(base->solver) {
                 case HydroSolver::hllc:
                     for(int j=0; j <= num_cells; j++) {
-                        flux[j] =  get_hlle_flux2(j); //hllc_flux(j);
+                        flux[j] =  hllc_flux(j); //hllc_flux(j);
                         
                     }
                     
@@ -767,7 +745,7 @@ void c_Species::execute(std::vector<AOS>& u_in, std::vector<AOS>& dudt, std::vec
                         flux[j] = hllc_flux(j);
                     }
                     for(int j=3; j <= num_cells; j++) {
-                        flux[j] = roe_flux(j);
+                        flux[j] = roe_flux(u[j],u[j+1]);
                     }
                     
                     break;
@@ -776,36 +754,35 @@ void c_Species::execute(std::vector<AOS>& u_in, std::vector<AOS>& dudt, std::vec
                         flux[j] =  hllc_flux(j);
                     }
                     for(int j=3; j <= num_cells; j++) {
-                        flux[j] =  roe_flux(j);
+                        flux[j] = roe_flux(u[j],u[j+1]);
+                        //flux[j] =  roe_flux(prim_to_u(prim_r[j]),prim_to_u(prim_l[j+1])); //Pass boundary extrapolated values to Roe - doesn't like this
+
+                        if( (base->steps==10) && ((j==305) || (j==306) || (j==100)  )  ) {
+                            cout<<" old u  "<<u[j].u1<<" / "<<u[j+1].u1<<"  converted u "<<prim_to_u(prim_r[j]).u1<<" / "<<prim_to_u(prim_l[j+1]).u1<<" j "<<j <<endl;
+                            cout<<" old u  "<<u[j].u2<<" / "<<u[j+1].u2<<"  converted u "<<prim_to_u(prim_r[j]).u2<<" / "<<prim_to_u(prim_l[j+1]).u2<<endl;
+                            cout<<" old u  "<<u[j].u3<<" / "<<u[j+1].u3<<"  converted u "<<prim_to_u(prim_r[j]).u3<<" / "<<prim_to_u(prim_l[j+1]).u3<<endl;
+                        }   
                     }
-                    //cout<<"ROE"<<endl;
                     break;
                 case  HydroSolver::mix:
                     
-                    //if(this_species_index > 0)
-                    //    for(int j=0; j <= num_cells; j++) { flux[j]  = roe_flux(j); }
-                    //else
-                    
-                    //cout<<" In mix solver ";
-                    //if(this_species_index == base->e_idx) {
                     if(this_species_index >= 0) {
                         for(int j=0; j <= num_cells; j++) {
                             double flim = 1.; //previously 0.1
 
-                    if(this_species_index == 0)
-                    flim = params[0];
-                    if(this_species_index == base->e_idx)
-                                    flim = params[2];
-                    else {
-                    if(j>base->mix_reset_i)
-                                        flim = params[1]; //1e-100; 
-                    else 
-                        flim = params[1];
-                    }
-                    //if(j > homopause_boundary_i)
-                    //if(j > base->grid2_transition_i)
-                    if(base->x_i12[j] > 9e99)
-                        flim = 1e-10;
+                            if(this_species_index == 0)
+                            flim = params[0];
+                            if(this_species_index == base->e_idx)
+                                            flim = params[2];
+                            else {
+                            if(j>base->mix_reset_i)
+                                flim = params[1]; //1e-100; 
+                            else 
+                                flim = params[1];
+                            }
+                            
+                            if(base->x_i12[j] > 9e99)
+                                flim = 1e-10;
 
                             double totpress = 0.;
                             int negpresscontributions = 0;
@@ -815,29 +792,12 @@ void c_Species::execute(std::vector<AOS>& u_in, std::vector<AOS>& dudt, std::vec
                                 if(base->species[s].prim[j].pres < 0)
                                     negpresscontributions++;
                             }
-                                    //double f           = prim[j].pres/base->total_press[j];
+                            
                             double f           = prim[j].pres/totpress;
-                                        //f = (f/flim)*(f/flim);
-                            //if(f > flim)
-                                        //    f=1;
-
                             f = 1.-1./std::exp( f*f/flim/flim );
-                                        //f = std::pow(f, params[0]); //Allow for continuous-linear scaling below threshold
                             f = std::max(f,1e-10);//Cut at very low values to keep sound speeds from rapidly fluctuating
-                            //AOS flux1 = hllc_flux(j);
-                                        //AOS flux2 = passivescalar_flux2(j);
-                                        //flux[j]   = (flux1 * f) +  (flux2 * (1.-f)); 
                             grav_prefactors[j] = f;
                             flux[j] = hllc_flux2(j, f);
-                            if(base->steps%1000==0) {
-                            //if(base->steps%5000==0 && base->steps > 33000e99) {
-                            //if(0==0) {
-                                //cout<<" s = "<<this_species_index<<" f ="<<f<<" 1.-f "<<(1.-f)<<" species "<<this_species_index<<" flim "<<flim<<endl;
-                                //<<" hllc.u1*f = "<<flux[j].u1<< " "<<flux[j].u1 * f<<" pflux.u1*(1-f) = "<<flux[j].u1<<" "<<flux[j].u1 * (1.-f)<<" 1-flux.u1/hllc.u1 = "<<1.-flux[j].u1/flux1.u1<<" negpress = "<<negpresscontributions<<endl; 
-                            }
-
-                            //flux[j]  = hllc_flux(j); // * f + passivescalar_flux(j) * (1.-f); 
-                            //flux[j] =  passivescalar_flux(j);
                         }
                     } else {
                         for(int j=0; j <= num_cells; j++) {
@@ -863,7 +823,7 @@ void c_Species::execute(std::vector<AOS>& u_in, std::vector<AOS>& dudt, std::vec
  
             if(base->steps % 1000==1 && base->steps < -1002) {
                 for(int j=0; j <= num_cells; j++) {
-                        AOS roe = roe_flux(j);
+                        AOS roe = roe_flux(u[j],u[j+1]);
                         AOS hllc = hllc_flux(j);
                         AOS p =  laxwendroff_flux(j); //passivescalar_flux(j);
                         if((j>20) && (j<80))
@@ -1219,47 +1179,55 @@ AOS c_Species::laxwendroff_flux(int j)
  * @param[in] dt timestep, as LF needs dt/dx
  * @return flux at cell interface j
  */
-AOS c_Species::roe_flux(int j) 
+AOS c_Species::roe_flux(const AOS &uleft, const AOS &uright ) 
 {
-    int jleft = j, jright = j+1;
-    AOS_prim prim_l  = this->prim_r[jleft];
-    AOS_prim prim_r  = this->prim_l[jright];
+    AOS_prim prim_l;
+    AOS_prim prim_r;
+    double ekin_l = 0.5* uleft.u2*uleft.u2/uleft.u1;
+    double ekin_r = 0.5* uright.u2*uright.u2/uright.u1;
+
+    prim_l.density = uleft.u1;
+    prim_r.density = uright.u1;
+
+    prim_l.speed = uleft.u2/uleft.u1;
+    prim_r.speed = uright.u2/uright.u1;
+
+    prim_l.pres = (uleft.u3-ekin_l)*(gamma_adiabat-1);
+    prim_r.pres = (uright.u3-ekin_r)*(gamma_adiabat-1);
     
-    AOS state_l      = AOS(prim_l.density, prim_l.speed*prim_l.density, prim_l.density*prim_l.internal_energy + 0.5*prim_l.density*prim_l.speed*prim_l.speed); //u[jleft];
-    AOS state_r      = AOS(prim_r.density, prim_r.speed*prim_r.density, prim_r.density*prim_r.internal_energy + 0.5*prim_r.density*prim_r.speed*prim_r.speed); // = u[jright];
+    AOS flux_l       = exact_flux(uleft);
+    AOS flux_r       = exact_flux(uright);
     
-    AOS flux_l       = exact_flux(state_l);
-    AOS flux_r       = exact_flux(state_r);
-    
-    double drho = state_r.u1 - state_l.u1;
+    double drho = uright.u1 - uleft.u1;
     double dp   = prim_r.pres - prim_l.pres;
     double du   = prim_r.speed - prim_l.speed;
     
     //Roe averages
-    double rho = std::sqrt(state_l.u1*state_r.u1);
-    double u   = (std::sqrt(state_l.u1) * prim_l.speed + std::sqrt(state_r.u1) * prim_r.speed )/(std::sqrt(state_l.u1) + std::sqrt(state_r.u1));
-    double hl  = (prim_l.pres + state_l.u3)/state_l.u1;
-    double hr  = (prim_r.pres + state_r.u3)/state_r.u1;
-    double h   = (std::sqrt(state_l.u1) * hl + std::sqrt(state_r.u1) * hr)/(std::sqrt(state_l.u1) + std::sqrt(state_r.u1));
+    double rho = std::sqrt(uleft.u1*uright.u1);
+    double u   = (std::sqrt(uleft.u1) * prim_l.speed + std::sqrt(uright.u1) * prim_r.speed )/(std::sqrt(uleft.u1) + std::sqrt(uright.u1));
+    double hl  = (prim_l.pres + uleft.u3)/uleft.u1;
+    double hr  = (prim_r.pres + uright.u3)/uright.u1;
+    double h   = (std::sqrt(uleft.u1) * hl + std::sqrt(uright.u1) * hr)/(std::sqrt(uleft.u1) + std::sqrt(uright.u1));
     double c   = std::sqrt((gamma_adiabat-1.) * (h-0.5*u*u));
- 
-    //double lambdas[3] = {std::abs(u-c), u, std::abs(u+c) };
-    double lambdas[3] = {std::fabs(u-c), std::fabs(u), std::fabs(u+c) };
-    double eps = 5e-1;
-    for(int k=0; k<=2; k+=2)
-        if(lambdas[k]/c<eps)
-            //lambdas[k] = 0.5*(lambdas[k]*lambdas[k]/eps+eps);
-            lambdas[k] = 0.5*(lambdas[k]*lambdas[k]/(c*eps)+c*eps);
     
-    double d[3] = {drho, state_r.u2 - state_l.u2, state_r.u3 - state_l.u3};
+    double lambdas[3] = {std::fabs(u-c), std::fabs(u), std::fabs(u+c) };
+    //double eps = 0.999;
+    double delta = 0.9*c;
+    for(int k=0; k<=2; k+=1)
+        if(lambdas[k]<delta) {
+            //lambdas[k] = 0.5*(lambdas[k]*lambdas[k]/eps+eps);
+            //lambdas[k] = (lambdas[k]*lambdas[k] + delta*delta)/(2.*delta); 
+            lambdas[k] = 0.5*(lambdas[k]*lambdas[k]/(delta)+delta);
+
+            /* lambdas[k] = 0.5*(lambdas[k]*lambdas[k]/(c*eps)+c*eps); */
+        }
+    
+    //double d[3] = {drho, uright.u2 - uleft.u2, uright.u3 - uleft.u3};
     double alphas[3];
     
     alphas[0] = (dp - rho * c * du)/(2*c*c);
     alphas[1] = drho - dp/(c*c);
     alphas[2] = (dp + rho * c * du)/(2*c*c);
-    
-    if(j==-80 && base->steps<10)
-        cout<<" alphas "<<alphas[0]<<" "<<alphas[1]<<" "<<alphas[2]<<endl;
     
     AOS ev0 = AOS(1, u-c, h - u*c);
     AOS ev1 = AOS(1, u, 0.5*u*u);
@@ -1270,30 +1238,39 @@ AOS c_Species::roe_flux(int j)
     return result;
 }
 
-Vector3d c_Species::roe_flux_vec(int j) {
-    AOS tmp    = roe_flux(j);
+Vector3d c_Species::roe_flux_vec(const AOS &uleft, const AOS &uright ) {
+    AOS tmp = roe_flux(uleft, uright);
 
+    //cout<<"  "
     return Vector3d(tmp.u1, tmp.u2, tmp.u3);
 }
 
-Vector3d c_Species::u_to_vec(int j) {
-    Vector3d v = {u[j].u1, u[j].u2, u[j].u3}; 
+Vector3d c_Species::u_to_vec(const AOS &uu) {
+    Vector3d v = {uu.u1, uu.u2, uu.u3}; 
     return v;
 }
 
 //
 // returns Roe averages at interface j - sits between cell j and j+1
 //
-AOS c_Species::get_roe_averages(int j) {
- int jleft = j, jright = j+1;
-    AOS_prim prim_l  = this->prim[jleft];
-    AOS_prim prim_r  = this->prim[jright];
+AOS c_Species::get_roe_averages(const AOS &uleft, const AOS &uright) {
     
-    AOS state_l      = AOS(prim_l.density, prim_l.speed*prim_l.density, prim_l.density*prim_l.internal_energy + 0.5*prim_l.density*prim_l.speed*prim_l.speed); //u[jleft];
-    AOS state_r      = AOS(prim_r.density, prim_r.speed*prim_r.density, prim_r.density*prim_r.internal_energy + 0.5*prim_r.density*prim_r.speed*prim_r.speed); // = u[jright];
+    AOS_prim prim_l;//  = this->prim[jleft];
+    AOS_prim prim_r;//  = this->prim[jright];
+    double ekin_l = 0.5* uleft.u2*uleft.u2/uleft.u1;
+    double ekin_r = 0.5* uright.u2*uright.u2/uright.u1;
+
+    prim_l.density = uleft.u1;
+    prim_r.density = uright.u1;
+
+    prim_l.speed = uleft.u2/uleft.u1;
+    prim_r.speed = uright.u2/uright.u1;
+
+    prim_l.pres = (uleft.u3-ekin_l)*(gamma_adiabat-1);
+    prim_r.pres = (uright.u3-ekin_r)*(gamma_adiabat-1);
     
-    AOS flux_l       = exact_flux(state_l);
-    AOS flux_r       = exact_flux(state_r);
+    AOS state_l      = uleft;//AOS(prim_l.density, prim_l.speed*prim_l.density, prim_l.density*prim_l.internal_energy + 0.5*prim_l.density*prim_l.speed*prim_l.speed); //u[jleft];
+    AOS state_r      = uright;//AOS(prim_r.density, prim_r.speed*prim_r.density, prim_r.density*prim_r.internal_energy + 0.5*prim_r.density*prim_r.speed*prim_r.speed); // = u[jright];
     
     double drho = state_r.u1 - state_l.u1;
     double dp   = prim_r.pres - prim_l.pres;
@@ -1378,7 +1355,7 @@ AOS c_Species::passivescalar_flux2(int j)
  * @param[in] prim the primitive corresponding to u. Needed to compute the exact flux
  * @return flux at cell interface j
  */
-AOS c_Species::exact_flux(AOS u) 
+AOS c_Species::exact_flux(const AOS &u) 
 {
     double speed = u.u2/u.u1;
     double press = (gamma_adiabat - 1.) *(u.u3 - 0.5 * u.u2 * speed);
@@ -1389,15 +1366,20 @@ AOS c_Species::exact_flux(AOS u)
     return result;
 }
 
-Vector3d c_Species::exact_flux_as_vector(int j) 
+Vector3d c_Species::exact_flux_difference(const AOS &uleft, const AOS &uright) 
 {
-    AOS uu = this->u[j];
-    double speed = uu.u2/uu.u1;
-    double press = (gamma_adiabat - 1.) *(uu.u3 - 0.5 * uu.u2 * speed);
-    double flux2 = (press + uu.u2*speed);
-    double flux3 = (speed*(uu.u3 + press));
-    Vector3d result(uu.u2, flux2, flux3);
-    
+    /* AOS uu = exact_flux(uright) * 1.0 - exact_flux(uleft) * 1.0;
+    Vector3d result(-uu.u1, -uu.u2, -uu.u3);
+     */
+    AOS uu;
+    double v12 = 0.5*(uleft.u2/uleft.u1+uright.u2/uright.u1);
+    if(v12 > 0)
+        uu = exact_flux(uleft);
+    else
+        uu = exact_flux(uright);
+
+    Vector3d result(uu.u1, uu.u2, uu.u3);
+
     return result;
 }
 
@@ -1735,11 +1717,17 @@ double c_Species::return_entropy_with_jump(double k) {
 /**
  * Core function for the HLLE approach - feeds wave speed estimates and left and right states into both explicit and implicit routines.
  */
-void c_Species::write_hlle_wavespeeds(AOS_prim prim_l_in, AOS_prim prim_r_in, AOS &state_l_out, AOS &state_r_out, double &SL_out, double &SR_out) {
+void c_Species::write_hlle_wavespeeds( const AOS &state_l_in, const AOS &state_r_in, double &SL_out, double &SR_out) {
 
-    AOS_prim prim_l  = prim_l_in;
-    AOS_prim prim_r  = prim_r_in;
+    AOS_prim prim_l;
+    AOS_prim prim_r;
     
+    eos->compute_primitive(&(state_l_in), &(prim_l), 1) ;   //  eos->compute_primitive(&(state_l_in), &(prim[j]), 1) ;    
+    eos->compute_auxillary(&(prim_l), 1);//eos->compute_auxillary(&(prim[j]), 1);
+    eos->compute_primitive(&(state_r_in), &(prim_r), 1) ;  
+    eos->compute_auxillary(&(prim_r), 1);
+    //This is a poor solution for now, but given that HLLE is not really in production use...
+
     //Speed of gas
     double ul = prim_l.speed;  
     double ur = prim_r.speed; 
@@ -1756,15 +1744,15 @@ void c_Species::write_hlle_wavespeeds(AOS_prim prim_l_in, AOS_prim prim_r_in, AO
     double El = dl*prim_l.internal_energy + 0.5*mom_l*ul ;
     double Er = dr*prim_r.internal_energy + 0.5*mom_r*ur ;
 
-    AOS state_l      = AOS(prim_l.density, mom_l, El); //u[jleft];
-    AOS state_r      = AOS(prim_r.density, mom_r, Er); // = u[jright];
+    //AOS state_l      = AOS(prim_l.density, mom_l, El); //u[jleft];
+    //AOS state_r      = AOS(prim_r.density, mom_r, Er); // = u[jright];
 
     //Roe averages
     double denom = (std::sqrt(dl) + std::sqrt(dr));
     double rho   = std::sqrt(dl*dr);
     double v     = (std::sqrt(dl) * ul + std::sqrt(dr) * ur )/denom;
-    double hl    = (pl + state_l.u3)/dl;
-    double hr    = (pr + state_r.u3)/dr;
+    double hl    = (pl + El)/dl;
+    double hr    = (pr + Er)/dr;
     double h     = (std::sqrt(dl) * hl + std::sqrt(dr) * hr)/denom;
     double c     = std::sqrt((gamma_adiabat-1.) * (h-0.5*v*v));
     
@@ -1792,8 +1780,8 @@ void c_Species::write_hlle_wavespeeds(AOS_prim prim_l_in, AOS_prim prim_r_in, AO
     SL_out = v - dbar;
     SR_out = v + dbar;
 
-    state_l_out = state_l;
-    state_r_out = state_r;
+    //state_l_out = state_l;
+    //state_r_out = state_r;
 }
 
 /**
@@ -1802,20 +1790,13 @@ void c_Species::write_hlle_wavespeeds(AOS_prim prim_l_in, AOS_prim prim_r_in, AO
  * @param[in] j cell interface number at which to compute the flux. 
  * @return flux at cell interface j
  */
-AOS c_Species::get_hlle_flux2(int j) 
+AOS c_Species::get_hlle_flux2(const AOS& state_l, const AOS& state_r) 
 {
-    int jleft = j, jright = j+1;
-
-    //if(base->steps>100)
-    //    jright = 1;
-
-    AOS flux, state_l, state_r;
+    AOS flux;
     int option = 0;
     double SL, SR, denom;
-    AOS_prim prim_l  = this->prim_r[jleft];
-    AOS_prim prim_r  = this->prim_l[jright];
 
-    write_hlle_wavespeeds(prim_l, prim_r, state_l, state_r, SL, SR); //in, in, out,out,out,out
+    write_hlle_wavespeeds(state_l, state_r, SL, SR); //in, in, out,out,out,out
     AOS FL = exact_flux(state_l);
     AOS FR = exact_flux(state_r);
     denom = (SR-SL);
@@ -1840,16 +1821,14 @@ AOS c_Species::get_hlle_flux2(int j)
 /*
 * Write Jacobian matrices consistent with our HLLE implementation
 */
-void c_Species::write_hlle_jacobians(Matrix3d &left_m, Matrix3d &right_m, int j) {
+void c_Species::write_hlle_jacobians(Matrix3d &left_m, Matrix3d &right_m, const AOS &state_l, const AOS &state_r) {
 
-    int jleft = j, jright = j+1;
-    AOS flux, state_l, state_r;
+    
+    AOS flux;
     int option = 0;
     double SL, SR, denom;
-    AOS_prim prim_l  = this->prim_r[jleft];
-    AOS_prim prim_r  = this->prim_l[jright];
 
-    write_hlle_wavespeeds(prim_l, prim_r, state_l, state_r, SL, SR); //in, in, out,out,out,out
+    write_hlle_wavespeeds(state_l, state_r, SL, SR); //in, in, out,out,out,out
     AOS FL = exact_flux(state_l);
     AOS FR = exact_flux(state_r);
     denom = (SR-SL);
@@ -1864,9 +1843,6 @@ void c_Species::write_hlle_jacobians(Matrix3d &left_m, Matrix3d &right_m, int j)
  
     left_m  = A_left * (SR/denom) - A_tilda;
     right_m = A_right*(-SL/denom) + A_tilda;
- 
-    //left_m  = A_left;
-    //right_m = A_right;
 }
 
 
@@ -1876,16 +1852,86 @@ void c_Species::write_hlle_jacobians(Matrix3d &left_m, Matrix3d &right_m, int j)
  * @param[in] j cell interface number at which to compute the flux. 
  * @return flux at cell interface j
  */
-Vector3d c_Species::get_hlle_flux(int j) 
+Vector3d c_Species::get_hlle_flux(const AOS& uleft, const AOS & uright) 
 {
-    AOS flux = get_hlle_flux2(j) ;
+    AOS flux = get_hlle_flux2(uleft, uright) ;
     Vector3d vflux;
     vflux << flux.u1, flux.u2, flux.u3;
     return vflux;
 }
 
 
-void c_Species::write_exact_jacobians(Matrix3d &left_m, Matrix3d &right_m, int j) {
-    left_m  = get_exact_Jacobian(u[j]);
-    right_m = get_exact_Jacobian(u[j+1]);
+void c_Species::write_exact_jacobians(Matrix3d &left_m, Matrix3d &right_m,const AOS& uleft,const AOS& uright) {
+    left_m  = get_exact_Jacobian(uleft) * 0.5;
+    right_m = get_exact_Jacobian(uright) * 0.5;
+}
+
+AOS c_Species::roe_flux(const AOS &uleft2, const AOS &uright2, int j ) 
+{
+    //cout<<" Im in the better ROE Flux! "<<endl;
+    int jleft = j, jright = j+1;
+    AOS_prim prim_l  = this->prim[jleft];
+    AOS_prim prim_r  = this->prim[jright];
+    
+    AOS state_l      = AOS(prim_l.density, prim_l.speed*prim_l.density, prim_l.density*prim_l.internal_energy + 0.5*prim_l.density*prim_l.speed*prim_l.speed); //u[jleft];
+    AOS state_r      = AOS(prim_r.density, prim_r.speed*prim_r.density, prim_r.density*prim_r.internal_energy + 0.5*prim_r.density*prim_r.speed*prim_r.speed); // = u[jright];
+    
+    AOS flux_l       = exact_flux(state_l);
+    AOS flux_r       = exact_flux(state_r);
+    
+    double drho = state_r.u1 - state_l.u1;
+    double dp   = prim_r.pres - prim_l.pres;
+    double du   = prim_r.speed - prim_l.speed;
+    
+    //Roe averages
+    double rho = std::sqrt(state_l.u1*state_r.u1);
+    double u   = (std::sqrt(state_l.u1) * prim_l.speed + std::sqrt(state_r.u1) * prim_r.speed )/(std::sqrt(state_l.u1) + std::sqrt(state_r.u1));
+    double hl  = (prim_l.pres + state_l.u3)/state_l.u1;
+    double hr  = (prim_r.pres + state_r.u3)/state_r.u1;
+    double h   = (std::sqrt(state_l.u1) * hl + std::sqrt(state_r.u1) * hr)/(std::sqrt(state_l.u1) + std::sqrt(state_r.u1));
+    double c   = std::sqrt((gamma_adiabat-1.) * (h-0.5*u*u));
+ 
+    //double lambdas[3] = {std::abs(u-c), u, std::abs(u+c) };
+    double lambdas[3] = {std::fabs(u-c), std::fabs(u), std::fabs(u+c) };
+    //double eps = 0.9;
+    double delta = 0.9*c;
+    for(int k=1; k<=1; k+=1)
+        if(lambdas[k]<delta) {
+            //lambdas[k] = 0.5*(lambdas[k]*lambdas[k]/eps+eps);
+            //lambdas[k] = 0.5*(lambdas[k]*lambdas[k]/(c*eps)+c*eps);
+            //lambdas[k] = 0.5*(lambdas[k]*lambdas[k]/(delta)+delta);
+            lambdas[k] = (lambdas[k]*lambdas[k] + delta*delta)/(2.*delta); 
+        }
+    
+    double d[3] = {drho, state_r.u2 - state_l.u2, state_r.u3 - state_l.u3};
+    double alphas[3];
+    
+    alphas[0] = (dp - rho * c * du)/(2*c*c);
+    alphas[1] = drho - dp/(c*c);
+    alphas[2] = (dp + rho * c * du)/(2*c*c);
+    
+    if(j==-80 && base->steps<10)
+        cout<<" alphas "<<alphas[0]<<" "<<alphas[1]<<" "<<alphas[2]<<endl;
+    
+    AOS ev0 = AOS(1, u-c, h - u*c);
+    AOS ev1 = AOS(1, u, 0.5*u*u);
+    AOS ev2 = AOS(1, u+c, h + u*c);
+    
+    AOS result = (flux_l + flux_r) * 0.5 - ( (ev0*(alphas[0]*lambdas[0]))  + (ev1*(alphas[1]*lambdas[1])) + (ev2*(alphas[2]*lambdas[2]))) * 0.5;
+    
+    return result;
+}
+
+AOS c_Species::prim_to_u(const AOS_prim &p) {
+    double rho = p.density;
+    double mom = p.speed*rho;
+    double E   = 0.5*mom*mom/rho + rho*p.internal_energy;
+    return AOS(rho,mom,E);
+}
+double c_Species::eint(const AOS &u) {
+    return (u.u3- (0.5*u.u2*u.u2/u.u1));
+}
+
+double c_Species::eintemp(const AOS &u) {
+    return (u.u3-0.5*u.u2*u.u2/u.u1)/u.u1/cv;
 }

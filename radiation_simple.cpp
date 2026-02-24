@@ -182,16 +182,6 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
             
             double exchange_d_sum = 0.;
             double exchange_r_sum = 0.;
-/* 
-            if(steps>= 457) {
-                    species[0].prim[j].temperature = 1e4;
-                    species[1].prim[j].temperature = 1e4;
-                    species[2].prim[j].temperature = 1e4;
-                    species[3].prim[j].temperature = 1e4;
-                    species[4].prim[j].temperature = 1e4;
-                }
-                do_highenergy_cooling(j, std::max(1e4, 3.) );
-             */
 
             //Compute etas
             for (int s=0; s < num_species; s++) {
@@ -201,18 +191,6 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
                 double Ts3 = Ts*Ts*Ts;
                 double rhos = species[s].prim[j].density ;
                 double kappa = species[s].opacity_planck(j, 0);
-                
-                /* 
-                //For heat debugging
-                if(steps <458) {
-                    species[s].dS(j) = 0; //1e10*species[s].u[j].u1;
-                    //species[s].dG(j) = 1e10*species[s].u[j].u1;;
-                } else {
-                    species[s].dS(j) = 0;
-                    //species[s].dG(j) = 0;
-                }
-                   
-                kappa = 0e0; */
 
                 double fac = 1. * ddt * no_rad_trans * kappa / species[s].cv * sigma_rad * Ts3;
                 double moredenom = - photocooling_expansion * species[s].dGdT(j) * ddt / ( species[s].cv * species[s].u[j].u1);
@@ -227,8 +205,6 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
                 eta2[idx_s] += 4.* pi * ddt * kappa * no_rad_trans / species[s].cv;
 
                 //Sub-cycling heating function
-                //lhs_sc[idx_s] += 0;
-                //rhs_sc(idx_s) += (species[s].dS(j) + species[s].dG(j) )/species[s].u[j].u1;
                 if(couple_J_into_T)
                         rhs_sc(idx_s) +=  4.* pi * kappa * Jrad_FLD(j, 0);
                 
@@ -289,7 +265,7 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
     if( globalTime > 1e15)
         Jswitch = 1;
     
-    for (int j=0; j <= num_cells+numcells_offset; j++) {
+    for (int j=0; j <= num_cells+numcells_offset-1; j++) {
         for(int b=0; b<num_bands_out; b++) {
             if(solve_for_j)
                 Jrad_FLD(j, b) = r[j*num_vars + b] ;
@@ -331,30 +307,11 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
             double init_tmean  = return_T_mean(j);
             double init_etotal = return_e_total(j);
 
-            if(1==0) {
-
-                if(steps>= 457) {
-                    species[0].prim[j].temperature = 1e4;
-                    species[1].prim[j].temperature = 1e4;
-                    species[2].prim[j].temperature = 1e4;
-                    species[3].prim[j].temperature = 1e4;
-                    species[4].prim[j].temperature = 1e4;
-                }
-                if((j==10) && steps >= 457) {
-                    cout<<endl<<" ######################################################## "<<endl;
-                    cout<<" Tini = ";
-                    for(int ss=0; ss<num_species; ss++){ cout<<" "<<species[ss].prim[j].temperature; }
-                    cout<<endl; 
-                }
+            if(1==0) { //Old heat solver
 
                 fill_alpha_basis_arrays(j);
                 compute_alpha_matrix(j);
                 do_highenergy_cooling(j, std::max(init_tmean, 3.) );
-                /* 
-                Matrix_t coll_heat_matrix   = Matrix_t::Zero(num_species, num_species);
-                Vector_t coll_heat_b        = Vector_t::Zero(num_species);
-                Vector_t coll_heat_output   = Vector_t::Zero(num_species);
-                */
                 
                 coll_heat_matrix.setZero();
                 coll_heat_b.setZero();
@@ -362,13 +319,7 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
 
                 double   tau = total_opacity(j,0) * (x_i12[j+1]-x_i12[j]);
                 double security_multiplier = tau<1e3?1.:1.e-4;
-                /* 
-                if(update_coll_frequently && j>=2) {
-                    fill_alpha_basis_arrays(j);
-                    compute_alpha_matrix(j);
-                }
-                 */
-                ////compute_collisional_heat_exchange_matrix(j);
+                //compute_collisional_heat_exchange_matrix(j);  21 May 2023: This function has been disabled in radiation_simple, the coefficients are computed in place there now
 
                 for(int si=0; si<num_species; si++) {
                     
@@ -400,16 +351,6 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
 
                 LU.compute(coll_heat_matrix) ;
                 coll_heat_output.noalias() = LU.solve(coll_heat_b);
-            
-                if(0==1) {
-                    cout<<j<<" heat matrix "<<coll_heat_matrix<<endl<<" b = "<<coll_heat_b<<" result "<<coll_heat_output<<endl;
-                    cout<<" coll coeffs "<<friction_coefficients<<endl;
-                    
-                    for(int ss=0; ss<num_species; ss++){
-                        int idx_s = j * (num_species) + ss;
-                        cout<<" "<<eta1[idx_s]<<" "<<eta2[idx_s]<<endl;
-                    }
-                }
 
                 double final_tmean  = return_T_mean(j, coll_heat_output);
                 double final_etotal = return_e_total(j, coll_heat_output);
@@ -430,14 +371,15 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
             }
 
             int dd = 0;
-            if((steps>=10000) && (j==122) && (steps <= 10010)){
+            if((steps>=10000) && (j==122) && (steps <= 10010)){ //Choose a time and cell to look into
                 dd=0;
             }
             int found_solution=0;
             int num_cycles = num_subcycles;
+            const int max_heat_cycles = 5;
             while(!subcycle_heat_exchange(j, num_cycles++, debug=dd, dt)) {
                 
-                if(num_cycles>5) break;
+                if(num_cycles>max_heat_cycles) break;
             }
             
 
@@ -483,11 +425,8 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
                     for(int si=0; si<num_species; si++) 
                         totalheat += species[si].dS(j);
 
-                    //if(totalheat < 1e-50) {
-                    //if(use_shadow_relaxation && totalheat < ( shadow_relaxation_threshold && (x_i[j]<x_i[num_cells]/2) )) { //1e-50 is the arbitrary limit we set on the heating function throughout the code
-                    //if(use_shadow_relaxation && (totalheat < shadow_relaxation_threshold) && (x_i[j]<x_i[num_cells]/4) ) { //1e-50 is the arbitrary limit we set on the heating function throughout the code
-                    if(use_shadow_relaxation && (totalheat < shadow_relaxation_threshold) && (x_i[j]< shadow_relaxation_radius) ) { //1e-50 is the arbitrary limit we set on the heating function throughout the code
-                    //if(use_shadow_relaxation && (x_i[j]< shadow_relaxation_radius) ) { //1e-50 is the arbitrary limit we set on the heating function throughout the code
+                    
+                    if(use_shadow_relaxation && (totalheat < shadow_relaxation_threshold) && (x_iVC[j]< shadow_relaxation_radius) ) { //1e-50 is the arbitrary limit we set on the heating function throughout the code
                         double fac = ddt/rt;
                         double f1  = (1 + 1e-40) / (1 + fac + 1e-40);
                         double f2  = (1 + 1e-40) / (1/fac + 1 + 1e-40);
@@ -496,9 +435,6 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
                     }
                         else
                             relaxtemp = avgtemp;
-                    
-                    //if(steps > 850)
-                    //    cout<<" global_time < avg_temperature"<<avgtemp<<" relaxtemp = "<<relaxtemp<< "steps ="<<steps<<endl;     
 
                     for(int si=0; si<num_species; si++) {
                             species[si].prim[j].temperature = relaxtemp;
@@ -509,12 +445,7 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
                                 species[si].prim[j].temperature = avgT_nom/avgT_denom * (1. - globalTime/avg_temperature_t1)  + species[si].prim[j].temperature * globalTime/avg_temperature_t1;
                         }
                 }
-            } else {
-                //cout<<use_avg_temperature<<" "<<globalTime<<" "<<avg_temperature_t1<<endl;
-            }
-            
-            //if(steps == 1000)
-            //    cout<<(1-return_total_e(j)/e_orig)<<endl;
+            }//No else case need: temperatures already assigned
 
         } //end j loop
 
@@ -611,7 +542,7 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
         }
 	//temp_temperatures[2] = species[0].const_T_space;
         
-        for (int j=1; j < num_cells+numcells_offset; j++){
+        for (int j=1; j < num_cells+numcells_offset-1; j++){
                 
             if(j==-20 && globalTime > 1.) {
                 cout<<" temperatures before and after: "<<species[0].prim[j].temperature<<" "<<temp_temperatures[j]<<" delta = "<<(1.-species[0].prim[j].temperature/temp_temperatures[j])<<endl;
@@ -812,10 +743,7 @@ int c_Sim::subcycle_heat_exchange(int j, int num_cycles, int debug, double dt) {
             double ddt = dt/((double)num_cycles);
 
             for(int c=0; c<num_cycles; c++) {
-                /* if( num_cycles==2) {
-                    if(c==0) ddt = 0.5*dt;
-                    else ddt = dt;
-                } */
+                
                 //Reset matrices for this cycle
                 coll_heat_matrix  = coll_heat_matrix_fixed;
                 coll_heat_b       = coll_heat_b_fixed;
@@ -872,7 +800,7 @@ int c_Sim::subcycle_heat_exchange(int j, int num_cycles, int debug, double dt) {
                     do_highenergy_cooling(j, cooling_temp); 
                 }
                 //Update with mean temperature, as intermediate electron temperatures can be extremely high
-                    //do_highenergy_cooling(j, std::max(documentation(e_idx,c), 3.) ); //TODO: Add also update for kappa_planck, to allow bolometric cooling to converge
+                //do_highenergy_cooling(j, std::max(documentation(e_idx,c), 3.) ); //TODO: Add also update for kappa_planck, to allow bolometric cooling to converge
                 
                 //
                 // Add remaining terms for this cycle 
@@ -895,9 +823,6 @@ int c_Sim::subcycle_heat_exchange(int j, int num_cycles, int debug, double dt) {
                     coll_heat_b(si)         += scl_fac * (species[si].cv/ddt     + 12 * sigma_rad * kappa * Ts3) * Tsold ;
                     coll_heat_b(si)         += scl_fac * (species[si].dS(j)      - species[si].dG(j)  + dgdt_mul * species[si].dGdT(j) * Tsold )/species[si].u[j].u1;
 
-                    //if((steps==457) || (steps==458) )
-                    //    if(si==e_idx)
-                    //        cout<<"                                                       cooling "<<species[si].dG(j)<<" "<<species[si].dGdT(j)<<" "<<(species[si].dG(j) + species[si].dGdT(j)*(-5000.))<<endl;
                     
                     /////////////////////////////////////////////////////////////////////
                     /////////////////////////////////////////////////////////////////////
@@ -920,8 +845,7 @@ int c_Sim::subcycle_heat_exchange(int j, int num_cycles, int debug, double dt) {
                     /////////////////////////////////////////////////////////////////////
                 }
 
-                //double e_orig = return_total_e(j);
-                
+                //Still code variant which recombutes collision alphas, might need to reimplement if instabilities occur
                 /* 
                 LU.compute(coll_heat_matrix) ;
                 coll_heat_output.noalias() = LU.solve(coll_heat_b);
@@ -929,21 +853,13 @@ int c_Sim::subcycle_heat_exchange(int j, int num_cycles, int debug, double dt) {
                 tmp_temperatures = coll_heat_output;
  
                 Vector_t tmp_results = return_preconditioned_LU_solution(coll_heat_matrix, coll_heat_b, LU, j);
-
-                if( (steps==200) && (j==10) )
-                    cout<<" TEMP RESULTS ARE HERE! HYPE! "<<endl<<tmp_results<<endl;
-                    */
+                */
                 if(debug >=1) {
-                    
                     cout<<" b = ";
                     for(int ss=0; ss<num_species; ss++){ cout<<" "<<coll_heat_b(ss); }
                     cout<<endl; 
-                    //cout<<" mat = "<<endl;
-                    //cout<<coll_heat_matrix; 
-                    //cout<<endl; 
                 }
 
-                
                 if(steps < 10e99) {
                     LU.compute(coll_heat_matrix) ;
                     coll_heat_output.noalias() = LU.solve(coll_heat_b);
@@ -967,15 +883,7 @@ int c_Sim::subcycle_heat_exchange(int j, int num_cycles, int debug, double dt) {
         // All cycles complete   
         //********************************************************************** */
         //********************************************************************** */
-        //********************************************************************** */
-        //********************************************************************** */
-        // After checks are complete, write last solution into original temperature   
-        //********************************************************************** */
-        //********************************************************************** */
        
-
-
-
         //********************************************************************** */
         //********************************************************************** */
         // Show time evolution of temperatures    
@@ -983,7 +891,6 @@ int c_Sim::subcycle_heat_exchange(int j, int num_cycles, int debug, double dt) {
         //********************************************************************** */
         
         if( (debug >= 1)) {
-        //if( (debug >= 1) || (num_cycles>num_subcycles)) {
             cout<<endl<<"step "<<steps<<" j "<<j<<" dt = "<<dt <<" Showing time evolution over subcycles "<<endl;
             for(int si=0; si<num_species; si++) {
                 
@@ -1010,18 +917,29 @@ int c_Sim::subcycle_heat_exchange(int j, int num_cycles, int debug, double dt) {
         }
     
  
+        //********************************************************************** */
+        //********************************************************************** */
+        // After checks are complete, write last solution into original temperature   
+        //********************************************************************** */
+        //********************************************************************** */
+       
     int allgood = 1;
     for(int si=0; si<num_species; si++) {
         AOS      tmp  = species[si].u[j];
         AOS_prim tmpp = species[si].prim[j];
-        double tt = tmpp.temperature;//tmp.u3 - 0.5 * tmp.u2*tmp.u2/tmp.u1;
+        double tt = documentation(si, num_cycles-1); 
         
-        if(std::isnan(tt) || (tt<0)) {
-            cout<<" @end T subcycling found NaN or <0! "<<steps<<" "<<j<<" "<<si<<" "<<tt<<" u = "<<tmp.u1<<" "<<tmp.u2<<" "<<tmp.u3<<" prim = "<<tmpp.internal_energy<<" "<<tt<<" "<<tmpp.pres<<" "<<tmpp.sound_speed<<" "<<tmpp.speed<<endl;                
+        if(std::isnan(tt) || (tt<0) || ( (j==300) && (steps==10000))) {
+            cout<<" @end T subcycling found NaN or <0! "<<steps<<" "<<j<<" "<<si<<" "<<tt<<" u = "<<tmp.u1<<" "<<tmp.u2<<" "<<tmp.u3<<" prim = "<<tmpp.internal_energy<<" "<<tt<<" "<<tmpp.pres<<" "<<tmpp.sound_speed<<" "<<tmpp.speed<<endl;   
+            cout<<" Temperature history: in subcycling: ";
+            for(int c=0; c<=num_cycles; c++) {
+                cout<<documentation(si, c)<<" ";
+            }
+            cout<<endl;
+            
             allgood =0;
         }
     }
-
 
     if(!allgood)
         return 0;
@@ -1029,7 +947,7 @@ int c_Sim::subcycle_heat_exchange(int j, int num_cycles, int debug, double dt) {
     if(debug <= 1) {
 
         for(int si=0; si<num_species; si++) {
-                    species[si].prim[j].temperature = documentation(si, num_cycles-1);//coll_heat_output(si); //ignore last computation
+            species[si].prim[j].temperature = documentation(si, num_cycles-1); //ignore last computation
         }
         
         if( (debug >= 1) && (e_idx > -1))
