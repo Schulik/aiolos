@@ -191,9 +191,9 @@ AOS c_Species::source_grav_noconserved(int &j) {
 void c_Species::update_kzz_and_gravpot(int argument) {
     
     homopause_boundary_i = 0;
-    double mu = 1;
-    if(this->this_species_index > 0)
-        base->species[0].mass_amu;
+    double mu = base->species[0].mass_amu;
+    //if(this->this_species_index > 0)
+    //    base->species[0].mass_amu;
     double mi = this->mass_amu;
     double slope = 1;
     
@@ -209,7 +209,7 @@ void c_Species::update_kzz_and_gravpot(int argument) {
             if(kzz*n < 1.)
                 K_zzf[i] = 1.;
             else {
-		K_zzf[i] = mu/mi;
+		        K_zzf[i] = mu/mi;
                 slope    = mu/mi;
 	    }
 	
@@ -533,7 +533,7 @@ void c_Sim::compute_friction_numerical(double dtt) {
             cout<<"    velocities[0] = "<<friction_vec_input(0)<<endl;
             cout<<"    rho[0] = "<<species[0].u[j].u1<<endl;
         }
-        
+
         friction_matrix_T = identity_matrix - friction_coefficients * dtt;
         friction_matrix_T.diagonal().noalias() += dtt * (friction_coefficients * unity_vector);
         
@@ -704,7 +704,7 @@ void c_Sim::compute_alpha_matrix(int j) { //Called in compute_friction() and com
         double alpha_local;
         double coll_b;
         //double mtot;
-        double mumass, mumass_amu, meanT;
+        double mumass, mumass_amu, meanT, meanT300;
 
         for(int si=0; si<num_species; si++) {
             for(int sj=0; sj<num_species; sj++) {
@@ -722,7 +722,7 @@ void c_Sim::compute_alpha_matrix(int j) { //Called in compute_friction() and com
                             mumass     = mass_vector(si) * mass_vector(sj) * inv_totmasses(si,sj); /// (mass_vector(si) + mass_vector(sj));
                             mumass_amu = mumass/amu;
                             meanT      = (mass_vector(sj)*temperature_vector(si) + mass_vector(si)*temperature_vector(sj)) * inv_totmasses(si,sj); // / (mass_vector(si) + mass_vector(sj)); //Mean collisional mu and T from Schunk 1980
-                            
+                            meanT300   = meanT/300.;
 
                             ////////////////////////////////////////////////////////
                             //// Dust-Gas drag
@@ -738,7 +738,7 @@ void c_Sim::compute_alpha_matrix(int j) { //Called in compute_friction() and com
                                 
                                 double A = M_PI*(s0+s1)*(s0+s1) ;
                                 double v_th = std::sqrt(8*kb*meanT/(M_PI * mumass)) ;
-
+                                
                                 alpha_local = 4/3. * dens_vector(sj) * v_th * A * inv_totmasses(si,sj) ;
                             } else {
 
@@ -1023,7 +1023,7 @@ AOS c_Species::source_diffusion_flux2(int j, bool get_v=false) {
     double pscl = 1.;
     double plimit = 1e-9; //
     if(base->total_press[j]/1e6 < plimit) 
-        pscl = base->total_press[j] / 1e6 / plimit; //Scale down diffusion beyond a nanobar to increase numerical stability
+        pscl = 0.;//base->total_press[j] / 1e6 / plimit; //Scale down diffusion beyond a nanobar to increase numerical stability
     u_diff *= pscl;
 
     if(j<=2)//if(j<=base->num_ghosts)
@@ -1110,4 +1110,5 @@ double c_Sim::get_kzz(double pressure_in_bar) {
     if(pressure_in_bar < kzz_pmax)
         return kzz_max;
     return  tmp_kzz;
+    
 }

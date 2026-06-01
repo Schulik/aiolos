@@ -34,6 +34,7 @@ double c_Sim::get_cfl_timestep() {
     int cnstr_cell= -1;
     double max_temper = 0;
     double max_mach = 0;
+    timestep_rad2 = 1e99;
     
     for(int s = 0; s < num_species; s++) {
 
@@ -48,7 +49,8 @@ double c_Sim::get_cfl_timestep() {
         }
     }
     
-    timestep_rad2 = dt / maxde * energy_epsilon;
+    if(maxde > 0)
+        timestep_rad2 = dt / maxde * energy_epsilon;
 
     //
     // Compute individual max wave crossing timesteps per cell

@@ -1092,6 +1092,7 @@ public:
     int    is_dust_like;
     double pressure_broadening_factor;
     double pressure_broadening_exponent;
+    double pressure_broadening_one;
     
     //
     // Boundary condensation mass reservoir variables

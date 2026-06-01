@@ -794,7 +794,8 @@ void c_Species::execute(std::vector<AOS>& u_in, std::vector<AOS>& dudt, std::vec
                             }
                             
                             double f           = prim[j].pres/totpress;
-                            f = 1.-1./std::exp( f*f/flim/flim );
+                            double tmp = std::exp( -f*f/flim/flim );
+                            f = 1.-tmp;
                             f = std::max(f,1e-10);//Cut at very low values to keep sound speeds from rapidly fluctuating
                             grav_prefactors[j] = f;
                             flux[j] = hllc_flux2(j, f);

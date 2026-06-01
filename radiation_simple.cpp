@@ -929,13 +929,14 @@ int c_Sim::subcycle_heat_exchange(int j, int num_cycles, int debug, double dt) {
         AOS_prim tmpp = species[si].prim[j];
         double tt = documentation(si, num_cycles-1); 
         
-        if(std::isnan(tt) || (tt<0) || ( (j==300) && (steps==10000))) {
+        if(std::isnan(tt) || (tt<0)) {
+            /*
             cout<<" @end T subcycling found NaN or <0! "<<steps<<" "<<j<<" "<<si<<" "<<tt<<" u = "<<tmp.u1<<" "<<tmp.u2<<" "<<tmp.u3<<" prim = "<<tmpp.internal_energy<<" "<<tt<<" "<<tmpp.pres<<" "<<tmpp.sound_speed<<" "<<tmpp.speed<<endl;   
             cout<<" Temperature history: in subcycling: ";
             for(int c=0; c<=num_cycles; c++) {
                 cout<<documentation(si, c)<<" ";
             }
-            cout<<endl;
+            cout<<endl; */
             
             allgood =0;
         }

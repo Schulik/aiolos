@@ -228,8 +228,8 @@ void c_Sim::init_reactions(int cdebug) {
     for(int pr=0; pr < photoreactions.size(); pr++){ 
 	  cout<<setprecision(1)<<thin_photorates_n[pr]<<" ";
     }
-    cout<<endl;
-    cout<<" Total flux = "<<flux_total<<", flux between 13.6 and 2000 eV = "<<flux_xuv<<endl;
+    cout<<endl<<endl;
+    cout<<" Total flux = "<<flux_total<<", flux between 13.6 and 2000 eV = "<<flux_xuv<<" [erg/cm^2/s] "<<endl;
 
     if(cdebug)
         cout<<" Finished init chemistry."<<endl;
@@ -302,15 +302,19 @@ void c_Sim::do_chemistry(double dt_chem) {
     
 //#pragma omp parallel for schedule(static,5)
 //    for (int j = num_cells+1; j >= 0; j--) {
-    
+    Vector_t n_init  = Vector_t::Zero(num_species);
+    Vector_t n_tmp   = Vector_t::Zero(num_species);
+    Vector_t n_tmp2  = Vector_t::Zero(num_species);
+    Vector_t n_tmp3  = Vector_t::Zero(num_species);
+
     for (int j = imaxchem-1; j >= iminchem; j--) {  //imaxchem is num_cells+1 by default; iminchem is 2 
         
         //std::vector<double> n_init = np_zeros(num_species);
         //std::vector<double> n_tmp  = np_zeros(num_species);
-        Vector_t n_init  = Vector_t(num_species);
-        Vector_t n_tmp   = Vector_t(num_species);
-        Vector_t n_tmp2  = Vector_t(num_species);
-        Vector_t n_tmp3  = Vector_t(num_species);
+        n_init.setZero();
+        n_tmp.setZero();
+        n_tmp2.setZero();
+        n_tmp3.setZero();
         //Vector_t n_tmpf  = Vector_t(num_species);
         
         double n_tot = 0.;
@@ -329,8 +333,6 @@ void c_Sim::do_chemistry(double dt_chem) {
                     n_init(s) = 0.;
             }
         }
-
-
         ///////////////////////////////////////////////////////////////////////////////////
 
 
@@ -343,10 +345,14 @@ void c_Sim::do_chemistry(double dt_chem) {
          	    charge_imbalance += ((double)species[s].static_charge) * n_init(s);
             }
         }
-        if( (n_e/n_tot < 1e-4) && neutralize_electrons) { //Force electrons to balance out the charges per celll
+        if(e_idx > -1) {
+            n_e = n_init(e_idx);
+            if( (n_e/mn_tot < 1e-4) && neutralize_electrons) { //Force electrons to balance out the charges per celll
                    n_init(e_idx) = std::fabs(charge_imbalance);
+            }
         }
-
+        
+        
         //////////////////////////////////////////////////////////////////////////////////
        
         //
@@ -510,7 +516,8 @@ void c_Sim::do_chemistry(double dt_chem) {
         }
 
         update_dS_jb_photochem(j, dt_chem);
-        
+        //out for debugging
+
         if(output_chemistry==1)  
             save_reaction_data_for_cell(j, dt_chem, n_tot);
         
@@ -519,10 +526,6 @@ void c_Sim::do_chemistry(double dt_chem) {
         if(j>10 && j<num_cells && (e_idx>-1))
             do_highenergy_cooling(j, species[e_idx].prim[j].temperature);
         
-        if(steps>311e99 && steps < 330 && j==100) {
-            cout<<"in do_chemistry, cooling j = "<<j<<" for spec 2 = "<< species[2].dG(j)<<" + " << species[2].dGdT(j)<<endl;
-            cout<<"in do_chemistry, cooling j = "<<j<<" for spec "<<e_idx<<" = "<< species[e_idx].dG(j)<<" + " << species[e_idx].dGdT(j)<<endl;
-        }
             
         //
         // Flooring
@@ -610,8 +613,8 @@ double c_reaction::get_reaction_rate(double T) {
  */
 Vector_t c_Sim::solver_cchem_implicit_general(double dtt, int cell, int cdebug, const Vector_t& n_olds, const Vector_t& n_midp, double n_tot, double mn_tot) {
     
-    int loc_thr = omp_get_thread_num();
-    Vector_t n_news = Vector_t(num_species);
+    int loc_thr     = omp_get_thread_num();
+    Vector_t n_news = Vector_t::Zero(num_species);
     reaction_matrix_ptr[loc_thr].setZero();
 
     for(int s=0;s<num_species; s++) {
@@ -875,6 +878,7 @@ Vector_t c_Sim::solver_cchem_implicit_general(double dtt, int cell, int cdebug, 
     ////////////////////////////////////////////////////////////////////////////////////////////
     Matrix_t fullmatrix = identity_matrix + reaction_matrix_ptr[loc_thr].transpose();
     n_news = return_preconditioned_LU_solution(fullmatrix, reaction_b_ptr[loc_thr], n_olds, LUchem_ptr[loc_thr], cell); 
+    
     /* 
     
 
@@ -966,16 +970,16 @@ Vector_t c_Sim::solver_cchem_implicit_general(double dtt, int cell, int cdebug, 
  */
 void c_Sim::update_dS_jb_photochem(int cell, double dtt) {
     
-    Vector_t n_olds          = Vector_t(num_species);
-    Vector_t n_news          = Vector_t(num_species);
-    Vector_t T_olds          = Vector_t(num_species);
+    Vector_t n_olds          = Vector_t::Zero(num_species);
+    Vector_t n_news          = Vector_t::Zero(num_species);
+    Vector_t T_olds          = Vector_t::Zero(num_species);
     double   n_tot = 0.;
     double ndot_multiplier =1e0;
     
     std::vector<double> mom    = np_zeros(num_species);
     chem_momentum_matrix       = Matrix_t::Zero(num_species, num_species);
-    momentum_b                 = Vector_t(num_species);
-    Vector_t internalenergy_b  = Vector_t(num_species);
+    momentum_b                 = Vector_t::Zero(num_species);
+    Vector_t internalenergy_b  = Vector_t::Zero(num_species);
     
     for(int s=0;s<num_species; s++) {
         n_tot += species[s].prim[cell].number_density;
@@ -1157,8 +1161,8 @@ void c_Sim::update_dS_jb_photochem(int cell, double dtt) {
             cout<<endl;
         }
         
-        Vector_t mom_news  = Vector_t(num_species);
-        Vector_t eint_news = Vector_t(num_species);
+        Vector_t mom_news  = Vector_t::Zero(num_species);
+        Vector_t eint_news = Vector_t::Zero(num_species);
         LUchem_mom.compute(identity_matrix + chem_momentum_matrix) ;
         
         mom_news.noalias() = LUchem_mom.solve(momentum_b); 
@@ -1778,7 +1782,7 @@ std::vector<double> get_thermo_variables(double T,string species_string) {
 
 void c_Sim::enforce_charge_neutrality(int j) {
 
-	Vector_t n_tmp  = Vector_t(num_species);
+	Vector_t n_tmp  = Vector_t::Zero(num_species);
         for(int s=0;s<num_species; s++) {
                 n_tmp(s)      = species[s].prim[j].number_density;
         }

@@ -1,0 +1,28 @@
+Long running simulations:
+
+matthaus  444289   34315 68 Jan07 pts/5    3-17:10:07 ./aiolos -dir venus/ -par venus_thermochemistry_nonisothermal-kzz0-fuv3-sol0-redo.par
+matthaus  639777   34315 58 Jan08 pts/5    2-09:42:43 ./aiolos -dir venus/ -par venus_thermochemistry_nonisothermal-kzz0-fuv3-sol5-cfl10-o2-damping-rmax.par
+matthaus  647279   34315 58 Jan08 pts/5    2-09:18:26 ./aiolos -dir venus/ -par venus_thermochemistry_nonisothermal-kzz0-fuv3-sol0-rmax.par
+matthaus  660451   34315 57 Jan08 pts/5    2-07:00:33 ./aiolos -dir venus/ -par venus_thermochemistry_nonisothermal-kzz0-fuv3-sol5-cfl5-o2-cold2.par
+matthaus  661127   34315 57 Jan08 pts/5    2-06:52:20 ./aiolos -dir venus/ -par venus_thermochemistry_nonisothermal-kzz0-fuv3-sol5-cfl5-o1-cold2.par
+matthaus  662293   34315 57 Jan08 pts/5    2-06:37:50 ./aiolos -dir venus/ -par venus_thermochemistry_nonisothermal-kzz0-fuv3-sol0-cfl1-o1-cold2.par
+matthaus  666097   34315 57 Jan08 pts/5    2-06:03:12 ./aiolos -dir venus/ -par venus_thermochemistry_nonisothermal-kzz0-fuv3-sol5-cfl5-o1-damp6.par
+matthaus  666098   34315 57 Jan08 pts/5    2-06:03:17 ./aiolos -dir venus/ -par venus_thermochemistry_nonisothermal-kzz0-fuv3-sol5-cfl5-o1-damp10.par
+matthaus  666667   34315 57 Jan08 pts/5    2-05:53:25 ./aiolos -dir venus/ -par venus_thermochemistry_nonisothermal-kzz0-fuv3-sol5-cfl5-o2-cold2.par
+matthaus 1097567  575941 99 15:10 pts/0    00:56:51 ./aiolos -dir hd189733b/ -par hd189733b-fullhelium-oxygencarbonsodium-kzz0e-10_K2salz_sol5-cfl05.par
+matthaus 1107451  575941  0 16:06 pts/0    00:00:00 grep --color=auto aiolos
+matthaus 2308060   34315  0  2025 pts/5    00:01:05 ./aiolos -dir venus/ -par venus_thermochemistry_nonisothermal-kzz10-fuv3.par
+matthaus 2874548   34315 53  2025 pts/5    9-01:44:18 ./aiolos -dir venus/ -par venus_thermochemistry_nonisothermal-kzz12-fuv3.par
+
+
+
+[4]   Terminated              ./aiolos -dir venus/ -par venus_thermochemistry_nonisothermal-kzz12-fuv3.par > log_venus_thermochemistry_nonisothermal-kzz12-fuv3.log
+[6]   Terminated              ./aiolos -dir venus/ -par venus_thermochemistry_nonisothermal-kzz0-fuv3-sol${a}-redo.par > log_venus_thermochemistry_nonisothermal-kzz0-fuv3-sol${a}-redo.log
+[18]   Terminated              ./aiolos -dir venus/ -par venus_thermochemistry_nonisothermal-kzz0-fuv3-sol5-cfl10-o2-damping-rmax.par > log_venus_thermochemistry_nonisothermal-kzz0-fuv3-sol5-cfl10-o2-damping-rmax.log
+[20]   Terminated              ./aiolos -dir venus/ -par venus_thermochemistry_nonisothermal-kzz0-fuv3-sol0-rmax.par > log_venus_thermochemistry_nonisothermal-kzz0-fuv3-sol0-rmax.log
+[23]   Terminated              ./aiolos -dir venus/ -par venus_thermochemistry_nonisothermal-kzz0-fuv3-sol5-cfl5-o2-cold2.par > log_venus_thermochemistry_nonisothermal-kzz0-fuv3-sol5-cfl5-o2-cold2.log
+[24]   Terminated              ./aiolos -dir venus/ -par venus_thermochemistry_nonisothermal-kzz0-fuv3-sol5-cfl5-o1-cold2.par > log_venus_thermochemistry_nonisothermal-kzz0-fuv3-sol5-cfl5-o1-cold2.log
+[25]   Terminated              ./aiolos -dir venus/ -par venus_thermochemistry_nonisothermal-kzz0-fuv3-sol0-cfl1-o1-cold2.par > log_venus_thermochemistry_nonisothermal-kzz0-fuv3-sol0-cfl1-o1-cold2.log
+[26]   Terminated              ./aiolos -dir venus/ -par venus_thermochemistry_nonisothermal-kzz0-fuv3-sol5-cfl5-o1-damp${a}.par > log_venus_thermochemistry_nonisothermal-kzz0-fuv3-sol5-cfl5-o1-damp${a}.log
+[27]   Terminated              ./aiolos -dir venus/ -par venus_thermochemistry_nonisothermal-kzz0-fuv3-sol5-cfl5-o1-damp${a}.par > log_venus_thermochemistry_nonisothermal-kzz0-fuv3-sol5-cfl5-o1-damp${a}.log
+[28]-  Terminated              ./aiolos -dir venus/ -par venus_thermochemistry_nonisothermal-kzz0-fuv3-sol5-cfl5-o2-cold2.par > log_venus_thermochemistry_nonisothermal-kzz0-fuv3-sol5-cfl5-o2-cold2.log

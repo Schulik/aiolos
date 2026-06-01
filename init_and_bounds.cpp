@@ -31,7 +31,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, s
 
         //feenableexcept(FE_INVALID);
 
-        if(debug > 0) cout<<"Init position 0."<<endl;
+        if(debug_data[0] > 0) cout<<"Init position 0."<<endl;
         
         steps = -1;
         this->debug      = debug_data[0] ;
@@ -187,7 +187,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, s
         output_time = read_parameter_from_file<double>(filename,"PARI_TIME_OUTPUT", debug, 1e99).value;           //Create an output every xxx simulated seconds.
         output_time_offset = read_parameter_from_file<double>(filename,"TIME_OUTPUT_OFFSET", debug, 0.).value;    //Create outputs every PARI_TIME_OUTPUT but only starting after offset, in s
         log_time_start     = read_parameter_from_file<int>(filename,"LOG_TIME_START", debug, -20).value;    //Create outputs every PARI_TIME_OUTPUT but only starting after offset, in s
-        cont_output_steps    = read_parameter_from_file<int>(filename,"CONT_OUTPUT_STEPS", debug, -1).value;    //Create a continuous output CONT_TIME_STEPS steps, in overwrite mode - to see where the simulation is between long outputs
+        cont_output_steps    = read_parameter_from_file<int>(filename,"CONT_OUTPUT_STEPS", debug, 1e4).value;    //Create a continuous output CONT_TIME_STEPS steps, in overwrite mode - to see where the simulation is between long outputs
         log_time_factor    = read_parameter_from_file<double>(filename,"LOG_TIME_FACTOR", debug, 10.).value;    //Create outputs every PARI_TIME_OUTPUT but only starting after offset, in s
         monitor_time = read_parameter_from_file<double>(filename,"PARI_TIME_DT", debug).value;                    //Put measurements into the monitor file every xx s
         CFL_break_time = read_parameter_from_file<double>(filename,"CFL_BREAK_TIME", debug, std::numeric_limits<double>::max()).value ; //Use PARI_CFLFACTOR if t<CLF_break_time. Otherwise, set cflfactor to 0.9
@@ -450,6 +450,8 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, s
             string line;
             if(!file) {
                 cout<<"Couldnt open wavebins file "<<wavebinsfile<<"!!!!!!!!!!1111"<<endl;
+                char a;
+                cin>>a;
             }
 	    else {
 		cout<<"Opening wavebins file "<<wavebinsfile<<"..";;
@@ -852,7 +854,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, s
         friction_sample = Eigen::VectorXd::Zero(num_cells+2);
         
         reaction_matrix = Matrix_t::Zero(num_species, num_species);
-        reaction_b      = Vector_t(num_species);
+        reaction_b      = Vector_t::Zero(num_species);
         
         reaction_matrix_ptr = new Eigen::MatrixXd[omp_get_max_threads()];
         reaction_b_ptr      = new Eigen::VectorXd[omp_get_max_threads()];
@@ -860,7 +862,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, s
         
         for(int i =0; i<omp_get_max_threads(); i++ ) {
             reaction_matrix_ptr[i] = Matrix_t::Zero(num_species, num_species);
-            reaction_b_ptr[i]      = Vector_t(num_species);
+            reaction_b_ptr[i]      = Vector_t::Zero(num_species);
             //LUchem_ptr[i]          = Eigen::PartialPivLU<Matrix_t>;
         }
 
@@ -884,15 +886,15 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, s
             friction_coeff_mask   = Matrix_t::Ones(num_species, num_species);
             inv_totmasses         = Matrix_t::Zero(num_species, num_species);
             resonant_pair_matrix  = Matrix_t::Ones(num_species, num_species);
-            friction_vec_input    = Vector_t(num_species);
-            friction_vec_output   = Vector_t(num_species);
-            friction_dEkin        = Vector_t(num_species);
-            dens_vector           = Vector_t(num_species);
-            numdens_vector        = Vector_t(num_species);
-            mass_vector           = Vector_t(num_species);
-            temperature_vector    = Vector_t(num_species);
+            friction_vec_input    = Vector_t::Zero(num_species);
+            friction_vec_output   = Vector_t::Zero(num_species);
+            friction_dEkin        = Vector_t::Zero(num_species);
+            dens_vector           = Vector_t::Zero(num_species);
+            numdens_vector        = Vector_t::Zero(num_species);
+            mass_vector           = Vector_t::Zero(num_species);
+            temperature_vector    = Vector_t::Zero(num_species);
             temperature_old       = Vector_t::Ones(num_cells+2);
-            temperature_vector_augment    = Vector_t(num_species);
+            temperature_vector_augment    = Vector_t::Zero(num_species);
 
             identity_matrix       = Matrix_t::Identity(num_species, num_species);
             unity_vector          = Vector_t::Ones(num_species);
@@ -920,10 +922,10 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, s
     
     radiation_matrix_T   = Matrix_t::Zero(num_species, num_species);
     radiation_matrix_M   = Matrix_t::Zero(num_species, num_species);
-    radiation_vec_input  = Vector_t(num_species);
-    radiation_vec_output = Vector_t(num_species);
-    radiation_cv_vector  = Vector_t(num_species);
-    radiation_T3_vector  = Vector_t(num_species);
+    radiation_vec_input  = Vector_t::Zero(num_species);
+    radiation_vec_output = Vector_t::Zero(num_species);
+    radiation_cv_vector  = Vector_t::Zero(num_species);
+    radiation_T3_vector  = Vector_t::Zero(num_species);
     
     previous_monitor_J = std::vector<double>(num_bands_out) ;
     previous_monitor_T = std::vector<double>(num_species) ;
@@ -992,7 +994,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, s
                     cout<<" Solar heating is "<<solar_heating(b)<<" T_star = "<<T_star<<" pow(R_star*rsolar,2.) "<<pow(R_star*rsolar,2.)<<" pow(planet_semimajor*au,2.) "<<planet_semimajor<<endl;
                 }
                 else{
-                    //cout<<"SOLAR HEATING in bin "<<b;
+                    
                     //cout<<" from/to lmin/lmax"<<l_i_in[b];
                     //cout<<"/"<<l_i_in[b+1]<<" with frac = "<<compute_planck_function_integral4(l_i_in[b], l_i_in[b+1], T_star);
                     
@@ -1000,6 +1002,8 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, s
                     solar_heating(b) += sigma_rad * pow(T_other,4.) * pow(R_other*rsolar,2.)/pow(d_other*au,2.) * compute_planck_function_integral4(l_i_in[b], l_i_in[b+1], T_other);;
                     templumi         += solar_heating(b);
                     
+                    cout<<"SOLAR HEATING in bin "<<b<<" solar_heating(b) = "<<solar_heating(b)<<" blackbody in this band "<<sigma_rad * pow(T_star,4.) * pow(R_star*rsolar,2.)/pow(planet_semimajor*au,2.) * compute_planck_function_integral4(l_i_in[b], l_i_in[b+1], T_star);
+
                     //if (BAND_IS_HIGHENERGY[b] == 1) {
                     if(l_i_in[b+1] <= 0.09161) { //Detect the EUV band 
                             
@@ -1038,7 +1042,11 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, s
             ifstream file(fluxfile);
             string line;
             if(!file) {
-                cout<<"Couldnt open flux spectrum file "<<fluxfile<<"!!!!!!!!!!1111"<<endl;
+                cout<<"Couldnt open flux spectrum file "<<fluxfile<<"!"<<endl;
+                char a;
+                cin>>a;
+            } else {
+                cout<<"Opening flux spectrum file "<<fluxfile<<"."<<endl;
             }
             
             while(std::getline( file, line )) {
@@ -1062,16 +1070,16 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, s
              
              if(cnt > 0) {
                  //tempenergy /= (double)cnt;
-                 solar_heating(b) += tempenergy * fluxmultiplier;
-                 templumi += solar_heating(b);
+                 solar_heating(b)       += tempenergy * fluxmultiplier;
+                 templumi               += solar_heating(b);
                  solar_heating_final(b) += solar_heating(b);
             } else {
                 solar_heating(b) = 0.;
             }
             //if(b!=2) {
-	//	solar_heating(b) = 0.;
-	//	solar_heating_final(b) = 0.;
-	  //  }
+            //	solar_heating(b) = 0.;
+            //	solar_heating_final(b) = 0.;
+            //  }
 
             cout<<"SOLAR HEATING read from file in bin "<<b;
             cout<<" from/to lmin/lmax"<<l_i_in[b]<<"/"<<l_i_in[b+1];
@@ -1336,6 +1344,7 @@ c_Species::c_Species(c_Sim *base_simulation, string filename, string species_fil
         TEMPERATURE_BUMP_STRENGTH    = read_parameter_from_file<double>(filename,"TEMPERATURE_BUMP_STRENGTH", debug, 0.).value; //Discontinued
         pressure_broadening_factor   = read_parameter_from_file<double>(filename,"PRESSURE_BROADENING", debug, 0.).value;  //For opacity model==P, weaken/strengthen pressure broadening
         pressure_broadening_exponent = read_parameter_from_file<double>(filename,"BROADENING_EXP", debug, 1.).value;       //For opacity model==P, opacity = (1+broad_factor * (p/1e5)^exponent)
+        pressure_broadening_one      = read_parameter_from_file<double>(filename,"BROADENING_ONE", debug, 1.).value;       //For opacity model==P, opacity = (1+broad_factor * (p/1e5)^exponent)
         
         if(debug > 0) cout<<"        Species["<<species_index<<"] Init: Finished reading boundaries."<<endl;
         if(debug > 0) cout<<"         Boundaries used in species["<<speciesname<<"]: "<<boundary_left<<" / "<<boundary_right<<endl;
@@ -2034,7 +2043,7 @@ void c_Species::apply_boundary_left(std::vector<AOS>& u) {
                 u[igh]     = u[iact]; 
                 u[igh].u2 *= -1;
                 base->phi[igh]   = base->phi[iact] ;
-                u[igh].u3 = 0.5*u[igh].u2*u[igh].u2/u[igh].u1 + u[igh].u1 * cv * const_T_space;
+                u[igh].u3 = 0.5*u[igh].u2*u[igh].u2/u[igh].u1 + u[igh].u1 * cv * prim[iact].temperature;
 
                 eos->compute_primitive(&u[igh],&(prim[igh]), 1) ;
                 eos->compute_auxillary(&(prim[igh]), 1);
