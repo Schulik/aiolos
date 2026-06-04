@@ -12,7 +12,7 @@ BFLAGS = -I. -O3 -g #or -g
 else
 CXX = g++ -std=c++17 
 CXXFLAGS = -Wall -Wextra -march=native #-flto  #-pg or -g put compiler settings here
-BFLAGS = -I. -O3 -fopenmp -g -pg -w #or -g
+BFLAGS = -I. -O3 -fopenmp -w #or -pg -g
 endif
 endif
 CPPFLAGS = -I/usr/include/eigen3 -DNDEBUG # put pre-processor settings (-I, -D, etc) here
@@ -56,4 +56,4 @@ tests: $(TEST_OBJ) makefile aiolos.h
 	cd test_files ; python3 test_coll_heating.py
 
 clean:
-	rm -f *.o test_files/*.o problems/*.o test_files/*dat
+	rm -f *.o test_files/*.o problems/*.o

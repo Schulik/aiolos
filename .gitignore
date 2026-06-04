@@ -22,3 +22,4 @@ tests
 tmp*
 *.wav
 *.py
+execution_log.txt
