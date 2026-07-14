@@ -1,6 +1,6 @@
 /**
  * chemistry.cpp
- * 
+ *     
  * A module to solve for time-dependent chemistry and photochemistry.
  * Not documented in the aiolos paper, but a further development.
  */
@@ -88,7 +88,7 @@ void c_Sim::init_reactions(int cdebug) {
     init_highenergy_opacities(); //Redoes string interpretation for photoreactions, needs base pointer to set opacities
     
     //Step 2.1: Output the thermochemical reaction list which the program thinks its using
-    cout<<"In init chemistry, reporting thermochemical reactions: "<<endl;
+    cout<<endl<<"In init chemistry, reporting thermochemical reactions: "<<endl;
     for(c_reaction& reaction : reactions) {
 
 

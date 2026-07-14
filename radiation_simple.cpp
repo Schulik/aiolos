@@ -757,7 +757,6 @@ int c_Sim::subcycle_heat_exchange(int j, int num_cycles, int debug, double dt) {
                     if(debug >= 1)
                         cout<<" in heat subscycling, order = "<<num_cycles<<" Adding the following steps to average: "<<steps<<" time "<<this->globalTime;
                     
-                    
                     if(num_cycles==1) { //If more than 
                             for(int si=0; si<num_species; si++) {
                                 tmp_temperatures(si) += documentation(si,0);
@@ -818,6 +817,9 @@ int c_Sim::subcycle_heat_exchange(int j, int num_cycles, int debug, double dt) {
                     double kappa = 1.*species[si].opacity_planck(j, 0);
                     //
                     // Rad equilibrium terms
+                    
+                    //if( steps>500 && j==3)
+                    //    cout<<" sign in terms "<<sigma_rad * kappa * Ts3<<endl;
 
                     coll_heat_matrix(si,si) += scl_fac * (species[si].cv/ddt     + 16 * sigma_rad * kappa * Ts3);
                     coll_heat_b(si)         += scl_fac * (species[si].cv/ddt     + 12 * sigma_rad * kappa * Ts3) * Tsold ;
@@ -890,7 +892,12 @@ int c_Sim::subcycle_heat_exchange(int j, int num_cycles, int debug, double dt) {
         //********************************************************************** */
         //********************************************************************** */
         
-        if( (debug >= 1)) {
+        double ddebug = 0;
+        //if( (globalTime > 1e+1) && (j==2))
+        if( debug >= 1)
+            ddebug = 1;
+
+        if( (ddebug >= 1)) {
             cout<<endl<<"step "<<steps<<" j "<<j<<" dt = "<<dt <<" Showing time evolution over subcycles "<<endl;
             for(int si=0; si<num_species; si++) {
                 
@@ -914,6 +921,9 @@ int c_Sim::subcycle_heat_exchange(int j, int num_cycles, int debug, double dt) {
                 de_total_expected += dt  * (species[si].dS(j) - species[si].dG(j) - species[si].dGdT(j) * (documentation(si,num_cycles)-documentation(si,0)  )   );
             }
             cout<<" rel. de expected from heating: "<<de_total_expected/e_init<<endl ;
+
+            char a;
+            cin>>a;
         }
     
  
@@ -945,13 +955,13 @@ int c_Sim::subcycle_heat_exchange(int j, int num_cycles, int debug, double dt) {
     if(!allgood)
         return 0;
     
-    if(debug <= 1) {
+    if(ddebug <= 1) {
 
         for(int si=0; si<num_species; si++) {
             species[si].prim[j].temperature = documentation(si, num_cycles-1); //ignore last computation
         }
         
-        if( (debug >= 1) && (e_idx > -1))
+        if( (ddebug >= 1) && (e_idx > -1))
             cout<<" Found temperature solution with num_cycles="<<num_cycles<<", returning. FInal electron temperature ="<<species[e_idx].prim[j].temperature<<endl;
     }
     return 1; //allgood

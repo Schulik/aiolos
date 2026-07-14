@@ -228,7 +228,6 @@ void c_Species::update_kzz_and_gravpot(int argument) {
             if( std::fabs(K_zzf[i] - 1.) < 1e-5 && std::fabs( K_zzf[i-1] - 1.) > 1e-5) //found homopause
                     homopause_boundary_i = i;
         }
-            
     }
     else {
         for(int i=0; i<num_cells+2; i++) {
@@ -253,19 +252,19 @@ void c_Species::update_kzz_and_gravpot(int argument) {
     int smoothradius = base->homopause_smoothing_rad;
     if(homopause_boundary_i > smoothradius) {
         int repeats = base->homopause_smoothing_rep; 
-	double tmp_phis[smoothradius*2+1];
+        double tmp_phis[smoothradius*2+1];
 
-	for(int a=0; a<repeats; a++){
-		for(int k=-smoothradius; k<=smoothradius; k++) {
-			double qq = std::log10( -phi_s[homopause_boundary_i-1+k] ) + std::log10(- phi_s[homopause_boundary_i+1+k]);
-                        tmp_phis[k+smoothradius] = -std::pow(10.,0.5*qq); //phi_s[homopause_boundary_i] = -std::pow(10.,0.5*qq);
+        for(int a=0; a<repeats; a++){
+            for(int k=-smoothradius; k<=smoothradius; k++) {
+                double qq = std::log10( -phi_s[homopause_boundary_i-1+k] ) + std::log10(- phi_s[homopause_boundary_i+1+k]);
+                            tmp_phis[k+smoothradius] = -std::pow(10.,0.5*qq); //phi_s[homopause_boundary_i] = -std::pow(10.,0.5*qq);
 
-		}
+            }
 
-		for(int k=-smoothradius; k<=smoothradius; k++) {
-				phi_s[homopause_boundary_i + k] = tmp_phis[k+smoothradius];
-		}
-	}
+            for(int k=-smoothradius; k<=smoothradius; k++) {
+                    phi_s[homopause_boundary_i + k] = tmp_phis[k+smoothradius];
+            }
+        }
 
     }
     /*

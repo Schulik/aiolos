@@ -27,7 +27,7 @@ extern double VanLeerSlope(double ql, double qm, double qr, double cF, double cB
  * @param[in] debug_cell Get detailed information for a specific cell (To be implemented by user..)
  * @param[in] debug_steps Get detailed information for a specific timestep (To be implemented by user..)
  */
-c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, string tintent, std::vector<int> debug_data, int restartnumber, double restarttime_cmdline) {
+c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, string tintent, std::vector<int> debug_data, std::vector<double> restart_data) {
 
         //feenableexcept(FE_INVALID);
 
@@ -45,8 +45,10 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, s
         this->intent     = tintent;
         string filename    = workingdir + filename_solo;
         parfile            = workingdir + filename_solo;
-        this->restartnumber     = restartnumber;
-        this->restarttime        = 0.;
+        this->restartnumber      = (int)(restart_data[0]*1.000001); //factor slightly larger than 1 to ward off against rounding errors
+        this->restarttime        = restart_data[1];
+        this->restartmode        = (int)(restart_data[2]*1.000001);
+        cout<<" RESTARTPARAMETERS : restarttime = "<< this->restarttime<<endl;
         
         
         if(speciesfile_solo.compare("default.spc")==0)
@@ -184,10 +186,10 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, s
         dt_max      = read_parameter_from_file<double>(filename,"PARI_DTMAX", debug, 1e99).value;     // Limit the largest possible timestep size in seconds.
         max_timestep_change = read_parameter_from_file<double>(filename,"MAX_TIMESTEP_CHANGE", debug, 1.1).value; //Max. change of timestep per following timestep in s.
         dt_min_init         = read_parameter_from_file<double>(filename,"DT_MIN_INIT", debug, 1e-20).value;       //Initial dt in s
-        output_time = read_parameter_from_file<double>(filename,"PARI_TIME_OUTPUT", debug, 1e99).value;           //Create an output every xxx simulated seconds.
+        output_time        = read_parameter_from_file<double>(filename,"PARI_TIME_OUTPUT", debug, 1e99).value;           //Create an output every xxx simulated seconds.
         output_time_offset = read_parameter_from_file<double>(filename,"TIME_OUTPUT_OFFSET", debug, 0.).value;    //Create outputs every PARI_TIME_OUTPUT but only starting after offset, in s
         log_time_start     = read_parameter_from_file<int>(filename,"LOG_TIME_START", debug, -20).value;    //Create outputs every PARI_TIME_OUTPUT but only starting after offset, in s
-        cont_output_steps    = read_parameter_from_file<int>(filename,"CONT_OUTPUT_STEPS", debug, 1e4).value;    //Create a continuous output CONT_TIME_STEPS steps, in overwrite mode - to see where the simulation is between long outputs
+        cont_output_steps    = read_parameter_from_file<double>(filename,"CONT_OUTPUT_STEPS", debug, 1e4).value;    //Create a continuous output CONT_TIME_STEPS steps, in overwrite mode - to see where the simulation is between long outputs
         log_time_factor    = read_parameter_from_file<double>(filename,"LOG_TIME_FACTOR", debug, 10.).value;    //Create outputs every PARI_TIME_OUTPUT but only starting after offset, in s
         monitor_time = read_parameter_from_file<double>(filename,"PARI_TIME_DT", debug).value;                    //Put measurements into the monitor file every xx s
         CFL_break_time = read_parameter_from_file<double>(filename,"CFL_BREAK_TIME", debug, std::numeric_limits<double>::max()).value ; //Use PARI_CFLFACTOR if t<CLF_break_time. Otherwise, set cflfactor to 0.9
@@ -429,7 +431,8 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, s
             
             for(int b=2; b<num_bands_in-1; b++) {
                 l_i_in[b]      = l_i_in[b-1] * dlogl2;
-                cout<<" in NUM_BANDS>2, b = "<<b<<" l_i_in[b] = "<<l_i_in[b]<<endl;
+                if(debug > 1)
+                    cout<<" in NUM_BANDS>2, b = "<<b<<" l_i_in[b] = "<<l_i_in[b]<<endl;
             }
             
             for(int b=0; b<num_bands_in; b++) {
@@ -454,22 +457,23 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, s
                 cin>>a;
             }
 	    else {
-		cout<<"Opening wavebins file "<<wavebinsfile<<"..";;
+		    cout<<"Opening wavebins file "<<wavebinsfile<<".."<<endl;
 	    }
 
 
 		int b_current = 1;
 
-            	while(std::getline( file, line )) {
-			if(b_current == num_bands_in)
-				break;
-			cout<<" band b = "<<b_current<<" / current l_i_in[b] ="<<l_i_in[b_current];
-        	        std::vector<string> stringlist = stringsplit(line," ");
-                	l_i_in[b_current]   = std::stod(stringlist[0]); //micrometer! ...  also user has to make sure that b_current doesnt exceed l_min
-			cout<<" changed to l_i_in[b] = "<<l_i_in[b_current]<<endl;
-
-			b_current++;
-             	}
+            while(std::getline( file, line )) {
+                if(b_current == num_bands_in)
+                    break;
+                if(debug > 1) {
+                    cout<<" band b = "<<b_current<<" / current l_i_in[b] ="<<l_i_in[b_current];
+                            std::vector<string> stringlist = stringsplit(line," ");
+                            l_i_in[b_current]   = std::stod(stringlist[0]); //micrometer! ...  also user has to make sure that b_current doesnt exceed l_min
+                    cout<<" changed to l_i_in[b] = "<<l_i_in[b_current]<<endl;
+                }
+                b_current++;
+            }
 	   
            file.close(); 
 
@@ -493,7 +497,8 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, s
             
             for(int b=2; b<num_bands_out-1; b++) {
                 l_i_out[b]      = l_i_out[b-1] * dlogl2;
-                cout<<" in NUM_BANDS>2, b = "<<b<<" l_i_out[b] = "<<l_i_out[b]<<endl;
+                if(debug > 1)
+                    cout<<" in NUM_BANDS>2, b = "<<b<<" l_i_out[b] = "<<l_i_out[b]<<endl;
             }
             
             for(int b=0; b<num_bands_out; b++) {
@@ -534,10 +539,10 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, s
 			if(b==num_bands_in-1)
 				photon_energies[b]  = elow;
 			
-			cout<<"Assigned to highenergy band b = "<<b<<" a photon energy of "<<photon_energies[b]/ev_to_K/kb<<" eV; elow / ehigh = "<<elow/ev_to_K/kb<<" / "<<ehigh/ev_to_K/kb<<endl;
+			cout<<"Assigned to energy band b = "<<b<<" a photon energy of "<<photon_energies[b]/ev_to_K/kb<<" eV; elow / ehigh = "<<elow/ev_to_K/kb<<" / "<<ehigh/ev_to_K/kb<<endl;
 		}
 	
-            cout<<"Assigned to highenergy band b = "<<b<<" a photon energy of "<<photon_energies[b]/ev_to_K/kb<<" eV "<<endl;
+            //cout<<"Assigned to energy band b = "<<b<<" a photon energy of "<<photon_energies[b]/ev_to_K/kb<<" eV "<<endl;
         }
 
         cout<<" WAVELENGTH GRID FINISHED. num_bands_in / num_he_bands / num_bands_out = "<<num_bands_in<<" / "<<num_he_bands<<" / "<<num_bands_out<<endl;
@@ -782,7 +787,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, s
         // RESTART FUNCTIONALITY
         //
         if(restartnumber != 0)
-            c_Sim::restart_from_outputnumber(restartnumber, restarttime_cmdline);
+            c_Sim::restart_from_outputnumber(restartnumber, restarttime, restartmode);
         
         //
         // END RESTART
@@ -790,7 +795,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, s
        
 
        //Rebuild electron densities
-       init_highenergy_cooling_indices(); 
+       //init_highenergy_cooling_indices(); 
        if(e_idx > -1) {
             for(int i=0; i<num_cells+1; i++) {
                 enforce_charge_neutrality(i);
@@ -1002,7 +1007,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, s
                     solar_heating(b) += sigma_rad * pow(T_other,4.) * pow(R_other*rsolar,2.)/pow(d_other*au,2.) * compute_planck_function_integral4(l_i_in[b], l_i_in[b+1], T_other);;
                     templumi         += solar_heating(b);
                     
-                    cout<<"SOLAR HEATING in bin "<<b<<" solar_heating(b) = "<<solar_heating(b)<<" blackbody in this band "<<sigma_rad * pow(T_star,4.) * pow(R_star*rsolar,2.)/pow(planet_semimajor*au,2.) * compute_planck_function_integral4(l_i_in[b], l_i_in[b+1], T_star);
+                    //cout<<"SOLAR HEATING in bin "<<b<<" solar_heating(b) = "<<solar_heating(b)<<" blackbody in this band "<<sigma_rad * pow(T_star,4.) * pow(R_star*rsolar,2.)/pow(planet_semimajor*au,2.) * compute_planck_function_integral4(l_i_in[b], l_i_in[b+1], T_star);
 
                     //if (BAND_IS_HIGHENERGY[b] == 1) {
                     if(l_i_in[b+1] <= 0.09161) { //Detect the EUV band 
@@ -1046,7 +1051,8 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, s
                 char a;
                 cin>>a;
             } else {
-                cout<<"Opening flux spectrum file "<<fluxfile<<"."<<endl;
+                if(b==0)
+                    cout<<"Opening flux spectrum file "<<fluxfile<<"."<<endl;
             }
             
             while(std::getline( file, line )) {
@@ -1298,7 +1304,7 @@ c_Species::c_Species(c_Sim *base_simulation, string filename, string species_fil
         this->workingdir   = base->workingdir;
         this->debug        = debug;
         
-        if(debug >= 0) cout<<"        Species["<<species_index<<"] = "<<speciesname<<" Beginning init."<<endl;
+        if(debug >= 0) cout<<" Species["<<species_index<<"], beginning init."<<endl;
         
         ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         //
@@ -1356,10 +1362,10 @@ c_Species::c_Species(c_Sim *base_simulation, string filename, string species_fil
         // //Readin species file, const_cv, const_gamma_adiabat for this species
         //
         ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        if(debug > 0) cout<<"        Species["<<species_index<<"] Init: Reading species data..."<<endl;
+        if(debug > 1) cout<<"        Species["<<species_index<<"] Init: Reading species data..."<<endl;
         read_species_data(species_filename, species_index); 
-        if(debug > 0) cout<<"        Species["<<species_index<<"] Init: Done reading species data."<<endl;
-        if(debug > -1) cout<<"        AFTER READ DATA Species["<<speciesname<<"] mass = "<<mass_amu<<endl;
+        if(debug > 1) cout<<"        Species["<<species_index<<"] Init: Done reading species data."<<endl;
+        if(debug > 1) cout<<"        AFTER READ DATA Species["<<speciesname<<"] mass = "<<mass_amu<<endl;
         
         u               = init_AOS(num_cells+2); //Conserved hyperbolic variables: density, mass flux, energy density
         u0              = init_AOS(num_cells+2); //Conserved hyperbolic variables: density, mass flux, energy density
@@ -1392,7 +1398,7 @@ c_Species::c_Species(c_Sim *base_simulation, string filename, string species_fil
             eos           = new IdealGas_EOS(degrees_of_freedom, cv, mass_amu*amu) ;
         }
         
-        if(debug >= 0) cout<<"        Species["<<species_index<<"] got a gamma_adiabatic = "<<gamma_adiabat<<" and cv = "<<cv<<" and a charge of "<<static_charge<<endl;
+        if(debug >= 0) cout<<"        Species["<<species_index<<"]="<<speciesname<<" read with mass = "<<mass_amu<<" gamma_adiabatic = "<<gamma_adiabat<<" and cv = "<<cv<<" and a charge of "<<static_charge<<endl;
 
         u_analytic     = np_zeros(num_cells+2);
 
@@ -1418,7 +1424,7 @@ c_Species::c_Species(c_Sim *base_simulation, string filename, string species_fil
         // Initialize/readin scenario parameters
         //
         //////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        if(debug > -1) cout<<"        AFTER READ DATA Species["<<speciesname<<"] mass = "<<mass_amu<<endl;
+        if(debug > 1) cout<<"        AFTER READ DATA Species["<<speciesname<<"] mass = "<<mass_amu<<endl;
         
         //
         // Problem 1: two states, left and right, separated at a mid-position
@@ -1486,7 +1492,7 @@ c_Species::c_Species(c_Sim *base_simulation, string filename, string species_fil
             //
             // If we want to initialize a hydrostatic atmosphere, then we overwrite the so far given density/pressure data and set every velocity to 0
             //
-            if(debug > -1) cout<<"        AFTER READ DATA Species["<<speciesname<<"] mass = "<<mass_amu<<endl;
+            if(debug > 1) cout<<"        AFTER READ DATA Species["<<speciesname<<"] mass = "<<mass_amu<<endl;
 
             if(init_static_atmosphere == 1) {
                 initialize_hydrostatic_atmosphere(filename);
@@ -1602,7 +1608,7 @@ void c_Species::initialize_hydrostatic_atmosphere(string filename) {
     //
     // First, initialize (adiabatic) temperature
     //
-    if(debug > -1) cout<<"        IN CONSTRUCT HYDROSTATIC  AFTER READ DATA Species["<<speciesname<<"] mass = "<<mass_amu<<endl;
+    if(debug > 1) cout<<"        IN CONSTRUCT HYDROSTATIC  AFTER READ DATA Species["<<speciesname<<"] mass = "<<mass_amu<<endl;
 
     for(int i=num_cells+1; i>=0; i--) {
             
@@ -1674,9 +1680,11 @@ void c_Species::initialize_hydrostatic_atmosphere(string filename) {
         }
     }
     
-    cout<<" POS1 dens[2] = "<<u[2].u1<<" temp[2] = "<<prim[2].temperature<<" num_cells+2 = "<<num_cells+2<<endl;
-    cout<<" temperatures = "<<const_T_space<<" "<<const_T_space2<<" "<<dphi_factor<<endl;
-	cout<<" gamma_adiabt = "<<gamma_adiabat<<endl;
+    if (debug >1) {
+        cout<<" POS1 dens[2] = "<<u[2].u1<<" temp[2] = "<<prim[2].temperature<<" num_cells+2 = "<<num_cells+2<<endl;
+        cout<<" temperatures = "<<const_T_space<<" "<<const_T_space2<<" "<<dphi_factor<<endl;
+        cout<<" gamma_adiabt = "<<gamma_adiabat<<endl;
+    }
     //At this point, the right ghost cell is already initialized, so we can just build up a hydrostatic state from there
     int iter_start;
     if(base->type_of_grid==-2)
@@ -2469,13 +2477,17 @@ void c_Sim::init_highenergy_opacities() {
  
      for(c_photochem_reaction& r: photoreactions) {
 
+    if(debug>1)
         cout<<"Attempting to construct opacities for reaction number "<<r.reaction_number<<" with opastring "<<r.opafile<<endl;
+    
 	if( r.opafile.compare("") == 0 ) { //None given, revert to default value
-                cout<<"      Setting defaults... iwth species index "<<r.educts[0]<<" and name "<<species[r.educts[0]].speciesname<<endl;
-                r.opacity_twotemp = species[r.educts[0]].opacity_avg_solar;
+        if(debug>1)
+            cout<<"      Setting defaults... with species index "<<r.educts[0]<<" and name "<<species[r.educts[0]].speciesname<<endl;
+        r.opacity_twotemp = species[r.educts[0]].opacity_avg_solar;
 	}
 	else { //Try to open and itnerpret opacity file
-		cout<<"      Setting process-specific opacities..."<<endl;
+        if(debug>1)
+		    cout<<"      Setting process-specific opacities..."<<endl;
 		r.opacity_twotemp = read_and_bin_opacityfile(r.opafile);
 	}
 

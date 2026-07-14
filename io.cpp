@@ -86,13 +86,14 @@ int c_Species::read_species_data(string filename, int species_index) {
 			for(auto s: stringlist)
 				cout<<s<<endl;
 		}
-                if(debug >= 1)
-                    cout<<"Found species called "<<this->speciesname<<endl;
-			cout<<" with a mass of "<<endl;
-			cout<<this->mass_amu<<" dof "<<endl;
-			cout<<this->degrees_of_freedom<<endl;
-			//cout<<" gamma "<<gamma_adiabat<<endl;
-			cout<<" and initial_fraction = "<<this->initial_fraction<<endl;
+            if(debug >= 1) {
+                cout<<"Found species called "<<this->speciesname<<endl;
+                cout<<" with a mass of "<<endl;
+                cout<<this->mass_amu<<" dof "<<endl;
+                cout<<this->degrees_of_freedom<<endl;
+                //cout<<" gamma "<<gamma_adiabat<<endl;
+                cout<<" and initial_fraction = "<<this->initial_fraction<<endl; 
+                }
                 
             }
 
@@ -151,7 +152,7 @@ int c_Species::read_species_data(string filename, int species_index) {
         if( base->opacity_model == 'K' ) //Run the routine with one argument further on in the species list 
             opacity_data_string = opacity_corrk_string;
         
-        cout<<"P or M or C or K opacity chosen & enough data to read in files. Reading file = "<<"inputdata/"<<opacity_data_string<<endl;
+        cout<<"        P or M or C or K opacity chosen & enough data to read in files. Reading file = "<<"inputdata/"<<opacity_data_string<<endl;
         //
         // Start reading opacity data
         //
@@ -401,23 +402,26 @@ int c_Species::read_species_data(string filename, int species_index) {
         }
         
         //Done! Now plot debug stuff so that we're sure the opacities do what they should.
-        cout<<"Done reading in data for species = "<<species_index<<". Wavelength grids in/out = ";
-        for(int b = 0; b <= num_bands_in; b++) cout<<base->l_i_in[b]<<"/";
-        cout<<" ||| ";
-        for(int b = 0; b <= num_bands_out; b++) cout<<base->l_i_out[b]<<"/";
-        cout<<endl<<endl;
-        
-        cout<<"        avg opacities solar = "<<endl;
-        for(int b = 0; b < num_bands_in; b++) cout<<"<"<<base->l_i_in[b]<<" - "<<base->l_i_in[b+1]<<" mum > "<<opacity_avg_solar(b)<<endl; //"/";
-        cout<<endl;
-        
-        cout<<"        avg opacities plnck = ";
-        for(int b = 0; b < num_bands_out; b++) cout<<opacity_avg_planck(b)<<"/";
-        cout<<endl;
-        
-        cout<<"        avg opacities rossl = ";
-        for(int b = 0; b < num_bands_out; b++) cout<<opacity_avg_rosseland(b)<<"/";
-        cout<<endl;
+        int verbose = 0;
+        if(verbose) {
+            cout<<"Done reading in data for species = "<<species_index<<". Wavelength grids in/out = ";
+            for(int b = 0; b <= num_bands_in; b++) cout<<base->l_i_in[b]<<"/";
+            cout<<" ||| ";
+            for(int b = 0; b <= num_bands_out; b++) cout<<base->l_i_out[b]<<"/";
+            cout<<endl<<endl;
+            
+            cout<<"        avg opacities solar = "<<endl;
+            for(int b = 0; b < num_bands_in; b++) cout<<"<"<<base->l_i_in[b]<<" - "<<base->l_i_in[b+1]<<" mum > "<<opacity_avg_solar(b)<<endl; //"/";
+            cout<<endl;
+            
+            cout<<"        avg opacities plnck = ";
+            for(int b = 0; b < num_bands_out; b++) cout<<opacity_avg_planck(b)<<"/";
+            cout<<endl;
+            
+            cout<<"        avg opacities rossl = ";
+            for(int b = 0; b < num_bands_out; b++) cout<<opacity_avg_rosseland(b)<<"/";
+            cout<<endl;
+        }
         
     }
      else {
@@ -1201,12 +1205,14 @@ void c_Sim::interpret_chem_reaction_list(string dir, string filename) {
             if(stringlist2[2].find("A") != string::npos) {
                 //cout<<" starting search for band numbers..."<<endl;
                 band_number = find_closest_band(energy_threshold);
-		cout<<" automatically found band number "<<band_number<<" with algorithm "<<endl;
+                if(debug > 1)
+		            cout<<" automatically found band number "<<band_number<<" with algorithm "<<endl;
             }
             else {
                 //cout<<" converted bandnumber = "<<std::stod(stringlist2[2])<<endl;
                 band_number = std::stod(stringlist2[2]);
-		cout<<" read band number "<<band_number<<" from file."<<endl;
+                if(debug > 1)
+		            cout<<" read band number "<<band_number<<" from file."<<endl;
             }
 
             
@@ -1217,12 +1223,14 @@ void c_Sim::interpret_chem_reaction_list(string dir, string filename) {
             
             for(int elm : e_stoch_i)
                 if(elm==-1) {
-                    cout<<"REACTANT NOT FOUND!"<<endl;
+                    if(debug > 1)
+                        cout<<"REACTANT NOT FOUND!"<<endl;
                     checkspassed = 0;
                 }
             for(int elm : p_stoch_i)
                 if(elm==-1) {
-                    cout<<"REACTANT NOT FOUND!"<<endl;
+                    if(debug > 1)
+                        cout<<"REACTANT NOT FOUND!"<<endl;
                     checkspassed = 0;
                 }        
             
@@ -1234,20 +1242,22 @@ void c_Sim::interpret_chem_reaction_list(string dir, string filename) {
             cout<<endl; */
             
             if(checkspassed) {
-		string opafile = "";
+                string opafile = "";
 
-                for(auto elm: stringlist2)
-			cout<<elm<<" "<<endl;
+                if(debug > 0)
+                    for(auto elm: stringlist2)
+                        cout<<elm<<" "<<endl;
 
-		if(stringlist2.size() >= 4) { 
-			std::vector<string> tmp = stringsplit(stringlist2[3]," ");
-                        opafile = tmp[0]; //This assumes the first part behind the last | is the speciesfile. everything else can be comment
-			//opafile = stringlist2[4]; 
-		}
-                cout<<"constructing photoreactions, opafile = "<<opafile<<endl;
+                if(stringlist2.size() >= 4) { 
+                    std::vector<string> tmp = stringsplit(stringlist2[3]," ");
+                                opafile = tmp[0]; //This assumes the first part behind the last | is the speciesfile. everything else can be comment
+                    //opafile = stringlist2[4]; 
+                }
+                if(debug > 1)
+                    cout<<"constructing photoreactions, opafile = "<<opafile<<endl;
 
 
-                //cout<<" Passing data to a photoreaction constructor..."<<endl;
+                    //cout<<" Passing data to a photoreaction constructor..."<<endl;
                 photoreactions.push_back(c_photochem_reaction( ns, num_bands_in, band_number, e_stoch_i, p_stoch_i, {1.}, p_stoch, branching, energy_threshold, opafile )); 
 
             }
@@ -1339,12 +1349,14 @@ void c_Sim::interpret_chem_reaction_list(string dir, string filename) {
             
             for(int elm : e_stoch_i)
                 if(elm==-1) {
-                    cout<<"REACTANT NOT FOUND!"<<endl;
+                    if(debug > 1)
+                        cout<<"REACTANT NOT FOUND!"<<endl;
                     checkspassed = 0;
                 }
             for(int elm : p_stoch_i)
                 if(elm==-1) {
-                    cout<<"REACTANT NOT FOUND!"<<endl;
+                    if(debug > 1)
+                        cout<<"REACTANT NOT FOUND!"<<endl;
                     checkspassed = 0;
                 }   
             
@@ -1361,7 +1373,7 @@ void c_Sim::interpret_chem_reaction_list(string dir, string filename) {
                 reactions.push_back(c_reaction(is_reverse, is_mtype, ns, e_stoch_i, p_stoch_i, e_stoch, p_stoch, a, b, c ));
             }
             else
-                cout<<"Erroneous reaction. Reaction ignored. Reaction string = "<<line<<endl;
+                cout<<">>> Erroneous reaction! Reaction ignored. Reaction string = "<<line<<endl;
         }
     
     }

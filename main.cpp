@@ -32,12 +32,14 @@ int main(int argc, char** argv)
     int debug_cell = 1e9;
     long int debug_steps = 99999999;
     std::vector<int> debug_data = std::vector<int>(4, std::numeric_limits<int>::max());//inp_somevalue(4, 1e10);
+    std::vector<double> restart_data = std::vector<double>(3, std::numeric_limits<double>::max());//inp_somevalue(4, 1e10);
     debug_data[0] = 0;
 
     int suppress_warnings_global = 0;
     int external_thread_num = 1;
     int restartnumber = 0;
     double restarttime_cmdline = 0;
+    int restartmode = 0;
     cout<<endl<<"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"<<endl;
           cout<<"~~~ Welcome to AIOLOS! May a gentle breeze lead your way through the bugs."<<endl;
           cout<<"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"<<endl;
@@ -124,8 +126,14 @@ int main(int argc, char** argv)
         }
 
         if(tmpstring.compare("-retime") == 0) {
-            restarttime_cmdline      = std::stod(argv[i+1]);
+            restarttime_cmdline     = std::stod(argv[i+1]);
             cout<<"Restarttime found as "<<restarttime_cmdline<<endl;
+            i++;
+        }
+
+        if(tmpstring.compare("-remode") == 0) {
+            restartmode      = std::stoi(argv[i+1]);
+            cout<<"Restartmode found as "<<restartmode<<endl;
             i++;
         }
     }
@@ -149,11 +157,15 @@ int main(int argc, char** argv)
         debug_data[1] = debug_cell;
         debug_data[2] = debug_steps;
         debug_data[3] = 0;
+
+        restart_data[0] = (double)restartnumber;
+        restart_data[1] = restarttime_cmdline;
+        restart_data[2] = (double)restartmode;
         
         cout<<endl<<"In main, construction of simulation is about to start."<<endl;
        
         //Main simulation class object, is initialized with the simulation parameters from a file
-        c_Sim simulation1(simulationname, speciesfile, workingdir, tempintent, debug_data, restartnumber, restarttime_cmdline);
+        c_Sim simulation1(simulationname, speciesfile, workingdir, tempintent, debug_data, restart_data);
         
         simulation1.set_suppress_warnings(suppress_warnings_global);
 

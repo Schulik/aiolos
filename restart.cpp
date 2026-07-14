@@ -17,13 +17,16 @@
  * Searches for restart data, reads it in, and overwrites initial conditions with that data, so that the simulation can continue from the savenumber.
  * 
  */
-void c_Sim::restart_from_outputnumber(int restartnumber, double restarttime_cmdline) {
+void c_Sim::restart_from_outputnumber(int restartnumber, double restarttime_cmdline, int restartmode) {
     
-    char a;
-    cout<<" In restart, restartnumber = "<<restartnumber<<" enter a char to continue."<<endl;
+    
+    cout<<" In restart, restartnumber = "<<restartnumber<<" enter a char to continue. retime/mode = "<<restarttime_cmdline<<" / "<<restartmode<<endl;
+    //char a;
     //cin>>a;
     
-    
+    string fappendix = "";
+    if(restartmode > 0.5)
+        fappendix = "RE"; //Restart from already restarted files
     
     //
     // Locate output files to read in with right number
@@ -34,12 +37,15 @@ void c_Sim::restart_from_outputnumber(int restartnumber, double restarttime_cmdl
         {
             stringstream filenamedummy;
             string truncated_name = stringsplit(simname,".")[0];
-            filenamedummy<<workingdir<<"output_"<<truncated_name<<"_"<<species[s].speciesname<<"_t"<<restartnumber<<".dat";
+            filenamedummy<<workingdir<<"output_"<<truncated_name<<"_"<<species[s].speciesname<<"_t"<<restartnumber<<fappendix<<".dat";
             filename = filenamedummy.str() ;
         }
         ifstream infile(filename, ios::in);
-        if (!infile.is_open())
+        if (!infile.is_open()) {
+            cout<<filename<<" does not exist!"<<endl;
             allfilesexist = 0;
+        }
+            
     }
     
     //
@@ -54,7 +60,7 @@ void c_Sim::restart_from_outputnumber(int restartnumber, double restarttime_cmdl
             {
                 stringstream filenamedummy;
                 string truncated_name = stringsplit(simname,".")[0];
-                filenamedummy<<workingdir<<"output_"<<truncated_name<<"_"<<species[s].speciesname<<"_t"<<restartnumber<<".dat";
+                filenamedummy<<workingdir<<"output_"<<truncated_name<<"_"<<species[s].speciesname<<"_t"<<restartnumber<<fappendix<<".dat";
                 filename = filenamedummy.str() ;
             }
             ifstream infile(filename, ios::in);
@@ -66,8 +72,7 @@ void c_Sim::restart_from_outputnumber(int restartnumber, double restarttime_cmdl
             string line;
             int num_lines = 0;
             
-            
-            while(std::getline( infile, line )) 
+            while(std::getline( infile, line )) //The allocated array should not have changed after the restart
             {
                 std::vector<string> datalist = stringsplit(line,"\t");
                 //tmp[num_lines].u1 = std::stod(datalist[1]);
@@ -80,9 +85,12 @@ void c_Sim::restart_from_outputnumber(int restartnumber, double restarttime_cmdl
                 
                 num_lines++;
                 
-                if(num_lines==100)
+                if(num_lines==1) {
                     //cout<<"reading "<<tmp[num_lines].u1
-                    cout<<"Restarting species = "<<species[s].speciesname<<" "<<species[s].u[num_lines].u1<<endl;
+                    cout<<"Restarting species = "<<species[s].speciesname<<" reading boundary dens = "<<species[s].u[num_lines].u1<<" from "<<filename<<endl;
+                    //char cc;
+                    //cin>>cc;
+                }
             }
             
             //for(int i=1; i<= num_cells; i++) {}
@@ -93,6 +101,8 @@ void c_Sim::restart_from_outputnumber(int restartnumber, double restarttime_cmdl
         
     } else {
         cout<<" ERROR IN RESTART: Not all files exist for chosen input! "<<endl;
+        char b;
+        cin>>b;
     }
     
     restarttime = output_time * ((int)restartnumber);   
@@ -110,6 +120,6 @@ void c_Sim::restart_from_outputnumber(int restartnumber, double restarttime_cmdl
     //
     //
     for(int s = 0; s < num_species; s++)
-                species[s].compute_pressure(species[s].u);
+        species[s].compute_pressure(species[s].u);
     
 }

@@ -412,8 +412,9 @@ public:
     int problem_number;
     int debug;
     int restartnumber;
+    int restartmode;
     double restarttime;
-    double restarttime_cmdline;
+    //double restarttime_cmdline;
     int cdebug = 0;
     int debug_cell = 1e99; //default values that should never trigger debugging, if not set to sensible values
     int debug_steps = 1e99;
@@ -973,11 +974,11 @@ public:
 public:
     
     c_Sim() {};
-    c_Sim(string parameter_filename, string species_filename, string workingdir, string intent, std::vector<int> debug_data, int restartnumber, double restarttime_cmdline);
+    c_Sim(string parameter_filename, string species_filename, string workingdir, string intent, std::vector<int> debug_data, std::vector<double> restart_data);
     ~c_Sim();
     
     void execute(int restartnumber, double restarttime); //Main loop
-    void restart_from_outputnumber(int restartnumber, double restarttime);
+    void restart_from_outputnumber(int restartnumber, double restarttime, int restartmode);
     
     void set_debug(int);
     void set_suppress_warnings(int j) {suppress_warnings = j;}
