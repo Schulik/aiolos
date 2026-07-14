@@ -114,8 +114,6 @@ void c_Sim::restart_from_outputnumber(int restartnumber, double restarttime_cmdl
         //cin>>a;
     }
     
-    
-    
     //
     //
     //

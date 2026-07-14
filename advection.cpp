@@ -362,7 +362,7 @@ void c_Sim::execute(int restartnumber, double restarttime_cmdline) {
             species[s].fix_negative_pressures_sometimes(species[s].u, 3);
         }
 
-        if(steps >printstuff_steps) {    
+        if(steps > printstuff_steps) {    
                 print_velocity_numberdens_ratios(" Pos 1.5:: ", 210);
         }
 

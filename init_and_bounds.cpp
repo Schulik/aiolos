@@ -795,7 +795,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, s
        
 
        //Rebuild electron densities
-       //init_highenergy_cooling_indices(); 
+       init_highenergy_cooling_indices(); 
        if(e_idx > -1) {
             for(int i=0; i<num_cells+1; i++) {
                 enforce_charge_neutrality(i);

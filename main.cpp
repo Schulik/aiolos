@@ -171,7 +171,7 @@ int main(int argc, char** argv)
 
         cout<<"In main, execution is about to start."<<endl;
         
-        simulation1.execute(restartnumber, restarttime_cmdline);
+        simulation1.execute(restartnumber + (restartnumber>0 ? 1 : 0), restarttime_cmdline);
     }
     catch (int err){
         
