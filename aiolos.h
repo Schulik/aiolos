@@ -733,6 +733,7 @@ public:
     int radiation_diffusion_test_linear;
     int radiation_diffusion_test_nonlinear;
     int couple_J_into_T;
+    int single_T_solve;
     double no_rad_trans;      // Multiplier for the div F radiation transport in the radiation solver to compare to models which don't cool thermally
     double heating_eta;       // Multiplier for the high-energy cooling
     double CFL_break_time; //Numerical time after which cflfactor=0.9. Used in get_cfl_timestep()
@@ -751,6 +752,7 @@ public:
     Eigen::MatrixXd solar_heating_final;
     std::vector<int> BAND_IS_HIGHENERGY;
     std::vector<double> photon_energies;
+    std::vector<double> photon_energies_eV;
     const int HIGHENERGY_BAND_TRUE = 1;
     const int HIGHENERGY_BAND_FALSE= 0;
     

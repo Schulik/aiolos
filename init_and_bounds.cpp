@@ -271,6 +271,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, s
         no_rad_trans               = read_parameter_from_file<double>(filename,"NO_RAD_TRANS", debug, 1.).value; //Multiplier for strength for thermal radiative losses in radiation transport. Set to 1e-100 to emulate perfect energy-limited escape.
         heating_eta                = read_parameter_from_file<double>(filename,"HEATING_ETA", debug, 1.).value;  //Multiplier for high-energy heating
         solve_for_j                = read_parameter_from_file<int>(filename,"SOLVE_FOR_J", debug, 1).value; //Debugging parameter. Switch to zero for decoupling of T and J in simple rad transport
+        single_T_solve             = read_parameter_from_file<int>(filename,"SINGLE_T_SOLVE", debug, 0).value; 
         photocooling_multiplier    = read_parameter_from_file<double>(filename,"CO_COOL_MULTIPLIER", debug, 0.).value; //OLD DEPRECATED
         secondary_ion_heating      = read_parameter_from_file<double>(filename,"SECONDARY_ETA", debug, 0.1).value; //Heating efficiency for very high energy photons
         photocooling_expansion     = read_parameter_from_file<double>(filename,"COOL_EXPANSION", debug, 0.).value; //OLD DEPRECATED
@@ -441,7 +442,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, s
             }
         }
 
-      if(wavebinsfile.compare("---")!=0) { //NOTE: Wavebins boundaries given in micrometers! This is consistent with other data given in *opa files and the fluxfile
+        if(wavebinsfile.compare("---")!=0) { //NOTE: Wavebins boundaries given in micrometers! This is consistent with other data given in *opa files and the fluxfile
 
             double tempenergy = 0.;
             int cnt = 0;
@@ -455,31 +456,29 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, s
                 cout<<"Couldnt open wavebins file "<<wavebinsfile<<"!!!!!!!!!!1111"<<endl;
                 char a;
                 cin>>a;
-            }
-	    else {
-		    cout<<"Opening wavebins file "<<wavebinsfile<<".."<<endl;
-	    }
+            } else {
+		        cout<<"Opening wavebins file "<<wavebinsfile<<".."<<endl;
+	        }
 
-
-		int b_current = 1;
+		    int b_current = 1;
 
             while(std::getline( file, line )) {
                 if(b_current == num_bands_in)
                     break;
                 if(debug > 1) {
                     cout<<" band b = "<<b_current<<" / current l_i_in[b] ="<<l_i_in[b_current];
-                            std::vector<string> stringlist = stringsplit(line," ");
-                            l_i_in[b_current]   = std::stod(stringlist[0]); //micrometer! ...  also user has to make sure that b_current doesnt exceed l_min
                     cout<<" changed to l_i_in[b] = "<<l_i_in[b_current]<<endl;
                 }
+                std::vector<string> stringlist = stringsplit(line," ");
+                l_i_in[b_current]   = std::stod(stringlist[0]); //micrometer! ...  also user has to make sure that b_current doesnt exceed l_min
                 b_current++;
             }
 	   
            file.close(); 
 
-	} else {
-		cout<<"No wavebins file provided, proceeding as usual.. wavebinsfile="<<wavebinsfile<<endl;
-	}
+	    } else {
+		    cout<<"No wavebins file provided, proceeding as usual.. wavebinsfile="<<wavebinsfile<<endl;
+	    }
         /////////////////////////////////////////////////////////
         ////////////////////////////////Bands out
         /////////////////////////////////////////////////////////
@@ -524,22 +523,28 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, s
                     num_he_bands++;
                 }
         }
-        photon_energies = np_somevalue(num_bands_in, 20. * ev_to_K * kb);
+        photon_energies    = np_somevalue(num_bands_in, 20. * ev_to_K * kb);
+        photon_energies_eV = np_somevalue(num_bands_in, 20.);
         
         for(int b=0; b<num_bands_in; b++) {
 
-	    if(b==0)
+	    if(b==0) {
 	            photon_energies[b] = 2. * 1.24/( l_i_in[b + 1] ) * ev_to_K * kb ;
-	    else{
+                photon_energies_eV[b] = 2. * 1.24/( l_i_in[b + 1] );
+        } else{
 			double elow = 1.24/( l_i_in[b + 1] ) * ev_to_K * kb;
 			double ehigh= 1.24/( l_i_in[b] )     * ev_to_K * kb;
 
-			photon_energies[b]  = 0.1*elow + 0.9*ehigh;
+			photon_energies[b]     = 0.1*elow + 0.9*ehigh;
+            photon_energies_eV[b]  = photon_energies[b]/(ev_to_K*kb);
+
 			//photon_energies[b]  = std::pow(10, 0.25*std::log10(elow) + 0.75*std::log10(ehigh)  );
-			if(b==num_bands_in-1)
+			if(b==num_bands_in-1) {
 				photon_energies[b]  = elow;
+                photon_energies_eV[b]  = elow/(ev_to_K*kb);
+            }
 			
-			cout<<"Assigned to energy band b = "<<b<<" a photon energy of "<<photon_energies[b]/ev_to_K/kb<<" eV; elow / ehigh = "<<elow/ev_to_K/kb<<" / "<<ehigh/ev_to_K/kb<<endl;
+            cout<<"Assigned to energy band b = "<<b<<" a photon energy of "<<photon_energies_eV[b]<<" eV; elow / ehigh = "<<elow/ev_to_K/kb<<" / "<<ehigh/ev_to_K/kb<<endl;
 		}
 	
             //cout<<"Assigned to energy band b = "<<b<<" a photon energy of "<<photon_energies[b]/ev_to_K/kb<<" eV "<<endl;
@@ -2069,8 +2074,10 @@ void c_Species::apply_boundary_left(std::vector<AOS>& u) {
                     else {
                         wall = BACKGROUND_U; 
                     }
+                    double walltemp = const_T_space;
+                    //double walltemp = this->prim[iact].temperature;
                     u[igh]     = wall;
-                    u[igh].u3 = 0.5*wall.u2*wall.u2/wall.u1  + wall.u1 * cv * this->prim[iact].temperature;
+                    u[igh].u3 = 0.5*wall.u2*wall.u2/wall.u1  + wall.u1 * cv * walltemp;
 
                     base->phi[igh]   = base->phi[iact] ;
 

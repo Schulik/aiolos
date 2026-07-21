@@ -536,17 +536,12 @@ void c_Sim::compute_friction_numerical(double dtt) {
         friction_matrix_T = identity_matrix - friction_coefficients * dtt;
         friction_matrix_T.diagonal().noalias() += dtt * (friction_coefficients * unity_vector);
         
-        
         LU.compute(friction_matrix_T) ;
         friction_vec_output.noalias() = LU.solve(friction_vec_input);
         
         //Lets try if preconditioning makes a difference
         //    Matrix_t fullmatrix = friction_matrix_T;
         //    friction_vec_output = return_preconditioned_LU_solution(fullmatrix, friction_vec_input, friction_vec_input, LU, j); 
-        
-        
-
-        
         
         if(debug >= 3 && j==700 && steps == 10) {
             

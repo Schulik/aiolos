@@ -789,7 +789,8 @@ void c_Species::print_AOS_component_tofile(int timestepnumber) {
             
             //outfile<<base->x_i12[i]<<'\t'<<u[i].u1<<'\t'<<u[i].u2<<'\t'<<u[i].u3<<'\t'<<flux[i].u1<<'\t'<<flux[i].u2<<'\t'<<flux[i].u3<<'\t'<<balance1<<'\t'<<balance2<<'\t'<<balance3<<'\t'<<prim[i].pres<<'\t'<<u[i].u2/u[i].u1<<'\t'<<prim[i].temperature <<'\t'<<timesteps_cs[i]<<'\t'<<base->cflfactor/timesteps[i]<<'\t'<<prim[i].sound_speed<<'\t'<<timesteps_de[i]<<'\t'<<u_analytic[i]<<'\t'<<base->alphas_sample(i)<<'\t'<<base->phi[i]<<'\t'<<base->enclosed_mass_tmp[i]<<'\t'<<Jtot<<'\t'<<Stot<<'\t'<<base->friction_sample(i)<<endl;
             double ri = base->x_i12[i];
-            outfile<<ri<<'\t'<<u[i].u1<<'\t'<<u[i].u2<<'\t'<<u[i].u3<<'\t'<<u[i].u1/mass_amu/amu<<'\t'<<12.*u[i].u2*ri*ri<<'\t'<<12.*u[i].u2*ri*ri/mass_amu/amu<<'\t'<<balance1<<'\t'<<balance2<<'\t'<<balance3<<'\t'<<prim[i].pres<<'\t'<<u[i].u2/u[i].u1<<'\t'<<prim[i].temperature <<'\t'<<timesteps_cs[i]<<'\t'<<base->cflfactor/timesteps[i]<<'\t'<<prim[i].sound_speed<<'\t'<<timesteps_de[i]<<'\t'<<u_analytic[i]<<'\t'<<base->alphas_sample(i)<<'\t'<<phi_s[i]<<'\t'<<base->enclosed_mass_tmp[i]<<'\t'<<dG(i)+0.*dGdT(i)*prim[i].temperature <<'\t'<<dS(i)<<'\t'<<base->cell_optical_depth(i,0)<<endl;
+            //outfile<<ri<<'\t'<<u[i].u1<<'\t'<<u[i].u2<<'\t'<<u[i].u3<<'\t'<<u[i].u1/mass_amu/amu<<'\t'<<12.*u[i].u2*ri*ri<<'\t'<<12.*u[i].u2*ri*ri/mass_amu/amu<<'\t'<<balance1<<'\t'<<balance2<<'\t'<<balance3<<'\t'<<prim[i].pres<<'\t'<<u[i].u2/u[i].u1<<'\t'<<prim[i].temperature <<'\t'<<timesteps_cs[i]<<'\t'<<base->cflfactor/timesteps[i]<<'\t'<<prim[i].sound_speed<<'\t'<<timesteps_de[i]<<'\t'<<u_analytic[i]<<'\t'<<base->alphas_sample(i)<<'\t'<<phi_s[i]<<'\t'<<base->enclosed_mass_tmp[i]<<'\t'<<dG(i)+0.*dGdT(i)*prim[i].temperature <<'\t'<<dS(i)<<'\t'<<base->cell_optical_depth(i,0)<<endl;
+            outfile<<ri<<'\t'<<u[i].u1<<'\t'<<u[i].u2<<'\t'<<u[i].u3<<'\t'<<u[i].u1/mass_amu/amu<<'\t'<<12.*u[i].u2*ri*ri<<'\t'<<12.*u[i].u2*ri*ri/mass_amu/amu<<'\t'<<prim[i].number_density/base->total_numdens[i]<<'\t'<<base->total_press[i]/1e6<<'\t'<<balance3<<'\t'<<prim[i].pres<<'\t'<<u[i].u2/u[i].u1<<'\t'<<prim[i].temperature <<'\t'<<timesteps_cs[i]<<'\t'<<base->cflfactor/timesteps[i]<<'\t'<<prim[i].sound_speed<<'\t'<<timesteps_de[i]<<'\t'<<u_analytic[i]<<'\t'<<base->alphas_sample(i)<<'\t'<<-phi_s[i]<<'\t'<<base->enclosed_mass_tmp[i]<<'\t'<<dG(i)+0.*dGdT(i)*prim[i].temperature <<'\t'<<dS(i)<<'\t'<<base->cell_optical_depth(i,0)<<endl;
         } 
         //cout<<"bonus cooling info at output time: "<<-dG(num_cells/2)+dGdT(num_cells/2)*prim[num_cells/2].temperature<<endl;
         //Print right ghost stuff
@@ -1571,7 +1572,7 @@ Eigen::VectorXd c_Sim::read_and_bin_opacityfile(string filename, int col) {
                 int    faultycount = 0;
                 double lmin = (*lgrid)[b]; //base->l_i[b];
                 double lmax = (*lgrid)[b+1]; //base->l_i[b+1];
-		double tmp_opacity_data = 0;
+		        double tmp_opacity_data = 0;
                 (*opacity_avg)[b] = minimum_opacity;
                 
                 //cout<<" DEBUG band b = "<<b<<" lmin/lmax = "<<lmin<<"/"<<lmax<<endl;
@@ -1584,24 +1585,18 @@ Eigen::VectorXd c_Sim::read_and_bin_opacityfile(string filename, int col) {
                     
                     if( wl < lmax && wl > lmin) {
                         
-			tmp_opacity_data = opacity_data(i,col);
-			if(!std::isnan(tmp_opacity_data)) {
-				(*opacity_avg)[b]+= opacity_data(i,col); 
-				wlcount++;
-			}
-			else
-				faultycount++;
+                        tmp_opacity_data = opacity_data(i,col);
+                        if(!std::isnan(tmp_opacity_data)) {
+                            (*opacity_avg)[b]+= opacity_data(i,col); 
+                            wlcount++;
+                        }
+                        else
+                            faultycount++;
 
                         //(*opacity_avg)[b]+= opacity_data(i,col); 
                         //wlcount++;
                     }
-                    if(i==0) {
-                        
-                        //TODO: When data boundary and band boundary do not coincide
-                    }
-                    else if(i==num_tmp_lambdas-2) {
-                        //TODO: When data boundary and band boundary do not coincide
-                    }
+                    
                 }
                 
                 if(wlcount > 1) {
@@ -1618,12 +1613,10 @@ Eigen::VectorXd c_Sim::read_and_bin_opacityfile(string filename, int col) {
                 // For bands which have no opacity data given / first and last band, we assume the nearest datapoint
                 //
                 if(lmax < opacity_data(0,0) ) {
-                    (*opacity_avg)[b] = opacity_data(0,col);
-                    //cout<<" Band "<<b<<", lmax "<<lmax<<"< opa_data(0,0)"<<opacity_data(0,0)<<endl;
+                    (*opacity_avg)[b] = 0. * opacity_data(0,col); //Jul 2026: Changed to 0 - too often this leads to opacities beyond the ionization edge
                 }
                 if(lmin > opacity_data(num_tmp_lambdas-1,0) ) {
-                    (*opacity_avg)[b] = opacity_data(num_tmp_lambdas-1,col);
-                    //cout<<" Band "<<b<<", lmin "<<lmin<<"< opa_data(-1,0)"<<opacity_data(num_tmp_lambdas,0)<<endl;
+                    (*opacity_avg)[b] = 0. * opacity_data(num_tmp_lambdas-1,col);
                 }
                 if((*opacity_avg)[b] < 0.) {
                     
