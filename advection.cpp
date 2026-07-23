@@ -177,7 +177,7 @@ void c_Sim::execute(int restartnumber, double restarttime_cmdline) {
         //
 
         if(steps >printstuff_steps) {    
-                print_velocity_numberdens_ratios(" Pos 0:: ", 210); 
+            print_velocity_numberdens_ratios(" Pos 0:: ", 210); 
         }
         
         if (do_hydrodynamics == 1) {
@@ -592,6 +592,7 @@ void c_Sim::execute(int restartnumber, double restarttime_cmdline) {
 void c_Sim::compute_total_pressure() {
 
     for(int i=num_cells+1; i>=0; i--)  {
+        double mmw_nom   = 0;
             
         total_press_l[i] = 0.;
         total_press_r[i] = 0.;
@@ -599,16 +600,19 @@ void c_Sim::compute_total_pressure() {
         total_numdens[i] = 0;
             
         for(int s = 0; s < num_species; s++) {
-                //total_pressure[i] += species[s].prim[i].pressure;
+            //total_pressure[i] += species[s].prim[i].pressure;
             //if(species[s].prim_l[i].pres > 0.) {
-                total_press[i] += species[s].prim[i].pres;
-                total_numdens[i] += species[s].prim[i].number_density ;
-                total_press_l[i] += species[s].prim_l[i].pres;
-                total_press_r[i] += species[s].prim_r[i].pres;
+            total_press[i] += species[s].prim[i].pres;
+            total_numdens[i] += species[s].prim[i].number_density ;
+            total_press_l[i] += species[s].prim_l[i].pres;
+            total_press_r[i] += species[s].prim_r[i].pres;
+
+            mmw_nom += species[s].prim[i].number_density * species[s].mass_amu;
             //}
                 
             //if(i<5) cout<<" i/s = "<<i<<"/"<<s<<" pl/pr = "<<species[s].prim_l[i].pres<<"/"<<species[s].prim_r[i].pres<<" dens = "<<species[s].prim_l[i].density<<endl;
         }
+        mean_molecular_weight[i] = mmw_nom / total_numdens[i];
             
         //cout<<"total quantities, cell "<<i<<" n/p = "<<total_numdens[i]<<"/"<<total_press[i]<<endl;
             

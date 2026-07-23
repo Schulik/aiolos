@@ -747,6 +747,8 @@ void c_Species::print_AOS_component_tofile(int timestepnumber) {
         filename = filenamedummy.str() ;
     }
 
+    //cout<<" in output for species "<<speciesname<<" phi[0123] = "<<phi_s[0]<<'\t'<<phi_s[1]<<'\t'<<phi_s[2]<<'\t'<<phi_s[3]<<'\t'<<endl;
+
     if(debug > 1)
         cout<<"Trying to open file "<<filename<<endl;
     
@@ -760,11 +762,16 @@ void c_Species::print_AOS_component_tofile(int timestepnumber) {
         //double hydrostat2 = 0., hydrostat3 = 0.;
         
         //Print left ghost stuff
-        outfile<<base->x_i12[0]<<'\t'<<u[0].u1<<'\t'<<u[0].u2<<'\t'<<u[0].u3<<'\t'<<flux[0].u1<<'\t'<<flux[0].u2<<'\t'<<flux[0].u3<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<prim[0].pres<<'\t'<<u[0].u2/u[0].u1<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<base->phi[0]<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<endl;
+        outfile<<base->x_i12[0]<<'\t'<<u[0].u1<<'\t'<<u[0].u2<<'\t'<<u[0].u3<<'\t'<<prim[0].number_density<<'\t'<<'-'<<'\t'<<'-'<<'\t'
+        <<'-'<<'\t'<<'-'<<'\t'<<'-'
+        <<'\t'<<prim[0].pres<<'\t'<<u[0].u2/u[0].u1<<'\t'<<prim[0].temperature<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'
+        <<-phi_s[0]<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<endl;
         
         //Print the domain
-        base->enclosed_mass_tmp[0] = 0.;
-        for(int i = 2; i <= num_cells; i++) {
+        for(int i = 0; i < base->num_ghosts; i++) {
+            base->enclosed_mass_tmp[0] = 0.;
+        }
+        for(int i = base->num_ghosts; i <= num_cells; i++) {
             base->enclosed_mass_tmp[i] = base->enclosed_mass_tmp[i-1] +  4. * 3.141592 * (pow(base->x_i[i],3.)-pow(base->x_i[i-1],3.) )/3. * u[i].u1;
         }
         
@@ -794,7 +801,7 @@ void c_Species::print_AOS_component_tofile(int timestepnumber) {
         } 
         //cout<<"bonus cooling info at output time: "<<-dG(num_cells/2)+dGdT(num_cells/2)*prim[num_cells/2].temperature<<endl;
         //Print right ghost stuff
-        outfile<<base->x_i12[num_cells+1]<<'\t'<<u[num_cells+1].u1<<'\t'<<u[num_cells+1].u2<<'\t'<<u[num_cells+1].u3<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<prim[num_cells+1].pres<<'\t'<<u[num_cells+1].u2/u[num_cells+1].u1<<'\t'<<prim[num_cells+1].temperature<<'\t'<<'-'<<'\t'<<base->phi[num_cells+1]<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<endl;
+        outfile<<base->x_i12[num_cells+1]<<'\t'<<u[num_cells+1].u1<<'\t'<<u[num_cells+1].u2<<'\t'<<u[num_cells+1].u3<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<prim[num_cells+1].pres<<'\t'<<u[num_cells+1].u2/u[num_cells+1].u1<<'\t'<<prim[num_cells+1].temperature<<'\t'<<'-'<<'\t'<<-phi_s[num_cells+1]<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<'\t'<<'-'<<endl;
    
         if(this->this_species_index==0)
             cout<<"    Successfully written file "<<filename<<" for species = "<<speciesname<<" t = "<<base->globalTime<<" dt = "<<base->dt<<", cfl = "<<base->cflfactor<<" steps = "<<base->steps<<endl;

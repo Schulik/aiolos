@@ -602,6 +602,7 @@ public:
     std::vector<double> enclosed_mass_tmp;
     std::vector<double> total_press;
     std::vector<double> total_numdens;
+    std::vector<double> mean_molecular_weight;
     std::vector<double> total_press_l ; // Reconstructed left/ right edges
     std::vector<double> total_press_r ;
     std::vector<double> total_adiabatic_index;

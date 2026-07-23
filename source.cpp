@@ -25,25 +25,30 @@
  */
 void c_Sim::init_grav_pot() {
 
-    double rh = planet_semimajor * au * pow(planet_mass / (3.* star_mass ),0.333333333333333333);        
-    int num_bounds = 2;
-    if(order == IntegrationType::second_order)
-        num_bounds = 2;
+    double rh = planet_semimajor * au * pow(planet_mass / (3.* star_mass ),0.333333333333333333);
 
-    for(int i = num_bounds; i <= num_cells+1; i++) {
+    int lim = num_ghosts; //All cells below lim get constant gravity
+
+    for(int i = lim; i <= num_cells+1; i++) {
         enclosed_mass[i] = planet_mass;      //No self-gravity
         phi[i]           = get_phi_grav(x_i12[i], enclosed_mass[i]);
             
         if(use_tides == 1) {
-        	//if(x_i[i]>0.2*rh)
             		phi[i] -=0.5* 3.*G*init_star_mass*x_i12[i]*x_i12[i]/pow(planet_semimajor*au,3.);
-	}
-            //phi[i] -=0.5* 3.*G*star_mass*x_i12[i]*x_i12[i]/pow(planet_semimajor*au,3.);
-            
+	    }
+        
+        cout<<" grav init in i = "<<i<<" with phi[i] = "<<phi[i]<<endl;
     }
-    //if(order == IntegrationType::second_order)
-        phi[1]           = get_phi_grav(x_i12[2],         planet_mass); //So that there is no jump across the boundary
-    phi[0]           = get_phi_grav(x_i12[1],         planet_mass);
+
+    for(int i = 0; i<lim; i++) {
+        phi[i]           = phi[lim]; //No gravity gradients between first cell and the 
+        cout<<" grav init in i = "<<i<<" with phi[i] = "<<phi[i]<<endl;
+    }
+    
+    
+    //if(num_ghosts == 2)
+    //    phi[1]           = get_phi_grav(x_i12[2],         planet_mass); //So that there is no jump across the boundary
+    //phi[0]           = get_phi_grav(x_i12[1],         planet_mass);
         
     rhill = planet_semimajor*au * std::pow(planet_mass / 3. / star_mass, 0.333333333333333333333);
 }
@@ -78,33 +83,36 @@ void c_Sim::update_mass_and_pot() {
         
         if (use_self_gravity == 1) 
             phi[i]           = get_phi_grav(x_i12[i], enclosed_mass[i]);
-        else
-            phi[i]           = get_phi_grav(x_i12[i], enclosed_mass[0]);
+        //else {
+        //    if(i>num_ghosts)
+        //        phi[i]           = get_phi_grav(x_i12[i], enclosed_mass[0]);
+        //}
+            
         
         //if use tidal gravity
         if(use_tides == 1) {
             double d3 = planet_semimajor*au;
             double rh = planet_semimajor * au * pow(planet_mass / (3.* star_mass ),0.333333333333333333);
-	    double m0 = init_star_mass;
-	    double m1 = star_mass;
+            double m0 = init_star_mass;
+            double m1 = star_mass;
             double t0 = ramp_star_mass_t0;
-	    double t1 = ramp_star_mass_t1;
+            double t1 = ramp_star_mass_t1;
 
-	    double a = (m0-m1)/(t0-t1);
-	    double b = 0.5*(m0+m1 - a *(t1+t0));
+            double a = (m0-m1)/(t0-t1);
+            double b = 0.5*(m0+m1 - a *(t1+t0));
 
-	    double current_star_mass = m0;
-	    if(globalTime > t0)
-	     	current_star_mass =  a * globalTime + b;
-	    if(globalTime > t1)
-		current_star_mass = star_mass;
+            double current_star_mass = m0;
+            if(globalTime > t0)
+                current_star_mass =  a * globalTime + b;
+            if(globalTime > t1)
+                current_star_mass = star_mass;
 
-            //if(steps==5)
-	   //	cout<<" In tidal grav, t0/t1 = "<<t0<<"/"<<t1<<" m0/current_mass ="<<m0/msolar<<"/"<<current_stellar_mass/msolar<<endl;
+                //if(steps==5)
+                //	cout<<" In tidal grav, t0/t1 = "<<t0<<"/"<<t1<<" m0/current_mass ="<<m0/msolar<<"/"<<current_stellar_mass/msolar<<endl;
 
-            d3 = d3*d3*d3;
-	    //if(x_i[i]>0.2*rh)
-	            phi[i] -= 0.5* 3.*G*star_mass*x_i12[i]*x_i12[i]/d3;
+                d3 = d3*d3*d3;
+                //if(x_i[i]>0.2*rh)
+                //        phi[i] -= 0.5* 3.*G*star_mass*x_i12[i]*x_i12[i]/d3;
         }
             
     }
@@ -978,7 +986,7 @@ double c_Species::diffusive_timestep(int j) {
  */
 AOS c_Species::source_diffusion_flux2(int j, bool get_v=false) {
 
-    assert(j > base->num_ghosts && j <= num_cells) ;
+    assert(j >= base->num_ghosts && j <= num_cells) ;
     
     double fs_log        = (std::log(prim[j].number_density  /base->total_numdens[j]))  /(base->x_i12[j+1] - base->x_i12[j]) ;
     double fmean_log     = (std::log(prim[j+1].number_density/base->total_numdens[j+1]))/(base->x_i12[j+1] - base->x_i12[j]) ;
@@ -988,18 +996,18 @@ AOS c_Species::source_diffusion_flux2(int j, bool get_v=false) {
     double discr_factor = 1;//1e4;
 
     double ntotmean = 0.5*( base->total_numdens[j] + base->total_numdens[j+1]);
-    double rhomean = 0.5*( u[j].u1 + u[j+1].u1); //
-    double mommean = 0.5*( u[j].u2 + u[j+1].u2); //
-    double emean   = 0.5*( prim[j].internal_energy + prim[j+1].internal_energy); //
+    double rhomean  = 0.5*( u[j].u1 + u[j+1].u1); //
+    double mommean  = 0.5*( u[j].u2 + u[j+1].u2); //
+    double emean    = 0.5*( prim[j].internal_energy + prim[j+1].internal_energy); //
 
     double vjm1   = prim[j].speed;  
     double vj     = prim[j+1].speed;
     double p_bar  = base->total_press[j]/1e6; //cgs to bar
 
     double dfdr         = -( fj - fjm1) / (base->x_i12[j+1] - base->x_i12[j]) ;
-    double kzz          = base->get_kzz(p_bar);//std::min(( 6e5 / p_bar), base->vdiffusivity);
+    double kzz          = base->get_kzz(p_bar) * 2. / base->mean_molecular_weight[j] ;//std::min(( 6e5 / p_bar), base->vdiffusivity);
     double u_diff       = 0;
-    if(j>base->num_ghosts)
+    if(j >= base->num_ghosts)
             u_diff = kzz * (fs_log-fmean_log); //If diffusivity is in cm^2/s then u_diff is in cm/s
 
     double nmean   = 0.5*( prim[j].number_density + prim[j+1].number_density);
@@ -1015,16 +1023,15 @@ AOS c_Species::source_diffusion_flux2(int j, bool get_v=false) {
     double edonor       = ( u_diff < 0 ) ? prim[j+1].internal_energy : prim[j].internal_energy;
 
     double pscl = 1.;
-    double plimit = 1e-9; //
+    double plimit = 1e-9; //in bar
     if(base->total_press[j]/1e6 < plimit) 
         pscl = 0.;//base->total_press[j] / 1e6 / plimit; //Scale down diffusion beyond a nanobar to increase numerical stability
     u_diff *= pscl;
 
-    if(j<=2)//if(j<=base->num_ghosts)
+    if(j < base->num_ghosts)//safety
         u_diff = 0;
 
     if( base->steps == -100 ) {  
-    //if( ( (base->steps == 100)  || ((base->steps == 200 )) ) && (this_species_index<=1) && ( (j==2) || (j==3) || (j==4) || (j==5) || (j==1) )   )  
         cout<<"s: "<<speciesname<<" j: "<<j<<" in diffusion, udiff  "<<u_diff<<" ddf "<< (fs_log-fmean_log)<<" pbar / kzz "<<p_bar<<" "<<kzz<<endl;
     }
 
@@ -1053,7 +1060,7 @@ void c_Sim::execute_separate_diffusion_step() {
 
     //Diffuse
     for(int s=0; s<num_species; s++) {
-        for(int j=3; j < num_cells; j++) {
+        for(int j=num_ghosts; j < num_cells; j++) {
             AOS source_diffusion = AOS(0,0,0);
                 
             if (species[s].mass_amu > 0.5)
