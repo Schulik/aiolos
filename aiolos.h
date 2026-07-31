@@ -59,7 +59,6 @@ const double navo     = 6.02214e23; // particles per mole
 const double amu      = 1.66054e-24; //g
 const double h_planck = 6.62607015e-27;//  cm^2 g/s
 const double Rgas     = 8.31446261815324e7;  //erg/K/g    or //erg/K/mole?
-//const double Rgas_fake = 1.;
 const double kb       = 1.380649e-16;  //erg/K
 const double km       = 1e5; //kilometers in cm
 const double mearth   = 5.98e27;  //g
@@ -377,6 +376,7 @@ public:
     int band;                    //Minimum band to start this reaction being relevant (user needs to make sure this is compatible with threshold_energy!!!)
     double branching_ratio;
     double threshold_energy;
+    double threshold_energy_eV;
     double products_total_mass;
     double energy_split_factor;  //Ensure most of the heating goes to light products when mass ratios between products are extreme and an even split between reactants of equal mass
     int opacities_available;     //Checks if the reaction string has a separate opacity entry. If not, defaults to accept the "species" opacities, from the species list.
@@ -756,6 +756,7 @@ public:
     std::vector<double> photon_energies_eV;
     const int HIGHENERGY_BAND_TRUE = 1;
     const int HIGHENERGY_BAND_FALSE= 0;
+    double eband_fraction;
     
     Eigen::MatrixXd total_opacity;           //num_bands_out
     Eigen::MatrixXd cell_optical_depth;
@@ -901,6 +902,7 @@ public:
     void compute_total_pressure();
     int get_species_index(const string name, const int verbose);
     int find_closest_band(double energy_threshold);
+    int find_closest_band2(double energy_threshold);
     Eigen::VectorXd read_and_bin_opacityfile(string filename, int col=1);
     //
     // Friction

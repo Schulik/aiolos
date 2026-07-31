@@ -207,7 +207,6 @@ void c_Sim::update_dS_jb(int j, int b) {
                     S_band(j,b) = solar_heating(b);
                 else
                     S_band(j,b) = solar_heating(b) * std::exp(-radial_optical_depth_twotemp(j+1,b));
-                //S_band(j,b) = solar_heating(b) * fastexp2(-radial_optical_depth_twotemp(j,b));
                 
                 if(debug > 2)
                     cout<<" in cell ["<<j<<"] band ["<<b<<"] top-of-the-atmosphere heating = "<<solar_heating(b)<<" tau_rad(j,b) = "<<radial_optical_depth(j,b)<<" exp(tau) = "<<std::exp(-radial_optical_depth(j,b))<<endl;
@@ -223,17 +222,9 @@ void c_Sim::update_dS_jb(int j, int b) {
                 if(steps > -1) {
                             
                     if(j<num_cells+1){
-                        //dS_band(j,b) = 0.25 * solar_heating(b) * fastexp2(-radial_optical_depth_twotemp(j+1,b))  /dx[j] * (1.-bond_albedo);
-                        //dS_band(j,b) = 0.25 * solar_heating(b) * std::exp(-radial_optical_depth_twotemp(j+1,b))  /dx[j] * (1.-bond_albedo);
-                        dS_band(j,b) = 0.25 * S_band(j,b)  /dx[j] * (1.-bond_albedo);
+                        dS_band(j,b) = 0.25 * S_band(j,b)  / dx[j] * (1.-bond_albedo);
                         double dtau_tot = -(radial_optical_depth_twotemp(j+1,b) - radial_optical_depth_twotemp(j,b));
                         double dS_he_temp = dS_band(j,b);
-                        
-                        //Gamma_He=0.25*solar_heating(b)*std::exp(-radial_optical_depth_twotemp(j+1,b)) * (-std::expm1(-dtaus[b])) * (1 - 13.6 * ev_to_K * kb / photon_energies[b]) / dx[j] * dlognu; 
-                        
-                        if(j==num_cells-10e99) {
-                            cout<<"Pos 2.2 dS_UV = "<<dS_band(num_cells-10,0)<<endl;
-                        }
                         
                         if(dtau_tot > 1e-3)
                             dS_band(j,b) *= (-expm1(-dtau_tot));
@@ -247,32 +238,12 @@ void c_Sim::update_dS_jb(int j, int b) {
                             //dS_he_temp *=  -fastexpm1_2(-cell_optical_depth_highenergy(j,b)) ;
                             dS_he_temp *=  -expm1(-cell_optical_depth_highenergy(j,b)) ;
                         
-                        double heating3 = dS_he_temp * (1 - 13.6 * ev_to_K * kb / photon_energies[0]);
-                        
-                        if(j==num_cells-10e99) {
-                            cout<<"Pos 2.3 dS_UV = "<<dS_band(num_cells-10,0)<<" dS_bolo =  "<<dS_band(num_cells-10,1)<<" dS_he_temp "<<dS_he_temp<<" heating3 = "<<heating3<<endl;
-                        }
                         
                         //cout<<" j/b = "<<j<<"/"<<b<<" dS_band(j,b) "<<dS_band(j,b)<<" dS_he_temp "<<dS_he_temp<<endl;
                         dS_band(j,b) -= 0. * dS_he_temp; //Substract highenergy heating again, as this has already been added in update_dS_jb_photochem() around line 700 in chemistry.cpp
                         dS_band(j,b) = std::max(dS_band(j,b), 0.); //Safeguard against highenergy shenanigans
                         if(BAND_IS_HIGHENERGY[b] && photochemistry_level==1)
                             dS_band(j,b) = 0.;
-                        
-                        if(j==num_cells-10e99) {
-                            cout<<"Pos 2.4 dS_UV = "<<dS_band(num_cells-10,0)<<" dS_bolo = "<<dS_band(num_cells-10,0)<<" for b = "<<b<<endl;
-                        }
-                        
-                        if(b==999) {
-                            cout<<" in thermal heating: total heating ~ "<<dS_band(j,b)<<" of which highenergy is "<<dS_he_temp;
-                            cout<<" resulting in dS_band("<<j<<","<<b<<") = "<<dS_band(j,b)<<" F = "<<solar_heating(b)<< " F*e-tau = "<<solar_heating(b) * exp(-radial_optical_depth_twotemp(j+1,b))<<" tau "<<dtau_tot<<" ";
-                            for(int s=0; s<num_species; s++) {
-                                cout<<species[s].u[j].u1<<" ";
-                            }
-                            cout<<endl;
-                            
-                        }
-                        
                     }
                     else
                         // Use optically thin limit  
@@ -305,69 +276,22 @@ void c_Sim::update_dS_jb(int j, int b) {
                     //if lowenergy or photochem < 2
                     
                     if(photochemistry_level <= 2) {
-                        double newheating =  0.25 * solar_heating(b)  / dx[j];
-                        //double newheating =  0.25 * solar_heating(b)  * (surf[j])/vol[j];
-                        if(j==61e99 && b==1) {
-                            species[s].dS(j-1)   += 0.0 * newheating;
-                            species[s].dS(j)     += 0.0 * newheating;
-                            species[s].dS(j+1)   += 0.0 * newheating;
-                        }
-                        if(j==61e99 && b==1) {//170
-                            species[s].dS(j-1)   += 0.25 * newheating;
-                            species[s].dS(j)     += 0.5 * newheating;
-                            species[s].dS(j+1)   += 0.25 * newheating;
-                        }
-                            
+
                         species[s].dS(j)  += highenergy_switch(s,b) * dS_band(j,b) * species[s].fraction_total_solar_opacity(j,b)   ;
                         if(species[s].dS(j) < 1e-50)
                             species[s].dS(j) = 0.;
 
-			if(j<=1)
-			 	species[s].dS(j) = 0.;
+			            if(j<=1)
+			 	            species[s].dS(j) = 0.;
                         
                         if(species[s].dG(j) > -1e-50)
                             species[s].dG(j) = 0.;
                     }
                         
-                    else {
-                        
-                        //if(species.s participates in photoreaction)
-                                    //take educt.dS(j,b) and assign it to products, weighed with (1-E_lim/hv) and mass ratios
-                        
-                        //for all reacs:
-                            //for educt:
-                        //         Equant = dS_band(j,b) * species[s].fraction_total_solar_opacity(j,b);
-                        //    for products:
-                        //         dS += Equant * mass_weight;
-                        
-                    }
-                    
-                    
+                    //if(s==0)
+                    //species[s].dS(j) = 1.; //Debug value
                     /*
-                    else {
-                        
-                        //Assuming one photoreaction only acts on one reactant and photon band
-                        for(c_photochem_reaction& reaction : photoreactions) {
-                            threshold_energy = 13.6; //TODO: replace with reaction-specific number
-                            heating_mask_educ  = {0.};
-                            heating_mask_prod  = {0.,1.};
-                            
-                            double energy_available = dS_band(j,b) * (1 - threshold_energy * ev_to_K * kb / photon_energies[b]);
-                            double cooling = nX[2]*HOnly_cooling(nX, Tx(2));
-                            
-                            for(int& ej : reaction.educts ) {
-                                
-                                species[ej].dS(j)  += heating_mask[ej] * species[ej].fraction_total_solar_opacity(j,b) * energy_available;
-                                species[ej].dG(j)  += heating_mask[ej]
-                            }
-                            for(int& pj : reaction.products ) {
-                                
-                                species[pj].dS(j)  += heating_mask[pj] * species[pj].fraction_total_solar_opacity(j,b) * energy_available;
-                            }                            
-                        
-                        }
-                    
-                    }
+                        Highenergy dS moved to chemistry.cpp
                     */
                 }
                     

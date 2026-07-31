@@ -256,8 +256,8 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, s
         wavedamp_factor             = read_parameter_from_file<double>(filename,"WAVEDAMP_FACTOR", debug, -0.5).value; //Below solar heating of <threshold> we interpret this as shadow
         use_avg_temperature = read_parameter_from_file<int>(filename,"USE_AVG_T", debug, 0).value; //Compute avg c_v rho T  and use that as T_avg
         use_avg_velocity    = read_parameter_from_file<int>(filename,"USE_AVG_V", debug, 0).value; //Compute avg c_v rho T  and use that as T_avg
-	avg_temperature_t0  = read_parameter_from_file<double>(filename,"AVG_TEMPERATURE_T0", debug, 1e99).value; //All T_s = T_avg before t0. Between t0 and t1 a ramp-down begins
-	avg_temperature_t1  = read_parameter_from_file<double>(filename,"AVG_TEMPERATURE_T1", debug, 1e99).value; //All T_s remain T_s after t1. T_avg is ignored after t1
+	    avg_temperature_t0  = read_parameter_from_file<double>(filename,"AVG_TEMPERATURE_T0", debug, 1e99).value; //All T_s = T_avg before t0. Between t0 and t1 a ramp-down begins
+	    avg_temperature_t1  = read_parameter_from_file<double>(filename,"AVG_TEMPERATURE_T1", debug, 1e99).value; //All T_s remain T_s after t1. T_avg is ignored after t1
         avg_velocity_t0  = read_parameter_from_file<double>(filename,"AVG_VELOCITY_T0", debug, 1e99).value; //All T_s = T_avg before t0. Between t0 and t1 a ramp-down begins
         avg_velocity_t1  = read_parameter_from_file<double>(filename,"AVG_VELOCITY_T1", debug, 1e99).value; //All T_s remain T_s after t1. T_avg is ignored after t1
 
@@ -272,12 +272,13 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, s
         heating_eta                = read_parameter_from_file<double>(filename,"HEATING_ETA", debug, 1.).value;  //Multiplier for high-energy heating
         solve_for_j                = read_parameter_from_file<int>(filename,"SOLVE_FOR_J", debug, 1).value; //Debugging parameter. Switch to zero for decoupling of T and J in simple rad transport
         single_T_solve             = read_parameter_from_file<int>(filename,"SINGLE_T_SOLVE", debug, 0).value; 
-        photocooling_multiplier    = read_parameter_from_file<double>(filename,"CO_COOL_MULTIPLIER", debug, 0.).value; //OLD DEPRECATED
+        photocooling_multiplier    = read_parameter_from_file<double>(filename,"CO_COOL_MULTIPLIER", debug, 1.).value; //OLD DEPRECATED
         secondary_ion_heating      = read_parameter_from_file<double>(filename,"SECONDARY_ETA", debug, 0.1).value; //Heating efficiency for very high energy photons
         photocooling_expansion     = read_parameter_from_file<double>(filename,"COOL_EXPANSION", debug, 0.).value; //OLD DEPRECATED
         photocooling_multiplier    = read_parameter_from_file<double>(filename,"PHOTOCOOL_MULTIPLIER", debug, photocooling_multiplier).value; //Multiplier for non-thermal cooling rates
         photocooling_expansion     = read_parameter_from_file<double>(filename,"PHOTOCOOL_EXPANSION", debug, photocooling_expansion).value; //Multiplier for non-thermal second order cooling rates
         radiation_rampup_time      = read_parameter_from_file<double>(filename,"RAD_RAMPUP_TIME", debug, 0.).value; //Ramp up the irradiation in all bands smoothly over xxx seconds.
+        eband_fraction      = read_parameter_from_file<double>(filename,"EBAND_FRACTION", debug, 0.9).value; //Averaging factor for the band energy between E_upper and E_lower
         init_radiation_factor      = read_parameter_from_file<double>(filename,"INIT_RAD_FACTOR", debug, 0.).value; //Unused
         //radiation_solver           = read_parameter_from_file<int>(filename,"RADIATION_SOLVER", debug, 0).value; //replaced by use_rad_fluxes
         closed_radiative_boundaries = read_parameter_from_file<int>(filename,"PARI_CLOSED_RADIATIVE_BOUND", debug, 0).value; //Reflect thermal radiation at outer boundaries?
@@ -536,7 +537,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, s
 			double elow = 1.24/( l_i_in[b + 1] ) * ev_to_K * kb;
 			double ehigh= 1.24/( l_i_in[b] )     * ev_to_K * kb;
 
-			photon_energies[b]     = 0.1*elow + 0.9*ehigh;
+			photon_energies[b]     = (1-eband_fraction)*elow + eband_fraction*ehigh;
             photon_energies_eV[b]  = photon_energies[b]/(ev_to_K*kb);
 
 			//photon_energies[b]  = std::pow(10, 0.25*std::log10(elow) + 0.75*std::log10(ehigh)  );
@@ -1095,7 +1096,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, s
 
             cout<<"SOLAR HEATING read from file in bin "<<b;
             cout<<" from/to lmin/lmax"<<l_i_in[b]<<"/"<<l_i_in[b+1];
-            cout<<" is F = "<<solar_heating(b)<<" w/ datapoints ="<<cnt<<endl;
+            cout<<" is F = "<<solar_heating(b)<<" w/ datapoints = "<<cnt<<endl;
         }
         
     }
@@ -2267,23 +2268,20 @@ void c_photochem_reaction::set_base_pointer(c_Sim *base_simulation) {
                     if(pk != pj)
                         temp *= base->species[pk].mass_amu;
             }
-            //cout<<" energy split denom sum "<<temp<<endl;
             denom += temp;
     }
-    //cout<<" nom = "<<energy_split_factor<<endl;
+
     energy_split_factor /= denom;
     
-    //cout<<" energy split factor = "<<energy_split_factor<<" / 1/energy_split_factor = "<<1./energy_split_factor<<" denom = "<<denom<<endl;
-    //for(int& pj : products) {
-    //    cout<<"Species of mass ="<<base->species[pj].mass_amu<<" gets a fraction of energy xi/mass ="<<energy_split_factor/base->species[pj].mass_amu<<endl;
-    //}
     for(int b=0; b<=this->band; b++){
         base->highenergy_switch(educts[0], b) = 0.;
         //cout<<" In c_photochem_reaction::set_base_pointer, zeroing for spec = "<<educts[0]<<" band = "<<b<<endl;
     }
     //base->highenergy_switch(educts[0], this->band) = 0.;
 
-    this->threshold_energy = 1.24/( base->l_i_in[this->band+1] )  * ev_to_K * kb ;
+    this->threshold_energy    = 1.24/( base->l_i_in[this->band+1] )  * ev_to_K * kb ;
+    this->threshold_energy_eV = base->photon_energies_eV[this->band+1];
+    //cout<<" threshold energy in eV = "<<threshold_energy_eV<<" reaction number "<<this->reaction_number<<endl;
 }
 
 

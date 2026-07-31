@@ -23,3 +23,7 @@ tmp*
 *.wav
 *.py
 execution_log.txt
+*.ipynb
+*.svg
+*.jpg
+*.jpeg

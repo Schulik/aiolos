@@ -156,19 +156,28 @@ void c_Species::update_opacities() {
                         opacity_planck(j,b)  = base->const_opacity_planck_h2 * (pressure_broadening_one + pressure_broadening_factor * pow(prim[j].pres/1e5, pressure_broadening_exponent));
                         
                     }
-                    if(this_species_index == h2o_idx) {
+                    else if(this_species_index == h2o_idx) {
                         opacity_planck(j,b)  = base->const_opacity_planck_h2o * (pressure_broadening_one + pressure_broadening_factor * pow(prim[j].pres/1e5, pressure_broadening_exponent));
                             //opacity(j,b)         = base->opacity_semenov_malygin(1, prim[j].temperature, prim[j].density, prim[j].pres, this->is_dust_like);
                             //opacity_planck(j,b)  = base->opacity_semenov_malygin(0, prim[j].temperature, prim[j].density, prim[j].pres, this->is_dust_like);
                     } else {
                         if(degrees_of_freedom > 3) {
-                            opacity_planck(j,b)  = base->const_opacity_planck_h2o * (pressure_broadening_one + pressure_broadening_factor * pow(prim[j].pres/1e5, pressure_broadening_exponent));
+                            opacity_planck(j,b)  = base->const_opacity_planck_factor * (pressure_broadening_one + pressure_broadening_factor * pow(prim[j].pres/1e5, pressure_broadening_exponent));
                         }
                     }
                         //if(this_species_index == htwo_idx || this_species_index == c_idx || this_species_index == o_idx) {
                         //    opacity(j, num_bands_out-1)        = base->const_opacity_rosseland_h2;
                         //    opacity_planck(j, num_bands_out-1) = base->const_opacity_planck_h2;			
                         //}
+                }
+
+                for(int b=0; b<num_bands_in; b++) {
+                    if(this_species_index == h2o_idx ) {
+                        if(base->photon_energies_eV[b] < 2.5)
+                            if(base->steps==100)
+                                //cout<<" reporting bolometric h2o opacities, band,E = "<<b<<"/"<<base->photon_energies_eV[b]<<" = "<<opacity_twotemp(j, b)<<" gamma_rad = "<<opacity_twotemp(j, b)/opacity_planck(j, 0)<<endl;
+                                cout<<"";
+                    }
                 }
 
 		        //cout<<" s= "<<this_species_index<<" j= "<<j<<" opas= "<<opacity_twotemp(j,0)<<" "<<opacity(j,0)<<" "<<opacity_planck(j,0)<<" "<<endl;

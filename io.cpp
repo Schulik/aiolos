@@ -1212,7 +1212,7 @@ void c_Sim::interpret_chem_reaction_list(string dir, string filename) {
             
             if(stringlist2[2].find("A") != string::npos) {
                 //cout<<" starting search for band numbers..."<<endl;
-                band_number = find_closest_band(energy_threshold);
+                band_number = find_closest_band2(energy_threshold);
                 if(debug > 1)
 		            cout<<" automatically found band number "<<band_number<<" with algorithm "<<endl;
             }

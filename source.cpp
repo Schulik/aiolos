@@ -36,19 +36,11 @@ void c_Sim::init_grav_pot() {
         if(use_tides == 1) {
             		phi[i] -=0.5* 3.*G*init_star_mass*x_i12[i]*x_i12[i]/pow(planet_semimajor*au,3.);
 	    }
-        
-        cout<<" grav init in i = "<<i<<" with phi[i] = "<<phi[i]<<endl;
     }
 
     for(int i = 0; i<lim; i++) {
-        phi[i]           = phi[lim]; //No gravity gradients between first cell and the 
-        cout<<" grav init in i = "<<i<<" with phi[i] = "<<phi[i]<<endl;
+        phi[i]           = phi[lim]; //No gravity gradients between first cell and the boundaries
     }
-    
-    
-    //if(num_ghosts == 2)
-    //    phi[1]           = get_phi_grav(x_i12[2],         planet_mass); //So that there is no jump across the boundary
-    //phi[0]           = get_phi_grav(x_i12[1],         planet_mass);
         
     rhill = planet_semimajor*au * std::pow(planet_mass / 3. / star_mass, 0.333333333333333333333);
 }
@@ -1094,8 +1086,9 @@ void c_Sim::execute_separate_diffusion_step() {
 
             double p_from_entropy = std::pow(species[s].prim[j].density, species[s].gamma_adiabat ) * std::exp(species[s].u_diff[j].u3);
             double rho = species[s].u_diff[j].u1 * species[s].mass_amu * amu; 
-            double mom = rho*species[s].prim[j].speed; // ignore diffusive momentum update //species[s].u_diff[j].u2; 
-            double E   = 0.5*mom*mom/rho + rho*species[s].cv*mean_temp; //Ignore diffusive energy update 
+            double mom = rho*species[s].prim[j].speed;                                       //Ignore diffusive momentum update 
+            //double E   = 0.5*mom*mom/rho + rho*species[s].cv*mean_temp;                    //Ignore diffusive energy update 
+            double E   = 0.5*mom*mom/rho + rho*species[s].cv*species[s].prim[j].temperature; //Ignore diffusive energy update
             species[s].u[j] = AOS(rho, mom, E);
         }
         species[s].compute_pressure(species[s].u);

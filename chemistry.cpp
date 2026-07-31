@@ -52,7 +52,9 @@ void c_Sim::init_reactions(int cdebug) {
     if(debug>=2)
         cout<<" Init reactions pos1 "<<endl;
     
-    //Step 0: Construct reaction list
+    //
+    //Step 0: Construct reaction list: Sets all base numbers for reactions (Stochiometry, reaction rate coefficients, energy band limits etc.)
+    //
     if(cdebug)
         cout<<"Init photoreactions..."<<endl;
     
@@ -157,8 +159,8 @@ void c_Sim::init_reactions(int cdebug) {
                 
                         cout<<" + ( >";
             }
-            cout<<photon_energies[reaction.band]/(ev_to_K * kb)<<" - "; //threshold_energy = 1.24/( base->l_i_in[this->band] )  * ev_to_K * kb 
-            cout<<reaction.threshold_energy/(ev_to_K * kb)<<") eV -> "; //threshold_energy = 1.24/( base->l_i_in[this->band] )  * ev_to_K * kb 
+            cout<<photon_energies[reaction.band]/(ev_to_K * kb)<<" - "; 
+            cout<<reaction.threshold_energy/(ev_to_K * kb)<<") eV -> "; 
             for(int& pi : reaction.products) {
                 cout<<int(reaction.p_stoch[pi]*1.01)<<" "<<species[pi].speciesname;
                 if(reaction.products.back() != pi) 
@@ -168,8 +170,8 @@ void c_Sim::init_reactions(int cdebug) {
             
             if(photon_energies[reaction.band]/(ev_to_K * kb) < 1.) {
                 cout<<" WARNING! Ionizing with photons of <1 eV energy! Current band photon energy = "<<photon_energies[reaction.band]/(ev_to_K * kb)<<endl;
-                char stop;
-                cin>>stop;
+                //char stop;
+                //cin>>stop;
             }
 	   
 	    if(photon_energies[reaction.band] - reaction.threshold_energy < 0) {
@@ -189,7 +191,7 @@ void c_Sim::init_reactions(int cdebug) {
     double  flux_xuv = 0;
   
     //cout<<"                                                       ";
-    cout<<"                                                ";
+    cout<<"                                            ";
     for(auto r : photoreactions) { 
 	//cout<<r.reaction_number<<"           ";
 	cout<<cnstWidth(r.reaction_number,8);
@@ -992,7 +994,7 @@ void c_Sim::update_dS_jb_photochem(int cell, double dtt) {
         tau_tot_b *= n_tot*ds;
         cell_optical_depth_highenergy(cell, b) = tau_tot_b;
         
-        double dS = -std::expm1(-tau_tot_b) * F / ds;
+        double dS = -std::expm1(-tau_tot_b) * F / ds * 0.5; //Empirical 0.5 factor to match energy limit
     
         for(c_photochem_reaction& reaction : photoreactions) {
             
@@ -1006,7 +1008,8 @@ void c_Sim::update_dS_jb_photochem(int cell, double dtt) {
                 double eratio2 = reaction.threshold_energy/photon_energies[b+1];
 
                 double x_secondary  =1.; //Ionization factor for X-rays
-                if(l_i_in[b+1] < 0.030)
+                //if(l_i_in[b+1] < 0.030)
+                if(photon_energies_eV[b] - reaction.threshold_energy_eV > 10.) //True for H (Steenberg & Wieser) and approx. for O-rich gas as well (Garcia-Munoz2023)
                           x_secondary = secondary_ion_heating;
 
                 if(b == reaction.band) { //When we sit in the band just above the ionisation threshold, we need to check that it might be that E_lower[b] < E_ion but E_higher[b] > E_ion
@@ -1041,6 +1044,20 @@ void c_Sim::update_dS_jb_photochem(int cell, double dtt) {
                 
                 
             }
+
+            //Print ratios as double check
+            if (steps ==100 && cell==100e99){
+                cout<<" r "<<reaction.reaction_number<<" efficiencies ";
+                if(b <= reaction.band) {
+                    double x_secondary = 1.;
+                    //if(l_i_in[b+1] < 0.030)
+                    if(photon_energies_eV[b] - reaction.threshold_energy_eV > 10.) 
+                            x_secondary = secondary_ion_heating;
+                    cout<<" b = "<<b<<" E[b] = "<<photon_energies_eV[b]<<" eta = "<<x_secondary *(1- reaction.threshold_energy/photon_energies[b])<<" flux = "<<F<<endl;
+                }
+            }
+
+
         }
     }
     //
@@ -1309,7 +1326,7 @@ void  c_Sim::do_highenergy_cooling(int cell, double Te) {
     // Do highenergy-cooling
     // Indices now found in init routine for indices
     
-    double tau = (total_opacity(cell,0)*(x_i12[cell+1]-x_i12[cell])   + 1e-10) * 1e9;
+    double tau = (total_opacity(cell,0)*(x_i12[cell+1]-x_i12[cell])   + 1e-10) * 1e0;
     double beta = 0.;
     if(tau < 7.) 
         beta = (1.-std::exp(-2.34*tau))/(4.68*tau);

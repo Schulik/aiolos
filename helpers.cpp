@@ -321,7 +321,30 @@ int c_Sim::find_closest_band(double energy_threshold) {
     
     return num_bands_in - 1;    
 }
+ 
+/**
+ * Loops through the waveband limits and finds the closest low-energy-band limit to energy_threshold
+ * in a less confusing way than the original function
+ * 
+ * @param[in] energy_threshold the photon energy
+ * @return band number 
+ */
+int c_Sim::find_closest_band2(double energy_threshold) {
     
+    for(int b=0; b<num_bands_in; b++) {
+       double E_up   = photon_energies_eV[b];// 1.24/( l_i_in[b + 1] ); 
+       double E_down = photon_energies_eV[b+1];
+       if(debug>1)
+            cout<<" Searching energy threshold for E_thr="<<energy_threshold<<" eV, being searched between "<<E_down<<" and "<<E_up<<" eV"<<endl;
+
+       if((energy_threshold > E_down) && (energy_threshold < E_up))
+           return b;
+    }
+    
+    return num_bands_in-1;    
+}
+
+
 //
 //
 // Compute Planck integral in a quick way
@@ -579,7 +602,8 @@ int c_Sim::get_species_index(const string name, const int verbose=0) {
         
     }
     
-    cout<<" Couldn't find species index for searchlist = "<<name<<endl;
+    if(debug>0)
+        cout<<" Couldn't find species index for searchlist = "<<name<<endl;
     return -1;
 }
 

@@ -111,7 +111,7 @@ void c_Sim::execute(int restartnumber, double restarttime_cmdline) {
         
         update_mass_and_pot();
         
-	if(steps<10)
+	    if(steps<10)
 	        for(int s=0; s<num_species; s++)
         	    species[s].update_kzz_and_gravpot(s);  //Recomputes the homopause boundary and adjusts species-specific potentials
         

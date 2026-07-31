@@ -225,7 +225,6 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
                 double sum_rho = 0;
                 double sum_heat = 0;
                 double sum_cool = 0;
-
                 
                 for (int s=0; s < num_species; s++) {
                     sum_rho         +=  species[s].u[j].u1;
@@ -241,8 +240,6 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
                     sum_heat += species[s].dS(j);
                     sum_cool += species[s].dG(j) - photocooling_expansion * species[s].dGdT(j)*Tsmean[j];
                 }
-
-                
 
                 int idx_s = j * (num_species) + 0;
                 double Ts = Tsmean[j];
@@ -365,7 +362,7 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
             double init_tmean  = return_T_mean(j);
             double init_etotal = return_e_total(j);
 
-            if(1==0) { //Old heat solver
+            if(0==1) { //Old heat solver
 
                 fill_alpha_basis_arrays(j);
                 compute_alpha_matrix(j);
@@ -407,13 +404,25 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
 
                 //double e_orig = return_total_e(j);
 
+                if(j==100 && steps==435) {
+                    cout<< " in subcycle coll_heat_matrix and b "<<endl<<coll_heat_matrix<<endl<<endl<<coll_heat_b<<endl<<" dt , temps ="<<dt<<" "<<species[0].prim[j].temperature<<" "<<species[1].prim[j].temperature<<endl;
+                    double manualbuild_rhs = 0;
+                    manualbuild_rhs = species[0].prim[j].temperature + dt/(species[0].cv * species[0].u[j].u1);
+                    cout<<" ratio of actual and manually built rhs: "<<coll_heat_b[0]/manualbuild_rhs<<endl;
+
+                    manualbuild_rhs = species[1].prim[j].temperature + dt/(species[1].cv * species[1].u[j].u1);
+                    cout<<" ratio of actual and manually built rhs: "<<coll_heat_b[1]/manualbuild_rhs<<endl;
+                    cout<<" cooling terms :"<< species[0].dG(j)<<" "<< species[0].dGdT(j)<<" "<<species[1].dG(j)<<" "<< species[1].dGdT(j)<<endl;
+                }
+                    
+
                 LU.compute(coll_heat_matrix) ;
                 coll_heat_output.noalias() = LU.solve(coll_heat_b);
 
                 double final_tmean  = return_T_mean(j, coll_heat_output);
                 double final_etotal = return_e_total(j, coll_heat_output);
 
-                if((j==10) && steps >= 457) {
+                if((j==10) && steps >= 457e99) {
                     cout<<" Tfin = ";
                     for(int ss=0; ss<num_species; ss++){ cout<<" "<<coll_heat_output(ss); }
                     cout<<endl; 
@@ -479,8 +488,8 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
                 if(tt<temperature_floor)
                         tt=temperature_floor;
                     
-                if(tt> ( max_temperature + globalTime/max_temperature_time * 1e4) )
-                        tt=(max_temperature + globalTime/max_temperature_time * 1e4);         
+                //if(tt> ( max_temperature + globalTime/max_temperature_time * 1e4) )
+                //        tt= (max_temperature + globalTime/max_temperature_time * 1e4);         
 
                 avgT_nom   += species[si].u[j].u1 * species[si].cv * tt;
                 avgT_denom += species[si].u[j].u1 * species[si].cv;
@@ -748,10 +757,10 @@ int c_Sim::subcycle_heat_exchange(int j, int num_cycles, int debug, double dt) {
             //if(num_cycles>num_subcycles)
             //    cout<<" in subycles, being called at j ="<<j<<" with num_cycles = "<<num_cycles<<endl;
 
-            int scale_back = 0;
+            int scale_back = 1;
             double scl_fac = 1 ;  //Norm =1 or dt/cv
             double dgdt_mul = 1;
-            double cool_mul = 1;
+            double cool_mul = photocooling_multiplier;
 
             double cvrho_total = 0;
             double dT_estim = 0;
@@ -820,12 +829,15 @@ int c_Sim::subcycle_heat_exchange(int j, int num_cycles, int debug, double dt) {
                     coll_heat_matrix_fixed(si,sj) -= temp;
                 }
 
+                //if(j==100 && steps==100)
+                //    cout<< " in subcycle friction coeffs :"<<friction_coefficients<<endl;
+
                 coll_heat_matrix_fixed(si,si) += diag_sum; 
                 //coll_heat_matrix_fixed(si,si) += scl_fac * dgdt_mul * species[si].dGdT(j) / species[si].u[j].u1; //cooling gradient term
                 
                 //Initialize temperatures and document evolution
-                tmp_temperatures(si) = species[si].prim[j].temperature;
-                documentation(si,0)  = species[si].prim[j].temperature;
+                tmp_temperatures(si)          = species[si].prim[j].temperature;
+                documentation(si,0)           = species[si].prim[j].temperature;
                 documentation(num_species,0)  = return_T_mean(j); //Document mean temperature before first step
             }
 
@@ -914,20 +926,19 @@ int c_Sim::subcycle_heat_exchange(int j, int num_cycles, int debug, double dt) {
                     double Ts    = documentation(si,c);
                     double Ts3   = Ts*Ts*Ts;
                     double kappa = 1.*species[si].opacity_planck(j, 0);
-                    double heatswitch = 1.;
+                    
                     //
                     // Rad equilibrium terms
                     
                     //Estimate dT impact on total fluid and eliminate negligible, but numerically problematic values
-                    dT_estim = ddt*(species[si].dS(j)      - cool_mul * species[si].dG(j)  + dgdt_mul * species[si].dGdT(j) * Tsold )/cvrho_total;
-                    if(std::fabs(dT_estim/Tsold) < 0.01)
-                        heatswitch = 1.;
 
                     coll_heat_matrix(si,si) += scl_fac * (species[si].cv/ddt     + 16 * sigma_rad * kappa * Ts3);
                     coll_heat_b(si)         += scl_fac * (species[si].cv/ddt     + 12 * sigma_rad * kappa * Ts3) * Tsold ;
-                    coll_heat_b(si)         += heatswitch * scl_fac * (species[si].dS(j)      - cool_mul * species[si].dG(j)  + dgdt_mul * species[si].dGdT(j) * Tsold )/species[si].u[j].u1;
+                    coll_heat_b(si)         += scl_fac * (species[si].dS(j)      - cool_mul * species[si].dG(j)  + dgdt_mul * species[si].dGdT(j) * Tsold )/species[si].u[j].u1;
 
-                    coll_heat_matrix(si,si) += heatswitch * scl_fac * dgdt_mul * species[si].dGdT(j) / species[si].u[j].u1; //cooling gradient term
+                    //coll_heat_b(si)         = scl_fac * (species[si].cv/ddt * Tsold + species[si].dS(j)/species[si].u[j].u1 );
+
+                    coll_heat_matrix(si,si) += scl_fac * dgdt_mul * species[si].dGdT(j) / species[si].u[j].u1; //cooling gradient term
 
                     /////////////////////////////////////////////////////////////////////
                     /////////////////////////////////////////////////////////////////////
@@ -965,10 +976,22 @@ int c_Sim::subcycle_heat_exchange(int j, int num_cycles, int debug, double dt) {
                     cout<<endl; 
                 }
 
+                if(j==100 && steps==435)
+                    cout<< " in subcycle coll_heat_matrix and b "<<endl<<coll_heat_matrix<<endl<<endl<<coll_heat_b<<endl<<" coll_heat fixed: "<<endl<<endl<<coll_heat_matrix_fixed<<endl;
+
+                //
+                // Solve
+                //
                 if(steps < 10e99) {
-                    LU.compute(coll_heat_matrix) ;
+                    LU.compute(coll_heat_matrix);
                     coll_heat_output.noalias() = LU.solve(coll_heat_b);
 
+                //
+                // Done solve
+                //
+                if(j==100 && steps==435)
+                    cout<<" in subcycle Temperature solution: "<<endl<<endl<<coll_heat_output<<" heating = "<<species[0].dS(j)<<" "<<species[1].dS(j)<<endl;
+                
                     //tmp_temperatures = coll_heat_output;
                 } else {
                     coll_heat_output = return_preconditioned_LU_solution(coll_heat_matrix, coll_heat_b, temperature_vector, LU, j); //note: temperature_vector contains the initial temps going into this routine and are filled in fill_alpha_basis_matrix_thingies
