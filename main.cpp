@@ -30,7 +30,7 @@ int main(int argc, char** argv)
     string tempintent = "---";
     int debug = 0;
     int debug_cell = 1e9;
-    long int debug_steps = LONG_MAX;// 99999999;
+    long int debug_steps = 9999999999; //LONG_MAX;// 99999999;
     std::vector<int> debug_data = std::vector<int>(4, std::numeric_limits<int>::max());//inp_somevalue(4, 1e10);
     std::vector<double> restart_data = std::vector<double>(3, std::numeric_limits<double>::max());//inp_somevalue(4, 1e10);
     debug_data[0] = 0;
