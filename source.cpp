@@ -202,30 +202,30 @@ void c_Species::update_kzz_and_gravpot(int argument) {
         
         for(int i=0; i<num_cells+2; i++) {
             double n   = base->species[0].prim[i].number_density;
-            double kzz = base->K_zz[i]; //This is a meta-parameter for k_zz/b 
+            double kzz = base->K_zz_init ;//base->K_zz[i]; //This is a meta-parameter for k_zz/b 
             double par = std::pow(n, 1./1.);
             
-            //K_zzf[i] = (1. + kzz*par*mu/mi) / (1. + kzz*par); //This is some old formulation i've tried, supposedly better for smooth kzz profiles, but somethings wrong with it, cant remember
+            //K_zzf[i] = (1. + kzz*par*mu/mi) / (1. + kzz*par); //Old formulation
             if(kzz*n < 1.)
                 K_zzf[i] = 1.;
             else {
 		        K_zzf[i] = mu/mi;
                 slope    = mu/mi;
-	    }
+	        }
 	
-	    //special treatment for electrons: create zero gradient below approx. ionisation radius (ignoring homopause), so that they don't drop anymore
-	    if(mi < 0.5) {
-		    if(base->x_i12[i] < 0. * base->x_i12[2]) {
-			    K_zzf[i] = mu/mi; //-2e-1;
-			    slope    = mu/mi; //+1e-3;
+	        //special treatment for electrons: create zero gradient below approx. ionisation radius (ignoring homopause), so that they don't drop anymore
+	        if(mi < 0.5) {
+		        if(base->x_i12[i] < 0. * base->x_i12[2]) {
+			        K_zzf[i] = mu/mi; //-2e-1;
+			        slope    = mu/mi; //+1e-3;
+                }
             }
-        }
 
 
-        double one = 0.99999;
-        //if(K_zzf[i] > one && K_zzf[i-1] < one) //found homopause
-        if(i>1)
-            if( std::fabs(K_zzf[i] - 1.) < 1e-5 && std::fabs( K_zzf[i-1] - 1.) > 1e-5) //found homopause
+            double one = 0.99999;
+            //if(K_zzf[i] > one && K_zzf[i-1] < one) //found homopause
+            if(i>1)
+                if( std::fabs(K_zzf[i] - 1.) < 1e-5 && std::fabs( K_zzf[i-1] - 1.) > 1e-5) //found homopause
                     homopause_boundary_i = i;
         }
     }
@@ -267,6 +267,7 @@ void c_Species::update_kzz_and_gravpot(int argument) {
         }
 
     }
+    
     /*
     if(homopause_boundary_i > 0) {
         double qq = std::log10( -phi_s[homopause_boundary_i-1] ) + std::log10(- phi_s[homopause_boundary_i+1]);
@@ -684,7 +685,7 @@ void c_Sim::fill_alpha_basis_arrays(int j) { //Called in compute_friction() in s
         numdens_vector(si)     =  species[si].prim[j].number_density; 
         mass_vector(si)        =  species[si].mass_amu*amu;
         temperature_vector(si) =  std::max(species[si].prim[j].temperature, 3.);
-        temperature_vector_augment(si) = species[si].prim[j].temperature - dt * (species[si].dS(j) + species[si].dG(j)) / species[si].u[j].u1 / species[si].cv;
+        temperature_vector_augment(si) = species[si].prim[j].temperature - dt * (species[si].dS(j) - species[si].dG(j)) / species[si].u[j].u1 / species[si].cv;
     }
 }
 
@@ -948,6 +949,10 @@ AOS c_Species::source_diffusion_flux(int j) {
 
     if(j<=base->num_ghosts-1)
         u_diff = 0;
+    
+    if(base->steps == 1000)
+        cout<<" s/j/u_diff = "<<this_species_index<<" / "<<j<<" / "<<u_diff<<endl;
+    
     return AOS( u_diff * rhodonor, u_diff * momdonor, u_diff * edonor); // rho e = rho c_v T = E - 0.5 rho u^2
 }
 
@@ -1105,4 +1110,90 @@ double c_Sim::get_kzz(double pressure_in_bar) {
         return kzz_max;
     return  tmp_kzz;
     
+}
+
+
+/**
+ * Compute the electric source flux, including momentum and energy flux
+ * @param[in] u Conservative data in cell j
+ * @param[in] j Interface number
+ * @return    Efield flux for interface j
+ */
+AOS c_Species::source_electric_flux(int j) {
+
+    assert(j > 0 && j <= num_cells) ;
+
+    int e_idx = base->e_idx;
+    if(e_idx < 0 || this_species_index==e_idx)
+        return AOS( 0, 0, 0);
+    if(static_charge==0)
+        return AOS( 0, 0, 0);
+
+    //double n_e = logmean( base->species[e_idx].prim[j].number_density,  base->species[e_idx].prim[j+1].number_density);
+    double n_e    = 0.5 * ( base->species[e_idx].prim[j].number_density + base->species[e_idx].prim[j+1].number_density);
+    
+    double fjm1   = base->species[e_idx].prim_r[j].pres;  
+    double fj     = base->species[e_idx].prim_l[j+1].pres;
+
+    fjm1   = base->species[e_idx].prim[j].pres;  
+    fj     = base->species[e_idx].prim[j+1].pres;
+
+    //double n_e = (fj-fjm1) < 0? base->species[e_idx].prim[j+1].number_density : base->species[e_idx].prim[j].number_density;
+
+    //double nmean   = logmean( prim[j].number_density,  prim[j+1].number_density);
+    double nmean   = 0.5 * ( prim[j].number_density + prim[j+1].number_density);
+    nmean          = (fj-fjm1) < 0? prim[j+1].number_density : prim[j].number_density;
+    double udonor = (fj-fjm1) > 0? prim[j+1].speed : prim[j].speed;
+    double rhomean = logmean( u[j].u1,  u[j+1].u1);
+    double mommean =    0.5*( u[j].u2,  u[j+1].u2);
+    double umean   = mommean / rhomean;
+    double emean   = logmean( u[j].u3,  u[j+1].u3);
+    double dpdr    =  -( fj - fjm1) * base->surf[j] ;
+    //double dpdr    = ( fj - fjm1) / (base->x_i12[j+1] - base->x_i12[j]);
+
+    double q_s = (double)this->static_charge;
+    double dfdr = base->use_efield * 2. * q_s /  n_e * dpdr ;
+
+    //if(dfdr > 0)
+    if(j > num_cells-10)
+        dfdr = 0;
+    //cout<<" In efield s/j/force = "<<this_species_index<<" /" <<" / "<<j<<" / "<<dfdr<<endl;
+
+    return AOS( 0., dfdr, umean * dfdr); // rho e = rho c_v T = E - 0.5 rho u^2
+}
+
+/**
+ * Compute the electric source flux, including momentum and energy flux
+ * @param[in] u Conservative data in cell j
+ * @param[in] j Interface number
+ * @return    Efield flux for interface j
+ */
+double c_Species::electric_timestep(int j) {
+
+    double timestep;
+    assert(j > 0 && j <= num_cells) ;
+
+    int e_idx = base->e_idx;
+    if(e_idx < 0)
+        return 1e99;
+
+    double n_e = logmean( base->species[e_idx].prim[j].number_density,  base->species[e_idx].prim[j+1].number_density);
+    double fjm1   = base->species[e_idx].prim[j].pres;  
+    double fj     = base->species[e_idx].prim[j+1].pres;
+
+    double nmean   = logmean( prim[j].number_density,  prim[j+1].number_density);
+    double rhomean = logmean( u[j].u1,  u[j+1].u1);
+    double mommean =    0.5*( u[j].u2,  u[j+1].u2);
+    double emean   = logmean( u[j].u3,  u[j+1].u3);
+
+    double q_s = (double)this->static_charge;
+    double dfdr = 1e0 * q_s * nmean /  n_e * ( fj - fjm1) / (base->x_i12[j+1] - base->x_i12[j]) ;
+    
+    //if(dfdr > 0)
+    if(j > num_cells-10)
+        return 1e99;
+    //cout<<" In efield s/j/force = "<<this_species_index<<" /" <<" / "<<j<<" / "<<dfdr<<endl;
+
+    timestep = std::abs(mommean / dfdr);
+    return timestep; // rho e = rho c_v T = E - 0.5 rho u^2
 }

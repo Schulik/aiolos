@@ -206,7 +206,7 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
                     //Non-subcycling heating function
                     denoms[idx_s] = denom;
                     eta1[idx_s] += Ts * ( 1. + 12. * fac);
-                    eta1[idx_s] += 1. * ddt * (species[s].dS(j) - species[s].dG(j) + photocooling_expansion * species[s].dGdT(j)*Ts     ) / species[s].u[j].u1 / species[s].cv;
+                    eta1[idx_s] += 1. * ddt * (species[s].dS(j) - species[s].dG(j) + photocooling_expansion * species[s].dGdT(j)*Ts + species[s].dQ_hydro(j)    ) / species[s].u[j].u1 / species[s].cv;
                     eta2[idx_s] += 4.* pi * ddt * kappa * no_rad_trans / species[s].cv;
 
                     //Sub-cycling heating function
@@ -237,8 +237,8 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
                 do_highenergy_cooling(j, Tsmean[j]);
 
                 for (int s=0; s < num_species; s++) {
-                    sum_heat += species[s].dS(j);
-                    sum_cool += species[s].dG(j) - photocooling_expansion * species[s].dGdT(j)*Tsmean[j];
+                    sum_heat += species[s].dS(j) + species[s].dQ_hydro(j);
+                    sum_cool += species[s].dG(j) - photocooling_expansion * species[s].dGdT(j)*Tsmean[j] ;
                 }
 
                 int idx_s = j * (num_species) + 0;
@@ -718,7 +718,7 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
             AOS      tmp  = species[si].u[j];
 
             if(std::isnan(species[si].prim[j].temperature))
-                cout<<" @end of T_solver_simple "<<steps<<" "<<j<<" "<<si<<" "<<" u = "<<tmp.u1<<" "<<tmp.u2<<" "<<tmp.u3<<" prim = "<<tmpp.internal_energy<<" "<<tmpp.temperature<<" "<<tmpp.pres<<" "<<tmpp.sound_speed<<" "<<tmpp.speed<<endl;
+                cout<<" @end of T_solver_simple "<<steps<<" "<<j<<" "<<si<<" "<<" u = "<<tmp.u1<<" "<<tmp.u2<<" "<<tmp.u3<<" prim = "<<tmpp.internal_energy<<" "<<tmpp.temperature<<" "<<tmpp.pres<<" "<<tmpp.sound_speed<<" "<<tmpp.speed<<" dt = "<<ddt<<endl;
             species[si].prim[j].temperature = std::min(std::max(species[si].prim[j].temperature, temperature_floor), max_temperature );
         }
 
@@ -934,7 +934,7 @@ int c_Sim::subcycle_heat_exchange(int j, int num_cycles, int debug, double dt) {
 
                     coll_heat_matrix(si,si) += scl_fac * (species[si].cv/ddt     + 16 * sigma_rad * kappa * Ts3);
                     coll_heat_b(si)         += scl_fac * (species[si].cv/ddt     + 12 * sigma_rad * kappa * Ts3) * Tsold ;
-                    coll_heat_b(si)         += scl_fac * (species[si].dS(j)      - cool_mul * species[si].dG(j)  + dgdt_mul * species[si].dGdT(j) * Tsold )/species[si].u[j].u1;
+                    coll_heat_b(si)         += scl_fac * (species[si].dS(j)      - cool_mul * species[si].dG(j)  + dgdt_mul * species[si].dGdT(j) * Tsold +  species[si].dQ_hydro(j) )/species[si].u[j].u1;
 
                     //coll_heat_b(si)         = scl_fac * (species[si].cv/ddt * Tsold + species[si].dS(j)/species[si].u[j].u1 );
 
@@ -1045,7 +1045,7 @@ int c_Sim::subcycle_heat_exchange(int j, int num_cycles, int debug, double dt) {
             // Heating
             double de_total_expected;
             for(int si=0; si<num_species; si++) {
-                de_total_expected += dt  * (species[si].dS(j) - species[si].dG(j) - species[si].dGdT(j) * (documentation(si,num_cycles)-documentation(si,0)  )   );
+                de_total_expected += dt  * (species[si].dS(j) - species[si].dG(j) + species[si].dGdT(j) * (documentation(si,num_cycles)-documentation(si,0) + species[si].dQ_hydro(j) )   );
             }
             cout<<" rel. de expected from heating: "<<de_total_expected/e_init<<endl ;
 

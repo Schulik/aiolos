@@ -17,6 +17,7 @@ void c_Sim::reset_dS() {
         for(int s=0; s<num_species; s++) {
             species[s].dS(j)    = 0.;
             species[s].dG(j)    = 0.;
+            species[s].dQ_hydro(j)    = 0.;
             species[s].dGdT(j)  = 0.;
         }
     }
@@ -86,6 +87,9 @@ void c_Sim::update_dS() {
         
     }
     
+    ////////////////////////////////////////////////////////////////////
+    //Test
+    ////////////////////////////////////////////////////////////////////
     //For tests of the radiation solver when initialising the radiation field out of equilibrium.
     if((steps==0) && (init_J_factor > 1e10)) {
         
@@ -103,7 +107,9 @@ void c_Sim::update_dS() {
             }
         }
     }
-    
+    ////////////////////////////////////////////////////////////////////
+    //Debugging
+    ////////////////////////////////////////////////////////////////////
     if(debug > 2) {
         
         for(int b=0; b<num_bands_in;b++) {
@@ -284,8 +290,8 @@ void c_Sim::update_dS_jb(int j, int b) {
 			            if(j<=1)
 			 	            species[s].dS(j) = 0.;
                         
-                        if(species[s].dG(j) > -1e-50)
-                            species[s].dG(j) = 0.;
+                        //if(species[s].dG(j) > -1e-50)
+                        //    species[s].dG(j) = 0.;
                     }
                         
                     //if(s==0)
@@ -294,11 +300,6 @@ void c_Sim::update_dS_jb(int j, int b) {
                         Highenergy dS moved to chemistry.cpp
                     */
                 }
-                    
-    
-    
-    
-    
 }
 
 /**
@@ -515,7 +516,7 @@ void c_Sim::update_fluxes_FLD() {
 
                 d[idx_s ] = 1 / dt ;
                 r[idx_rs] = Ts / dt ;
-                r[idx_rs] +=  (species[s].dS(j) + species[s].dG(j)) / species[s].u[j].u1 / species[s].cv; //Misc heating terms that are not directly related to self-consistent temperature are just added to the rhs
+                r[idx_rs] +=  (species[s].dS(j) - species[s].dG(j) + species[s].dQ_hydro(j)) / species[s].u[j].u1 / species[s].cv; //Misc heating terms that are not directly related to self-consistent temperature are just added to the rhs
                 
                 for(int b=0; b<num_bands_out; b++) {
                     int idx_b  = j*stride + b * (num_vars+1) ;
@@ -802,8 +803,8 @@ void c_Sim::update_temperatures_simple() {
     //Compute change in energy
     for (int j=0; j < num_cells+2; j++) {
         for(int s=0; s<num_species; s++) {
-            species[s].prim[j].temperature      += (species[s].dS(j) + species[s].dG(j) ) * dt / species[s].u[j].u1 / species[s].cv ;
-            species[s].prim[j].internal_energy  += (species[s].dS(j) + species[s].dG(j) ) * dt / species[s].u[j].u1;
+            species[s].prim[j].temperature      += (species[s].dS(j) - species[s].dG(j) + species[s].dQ_hydro(j) ) * dt / species[s].u[j].u1 / species[s].cv ;
+            species[s].prim[j].internal_energy  += (species[s].dS(j) - species[s].dG(j) + species[s].dQ_hydro(j) ) * dt / species[s].u[j].u1;
             
             if(species[s].prim[j].temperature < 0) {
                 

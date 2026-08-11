@@ -176,6 +176,13 @@ void c_Sim::execute(int restartnumber, double restarttime_cmdline) {
         // Step 0: Hydrodynamics, if so desired
         //
 
+        //
+        // Step 0.5: Reset TOA atmospheric radiation and heating/cooling
+        //
+        if(photochemistry_level >= 0) {
+            reset_dS();
+        }
+
         if(steps >printstuff_steps) {    
             print_velocity_numberdens_ratios(" Pos 0:: ", 210); 
         }
@@ -204,7 +211,7 @@ void c_Sim::execute(int restartnumber, double restarttime_cmdline) {
                 } else {
                     
                     int ex_order = 1;
-                    species[s].execute(species[s].u, species[s].dudt[0], species[s].u_mask, ex_order);
+                    species[s].execute(species[s].u, species[s].dudt[0], species[s].u_mask, ex_order, dt);
                     
                     //species[s].u0 = species[s].u ;
                     for(int j=0; j < num_cells+2; j++)
@@ -301,7 +308,7 @@ void c_Sim::execute(int restartnumber, double restarttime_cmdline) {
                     
                         
                         int ex_order = 1;//(s<=2)? 1.:0; //1;// (s==e_idx)?0:1;
-                        species[s].execute(species[s].u, species[s].dudt[1], species[s].u_mask, ex_order);
+                        species[s].execute(species[s].u, species[s].dudt[1], species[s].u_mask, ex_order, dt*0.5);
                         
                         for(int j=0; j < num_cells+2; j++) {
                             double scale_f =  1;//species[s].prim[j].pres/total_press[j];
@@ -366,7 +373,10 @@ void c_Sim::execute(int restartnumber, double restarttime_cmdline) {
                 print_velocity_numberdens_ratios(" Pos 1.5:: ", 210);
         }
 
+        ////////////////////////////////////////////////////////////////////
         //Misc sources: diffusion:
+        ////////////////////////////////////////////////////////////////////
+
         if(diffusivity_style >= 0) {
 
             if(do_hydrodynamics==0){
@@ -377,13 +387,15 @@ void c_Sim::execute(int restartnumber, double restarttime_cmdline) {
             }
             
             execute_separate_diffusion_step();
-        }
+        } 
 
         for(int s = 0; s < num_species; s++) {
             species[s].fix_negative_pressures_sometimes(species[s].u, 31);
         }
 
-        //Computes the velocity drag update after the new hydrodynamic state is known for each species
+        ////////////////////////////////////////////////////////////////////
+        // Step 2: drag
+        ////////////////////////////////////////////////////////////////////
         if (do_hydrodynamics == 1) 
             compute_drag_update(0.99*dt) ;
 
@@ -394,16 +406,20 @@ void c_Sim::execute(int restartnumber, double restarttime_cmdline) {
             species[s].fix_negative_pressures_sometimes(species[s].u, 4);
         }
 
+        //////////////////////////////////////////////////////////////////////
+        // Steps 3+4: Radiation + chemistry solution substep
+        //////////////////////////////////////////////////////////////////////
+
         // If either switch is set we need to think more carefully about what should be done
         if( (photochemistry_level + use_rad_fluxes ) > 0 ) {
             
             update_opacities();
-            if(photochemistry_level == 0 && use_rad_fluxes > 0)
-                reset_dS();
+            //if(photochemistry_level == 0 && use_rad_fluxes > 0)
+            //    reset_dS(); //Moved to beginning of timestep
 
             // Compute high-energy dS and ionization
             if(photochemistry_level == 1) {   //C2Ray scheme
-                reset_dS();
+                //reset_dS(); //Moved to beginning of timestep
                 
                 if(debug >= 2) {
                     cout<<"Before Photochem dS_UV = "<<dS_band(num_cells-10,0)<<endl;
@@ -419,7 +435,7 @@ void c_Sim::execute(int restartnumber, double restarttime_cmdline) {
                     
                     if(steps % dt_skip_ichem == 0) {
                         dt_skip_dchem += dt;
-                        reset_dS();
+                        //reset_dS(); //Moved to beginning of timestep
                         
                         //cout<<" Running chemistry with dt/dt_chem/dt_skip/steps = "<<dt<<" / "<<dt_skip_dchem<<" / "<<dt_skip_ichem<<" / "<<steps<<endl;
                         do_chemistry(dt_skip_dchem);
@@ -436,7 +452,7 @@ void c_Sim::execute(int restartnumber, double restarttime_cmdline) {
                 species[s].fix_negative_pressures_sometimes(species[s].u, 41);
             }
             
-            update_dS();               //Compute low-energy dS
+            update_dS();             //Compute low-energy dS
         
             if (do_hydrodynamics == 1) {
                 compute_drag_update(0.01*dt) ;
@@ -450,6 +466,10 @@ void c_Sim::execute(int restartnumber, double restarttime_cmdline) {
             if(false) {
                 cout<<"Pos 3 dS_UV = "<<dS_band(num_cells-10,0)<<endl;
             }
+
+            //
+            // Radiation solution substep
+            //
             
             if(use_rad_fluxes==1) {
                 update_fluxes_FLD();   //FLD Radiation transport, updating Temperatures and photon band energies
@@ -460,6 +480,12 @@ void c_Sim::execute(int restartnumber, double restarttime_cmdline) {
                 
             }
         }
+
+        ////////////////////////////////////////////////////////////////////
+        ////////////////////////////////////////////////////////////////////
+        // Radiation + chemistry substep ending
+        ////////////////////////////////////////////////////////////////////
+        ////////////////////////////////////////////////////////////////////
 
         for(int s = 0; s < num_species; s++) {
             //species[s].compute_pressure(species[s].u);
@@ -637,9 +663,10 @@ void c_Sim::compute_total_pressure() {
  * 
  * @param[in] u_in Vector of conservative variables over the entire grid.
  * @param[in] orderstep assures that the first order step is a strictly flux conserving step, by switching off the slope predictor for rho and v in the first step
+ * @param[in] dt timestep, only needed to electron corrections
  * @param[out] dudt Vector of time derivatives of conservative variables over entire grid.
  */
-void c_Species::execute(std::vector<AOS>& u_in, std::vector<AOS>& dudt, std::vector<double>& u_mask, int orderstep) {
+void c_Species::execute(std::vector<AOS>& u_in, std::vector<AOS>& dudt, std::vector<double>& u_mask, int orderstep, double dt) {
     
     
         if(base->steps > base->debug_steps && this_species_index == base->debug_species  && base->debug_cell < num_cells+1) {
@@ -740,7 +767,6 @@ void c_Species::execute(std::vector<AOS>& u_in, std::vector<AOS>& dudt, std::vec
                 case HydroSolver::hllc:
                     for(int j=0; j <= num_cells; j++) {
                         flux[j] =  hllc_flux(j); //hllc_flux(j);
-                        
                     }
                     
                     break;
@@ -774,15 +800,15 @@ void c_Species::execute(std::vector<AOS>& u_in, std::vector<AOS>& dudt, std::vec
                         for(int j=0; j <= num_cells; j++) {
                             double flim = 1.; //previously 0.1
 
-                            if(this_species_index == 0)
-                            flim = params[0];
+                            //if(this_species_index == 0)
+                            //    flim = params[0];
                             if(this_species_index == base->e_idx)
-                                            flim = params[2];
+                                flim = params[2];
                             else {
-                            if(j>base->mix_reset_i)
+                                //if(j>base->mix_reset_i)
                                 flim = params[1]; //1e-100; 
-                            else 
-                                flim = params[1];
+                                //else 
+                                //    flim = params[1];
                             }
                             
                             if(base->x_i12[j] > 9e99)
@@ -790,7 +816,7 @@ void c_Species::execute(std::vector<AOS>& u_in, std::vector<AOS>& dudt, std::vec
 
                             double totpress = 0.;
                             int negpresscontributions = 0;
-                                        
+                            
                             for(int s=0; s<base->num_species; s++) {
                                 totpress += base->species[s].prim[j].pres;
                                 if(base->species[s].prim[j].pres < 0)
@@ -798,11 +824,15 @@ void c_Species::execute(std::vector<AOS>& u_in, std::vector<AOS>& dudt, std::vec
                             }
                             
                             double f           = prim[j].pres/totpress;
-                            double tmp = std::exp( -f*f/flim/flim );
-                            f = 1.-tmp;
-                            f = std::max(f,1e-10);//Cut at very low values to keep sound speeds from rapidly fluctuating
-                            grav_prefactors[j] = f;
-                            flux[j] = hllc_flux2(j, f);
+                            double g = -std::expm1( -f*f/flim/flim );
+                            
+                            g = std::max(g,1e-10);//Cut at very low values to keep sound speeds from rapidly fluctuating
+
+                            //if( (base->steps % 5000==0) && j==32) {
+                            //    cout<<" in mix 2, species = "<<this->speciesname<<" f = "<<f<<" g = "<<g<<endl;
+                            //}
+                            grav_prefactors[j] = g;
+                            flux[j] = hllc_flux2(j, g);
                         }
                     } else {
                         for(int j=0; j <= num_cells; j++) {
@@ -849,14 +879,17 @@ void c_Species::execute(std::vector<AOS>& u_in, std::vector<AOS>& dudt, std::vec
         
         for(int j=1; j<=num_cells; j++) {
             source[j]          = source_grav(u_in[j], j) * grav_prefactors[j];
-            source_pressure[j] = AOS(0, -(base->source_pressure_prefactor_left[j] * prim_l[j].pres - 
+            source_pressure[j] = AOS(0, -(base->source_pressure_prefactor_left[j] *  prim_l[j].pres - 
                                           base->source_pressure_prefactor_right[j] * prim_r[j].pres)  ,0); 
 
-            if (this->mass_amu < 0.5)
-                source_diffusion[j]= AOS(0,0,0);
-            else
-                //source_diffusion[j]= ( source_diffusion_flux(j) * base->surf[j] * base->omegaplus[j] * (-1.) + source_diffusion_flux(j-1) * base->surf[j-1] * base->omegaminus[j]) / base->vol[j];
-                source_diffusion[j]= ( source_diffusion_flux(j) * base->surf[j] * (-1.) + source_diffusion_flux(j-1) * base->surf[j-1] ) / base->vol[j];
+            source_diffusion[j]= AOS(0,0,0);
+            if ( (0==1) && this->mass_amu > 0.5)
+                source_diffusion[j] = ( source_diffusion_flux(j) * base->surf[j] * (-1.) + source_diffusion_flux(j-1) * base->surf[j-1] ) / base->vol[j];
+
+            this->source_efield[j]  = AOS(0,0,0);
+            if (base->treat_as_plasma && this->mass_amu > 0.5)
+                //this->source_efield[j] = ( source_electric_flux(j) * base->surf[j] + source_electric_flux(j-1) * base->surf[j-1] ) * prim[j].number_density / base->vol[j];
+                this->source_efield[j] = ( source_electric_flux(j) + source_electric_flux(j-1) ) * 0.5 * prim[j].number_density / base->vol[j];;
         }
         
         //
@@ -872,18 +905,34 @@ void c_Species::execute(std::vector<AOS>& u_in, std::vector<AOS>& dudt, std::vec
         // Step 3: Add it all up to update the conserved variables
         //
         for(int j=base->num_ghosts; j<=num_cells; j++) {
-            dudt[j] = (flux[j-1] * base->surf[j-1] - flux[j] * base->surf[j]) / base->vol[j] + (source[j] + source_pressure[j] + source_diffusion[j]) ;
             
-            AOS newaos   = (flux[j-1] * base->surf[j-1] - flux[j] * base->surf[j]) / base->vol[j];
-            AOS sourceaos = (source[j] + source_pressure[j] + source_diffusion[j]);
+            dudt[j] = (flux[j-1] * base->surf[j-1] - flux[j] * base->surf[j]) / base->vol[j] + (source[j] + source_pressure[j] + source_diffusion[j] + source_efield[j] ) ;
+            
+            if(this_species_index==base->e_idx && base->treat_as_plasma) {
+                if(dt/base->dt < 0.9) {
+                    //AOS newterm = (flux[j-1] * base->surf[j-1] - flux[j] * base->surf[j]) / base->vol[j] + (source_pressure[j]);
+                    //AOS newterm = (roe_flux(u[j-1],u[j]) * base->surf[j-1] - roe_flux(u[j],u[j+1]) * base->surf[j]) / base->vol[j] + (source_pressure[j]);
+                    
+                    //dQ_hydro(j)   -= ( hydro_flux(j-1) * base->surf[j-1] - hydro_flux(j) * base->surf[j] ) / base->vol[j];
+                    dQ_hydro(j)   -=  1.*( hydro_flux(j-1) - hydro_flux(j)  )/base->vol[j];
 
-            if(j == -100 &&  this->speciesname=="H2" ) {
-                cout<<" flux part "<<newaos.u1<<" "<<newaos.u2<<" "<<newaos.u3<<" source part "<<sourceaos.u3<<endl;
-                char a;
-                cin>>a; 
+                    if( ((j==75) || (j==76) || (j==77)) && (base->steps%100000==0))
+                        cout<<"j = "<<j<<" e cooling in electrons : "<<dG(j)<<endl;
+                }
+                    
+                dudt[j] = AOS(0, 0, 0);
             }
+            
+            if(this_species_index!=base->e_idx && base->treat_as_plasma) {
+                base->species[base->e_idx].dG(j) += std::fabs(source_efield[j].u3)*0.0; //Cooling is a striclty positive number
 
-            //if( debug > 3) { //Or put in your own conditions
+                if( (this_species_index == base->num_species-1) && (j==75) && (base->steps%100000==0))
+                    cout<<" e cooling in last species : "<<base->species[base->e_idx].dG(j)<<endl;
+            }
+            
+            
+            
+            
             if( (base->steps >= 0) && (j==-100) && (this_species_index==18)) { //Or put in your own conditions    
                 char alpha;
                 cout<<"Debuggin fluxes in cell i= "<<j<<" for species "<<speciesname<<" at time "<<base->steps<<endl; 
@@ -929,13 +978,23 @@ AOS c_Species::hllc_flux(int j)
     int jleft = j, jright = j+1;
     AOS flux;
     int option = 0;
+    int e_idx = base->e_idx;
+    AOS_prim elc_l = base->species[e_idx].prim_r[jleft];
+    AOS_prim elc_r = base->species[e_idx].prim_l[jright];
     
     //Speed of gas
     double ul = prim_r[jleft].speed;  
     double ur = prim_l[jright].speed; 
-    
     double pl = prim_r[jleft].pres;  
     double pr = prim_l[jright].pres;
+
+    if(0==1) {
+    //if(base->treat_as_plasma) {
+        double rr = 1.;
+        pl += rr * elc_l.pres;
+        pr += rr * elc_r.pres;
+    }
+
     double pl_e = pl;
     double pr_e = pr;
     if(base->use_total_pressure) {
@@ -950,7 +1009,12 @@ AOS c_Species::hllc_flux(int j)
     double mom_r = dr*ur ;
 
     double El = dl*prim_r[jleft].internal_energy + 0.5*mom_l*ul ;
-    double Er = dr*prim_l[jright].internal_energy + 0.5*mom_r*ur ;
+    double Er = dr*prim_l[jright].internal_energy + 0.5*mom_r*ur;
+    //if(base->treat_as_plasma) {
+    if(0==1) {
+        El += elc_l.density * elc_l.internal_energy;
+        El += elc_r.density * elc_r.internal_energy;
+    }
 
     if( (debug > 2) && (j==100) && (this->speciesname=="H2")) {
         cout<<" IN HLLC, j = "<<j<<" dl/dr = "<<dl<<"/"<<dr<<" ul/ul = "<<ul<<"/"<<ur<<" pl/pr = "<<pl<<"/"<<pr<<" El/Er = "<<El<<"/"<<Er;
@@ -1369,6 +1433,40 @@ AOS c_Species::exact_flux(const AOS &u)
     AOS result = AOS(u.u2, flux2, flux3);
     
     return result;
+}
+
+
+/**
+ * Computes only the hydro internal energy flux terms from the pressure equation (vec u \cdot vec nabla) P + gamma_ad * P * (div u) at an interface
+ * and returns it as energy values  as P = (gamma_ad-1) rho e
+ * 
+ * @param[in] j index at which to compute the hydrodynamic energy flux for the internal energy equation, not the total energy
+ * @return flux at cell interface j, between cells j and j+1
+ */
+double c_Species::hydro_flux(int j) 
+{
+    double vm1 = prim[j].speed;
+    double v   = prim[j+1].speed;
+    double pm1   = prim[j].pres;
+    double p   = prim[j+1].pres;
+    double r  = base->x_i[j];
+    double r2 = r*r;
+    double dr = (base->x_iVC[j+1] - base->x_iVC[j]);
+    double rup2  = base->x_iVC[j+1]*base->x_iVC[j+1];
+    double rdown2 = base->x_iVC[j]*base->x_iVC[j];
+
+    double result1 = 0.5* (vm1 + v) * (p - pm1) / dr;                                       //(vec u \cdot vec nabla) P
+    double result2 = gamma_adiabat * 0.5 * (p + pm1) * 1/r2 * (rup2 * v - rdown2 * vm1)/dr; //gamma_ad * P * (div u)
+    
+    //return (result1 + result2)/(gamma_adiabat-1);
+
+    //Alternative function
+    double pl =  prim_r[j].pres;
+    double pr =  prim_l[j+1].pres;
+    double vl =  base->species[0].prim_r[j].speed;
+    double vr =  base->species[0].prim_l[j+1].speed;
+
+    return base->surf[j]*0.5*(vl+vr)*0.5*(pl+pr)/(gamma_adiabat-1);
 }
 
 Vector3d c_Species::exact_flux_difference(const AOS &uleft, const AOS &uright) 

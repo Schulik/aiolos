@@ -159,8 +159,8 @@ void c_Sim::init_reactions(int cdebug) {
                 
                         cout<<" + ( >";
             }
-            cout<<photon_energies[reaction.band]/(ev_to_K * kb)<<" - "; 
-            cout<<reaction.threshold_energy/(ev_to_K * kb)<<") eV -> "; 
+            cout<<photon_midp_energies_eV[reaction.band]<<" - "; 
+            cout<<reaction.threshold_energy_eV<<") eV -> "; 
             for(int& pi : reaction.products) {
                 cout<<int(reaction.p_stoch[pi]*1.01)<<" "<<species[pi].speciesname;
                 if(reaction.products.back() != pi) 
@@ -168,18 +168,21 @@ void c_Sim::init_reactions(int cdebug) {
             }
 	    cout<<"     Available flux = "<<available_flux;
             
-            if(photon_energies[reaction.band]/(ev_to_K * kb) < 1.) {
-                cout<<" WARNING! Ionizing with photons of <1 eV energy! Current band photon energy = "<<photon_energies[reaction.band]/(ev_to_K * kb)<<endl;
+            if(photon_midp_energies_eV[reaction.band] < 1.) {
+                cout<<" WARNING! Ionizing with photons of <1 eV energy! Current band photon energy = "<<photon_midp_energies_eV[reaction.band]<<endl;
                 //char stop;
                 //cin>>stop;
             }
 	   
-	    if(photon_energies[reaction.band] - reaction.threshold_energy < 0) {
+	    if(photon_midp_energies[reaction.band] - reaction.threshold_energy < 0) {
 		cout<<" WARNING! Ionization energy higher than lowest assigned reaction band! Check assigned band limits."<<endl;
                 char stop;
                 cin>>stop;
 	    }
             cout<<endl;
+
+        // Compute photon mean heating efficiency
+        reaction.compute_efficiency();
     }
     cout<<endl;
         
@@ -211,8 +214,8 @@ void c_Sim::init_reactions(int cdebug) {
          //for(auto r : photoreactions) {
          for(int pr=0; pr < photoreactions.size(); pr++){ 
 
-             thin_photorates_m[pr] += photoreactions[pr].opacity_twotemp(b) * solar_heating(b)/photon_energies[b];
-             thin_photorates_n[pr] += photoreactions[pr].opacity_twotemp(b) * solar_heating(b)/photon_energies[b] * species[photoreactions[pr].educts[0]].mass_amu * amu;
+             thin_photorates_m[pr] += photoreactions[pr].opacity_twotemp(b) * solar_heating(b)/photon_midp_energies[b];
+             thin_photorates_n[pr] += photoreactions[pr].opacity_twotemp(b) * solar_heating(b)/photon_midp_energies[b] * species[photoreactions[pr].educts[0]].mass_amu * amu;
 	     cout<<setprecision(1)<<photoreactions[pr].opacity_twotemp(b)<<" ";
 	     //cout<<r.opacity_twotemp(b)<<" ";
 
@@ -223,14 +226,19 @@ void c_Sim::init_reactions(int cdebug) {
     //At the end pront photoreactions
     //cout<<"                                                      ";
     //cout<<endl<<" opt. thin rates:                                      ";
-    cout<<endl<<" opt. thin rates/mass:                           ";
+    cout<<endl<<" opt. thin rates/mass:                         ";
     for(int pr=0; pr < photoreactions.size(); pr++){ 
 	  cout<<setprecision(1)<<thin_photorates_m[pr]<<" ";
     }
     cout<<endl;
-    cout<<" opt. thin rates/part:                           ";
+    cout<<" opt. thin rates/part:                         ";
     for(int pr=0; pr < photoreactions.size(); pr++){ 
 	  cout<<setprecision(1)<<thin_photorates_n[pr]<<" ";
+    }
+    cout<<endl;
+    cout<<" mean efficiencies:                            ";
+    for(auto r : photoreactions) {  
+	  cout<<setprecision(1)<<r.efficiency<<" ";
     }
     cout<<endl<<endl;
     cout<<" Total flux = "<<flux_total<<", flux between 13.6 and 2000 eV = "<<flux_xuv<<" [erg/cm^2/s] "<<endl;
@@ -358,6 +366,9 @@ void c_Sim::do_chemistry(double dt_chem) {
             if( (n_e/mn_tot < 1e-4) && neutralize_electrons) { //Force electrons to balance out the charges per celll
                    n_init(e_idx) = std::fabs(charge_imbalance);
             }
+
+            if(treat_as_plasma)
+                n_init(e_idx) = std::fabs(charge_imbalance);
         }
         
         
@@ -505,13 +516,22 @@ void c_Sim::do_chemistry(double dt_chem) {
                 if(n_tmp(s) < chemistry_numberdens_floor*mn_tot)
                         n_tmp(s) = chemistry_numberdens_floor*mn_tot;
                 
-                if( (n_e/mn_tot < 1e-4) && species[s].this_species_index == e_idx) { //Force electrons to balance out the charges per celll
+                if(species[s].this_species_index == e_idx) { //Enforce charge neutrality
 
-                    if(neutralize_electrons) {
-                        n_tmp(s) = std::fabs(charge_imbalance);
+                    if( (n_e/mn_tot < 1e-4) && neutralize_electrons ) { //Force electrons to balance out the charges per celll
+
+                        n_tmp(s)                 = std::fabs(charge_imbalance);
                         species[s].prim[j].speed = charge_momentum / n_tmp(s) ;
                     }
+
+                    if(treat_as_plasma) {
+                        n_tmp(s)                 = std::fabs(charge_imbalance);
+                        species[s].prim[j].speed = charge_momentum / n_tmp(s) ;
+                    }
+
+
                 }
+                
                 //if( s == e_idx) //Force electrons to balance out the charges per cell
             
             species[s].prim[j].number_density = n_tmp(s) * mcons_factor;
@@ -654,7 +674,7 @@ Vector_t c_Sim::solver_cchem_implicit_general(double dtt, int cell, int cdebug, 
         if(cell < num_cells)
             temptau = radial_optical_depth_twotemp_he(cell+1,b);
             
-        double F = 0.25 * solar_heating(b) / photon_energies[b] * std::exp(-temptau) * dlognu;
+        double F = 0.25 * solar_heating(b) / photon_midp_energies[b] * std::exp(-temptau) * dlognu;
         double tau_tot_b = 0.;
     
         //
@@ -976,7 +996,6 @@ void c_Sim::update_dS_jb_photochem(int cell, double dtt) {
             temptau = radial_optical_depth_twotemp_he(cell+1,b);
                 
         double F = 0.25 * solar_heating(b) * std::exp(-temptau) * dlognu;
-            
         double ntot_b = 0.;
         double tau_tot_b = 0.;
         
@@ -988,6 +1007,9 @@ void c_Sim::update_dS_jb_photochem(int cell, double dtt) {
             if(reaction.band >= b) {
                 ntot_b    +=  reaction.branching_ratio * n_olds[reaction.educts[0]];
                 tau_tot_b +=  reaction.branching_ratio * n_olds[reaction.educts[0]] * reaction.opacity_twotemp(b) * species[reaction.educts[0]].mass_amu*amu ;
+                if (steps ==100 && cell==100 && debug>0){
+                    cout<<" adding the following number densityies and opacities to tau_tot_b = "<<ntot_b<<" / "<<reaction.opacity_twotemp(b)<<endl;
+                }
             }
         }
         ntot_b    *= n_tot;
@@ -999,18 +1021,16 @@ void c_Sim::update_dS_jb_photochem(int cell, double dtt) {
         for(c_photochem_reaction& reaction : photoreactions) {
             
             if(b <= reaction.band) {
-                
                 //
                 // Heating terms
                 //
                 dlognu = 1.;
-                double eratio = reaction.threshold_energy/photon_energies[b];
-                double eratio2 = reaction.threshold_energy/photon_energies[b+1];
+                double eratio  = reaction.threshold_energy/photon_midp_energies[b];
+                double eratio2 = reaction.threshold_energy/photon_midp_energies[b+1];
 
-                double x_secondary  =1.; //Ionization factor for X-rays
-                //if(l_i_in[b+1] < 0.030)
-                if(photon_energies_eV[b] - reaction.threshold_energy_eV > 10.) //True for H (Steenberg & Wieser) and approx. for O-rich gas as well (Garcia-Munoz2023)
-                          x_secondary = secondary_ion_heating;
+                double x_secondary  = 1.; //Ionization factor for X-rays
+                if(photon_midp_energies_eV[b] > 2. * reaction.threshold_energy_eV) // More general for all processes, after reading (Steenberg & Wieser) and approx. for O-rich gas as well (Garcia-Munoz2023)
+                    x_secondary = secondary_ion_heating;
 
                 if(b == reaction.band) { //When we sit in the band just above the ionisation threshold, we need to check that it might be that E_lower[b] < E_ion but E_higher[b] > E_ion
                     
@@ -1019,7 +1039,7 @@ void c_Sim::update_dS_jb_photochem(int cell, double dtt) {
                     dlognu = std::max(dlognu,0.);
 
                     //if(b==3)
-                    //	cout<<" rnumber/ band / dlognu = "<<reaction.reaction_number<<" / "<<b<<" / "<<dlognu<<" 1-eratio, 1-eratio2 "<<1-eratio<<" / "<<1-eratio2<<" energies: thresh, elow, eup"<<reaction.threshold_energy/(ev_to_K * kb)<<" / "<<photon_energies[b]/(ev_to_K * kb)<<" / "<<photon_energies[b+1]/(ev_to_K * kb)<<endl;
+                    //	cout<<" rnumber/ band / dlognu = "<<reaction.reaction_number<<" / "<<b<<" / "<<dlognu<<" 1-eratio, 1-eratio2 "<<1-eratio<<" / "<<1-eratio2<<" energies: thresh, elow, eup"<<reaction.threshold_energy/(ev_to_K * kb)<<" / "<<photon_midp_energies[b]/(ev_to_K * kb)<<" / "<<photon_midp_energies[b+1]/(ev_to_K * kb)<<endl;
                 }
                 double tau_i =  reaction.branching_ratio * n_olds[reaction.educts[0]] * reaction.opacity_twotemp(b) * species[reaction.educts[0]].mass_amu*amu ;
                 tau_i       *= n_tot*ds;
@@ -1042,6 +1062,10 @@ void c_Sim::update_dS_jb_photochem(int cell, double dtt) {
                 //species[ej].dG(cell) +=  dt * reaction.dndt_old * species[ej].cv * species[ej].mass_amu * species[ej].prim[cell].temperature;
                 //--> This is now called separately outside of heating_dS_jb
                 
+                if (steps ==100 && cell==100 && debug>0){
+                // Heating terms
+                    cout<<" b = "<<b<<" E[b] = "<<photon_midp_energies_eV[b]<<" eta = "<<x_secondary *(1- reaction.threshold_energy/photon_midp_energies[b])<<" dS = "<<dS<<" fractional dS = "<<fractional_dS<<" tau "<<tau_tot_b<<" F "<<F<<" temptau "<<temptau<<endl;
+                }
                 
             }
 
@@ -1051,9 +1075,9 @@ void c_Sim::update_dS_jb_photochem(int cell, double dtt) {
                 if(b <= reaction.band) {
                     double x_secondary = 1.;
                     //if(l_i_in[b+1] < 0.030)
-                    if(photon_energies_eV[b] - reaction.threshold_energy_eV > 10.) 
+                    if(photon_midp_energies_eV[b] > 2. * reaction.threshold_energy_eV) // More general for all processes
                             x_secondary = secondary_ion_heating;
-                    cout<<" b = "<<b<<" E[b] = "<<photon_energies_eV[b]<<" eta = "<<x_secondary *(1- reaction.threshold_energy/photon_energies[b])<<" flux = "<<F<<endl;
+                    cout<<" b = "<<b<<" E[b] = "<<photon_midp_energies_eV[b]<<" eta = "<<x_secondary *(1- reaction.threshold_energy/photon_midp_energies[b])<<" flux = "<<F<<endl;
                 }
             }
 
@@ -1101,7 +1125,7 @@ void c_Sim::update_dS_jb_photochem(int cell, double dtt) {
             chem_momentum_matrix(ej, ej) -= 1.* dtt * reaction.dndts[ej] * n_tot  / n_news[ej]; //reaction.dndt_old;
             dLbit                =  dt * reaction.dndt_old * ndot_multiplier * species[ej].cv * species[ej].mass_amu * species[ej].prim[cell].temperature;
             dLambda              += dLbit;
-            species[ej].dG(cell) += dLbit;
+            //species[ej].dG(cell) += dLbit;
             
         }
         for(int& pj : reaction.products) {
@@ -1348,7 +1372,7 @@ void  c_Sim::do_highenergy_cooling(int cell, double Te) {
         //double Te = species[e_idx].prim[cell].temperature;
         double dT = 1e-5;
         double n_neutrals = 0.;          //For simplified excitation of O by H0, H2, H2O
-        species[e_idx].dG(cell) = 0;
+        //species[e_idx].dG(cell) = 0;   //We zero out all heating and cooling rates now at the beginning of each timestep
         
         if(h2_idx > -1)    n_neutrals += species[h2_idx].prim[cell].number_density;
         if(hnull_idx > -1) n_neutrals += species[hnull_idx].prim[cell].number_density;
@@ -1483,6 +1507,8 @@ void  c_Sim::do_highenergy_cooling(int cell, double Te) {
 
 	    
     }
+    
+
 
     if(steps == 200 && cell==100e99) {
         for(int s=0; s<num_species; s++)
@@ -1799,5 +1825,35 @@ void c_Sim::enforce_charge_neutrality(int j) {
                  species[s].eos->compute_conserved(&species[s].prim[j], &species[s].u[j], 1);
              }
          }
+
+}
+
+
+void c_photochem_reaction::compute_efficiency() {
+
+    double eta_nom = 0;
+    double eta_denom= 0;
+    for (int b=0; b<base->num_bands_in; b++) {
+    
+        if(b <= band) {
+            double F     = 0.25 * base->solar_heating(b);
+            double sigma = this->opacity_twotemp(b) * base->species[this->educts[0]].mass_amu*amu;
+            //
+            // Heating terms
+            //
+            double eratio = this->threshold_energy/base->photon_midp_energies[b];
+            double x_secondary  = 1.; //Ionization factor for X-rays
+            if(base->photon_midp_energies_eV[b] > 2. * this->threshold_energy_eV) // More general for all processes
+                x_secondary = base->secondary_ion_heating;
+            
+            //cout<<" efficiency pos 3, band ="<<b<<" efficiency = "<<x_secondary * (1.- eratio)<<" for E = "<<base->photon_midp_energies_eV[b]<<" eV."" photon energy and 2.*threshold = "<<base->photon_midp_energies_eV[b]<<" / "<<2. * this->threshold_energy_eV<<endl;;
+                
+            //Get relative contributions of this band to the mean efficiency
+            eta_nom   += F * sigma * base->heating_eta * x_secondary * (1.- eratio);
+            eta_denom += F * sigma;
+        }
+
+    }
+    this->efficiency = eta_nom/eta_denom;
 
 }

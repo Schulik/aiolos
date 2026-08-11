@@ -220,6 +220,8 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, s
         use_convective_fluxes = read_parameter_from_file<int>(filename,"USE_CONVECTION", debug, 0).value;   //Switch to turn on convective energy transport in the radiation module
         use_conduction        = read_parameter_from_file<int>(filename,"USE_CONDUCTION", debug, 0).value;   //Switch to turn on conductive energy transport in thesimple radiation module
         neutralize_electrons  = read_parameter_from_file<int>(filename,"NEUTRALIZE_ELECTRONS", debug, 0).value;   //Switch to turn on conductive energy transport in thesimple radiation module
+        treat_as_plasma       = read_parameter_from_file<int>(filename,"TREAT_AS_PLASMA", debug, 0).value;        //Switches to multifluid with 'painted' electrons, and switches on the ambipolar E-field source term, computed from the electron pressure gradient
+        use_efield            = read_parameter_from_file<double>(filename,"USE_EFIELD", debug, 1).value; 
         conductivity          = read_parameter_from_file<double>(filename,"CONDUCTIVITY", debug, 1e-5).value;  //Value of conductivity prefactor
         conductivity2         = read_parameter_from_file<double>(filename,"CONDUCT2",     debug, conductivity).value;  //Value of conductivity prefactor
         diffusivity           = read_parameter_from_file<double>(filename,"DIFFUSIVITY", debug, 0.).value;  //Value of conductivity prefactor
@@ -465,14 +467,17 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, s
 		    int b_current = 1;
 
             while(std::getline( file, line )) {
+
                 if(b_current == num_bands_in)
                     break;
-                if(debug > 1) {
-                    cout<<" band b = "<<b_current<<" / current l_i_in[b] ="<<l_i_in[b_current];
-                    cout<<" changed to l_i_in[b] = "<<l_i_in[b_current]<<endl;
-                }
+                
                 std::vector<string> stringlist = stringsplit(line," ");
                 l_i_in[b_current]   = std::stod(stringlist[0]); //micrometer! ...  also user has to make sure that b_current doesnt exceed l_min
+                
+                if(debug >= 1) {
+                    cout<<" band b = "<<b_current<<" / current l_i_in[b] ="<<l_i_in[b_current];
+                    //cout<<" changed to l_i_in[b] = "<<l_i_in[b_current]<<endl;
+                }
                 b_current++;
             }
 	   
@@ -491,7 +496,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, s
         }
         else if(num_bands_out > 2)
         {
-            l_i_out[1]             = lambda_min_out;
+            l_i_out[1]                 = lambda_min_out;
             l_i_out[num_bands_out-1]   = lambda_max_out;
             double dlogl2      = pow(lambda_max_out/lambda_min_out, 1./(num_bands_out-2));
             //l_i[0] = lambda_min;
@@ -504,6 +509,15 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, s
             
             for(int b=0; b<num_bands_out; b++) {
                 l_i12_out[b]  = pow( 10., 0.5 * (std::log10(l_i_out[b]) + std::log10(l_i_out[b+1])));   
+                
+            }
+        }
+
+        //
+        if(debug > 0 ) {
+            cout<<" Reporting ingoing wavelength grid"<<endl;
+            for(int b=0; b<num_bands_in; b++) {
+                cout<<" b = "<<b<<" in micron:"<<l_i_in[b]<<" in eV = "<<1.24/l_i_in[b]<<endl;
                 
             }
         }
@@ -525,33 +539,37 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, s
                     num_he_bands++;
                 }
         }
-        photon_energies    = np_somevalue(num_bands_in, 20. * ev_to_K * kb);
-        photon_energies_eV = np_somevalue(num_bands_in, 20.);
-        
-        for(int b=0; b<num_bands_in; b++) {
+        photon_energies    = np_somevalue(num_bands_in+1, 20. * ev_to_K * kb);
+        photon_energies_eV = np_somevalue(num_bands_in+1, 20.);
 
-	    if(b==0) {
-	            photon_energies[b] = 2. * 1.24/( l_i_in[b + 1] ) * ev_to_K * kb ;
-                photon_energies_eV[b] = 2. * 1.24/( l_i_in[b + 1] );
-        } else{
-			double elow = 1.24/( l_i_in[b + 1] ) * ev_to_K * kb;
-			double ehigh= 1.24/( l_i_in[b] )     * ev_to_K * kb;
+        photon_midp_energies    = np_somevalue(num_bands_in, 20. * ev_to_K * kb);
+        photon_midp_energies_eV = np_somevalue(num_bands_in, 20.);
 
-			photon_energies[b]     = (1-eband_fraction)*elow + eband_fraction*ehigh;
-            photon_energies_eV[b]  = photon_energies[b]/(ev_to_K*kb);
+        for(int b=0; b<num_bands_in+1; b++) {
 
-			//photon_energies[b]  = std::pow(10, 0.25*std::log10(elow) + 0.75*std::log10(ehigh)  );
-			if(b==num_bands_in-1) {
-				photon_energies[b]  = elow;
-                photon_energies_eV[b]  = elow/(ev_to_K*kb);
-            }
-			
-            cout<<"Assigned to energy band b = "<<b<<" a photon energy of "<<photon_energies_eV[b]<<" eV; elow / ehigh = "<<elow/ev_to_K/kb<<" / "<<ehigh/ev_to_K/kb<<endl;
-		}
-	
-            //cout<<"Assigned to energy band b = "<<b<<" a photon energy of "<<photon_energies[b]/ev_to_K/kb<<" eV "<<endl;
+            photon_energies[b]    = 1.24/( l_i_in[b] ) * ev_to_K * kb;
+            photon_energies_eV[b] = 1.24/( l_i_in[b] );
+                
+            //photon_energies[b]  = std::pow(10, 0.25*std::log10(elow) + 0.75*std::log10(ehigh)  );              
+        }
+        for(int b=0; b<num_bands_in+1; b++) {
+            cout<<"Assigned to energy lim = "<<b<<" a photon energy of "<<photon_energies_eV[b]<<" eV for wavelength ="<<l_i_in[b]<<endl;
         }
 
+        photon_midp_energies[0]     = photon_energies[1];
+        photon_midp_energies_eV[0]  = photon_energies[1]/(ev_to_K*kb);
+
+        for(int b=0; b<num_bands_in; b++) {
+            double elow  = photon_energies[b+1];
+            double ehigh = photon_energies[b];
+
+            if(b>0) {
+                photon_midp_energies[b]     = (1-eband_fraction)*elow + eband_fraction*ehigh;
+                photon_midp_energies_eV[b]  = photon_midp_energies[b]/(ev_to_K*kb);
+            }
+            
+            cout<<"Assigned to energy band b = "<<b<<" a photon energy of "<<photon_midp_energies_eV[b]<<" eV; elow / ehigh = "<<photon_energies_eV[b+1]<<" / "<<photon_energies_eV[b]<<endl;
+        }
         cout<<" WAVELENGTH GRID FINISHED. num_bands_in / num_he_bands / num_bands_out = "<<num_bands_in<<" / "<<num_he_bands<<" / "<<num_bands_out<<endl;
 
         /*
@@ -983,6 +1001,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, s
     for(int s=0; s<num_species; s++) {
         species[s].dS = Eigen::VectorXd::Zero(num_cells+2,  1);
         species[s].dG = Eigen::VectorXd::Zero(num_cells+2,  1);
+        species[s].dQ_hydro = Eigen::VectorXd::Zero(num_cells+2,  1);
         species[s].dGdT = Eigen::VectorXd::Zero(num_cells+2,  1);
     }
     
@@ -1384,6 +1403,7 @@ c_Species::c_Species(c_Sim *base_simulation, string filename, string species_fil
         source          = init_AOS(num_cells+2);  
         source_pressure = init_AOS(num_cells+2);
         source_diffusion= init_AOS(num_cells+2);
+        source_efield   = init_AOS(num_cells+2);
         flux            = init_AOS(num_cells+1);
         lconvect        =std::vector<double>(num_cells+1);
 
@@ -2279,9 +2299,9 @@ void c_photochem_reaction::set_base_pointer(c_Sim *base_simulation) {
     }
     //base->highenergy_switch(educts[0], this->band) = 0.;
 
-    this->threshold_energy    = 1.24/( base->l_i_in[this->band+1] )  * ev_to_K * kb ;
+    this->threshold_energy    = base->photon_energies[this->band+1];//1.24/( base->l_i_in[this->band] )  * ev_to_K * kb ;
     this->threshold_energy_eV = base->photon_energies_eV[this->band+1];
-    //cout<<" threshold energy in eV = "<<threshold_energy_eV<<" reaction number "<<this->reaction_number<<endl;
+    cout<<" threshold energy in eV = "<<threshold_energy_eV<<" reaction number "<<this->reaction_number<<endl;
 }
 
 

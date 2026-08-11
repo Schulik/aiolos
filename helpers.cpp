@@ -84,8 +84,10 @@ double c_Sim::get_cfl_timestep() {
                     //species[s].finalstep[i] = 1e-20 ; //Naively this should be the right approach, but there are numerical imbalances
                 }
 
+                if(treat_as_plasma)
+                    species[s].finalstep[i] = 1e-20;
+
                 species[s].finalstep[num_cells] = 1e-20;
-                
             }
             else
                 species[s].finalstep[i]    = std::sqrt(species[s].timesteps[i]*species[s].timesteps[i] + species[s].timesteps_cs[i]*species[s].timesteps_cs[i] ) ;
@@ -131,10 +133,12 @@ double c_Sim::get_cfl_timestep() {
                             max_temper = species[s].prim[i].temperature;
                             max_mach   = std::abs(species[s].prim[i].speed/species[s].prim[i].sound_speed);
                         }
-
                     }
 
-                    diffstep = std::min(diffstep, std::min(0.4*species[s].diffusive_timestep(i), 1e99 ));
+                    double tmp_doublemin = 0.4*species[s].diffusive_timestep(i);
+                    //if(treat_as_plasma)
+                    //    tmp_doublemin = std::min(0.4*species[s].diffusive_timestep(i), 0.4*species[s].electric_timestep(i));
+                    diffstep = std::min(diffstep, std::min(tmp_doublemin, 1e99 ));
                 }
         }
     }
@@ -334,14 +338,14 @@ int c_Sim::find_closest_band2(double energy_threshold) {
     for(int b=0; b<num_bands_in; b++) {
        double E_up   = photon_energies_eV[b];// 1.24/( l_i_in[b + 1] ); 
        double E_down = photon_energies_eV[b+1];
-       if(debug>1)
+       if(debug>=1)
             cout<<" Searching energy threshold for E_thr="<<energy_threshold<<" eV, being searched between "<<E_down<<" and "<<E_up<<" eV"<<endl;
 
        if((energy_threshold > E_down) && (energy_threshold < E_up))
            return b;
     }
     
-    return num_bands_in-1;    
+    return num_bands_in;    
 }
 
 

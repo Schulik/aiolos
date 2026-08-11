@@ -797,7 +797,7 @@ void c_Species::print_AOS_component_tofile(int timestepnumber) {
             //outfile<<base->x_i12[i]<<'\t'<<u[i].u1<<'\t'<<u[i].u2<<'\t'<<u[i].u3<<'\t'<<flux[i].u1<<'\t'<<flux[i].u2<<'\t'<<flux[i].u3<<'\t'<<balance1<<'\t'<<balance2<<'\t'<<balance3<<'\t'<<prim[i].pres<<'\t'<<u[i].u2/u[i].u1<<'\t'<<prim[i].temperature <<'\t'<<timesteps_cs[i]<<'\t'<<base->cflfactor/timesteps[i]<<'\t'<<prim[i].sound_speed<<'\t'<<timesteps_de[i]<<'\t'<<u_analytic[i]<<'\t'<<base->alphas_sample(i)<<'\t'<<base->phi[i]<<'\t'<<base->enclosed_mass_tmp[i]<<'\t'<<Jtot<<'\t'<<Stot<<'\t'<<base->friction_sample(i)<<endl;
             double ri = base->x_i12[i];
             //outfile<<ri<<'\t'<<u[i].u1<<'\t'<<u[i].u2<<'\t'<<u[i].u3<<'\t'<<u[i].u1/mass_amu/amu<<'\t'<<12.*u[i].u2*ri*ri<<'\t'<<12.*u[i].u2*ri*ri/mass_amu/amu<<'\t'<<balance1<<'\t'<<balance2<<'\t'<<balance3<<'\t'<<prim[i].pres<<'\t'<<u[i].u2/u[i].u1<<'\t'<<prim[i].temperature <<'\t'<<timesteps_cs[i]<<'\t'<<base->cflfactor/timesteps[i]<<'\t'<<prim[i].sound_speed<<'\t'<<timesteps_de[i]<<'\t'<<u_analytic[i]<<'\t'<<base->alphas_sample(i)<<'\t'<<phi_s[i]<<'\t'<<base->enclosed_mass_tmp[i]<<'\t'<<dG(i)+0.*dGdT(i)*prim[i].temperature <<'\t'<<dS(i)<<'\t'<<base->cell_optical_depth(i,0)<<endl;
-            outfile<<ri<<'\t'<<u[i].u1<<'\t'<<u[i].u2<<'\t'<<u[i].u3<<'\t'<<u[i].u1/mass_amu/amu<<'\t'<<12.*u[i].u2*ri*ri<<'\t'<<12.*u[i].u2*ri*ri/mass_amu/amu<<'\t'<<prim[i].number_density/base->total_numdens[i]<<'\t'<<base->total_press[i]/1e6<<'\t'<<balance3<<'\t'<<prim[i].pres<<'\t'<<u[i].u2/u[i].u1<<'\t'<<prim[i].temperature <<'\t'<<timesteps_cs[i]<<'\t'<<base->cflfactor/timesteps[i]<<'\t'<<prim[i].sound_speed<<'\t'<<timesteps_de[i]<<'\t'<<u_analytic[i]<<'\t'<<base->alphas_sample(i)<<'\t'<<-phi_s[i]<<'\t'<<base->enclosed_mass_tmp[i]<<'\t'<<dG(i)+0.*dGdT(i)*prim[i].temperature <<'\t'<<dS(i)<<'\t'<<base->cell_optical_depth(i,0)<<endl;
+            outfile<<ri<<'\t'<<u[i].u1<<'\t'<<u[i].u2<<'\t'<<u[i].u3<<'\t'<<u[i].u1/mass_amu/amu<<'\t'<<12.*u[i].u2*ri*ri<<'\t'<<12.*u[i].u2*ri*ri/mass_amu/amu<<'\t'<<prim[i].number_density/base->total_numdens[i]<<'\t'<<base->total_press[i]/1e6<<'\t'<<balance3<<'\t'<<prim[i].pres<<'\t'<<u[i].u2/u[i].u1<<'\t'<<prim[i].temperature <<'\t'<<timesteps_cs[i]<<'\t'<<base->cflfactor/timesteps[i]<<'\t'<<prim[i].sound_speed<<'\t'<<timesteps_de[i]<<'\t'<<source_diffusion_flux2(i,true).u1<<'\t'<<dQ_hydro(i)<<'\t'<<-phi_s[i]<<'\t'<<base->enclosed_mass_tmp[i]<<'\t'<<dG(i)+0.*dGdT(i)*prim[i].temperature <<'\t'<<dS(i)<<'\t'<<base->cell_optical_depth(i,0)<<endl;
         } 
         //cout<<"bonus cooling info at output time: "<<-dG(num_cells/2)+dGdT(num_cells/2)*prim[num_cells/2].temperature<<endl;
         //Print right ghost stuff
@@ -1213,13 +1213,13 @@ void c_Sim::interpret_chem_reaction_list(string dir, string filename) {
             if(stringlist2[2].find("A") != string::npos) {
                 //cout<<" starting search for band numbers..."<<endl;
                 band_number = find_closest_band2(energy_threshold);
-                if(debug > 1)
-		            cout<<" automatically found band number "<<band_number<<" with algorithm "<<endl;
+                if(debug >= 1)
+		            cout<<" automatically found band number "<<band_number<<" with algorithm, correpsonding energy "<<this->photon_energies_eV[band_number]<<"eV"<<endl;
             }
             else {
                 //cout<<" converted bandnumber = "<<std::stod(stringlist2[2])<<endl;
                 band_number = std::stod(stringlist2[2]);
-                if(debug > 1)
+                if(debug >= 1)
 		            cout<<" read band number "<<band_number<<" from file."<<endl;
             }
 

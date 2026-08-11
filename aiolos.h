@@ -379,6 +379,7 @@ public:
     double threshold_energy_eV;
     double products_total_mass;
     double energy_split_factor;  //Ensure most of the heating goes to light products when mass ratios between products are extreme and an even split between reactants of equal mass
+    double efficiency;           //Computed average heating efficiency, taking into consideration the photon spectrum, energy threshold and secondary ionization
     int opacities_available;     //Checks if the reaction string has a separate opacity entry. If not, defaults to accept the "species" opacities, from the species list.
     Eigen::VectorXd opacity_twotemp; //Opacities for this process
     string opafile;
@@ -386,6 +387,7 @@ public:
     c_photochem_reaction(int num_species, int num_bands, int band, std::vector<int> e_indices, std::vector<int> p_indices, std::vector<double> e_stoch, std::vector<double> p_stoch, double branching, double threshold, string opacityfile);
     void set_reac_number(int num) {reaction_number = num;}
     void set_base_pointer(c_Sim *base_simulation);
+    void compute_efficiency();
 };
 
 
@@ -443,6 +445,8 @@ public:
     int diffusivity_style;
     double do_cond_until;
     int neutralize_electrons;
+    int treat_as_plasma;
+    double use_efield;
     ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     //
     //  Numerical
@@ -752,8 +756,10 @@ public:
     Eigen::MatrixXd solar_heating;
     Eigen::MatrixXd solar_heating_final;
     std::vector<int> BAND_IS_HIGHENERGY;
-    std::vector<double> photon_energies;
+    std::vector<double> photon_energies;        //Energies with integer band index (band boundaries)
     std::vector<double> photon_energies_eV;
+    std::vector<double> photon_midp_energies;   //Energies with band-half index (i.e. intra-cell energies)
+    std::vector<double> photon_midp_energies_eV;
     const int HIGHENERGY_BAND_TRUE = 1;
     const int HIGHENERGY_BAND_FALSE= 0;
     double eband_fraction;
@@ -1047,8 +1053,9 @@ public:
     std::vector<AOS> u_diff;               //Special u for the diffusion step: 3rd entry represents small e, not big E
     std::vector<AOS> dudt[2];        // Time derivative of u at each stage ;      
     std::vector<AOS> source;         // Gravitational source term
-    std::vector<AOS> source_pressure;// Geometric source term
+    std::vector<AOS> source_pressure; // Geometric source term
     std::vector<AOS> source_diffusion;// Geometric source term
+    std::vector<AOS> source_efield;// Geometric source term
     std::vector<AOS> flux;
     std::vector<double> u_mask;   //Switches 2nd spatial order on and off, depending if a cell breaks
     std::vector<double> lconvect;
@@ -1067,6 +1074,7 @@ public:
     Eigen::MatrixXd fraction_total_solar_opacity; //num_cells * num_bands_in, what fraction of the total opacity is represented by this species in this cell. gives heating of the species
     Eigen::MatrixXd dS;  //num_cells * num_bands_out, Heating, low-energy and high-energy
     Eigen::MatrixXd dG;  //num_cells * num_bands_out, Cooling, high-energy
+    Eigen::MatrixXd dQ_hydro;  //num_cells * num_bands_out, Cooling, high-energy
     Eigen::MatrixXd dGdT; //num_cells * num_bands_out, Cooling, high-energy
     double dlogOpa;
     
@@ -1209,7 +1217,10 @@ public:
     AOS passivescalar_flux(int);
     AOS passivescalar_flux2(int);
     AOS exact_flux(const AOS &u);
+    double hydro_flux(int j);
     AOS exact_advection_flux(AOS u);
+    void do_separate_hydro_energy_solution();
+
     void positivity_preserving_step(int j);
     void compute_e_fluxes(int j);
     double return_entropy_with_jump(double j);
@@ -1245,6 +1256,8 @@ public:
     AOS source_grav_noconserved(int &j);
     AOS source_diffusion_flux(int j);
     AOS source_diffusion_flux2(int j, bool get_v);
+    AOS source_electric_flux(int j);
+    double electric_timestep(int j);
     double diffusive_timestep(int j);
     std::vector<double> phi_s;
 
@@ -1300,7 +1313,7 @@ public:
     //c_Species();
     c_Species(c_Sim *base_simulation, string filename, string species_filename, int species_index, int debug=0);
     ~c_Species();
-    void execute(std::vector<AOS>& u, std::vector<AOS>& dudt, std::vector<double>& u_mask, int orderstep);
+    void execute(std::vector<AOS>& u, std::vector<AOS>& dudt, std::vector<double>& u_mask, int orderstep, double dt);
     
 };
 
