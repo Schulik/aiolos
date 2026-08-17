@@ -188,6 +188,8 @@ void c_Sim::execute(int restartnumber, double restarttime_cmdline) {
         }
         
         if (do_hydrodynamics == 1) {
+            if(treat_as_plasma && (e_idx>-1))
+                enforce_electron_neutrality();
         
                 //March 19th 2024: Added get_cfl_timestep2() to sit here, to obtain the updated timestep based on the extrapolated left and right values - they can produce inconsistent fluxes with the cell-centered values, which the call of dt = get_cfl_timestep(); at the beginning of the timestep is based on;
                 //
@@ -258,6 +260,9 @@ void c_Sim::execute(int restartnumber, double restarttime_cmdline) {
                 update_mass_and_pot();
 
             if (do_hydrodynamics == 1) {
+
+                if(treat_as_plasma && (e_idx>-1))
+                    enforce_electron_neutrality();
 
                 if (use_drag_predictor_step) {
                     for(int s = 0; s < num_species; s++) {
@@ -889,18 +894,13 @@ void c_Species::execute(std::vector<AOS>& u_in, std::vector<AOS>& dudt, std::vec
             this->source_efield[j]  = AOS(0,0,0);
             if (base->treat_as_plasma && this->mass_amu > 0.5)
                 //this->source_efield[j] = ( source_electric_flux(j) * base->surf[j] + source_electric_flux(j-1) * base->surf[j-1] ) * prim[j].number_density / base->vol[j];
-                this->source_efield[j] = ( source_electric_flux(j) + source_electric_flux(j-1) ) * 0.5 * prim[j].number_density / base->vol[j];;
+                this->source_efield[j] = ( source_electric_flux(j) + source_electric_flux(j-1)  * (+1) ) * 1.0 * prim[j].number_density / base->vol[j];
         }
         
         //
         // Step 2a: Compute separate internal energy conserving fluxes for the kinetic energy dominated regime
         //
-        //for(int j=base->num_ghosts; j<=num_cells; j++) {
-        //     u[j].u4 = prim[j].internal_energy;
-        //}
-        for(int j=base->num_ghosts; j<=num_cells; j++) {
-            compute_e_fluxes(j); //This computes e>0 and if in the kinetic regime, and E-0.5rhou^2 < 0 then it sets new_e = e and updates E, i.e. u[j].u3
-        }
+        
         //
         // Step 3: Add it all up to update the conserved variables
         //
@@ -910,11 +910,19 @@ void c_Species::execute(std::vector<AOS>& u_in, std::vector<AOS>& dudt, std::vec
             
             if(this_species_index==base->e_idx && base->treat_as_plasma) {
                 if(dt/base->dt < 0.9) {
+                //if(true) {
                     //AOS newterm = (flux[j-1] * base->surf[j-1] - flux[j] * base->surf[j]) / base->vol[j] + (source_pressure[j]);
                     //AOS newterm = (roe_flux(u[j-1],u[j]) * base->surf[j-1] - roe_flux(u[j],u[j+1]) * base->surf[j]) / base->vol[j] + (source_pressure[j]);
                     
                     //dQ_hydro(j)   -= ( hydro_flux(j-1) * base->surf[j-1] - hydro_flux(j) * base->surf[j] ) / base->vol[j];
-                    dQ_hydro(j)   -=  1.*( hydro_flux(j-1) - hydro_flux(j)  )/base->vol[j];
+                    //double term   =  ( hydro_flux(j-1) * base->surf[j-1] - hydro_flux(j) * base->surf[j]  )/base->vol[j] + source[j].u3 + source_pressure[j].u3 ;
+                    
+                    //This was working, but wrong adiabatic cooling slope
+                    //double term = ( flux[j-1].u3 * base->surf[j-1] - flux[j].u3 * base->surf[j]  )/base->vol[j] + source[j].u3 + source_pressure[j].u3 ;
+                    //dQ_hydro(j)   +=  term /(gamma_adiabat-1) * dt/base->dt; //Weigh according to first/second order step
+
+                    double term   =  ( hydro_flux(j-1)- hydro_flux(j)) +  source[j].u3 + source_pressure[j].u3 ;
+                    dQ_hydro(j)   +=  term  * dt/base->dt; //Weigh according to first/second order step
 
                     if( ((j==75) || (j==76) || (j==77)) && (base->steps%100000==0))
                         cout<<"j = "<<j<<" e cooling in electrons : "<<dG(j)<<endl;
@@ -924,7 +932,7 @@ void c_Species::execute(std::vector<AOS>& u_in, std::vector<AOS>& dudt, std::vec
             }
             
             if(this_species_index!=base->e_idx && base->treat_as_plasma) {
-                base->species[base->e_idx].dG(j) += std::fabs(source_efield[j].u3)*0.0; //Cooling is a striclty positive number
+                base->species[base->e_idx].dG(j) += std::fabs(source_efield[j].u3); //Cooling is a striclty positive number
 
                 if( (this_species_index == base->num_species-1) && (j==75) && (base->steps%100000==0))
                     cout<<" e cooling in last species : "<<base->species[base->e_idx].dG(j)<<endl;
@@ -1445,28 +1453,46 @@ AOS c_Species::exact_flux(const AOS &u)
  */
 double c_Species::hydro_flux(int j) 
 {
-    double vm1 = prim[j].speed;
-    double v   = prim[j+1].speed;
-    double pm1   = prim[j].pres;
-    double p   = prim[j+1].pres;
-    double r  = base->x_i[j];
-    double r2 = r*r;
-    double dr = (base->x_iVC[j+1] - base->x_iVC[j]);
-    double rup2  = base->x_iVC[j+1]*base->x_iVC[j+1];
-    double rdown2 = base->x_iVC[j]*base->x_iVC[j];
-
-    double result1 = 0.5* (vm1 + v) * (p - pm1) / dr;                                       //(vec u \cdot vec nabla) P
-    double result2 = gamma_adiabat * 0.5 * (p + pm1) * 1/r2 * (rup2 * v - rdown2 * vm1)/dr; //gamma_ad * P * (div u)
-    
-    //return (result1 + result2)/(gamma_adiabat-1);
-
-    //Alternative function
     double pl =  prim_r[j].pres;
     double pr =  prim_l[j+1].pres;
     double vl =  base->species[0].prim_r[j].speed;
     double vr =  base->species[0].prim_l[j+1].speed;
 
+    double vm1 = prim[j].speed;
+    double v   = prim[j+1].speed;
+    double pm1   = prim[j].pres;
+    double p   = prim[j+1].pres;
+    double rhomean   = 0.5*(prim_l[j+1].density+prim_r[j].density);
+    double dT        = (prim[j+1].temperature - prim[j].temperature);
+    double Tmean     = (prim_l[j+1].temperature + prim_r[j].temperature);
+    double r  = base->x_i[j];
+    double r2 = r*r;
+    double dr = (base->x_iVC[j+1] - base->x_iVC[j]);
+    double rup  = base->x_iVC[j+1];
+    double rdown = base->x_iVC[j];
+    double localvol = 1./3.*(rup*rup*rup - rdown*rdown*rdown);
+
+                                       //(vec u \cdot vec nabla) P
+    double result1 =  0.5* (vl + vr) * dT / dr;                                       // rho cv (vec u \cdot vec nabla) T
+    //double result2 = gamma_adiabat/(gamma_adiabat-1) * 0.5 * (p + pm1) * 1/r2 * (rup2 * v - rdown2 * vm1)/dr; //gamma_ad * P * (div u)
+    double result2 = (gamma_adiabat-1) *  Tmean * (rup*rup * v - rdown*rdown * vm1)/localvol; //gamma_ad * P * (div u)
+    
+    return - this->cv * rhomean * (result1 + result2);
+
+    //Alternative function
+    
+    double vmean    = 0.5*(vl+vr);
+    double pmean    = 0.5*(pl+pr);
+    double vpmean   = 0.5*(vl*pl+vr*pl);
+    double ekinmean = 0.25*(prim_r[j].density * vl*vl + prim_l[j+1].density * vr*vr);
+    double ekinmean2 = 0.25*(prim_r[j].density + prim_l[j+1].density)*vmean*vmean;
+
+    double E_l = vm1*(0.5*prim[j].density * vm1*vm1 + pm1);
+    double E_r = v*(0.5*prim[j+1].density * v*v + p);
+
     return base->surf[j]*0.5*(vl+vr)*0.5*(pl+pr)/(gamma_adiabat-1);
+    //return                 (vmean*pmean+ vmean*ekinmean)/(gamma_adiabat-1) ;
+    //return (E_l > E_r) ? E_l/(gamma_adiabat-1) : E_r/(gamma_adiabat-1);
 }
 
 Vector3d c_Species::exact_flux_difference(const AOS &uleft, const AOS &uright) 
@@ -1707,11 +1733,6 @@ void c_Sim::apply_inflow_damping() {
 
     }
 
-
-}
-
-//Compute explicit fluxes for small e, to hopefully preserve positivity
-void c_Species::compute_e_fluxes(int j) { 
 
 }
 

@@ -906,6 +906,7 @@ public:
     void write_into_execution_log(string dir, string par, string spcfile);
     
     void compute_total_pressure();
+    void enforce_electron_neutrality();
     int get_species_index(const string name, const int verbose);
     int find_closest_band(double energy_threshold);
     int find_closest_band2(double energy_threshold);

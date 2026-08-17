@@ -982,3 +982,37 @@ double c_Sim::return_total_e(int j) {
 }
 
 
+//
+// Sets electrons to be charge neutral, their velocity to be the average charged momentum and updates momentum, energy etc.
+// Assumes that electron index exists, i.e. e_idx > -1, otherwise causes segfault
+//
+void c_Sim::enforce_electron_neutrality() {
+
+    for(int j=0; j<num_cells-1; j++) {
+
+        double charge_momentum = 0;
+        double charge_sum = 0;
+        double charge_dens_sum = 0;
+
+        for(int s=0;s<num_species; s++) {
+
+                if( (species[s].static_charge != 0) && (species[s].this_species_index != e_idx)) {
+                    charge_sum       += ((double)species[s].static_charge) * species[s].prim[j].number_density;
+                    charge_momentum  += ((double)species[s].static_charge) * species[s].prim[j].number_density * species[s].prim[j].speed;
+                }
+        }
+
+        species[e_idx].prim[j].number_density   = std::fabs(charge_sum);
+        species[e_idx].prim[j].density          = std::fabs(charge_sum) * species[e_idx].mass_amu * amu;
+        species[e_idx].prim[j].speed            = charge_momentum /  charge_sum;
+       
+    }
+
+    species[e_idx].eos->update_eint_from_T(&species[e_idx].prim[0], num_cells);
+    species[e_idx].eos->update_p_from_eint(&species[e_idx].prim[0], num_cells);
+    
+    species[e_idx].eos->compute_conserved(&species[e_idx].prim[0], &species[e_idx].u[0], num_cells);
+    species[e_idx].eos->compute_auxillary(&species[e_idx].prim[0], num_cells);
+        
+
+}

@@ -1060,8 +1060,15 @@ void c_Sim::execute_separate_diffusion_step() {
         for(int j=num_ghosts; j < num_cells; j++) {
             AOS source_diffusion = AOS(0,0,0);
                 
-            if (species[s].mass_amu > 0.5)
-                source_diffusion = ( species[s].source_diffusion_flux2(j) * surf[j] * (-1.) + species[s].source_diffusion_flux2(j-1) * surf[j-1] ) / vol[j];
+            if (species[s].mass_amu > 0.5) {
+                if(this->diffusivity_style == 3)
+                    source_diffusion = ( species[s].source_diffusion_flux2(j) * (-1.) + species[s].source_diffusion_flux2(j-1)) / (x_i[j]-x_i[j-1]); //Photochem/VULCAN like discretization in z
+                else
+                    source_diffusion = ( species[s].source_diffusion_flux2(j) * surf[j] * (-1.) + species[s].source_diffusion_flux2(j-1) * surf[j-1] ) / vol[j];
+            }
+                
+
+                
 
             species[s].u_diff[j] += source_diffusion * dt;
         }
@@ -1143,16 +1150,17 @@ AOS c_Species::source_electric_flux(int j) {
     //double nmean   = logmean( prim[j].number_density,  prim[j+1].number_density);
     double nmean   = 0.5 * ( prim[j].number_density + prim[j+1].number_density);
     nmean          = (fj-fjm1) < 0? prim[j+1].number_density : prim[j].number_density;
-    double udonor = (fj-fjm1) > 0? prim[j+1].speed : prim[j].speed;
-    double rhomean = logmean( u[j].u1,  u[j+1].u1);
-    double mommean =    0.5*( u[j].u2,  u[j+1].u2);
-    double umean   = mommean / rhomean;
+    //double udonor  = (fj-fjm1) > 0? prim[j+1].speed : prim[j].speed;
+    double udonor  = (u[j+1].u3+fj) > (u[j].u3+fjm1)? prim[j+1].speed : prim[j].speed;
+    double rhomean = 0.5 * ( u[j].u1 + u[j+1].u1);
+    double mommean = 0.5 * ( u[j].u2 + u[j+1].u2);
+    double umean   = 0.5 * (prim_r[j].speed + prim_l[j+1].speed);
     double emean   = logmean( u[j].u3,  u[j+1].u3);
     double dpdr    =  -( fj - fjm1) * base->surf[j] ;
     //double dpdr    = ( fj - fjm1) / (base->x_i12[j+1] - base->x_i12[j]);
 
     double q_s = (double)this->static_charge;
-    double dfdr = base->use_efield * 2. * q_s /  n_e * dpdr ;
+    double dfdr = base->use_efield * 1.0 * q_s /  n_e * dpdr ;
 
     //if(dfdr > 0)
     if(j > num_cells-10)
