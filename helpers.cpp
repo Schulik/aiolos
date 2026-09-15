@@ -1016,3 +1016,19 @@ void c_Sim::enforce_electron_neutrality() {
         
 
 }
+
+//
+// Solves the transcendental equation for the mean anomaly and returns distance
+//
+double c_Sim::get_planet_distance_au(double time) {
+    double p = this->planet_period;
+    double e = this->planet_eccentricity;
+    double a = this->planet_semimajor;
+
+    double M = 2.*3.141592*(time/(p));
+    double E = M;
+    for(int i = 0; i< 10; i++) { //Converges usually fast (wikipedia says 4-5 iterations), 10 should always be enough
+        E = E - (E - e * std::sin(E) - M)/(1. - e*std::cos(E));
+    }
+    return a * (1-e * std::cos(E));
+}

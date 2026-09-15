@@ -64,7 +64,8 @@ const double km       = 1e5; //kilometers in cm
 const double mearth   = 5.98e27;  //g
 const double msolar   = 2.0e33;   //g
 const double au       = 1.495978707e13;  //cm
-const double year     = 365*24*3600;
+const double day      = 24*3600;
+const double year     = 365.25*day;
 const double myear    = 1e6*year;
 const double gyear    = 1e9*year;
 const double rearth   = 6370e5;
@@ -591,6 +592,8 @@ public:
     double planet_mass;     //in Earth masses
     double planet_position; //inside the simulation domain
     double planet_semimajor;
+    double planet_period;
+    double planet_eccentricity;
     double rs;
     double rs_at_moment = 0 ;
     double rs_time;
@@ -911,6 +914,8 @@ public:
     int find_closest_band(double energy_threshold);
     int find_closest_band2(double energy_threshold);
     Eigen::VectorXd read_and_bin_opacityfile(string filename, int col=1);
+
+    double get_planet_distance_au(double time); //Solves the transcendental equation for the mean anomaly and returns distance #
     //
     // Friction
     //

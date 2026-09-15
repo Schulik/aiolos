@@ -22,7 +22,7 @@ tests
 tmp*
 *.wav
 *.py
-execution_log.txt
+./execution_log.txt
 *.ipynb
 *.svg
 *.jpg

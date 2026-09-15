@@ -892,9 +892,11 @@ void c_Species::execute(std::vector<AOS>& u_in, std::vector<AOS>& dudt, std::vec
                 source_diffusion[j] = ( source_diffusion_flux(j) * base->surf[j] * (-1.) + source_diffusion_flux(j-1) * base->surf[j-1] ) / base->vol[j];
 
             this->source_efield[j]  = AOS(0,0,0);
-            if (base->treat_as_plasma && this->mass_amu > 0.5)
+            if (base->treat_as_plasma && this->mass_amu > 0.5 && base->steps>10){
                 //this->source_efield[j] = ( source_electric_flux(j) * base->surf[j] + source_electric_flux(j-1) * base->surf[j-1] ) * prim[j].number_density / base->vol[j];
-                this->source_efield[j] = ( source_electric_flux(j) + source_electric_flux(j-1)  * (+1) ) * 1.0 * prim[j].number_density / base->vol[j];
+
+                this->source_efield[j] = ( source_electric_flux(j) + source_electric_flux(j-1)  * (-1) )  / base->vol[j]; //This is now correct dont touch
+            }
         }
         
         //
@@ -904,44 +906,44 @@ void c_Species::execute(std::vector<AOS>& u_in, std::vector<AOS>& dudt, std::vec
         //
         // Step 3: Add it all up to update the conserved variables
         //
+
+        int dQindex = 0;
+        if(dt/base->dt < 0.9) {
+            dQindex = 1;
+        }
+
         for(int j=base->num_ghosts; j<=num_cells; j++) {
             
             dudt[j] = (flux[j-1] * base->surf[j-1] - flux[j] * base->surf[j]) / base->vol[j] + (source[j] + source_pressure[j] + source_diffusion[j] + source_efield[j] ) ;
             
             if(this_species_index==base->e_idx && base->treat_as_plasma) {
-                if(dt/base->dt < 0.9) {
-                //if(true) {
-                    //AOS newterm = (flux[j-1] * base->surf[j-1] - flux[j] * base->surf[j]) / base->vol[j] + (source_pressure[j]);
-                    //AOS newterm = (roe_flux(u[j-1],u[j]) * base->surf[j-1] - roe_flux(u[j],u[j+1]) * base->surf[j]) / base->vol[j] + (source_pressure[j]);
-                    
-                    //dQ_hydro(j)   -= ( hydro_flux(j-1) * base->surf[j-1] - hydro_flux(j) * base->surf[j] ) / base->vol[j];
-                    //double term   =  ( hydro_flux(j-1) * base->surf[j-1] - hydro_flux(j) * base->surf[j]  )/base->vol[j] + source[j].u3 + source_pressure[j].u3 ;
-                    
-                    //This was working, but wrong adiabatic cooling slope
-                    //double term = ( flux[j-1].u3 * base->surf[j-1] - flux[j].u3 * base->surf[j]  )/base->vol[j] + source[j].u3 + source_pressure[j].u3 ;
-                    //dQ_hydro(j)   +=  term /(gamma_adiabat-1) * dt/base->dt; //Weigh according to first/second order step
+                
+                if(dQindex==0) {
+                    dQ_hydro(j,0) = 0.;
+                } else {
 
-                    double term   =  ( hydro_flux(j-1)- hydro_flux(j)) +  source[j].u3 + source_pressure[j].u3 ;
-                    dQ_hydro(j)   +=  term  * dt/base->dt; //Weigh according to first/second order step
+                
+                    double term   =  ( hydro_flux(j-1)- hydro_flux(j)) +  source[j].u3 ;
+                    dQ_hydro(j,dQindex)   =  term;
 
                     if( ((j==75) || (j==76) || (j==77)) && (base->steps%100000==0))
                         cout<<"j = "<<j<<" e cooling in electrons : "<<dG(j)<<endl;
+                
                 }
-                    
                 dudt[j] = AOS(0, 0, 0);
             }
             
-            if(this_species_index!=base->e_idx && base->treat_as_plasma) {
-                base->species[base->e_idx].dG(j) += std::fabs(source_efield[j].u3); //Cooling is a striclty positive number
+            if(this_species_index!=base->e_idx && base->treat_as_plasma && dQindex==1) {
+                base->species[base->e_idx].dG(j) -= source_efield[j].u3; //Cooling is a striclty positive number
 
-                if( (this_species_index == base->num_species-1) && (j==75) && (base->steps%100000==0))
+                if( (this_species_index == base->num_species-1) && (j==75) && (base->steps%100000==0)) {
+                    cout<<"s = "<<speciesname<<" Adding to electron cooling "<<source_efield[j].u3<<endl;
                     cout<<" e cooling in last species : "<<base->species[base->e_idx].dG(j)<<endl;
+                }
+                    
             }
             
-            
-            
-            
-            if( (base->steps >= 0) && (j==-100) && (this_species_index==18)) { //Or put in your own conditions    
+            if( (base->steps == 160) && (j==100) && (this_species_index>=0)) { //Or put in your own conditions    
                 char alpha;
                 cout<<"Debuggin fluxes in cell i= "<<j<<" for species "<<speciesname<<" at time "<<base->steps<<endl; 
                 cout<<"     fl.u1 = "<<flux[j-1].u1<<": fr.u1 = "<<flux[j].u1<<endl;
@@ -956,8 +958,9 @@ void c_Species::execute(std::vector<AOS>& u_in, std::vector<AOS>& dudt, std::vec
                 cout<<"     dP/dr = "<<((prim_l[j].pres - prim_r[j].pres)/base->dx[j])<<endl;
                 cout<<" "<<endl;
                 cout<<"     sP = "<<"/"<<source_pressure[j].u1<<"/"<<source_pressure[j].u2<<"/"<<source_pressure[j].u3<<endl;
-                cout<<"     Al*Fl - Ar*Fr = "<<((flux[j-1].u2 * base->surf[j-1] - flux[j].u2 * base->surf[j]) /base->vol[j])<<endl;
+                cout<<"     (Al*Fl - Ar*Fr)/V = "<<((flux[j-1].u2 * base->surf[j-1] - flux[j].u2 * base->surf[j]) /base->vol[j])<<endl;
                 cout<<"     dP/dr + S = "<<((prim_l[j].pres - prim_r[j].pres)/base->dx[j] + source[j].u2)<<endl;
+                cout<<"     source E= "<<source_efield[j].u1<<"/"<<source_efield[j].u2<<"/"<<source_efield[j].u3<<" boundary field = "<<source_electric_flux(j).u2<<" dQindex "<<dQindex<<" dQ_hydro(j,dQindex) = "<<dQ_hydro(j,0)<<"/"<<dQ_hydro(j,1)<<endl;
                 cout<<endl;
                 cout<<"     Al*Fl - Ar*Fr + s = "<<((flux[j-1].u2 * base->surf[j-1] - flux[j].u2 * base->surf[j]) / base->vol[j] + (source[j].u2))<<endl;
                 cout<<"     u1 : Al*Fl - Ar*Fr + s + sP = "<<((flux[j-1].u1 * base->surf[j-1] - flux[j].u1 * base->surf[j]) / base->vol[j] + (source[j].u1 +source_pressure[j].u1))<<endl;

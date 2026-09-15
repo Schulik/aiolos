@@ -21,7 +21,7 @@ void c_Sim::reset_dS() {
             species[s].dGdT(j)  = 0.;
         }
     }
-        
+
     if(globalTime < radiation_rampup_time) {
         for(int b=0; b<num_bands_in; b++) {
         
@@ -32,7 +32,15 @@ void c_Sim::reset_dS() {
             solar_heating(b) = solar_heating_final(b);
         }        
     }
-                
+
+    double dist_adjust = get_planet_distance_au(globalTime + 0.5 * planet_period)/planet_semimajor ; //Adjust Top-of-atmospehre flux for planetary distance, also ensuring compatibility with old versions
+    
+    for(int b=0; b<num_bands_in; b++) {
+        solar_heating(b) *= 1./(dist_adjust*dist_adjust);
+    }
+
+    if(steps%1000==0)
+        cout<<" radiation adjustment due to distance = "<<dist_adjust<<endl;
 }
 
 

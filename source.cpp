@@ -1129,16 +1129,26 @@ double c_Sim::get_kzz(double pressure_in_bar) {
 AOS c_Species::source_electric_flux(int j) {
 
     assert(j > 0 && j <= num_cells) ;
+    double q_s = (double)this->static_charge;
 
     int e_idx = base->e_idx;
     if(e_idx < 0 || this_species_index==e_idx)
         return AOS( 0, 0, 0);
     if(static_charge==0)
         return AOS( 0, 0, 0);
+    if(base->steps < 10)
+        return AOS( 0, 0, 0);
 
     //double n_e = logmean( base->species[e_idx].prim[j].number_density,  base->species[e_idx].prim[j+1].number_density);
-    double n_e    = 0.5 * ( base->species[e_idx].prim[j].number_density + base->species[e_idx].prim[j+1].number_density);
-    
+    double n_e     = 0.5 * ( base->species[e_idx].prim_r[j].number_density + base->species[e_idx].prim_l[j+1].number_density);
+    double n_s     = 0.5 * ( prim_r[j].number_density + prim_l[j+1].number_density);
+    double p_e     = 0.5 * ( base->species[e_idx].prim_r[j].pres + base->species[e_idx].prim_l[j+1].pres);
+    double dp      =  ( base->species[e_idx].prim_l[j+1].pres - base->species[e_idx].prim_r[j].pres );
+    double umean   = 0.5 * (prim_r[j].speed + prim_l[j+1].speed);
+
+    double force = - base->use_efield * q_s * n_s / n_e * p_e * base->surf[j];
+    return AOS( 0., force, umean * force); //  //This seems now correct, dont touch
+
     double fjm1   = base->species[e_idx].prim_r[j].pres;  
     double fj     = base->species[e_idx].prim_l[j+1].pres;
 
@@ -1154,12 +1164,12 @@ AOS c_Species::source_electric_flux(int j) {
     double udonor  = (u[j+1].u3+fj) > (u[j].u3+fjm1)? prim[j+1].speed : prim[j].speed;
     double rhomean = 0.5 * ( u[j].u1 + u[j+1].u1);
     double mommean = 0.5 * ( u[j].u2 + u[j+1].u2);
-    double umean   = 0.5 * (prim_r[j].speed + prim_l[j+1].speed);
+    
     double emean   = logmean( u[j].u3,  u[j+1].u3);
     double dpdr    =  -( fj - fjm1) * base->surf[j] ;
     //double dpdr    = ( fj - fjm1) / (base->x_i12[j+1] - base->x_i12[j]);
 
-    double q_s = (double)this->static_charge;
+    
     double dfdr = base->use_efield * 1.0 * q_s /  n_e * dpdr ;
 
     //if(dfdr > 0)

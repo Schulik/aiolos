@@ -97,7 +97,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, s
         star_mass        =  read_parameter_from_file<double>(filename,"PARI_MSTAR", debug, 1.).value; //Mass of the star in solar masses
         //star_mass        *= msolar;
         init_star_mass   = msolar * read_parameter_from_file<double>(filename,"INIT_MSTAR", debug, star_mass).value;
-	star_mass        *= msolar;
+	    star_mass        *= msolar;
         ramp_star_mass_t0 = read_parameter_from_file<double>(filename,"RAMP_MSTAR_T0", debug, 0.).value;
         ramp_star_mass_t1 = read_parameter_from_file<double>(filename,"RAMP_MSTAR_T1", debug, 1.).value;
 
@@ -107,7 +107,12 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, s
         X_star           = read_parameter_from_file<double>(filename,"PARI_XSTAR", debug, 0.).value;    //X-ray luminosity of the star, not used currently
         Lyalpha_star     = read_parameter_from_file<double>(filename,"PARI_LYASTAR", debug, 0.).value;  // Not used currently
         planet_semimajor= read_parameter_from_file<double>(filename,"PARI_PLANET_DIST", debug, 1.).value; //Distance to primary black-body in AU
-        
+        planet_semimajor= read_parameter_from_file<double>(filename,"ORBIT_SEMIMAJOR", debug, planet_semimajor).value; //Distance to primary black-body in AU
+        planet_period               = read_parameter_from_file<double>(filename,"ORBIT_PERIOD", debug, 10.).value; //Ramp up the irradiation in all bands smoothly over xxx seconds.
+        planet_period *= day;
+        planet_eccentricity         = read_parameter_from_file<double>(filename,"ORBIT_ECC", debug, 0.).value; //Ramp up the irradiation in all bands smoothly over xxx seconds.
+
+
         R_other          = read_parameter_from_file<double>(filename,"R_OTHER", debug, 0.).value;  //Second bolometric black-body source (i.e. second star or giant planet host) in stellar radii
         T_other          = read_parameter_from_file<double>(filename,"T_OTHER", debug, 0.).value;  //Temperature of other black-body in K
         d_other          = read_parameter_from_file<double>(filename,"D_OTHER", debug, 1.).value;  // Distance to other black-body in AU
@@ -282,6 +287,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, s
         radiation_rampup_time      = read_parameter_from_file<double>(filename,"RAD_RAMPUP_TIME", debug, 0.).value; //Ramp up the irradiation in all bands smoothly over xxx seconds.
         eband_fraction      = read_parameter_from_file<double>(filename,"EBAND_FRACTION", debug, 0.9).value; //Averaging factor for the band energy between E_upper and E_lower
         init_radiation_factor      = read_parameter_from_file<double>(filename,"INIT_RAD_FACTOR", debug, 0.).value; //Unused
+        
         //radiation_solver           = read_parameter_from_file<int>(filename,"RADIATION_SOLVER", debug, 0).value; //replaced by use_rad_fluxes
         closed_radiative_boundaries = read_parameter_from_file<int>(filename,"PARI_CLOSED_RADIATIVE_BOUND", debug, 0).value; //Reflect thermal radiation at outer boundaries?
         minimum_opacity             = read_parameter_from_file<double>(filename,"MINIMUM_OPACITY", debug, 1e-10).value;    //Minimum opacity for read-in opacities
@@ -1001,7 +1007,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, s
     for(int s=0; s<num_species; s++) {
         species[s].dS = Eigen::VectorXd::Zero(num_cells+2,  1);
         species[s].dG = Eigen::VectorXd::Zero(num_cells+2,  1);
-        species[s].dQ_hydro = Eigen::VectorXd::Zero(num_cells+2,  1);
+        species[s].dQ_hydro = Eigen::MatrixXd::Zero(num_cells+2,  2);
         species[s].dGdT = Eigen::VectorXd::Zero(num_cells+2,  1);
     }
     

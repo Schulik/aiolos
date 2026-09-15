@@ -319,7 +319,7 @@ void c_Sim::do_chemistry(double dt_chem) {
     Vector_t n_tmp2  = Vector_t::Zero(num_species);
     Vector_t n_tmp3  = Vector_t::Zero(num_species);
 
-    for (int j = imaxchem-1; j >= iminchem; j--) {  //imaxchem is num_cells+1 by default; iminchem is 2 
+    for (int j = imaxchem; j >= iminchem; j--) {  //imaxchem is num_cells+1 by default; iminchem is 2 
         
         //std::vector<double> n_init = np_zeros(num_species);
         //std::vector<double> n_tmp  = np_zeros(num_species);
@@ -712,7 +712,8 @@ Vector_t c_Sim::solver_cchem_implicit_general(double dtt, int cell, int cdebug, 
                 double dndt_local = 0. ;
 
                 double x_secondary  = 1.; //Ionization factor for X-rays
-                if(l_i_in[b+1] < 0.030)
+                //if(l_i_in[b+1] < 0.030)
+                if(photon_midp_energies_eV[b] > 2. * photoreactions[pr].threshold_energy_eV)
                     x_secondary = 1./secondary_ion_heating;
 
                 //
