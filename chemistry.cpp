@@ -186,7 +186,7 @@ void c_Sim::init_reactions(int cdebug) {
     }
     cout<<endl;
         
-    cout<<" Photoreaction opacities table "<<endl;
+    cout<<" Photoreaction opacities table: "<<endl;
     //////Print opacity table for photoreactions to check whether the opacities have been assigned correctly
     std::vector<double> thin_photorates_m = np_zeros(photoreactions.size());  //Compute the optically thin photorates as rough guiding numbers
     std::vector<double> thin_photorates_n = np_zeros(photoreactions.size());  //Compute the optically thin photorates as rough guiding numbers
@@ -1404,8 +1404,8 @@ void  c_Sim::do_highenergy_cooling(int cell, double Te) {
             
             //Simple approximation for thermal Ly-alpha excitation by neutral collisions
             double term = n_neutrals * nX[0] * 7.3e-19 * 1.5e-4 * std::exp(-118400./Tn);
-	        species[hnull_idx].dG(cell)   += term; 
-            species[hnull_idx].dGdT(cell) += (n_neutrals * nX[0] * 7.3e-19 * 1.5e-4 * std::exp(-118400./(Tn+dT)) - term )/dT;
+	        species[hnull_idx].dG(cell)   += red * term; 
+            species[hnull_idx].dGdT(cell) += red * (n_neutrals * nX[0] * 7.3e-19 * 1.5e-4 * std::exp(-118400./(Tn+dT)) - term )/dT;
         }
         
         if( C_idx!=-1 && e_idx!=-1 ) { 

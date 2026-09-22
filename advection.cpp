@@ -943,7 +943,7 @@ void c_Species::execute(std::vector<AOS>& u_in, std::vector<AOS>& dudt, std::vec
                     
             }
             
-            if( (base->steps == 160) && (j==100) && (this_species_index>=0)) { //Or put in your own conditions    
+            if( (base->steps == 160) && (j==-100) && (this_species_index>=0)) { //Or put in your own conditions    
                 char alpha;
                 cout<<"Debuggin fluxes in cell i= "<<j<<" for species "<<speciesname<<" at time "<<base->steps<<endl; 
                 cout<<"     fl.u1 = "<<flux[j-1].u1<<": fr.u1 = "<<flux[j].u1<<endl;

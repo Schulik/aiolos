@@ -558,9 +558,6 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, s
                 
             //photon_energies[b]  = std::pow(10, 0.25*std::log10(elow) + 0.75*std::log10(ehigh)  );              
         }
-        for(int b=0; b<num_bands_in+1; b++) {
-            cout<<"Assigned to energy lim = "<<b<<" a photon energy of "<<photon_energies_eV[b]<<" eV for wavelength ="<<l_i_in[b]<<endl;
-        }
 
         photon_midp_energies[0]     = photon_energies[1];
         photon_midp_energies_eV[0]  = photon_energies[1]/(ev_to_K*kb);
@@ -574,7 +571,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, s
                 photon_midp_energies_eV[b]  = photon_midp_energies[b]/(ev_to_K*kb);
             }
             
-            cout<<"Assigned to energy band b = "<<b<<" a photon energy of "<<photon_midp_energies_eV[b]<<" eV; elow / ehigh = "<<photon_energies_eV[b+1]<<" / "<<photon_energies_eV[b]<<endl;
+            //cout<<"Assigned to energy band b = "<<b<<" a photon energy of "<<photon_midp_energies_eV[b]<<" eV; elow / ehigh = "<<photon_energies_eV[b+1]<<" / "<<photon_energies_eV[b]<<endl;
         }
         cout<<" WAVELENGTH GRID FINISHED. num_bands_in / num_he_bands / num_bands_out = "<<num_bands_in<<" / "<<num_he_bands<<" / "<<num_bands_out<<endl;
 
@@ -805,7 +802,7 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, s
         }
 
         init_T_temp   = read_parameter_from_file<double>(filename,"INIT_T_TEMP", debug, 1.).value; //Overwrite initial temperature with this value. Use discouraged. 
-        if(debug > 0) cout<<"Init: About to setup species with num_species = "<<num_species<<endl; 
+        cout<<"Initializing species with num_species = "<<num_species<<" and speciesfile = "<<speciesfile<<endl; 
         
         species.reserve(num_species);
         
@@ -813,6 +810,20 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, s
             species.push_back(c_Species(this, filename, speciesfile, s, debug)); // Here we call the c_Species constructor
         }
         cout<<endl;
+
+        //
+        // Check that all species have been found
+        //
+        int scnt = 0;
+        for(int s = 0; s < num_species; s++) { scnt += species[s].initialized; }
+        if(scnt == num_species)
+            cout<<"Succesfully initialized "<<num_species<<" species."<<endl;
+        else {
+            cout<<"ERROR: Found only "<<scnt<<" out of "<<num_species<<" species in *spc file! Press a key to terminate simulation."<<endl;
+            char a;
+            cin>>a;
+            exit(0);
+        }
         
         //
         // RESTART FUNCTIONALITY
@@ -1088,6 +1099,9 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, s
             }
             
             while(std::getline( file, line )) {
+
+                if(line[0] == '#')
+                    continue;
     
                 std::vector<string> stringlist = stringsplit(line," ");
                 
@@ -1119,9 +1133,11 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, s
             //	solar_heating_final(b) = 0.;
             //  }
 
-            cout<<"SOLAR HEATING read from file in bin "<<b;
-            cout<<" from/to lmin/lmax"<<l_i_in[b]<<"/"<<l_i_in[b+1];
-            cout<<" is F = "<<solar_heating(b)<<" w/ datapoints = "<<cnt<<endl;
+            cout<<"     in bin "<<b;
+            cout<<" photon energy "<<photon_midp_energies_eV[b]<<" eV; elow / ehigh = "<<photon_energies_eV[b+1]<<" / "<<photon_energies_eV[b]<<" eV;";
+            cout<<" i.e. lmin/lmax"<<l_i_in[b]<<"/"<<l_i_in[b+1];
+            cout<<" reads F = "<<solar_heating(b)<<" w/ datapoints = "<<cnt<<endl;
+
         }
         
     }
@@ -1327,7 +1343,8 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, s
  * @param[in] debug Debug level set either on command line or in param file.
  */
 c_Species::c_Species(c_Sim *base_simulation, string filename, string species_filename, int species_index, int debug) {
-    
+
+        this->initialized        = 0;
         base               = base_simulation;
         this_species_index = species_index;
         num_cells          = base->num_cells;
@@ -1336,7 +1353,7 @@ c_Species::c_Species(c_Sim *base_simulation, string filename, string species_fil
         this->workingdir   = base->workingdir;
         this->debug        = debug;
         
-        if(debug >= 0) cout<<" Species["<<species_index<<"], beginning init."<<endl;
+        if(debug >= 0) cout<<"   Species["<<species_index<<"], beginning init."<<endl;
         
         ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         //
@@ -1395,7 +1412,7 @@ c_Species::c_Species(c_Sim *base_simulation, string filename, string species_fil
         //
         ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         if(debug > 1) cout<<"        Species["<<species_index<<"] Init: Reading species data..."<<endl;
-        read_species_data(species_filename, species_index); 
+        int readresult = read_species_data(species_filename, species_index); 
         if(debug > 1) cout<<"        Species["<<species_index<<"] Init: Done reading species data."<<endl;
         if(debug > 1) cout<<"        AFTER READ DATA Species["<<speciesname<<"] mass = "<<mass_amu<<endl;
         
@@ -2307,7 +2324,8 @@ void c_photochem_reaction::set_base_pointer(c_Sim *base_simulation) {
 
     this->threshold_energy    = base->photon_energies[this->band+1];//1.24/( base->l_i_in[this->band] )  * ev_to_K * kb ;
     this->threshold_energy_eV = base->photon_energies_eV[this->band+1];
-    cout<<" threshold energy in eV = "<<threshold_energy_eV<<" reaction number "<<this->reaction_number<<endl;
+    if(base->debug>0)
+        cout<<" threshold energy in eV = "<<threshold_energy_eV<<" reaction number "<<this->reaction_number<<endl;
 }
 
 

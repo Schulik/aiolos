@@ -38,8 +38,8 @@ void c_Sim::reset_dS() {
     for(int b=0; b<num_bands_in; b++) {
         solar_heating(b) *= 1./(dist_adjust*dist_adjust);
     }
-
-    if(steps%1000==0)
+    
+    if(steps%1000==0 && planet_eccentricity > 0.05)
         cout<<" radiation adjustment due to distance = "<<dist_adjust<<endl;
 }
 

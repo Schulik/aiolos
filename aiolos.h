@@ -1025,7 +1025,7 @@ public:
     //  Numerical
     //
     ////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
+    int initialized;
     string speciesname;
     string workingdir;
     

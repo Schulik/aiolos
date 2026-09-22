@@ -1,3 +1,6 @@
+#Solar Flux predicition from Claire et al, 2012
+#Computed for 4.40000 Ga and 1.00000 AU
+#wavelength (A)   flux (erg/cm^2/s/A)
 5.00000000e-04   5.08883619e+03
 1.50000000e-03   3.39234993e+03
 2.50000000e-03   4.24588883e+03

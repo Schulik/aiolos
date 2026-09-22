@@ -49,18 +49,23 @@ int c_Species::read_species_data(string filename, int species_index) {
     }
     
     int found = 0;
+    int counter = 0; // Counts successfully found species, removes need to explicitely number species in speciesfile
     double temp_static_charge = 0.;
     this->num_opacity_datas = -1;
     
     if(debug > 0) cout<<"          In read species Pos1"<<endl;
     
     while(std::getline( file, line )) {
+
+        if(line[0]=='#')
+            continue;
     
         std::vector<string> stringlist = stringsplit(line," ");
 
         if(stringlist[0].find("@") != string::npos) {
             
-            if(std::stoi(stringlist[1]) == species_index) {
+            //if(std::stoi(stringlist[1]) == species_index) { //Found species
+            if(counter == species_index) { //Found species
                 
                 found = 1;
                 
@@ -79,27 +84,37 @@ int c_Species::read_species_data(string filename, int species_index) {
                 
                 this->inv_mass = 1./(mass_amu*amu);
                 
-		if(debug >= 1) {
-			cout<<" Found  = "<<stringlist[2]<<" opacity_data_string = "<<stringlist[9]<<endl;
-			cout<< " line = "<<line<<endl;
+                if(debug >= 1) {
+                    cout<<" Found  = "<<stringlist[2]<<" opacity_data_string = "<<stringlist[9]<<endl;
+                    cout<< " line = "<<line<<endl;
 
-			for(auto s: stringlist)
-				cout<<s<<endl;
-		}
-            if(debug >= 1) {
-                cout<<"Found species called "<<this->speciesname<<endl;
-                cout<<" with a mass of "<<endl;
-                cout<<this->mass_amu<<" dof "<<endl;
-                cout<<this->degrees_of_freedom<<endl;
-                //cout<<" gamma "<<gamma_adiabat<<endl;
-                cout<<" and initial_fraction = "<<this->initial_fraction<<endl; 
+                    for(auto s: stringlist)
+                        cout<<s<<endl;
+                }
+                if(debug >= 1) {
+                    cout<<"Found species called "<<this->speciesname<<endl;
+                    cout<<" with a mass of "<<endl;
+                    cout<<this->mass_amu<<" dof "<<endl;
+                    cout<<this->degrees_of_freedom<<endl;
+                    //cout<<" gamma "<<gamma_adiabat<<endl;
+                    cout<<" and initial_fraction = "<<this->initial_fraction<<endl; 
                 }
                 
+                
+                this->initialized = 1;
             }
 
+            counter++; //Raise counter only when any species is successfully found
         }
     
+        
+    }// End file reading
+
+    if(!initialized) {
+        cout<<" Failed to find species number == "<<species_index<<" in file "<<filename<<endl;
+        return 1;
     }
+        
     
     if(std::abs(temp_static_charge) < 0.1) {
         this->static_charge = 0;
@@ -152,7 +167,8 @@ int c_Species::read_species_data(string filename, int species_index) {
         if( base->opacity_model == 'K' ) //Run the routine with one argument further on in the species list 
             opacity_data_string = opacity_corrk_string;
         
-        cout<<"        P or M or C or K opacity chosen & enough data to read in files. Reading file = "<<"inputdata/"<<opacity_data_string<<endl;
+        if(debug > 0)
+            cout<<"        Initializing bolometric opacities from file = "<<"inputdata/"<<opacity_data_string<<endl;
         //
         // Start reading opacity data
         //
@@ -425,7 +441,7 @@ int c_Species::read_species_data(string filename, int species_index) {
         
     }
      else {
-         //No other opacity mode needed for now. Do nothing. Table reading mode has been moved to lines 120ff.
+         //No other opacity mode needed for now. Do nothing. Table reading mode has been moved to c_Species::read_opacity_table(string tablename) for *aiopa tables and earlier in line 120
     }
     
     return 0;
@@ -631,6 +647,9 @@ simulation_parameter<T> read_parameter_from_file(string filename, string variabl
     while(std::getline( file, line )) {
     
         //cout<<"    In read_parameter Pos1.5: "<<line<<endl;
+
+        if(line[0] == '#')
+            continue;
         
         if(line.find(variablename) != string::npos) {
             tmp_parameter.name = variablename;
@@ -1212,7 +1231,8 @@ void c_Sim::interpret_chem_reaction_list(string dir, string filename) {
             
             if(stringlist2[2].find("A") != string::npos) {
                 //cout<<" starting search for band numbers..."<<endl;
-                band_number = find_closest_band2(energy_threshold);
+                band_number = find_closest_band2(energy_threshold)-1;
+                band_number = std::max(band_number, 0);
                 if(debug >= 1)
 		            cout<<" automatically found band number "<<band_number<<" with algorithm, correpsonding energy "<<this->photon_energies_eV[band_number]<<"eV"<<endl;
             }
