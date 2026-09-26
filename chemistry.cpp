@@ -1438,7 +1438,7 @@ void  c_Sim::do_highenergy_cooling(int cell, double Te) {
             double nc4p = species[C4p_idx].prim[cell].number_density;
             species[e_idx].dG(cell) += nc4p * ne * red * C4p_cooling(Te, ne); 
         }
-        if( O_idx!=-1 && e_idx!=-1 ) { 
+        if( O_idx!=-1) { 
             if(steps == 311 && cell==-100) {
                 cout<<"species[O_idx].dG(cell) before assignment = "<<species[O_idx].dG(cell);
             }            
@@ -1446,11 +1446,14 @@ void  c_Sim::do_highenergy_cooling(int cell, double Te) {
             double no    = species[O_idx].prim[cell].number_density;
             double n_eff = n_neutrals * 1.5e-4;
             
-            species[O_idx].dG(cell)   +=  no * ne    * red * O_cooling(Te, ne + n_eff);
-            species[O_idx].dG(cell)   +=  no * n_eff * red * O_cooling(Te, ne + n_eff);  //Feb23rd 2025: Included simplistic neutral-excitation, see Line cooling notes and Tielens book. Cooling counted for O, as e might not exist here
-            species[O_idx].dGdT(cell) +=  no * ne    * red * dfdx2(O_cooling, Te, dT, ne + n_eff);
-            species[O_idx].dGdT(cell) +=  no * n_eff * red * dfdx2(O_cooling, Te, dT, ne + n_eff);
+            species[O_idx].dG(cell)   +=  no * n_eff * red * O_cooling(Te, n_eff);  //Feb23rd 2025: Included simplistic neutral-excitation, see Line cooling notes and Tielens book. Cooling counted for O, as e might not exist here
+            species[O_idx].dGdT(cell) +=  no * n_eff * red * dfdx2(O_cooling, Te, dT, n_eff);
             
+            if( e_idx != -1 ) {
+                species[O_idx].dG(cell)   +=  no * ne    * red * O_cooling(Te, ne);
+                species[O_idx].dGdT(cell) +=  no * ne    * red * dfdx2(O_cooling, Te, dT, ne);
+            }
+
             if(steps == 311 && cell==-100) {
                     cout<<"species[O_idx].dG(cell) = "<<species[O_idx].dG(cell)<<" parts = "<< no<<"/"<<ne<<"/"<<red<<"/"<<O_cooling(Te, ne)<<"/"<<Te<<" product = "<< no * ne * red * O_cooling(Te, ne)<<endl;
             }
