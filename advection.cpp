@@ -415,6 +415,8 @@ void c_Sim::execute(int restartnumber, double restarttime_cmdline) {
         // Steps 3+4: Radiation + chemistry solution substep
         //////////////////////////////////////////////////////////////////////
 
+        compute_column_densities(); //Needed for ratiative cooling later
+
         // If either switch is set we need to think more carefully about what should be done
         if( (photochemistry_level + use_rad_fluxes ) > 0 ) {
             

@@ -18,7 +18,7 @@ extern double Cp_cooling(double Te, double ne);
 extern double Cpp_cooling(double Te, double ne);
 extern double C3p_cooling(double Te, double ne);
 extern double C4p_cooling(double Te, double ne);
-extern double O_cooling(double Te, double ne);
+extern double O_cooling(double Te, double ne, double column);
 extern double Op_cooling(double Te, double ne);
 extern double Opp_cooling(double Te, double ne);
 extern double O3p_cooling(double Te, double ne);
@@ -557,7 +557,7 @@ void c_Sim::do_chemistry(double dt_chem) {
         
         // Upon return momentum and v are updated (with e, p to be confirmed). Now with prim.density, primt.v, primt.eint?? updated, recomputed auxilliaries
         
-        if(j>10 && j<num_cells && (e_idx>-1))
+        if(j>1 && j<num_cells && (e_idx>-1))
             do_highenergy_cooling(j, species[e_idx].prim[j].temperature);
         
             
@@ -1350,7 +1350,7 @@ void  c_Sim::do_highenergy_cooling(int cell, double Te) {
     //
     // Do highenergy-cooling
     // Indices now found in init routine for indices
-    
+    const double xi = 1.5e-4; //Ratio between oxygen neutral and electron de-excitation rates. Also assumed to be the ratio between neutral and electron excitation rates.
     double tau = (total_opacity(cell,0)*(x_i12[cell+1]-x_i12[cell])   + 1e-10) * 1e0;
     double beta = 0.;
     if(tau < 7.) 
@@ -1366,6 +1366,9 @@ void  c_Sim::do_highenergy_cooling(int cell, double Te) {
     double n_neutrals = 0.;
     double dT = 1e-5;
 
+    if(cell==110 && (steps%1000==0))
+        cout<<"In highenergycooling, beta = "<<beta<<" for tau = "<<tau<<endl;
+
     //Compute total neutral collision partners
     if(h2_idx > -1)    n_neutrals += species[h2_idx].prim[cell].number_density;
     if(hnull_idx > -1) n_neutrals += species[hnull_idx].prim[cell].number_density;
@@ -1377,11 +1380,20 @@ void  c_Sim::do_highenergy_cooling(int cell, double Te) {
 
     //Excitation by neutrals
     if(O_idx > -1) {
-        double no    = species[O_idx].prim[cell].number_density;
-        double n_eff = n_neutrals * 1.5e-4; //Cross section multiplier between neutral and electron collisions
         
-        species[O_idx].dG(cell)   +=  no * n_eff * red * O_cooling(Te, n_eff);  //Feb23rd 2025: Included simplistic neutral-excitation, see Line cooling notes and Tielens book. Cooling counted for O, as e might not exist here
-        species[O_idx].dGdT(cell) +=  no * n_eff * red * dfdx2(O_cooling, Te, dT, n_eff);
+        double ne = 0;
+        if(e_idx > -1)
+            ne = species[e_idx].prim[cell].number_density;
+        double no    = species[O_idx].prim[cell].number_density;
+        double n_eff = ne + xi * n_neutrals; //Cross section multiplier between neutral and electron collisions
+        double column = species[O_idx].column_density[cell];
+
+        species[O_idx].dG(cell)   +=  xi * no * n_neutrals * red * O_cooling(Te, n_eff, column);  //Feb23rd 2025: Included simplistic neutral-excitation, see Line cooling notes and Tielens book. Cooling counted for O, as e might not exist here
+        species[O_idx].dGdT(cell) +=  xi * no * n_neutrals * red * dfdx3(O_cooling, Te, dT, n_eff, column);
+
+        //cout<<" example O cooling in cell "<<cell<<" columns "<<column<<" fun and dfun = "<<no * n_eff * red * O_cooling(Te, n_eff, column)<<" "<<no * n_eff * red * dfdx3(O_cooling, Te, dT, n_eff, column)<<endl;
+        //char a;
+        //cin>>a;
     }
     
     //Excitation by electrons
@@ -1449,10 +1461,12 @@ void  c_Sim::do_highenergy_cooling(int cell, double Te) {
         }
         if( O_idx!=-1) {          
             double no    = species[O_idx].prim[cell].number_density;
-            double n_eff = n_neutrals * 1.5e-4;
-            
-            species[O_idx].dG(cell)   +=  no * ne * red * O_cooling(Te, ne);
-            species[O_idx].dGdT(cell) +=  no * ne * red * dfdx2(O_cooling, Te, dT, ne);
+            double n_eff = ne + xi * n_neutrals; //Cross section multiplier between neutral and electron collisions
+            //double n_eff = n_neutrals * 1.5e-4;
+            double column = species[O_idx].column_density[cell];
+
+            species[O_idx].dG(cell)   +=  no * ne * red * O_cooling(Te, n_eff, column);
+            species[O_idx].dGdT(cell) +=  no * ne * red * dfdx3(O_cooling, Te, dT, n_eff, column);
         }
         if( Op_idx!=-1 && e_idx!=-1 ) { 
             if(steps == 311 && cell==-100) {
@@ -1526,7 +1540,7 @@ void  c_Sim::do_highenergy_cooling(int cell, double Te) {
         cout<<" C0 "<<C_cooling(Te,ne)<<endl;
         cout<<" Cp "<<Cp_cooling(Te,ne)<<endl;
         cout<<" Cpp "<<Cpp_cooling(Te,ne)<<endl;
-        cout<<" O0 "<<O_cooling(Te,ne)<<endl;
+        cout<<" O0 "<<O_cooling(Te,ne, 0.)<<endl;
         cout<<" Op "<<Op_cooling(Te,ne)<<endl;
         cout<<" Opp "<<Opp_cooling(Te,ne)<<endl;
 

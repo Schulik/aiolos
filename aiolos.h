@@ -49,7 +49,8 @@ using Matrix_t = Eigen::Matrix<double, NUM_SPECIES,NUM_SPECIES, Eigen::RowMajor>
 using Matrix3d = Eigen::Matrix<double, 3, 3, Eigen::RowMajor>;
 using Vector_t = Eigen::Matrix<double, NUM_SPECIES, 1>;
 using Vector3d = Eigen::Matrix<double, 3, 1>;
-
+using line     = std::array<double, 4>;
+using lines    = std::vector<line>;
 
 //Basic physics quantities
 const double G        = 6.678e-8; //cgs units
@@ -114,6 +115,11 @@ inline double dfdx(const function<double(double)>& f, double x0, double dx) {
 inline double dfdx2(const function<double(double, double)>& f, double x0, double dx, double otherarg) {
     
     return (f(x0+dx, otherarg)-f(x0-dx, otherarg))/(2*dx);
+}
+
+inline double dfdx3(const function<double(double, double, double)>& f, double x0, double dx, double arg2, double arg3) {
+    
+    return (f(x0+dx, arg2, arg3)-f(x0-dx, arg2, arg3))/(2*dx);
 }
 
 inline float __int_as_float (int32_t a) { float r; memcpy (&r, &a, sizeof r); return r;} 
@@ -838,7 +844,6 @@ public:
     Eigen::VectorXd *reaction_b_ptr;
     //Vector_t n_news;
     Eigen::PartialPivLU<Matrix_t> LUchem;
-    
     Eigen::PartialPivLU<Matrix_t> *LUchem_ptr;
     
     Matrix_t chem_momentum_matrix;
@@ -910,6 +915,7 @@ public:
     
     void compute_total_pressure();
     void enforce_electron_neutrality();
+    void compute_column_densities();
     int get_species_index(const string name, const int verbose);
     int find_closest_band(double energy_threshold);
     int find_closest_band2(double energy_threshold);
@@ -1063,6 +1069,7 @@ public:
     std::vector<AOS> source_diffusion;// Geometric source term
     std::vector<AOS> source_efield;// Geometric source term
     std::vector<AOS> flux;
+    std::vector<double> column_density;
     std::vector<double> u_mask;   //Switches 2nd spatial order on and off, depending if a cell breaks
     std::vector<double> lconvect;
     std::vector<double> u_analytic;

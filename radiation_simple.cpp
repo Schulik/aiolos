@@ -233,8 +233,9 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
                     sum_kapparho[j] += species[s].u[j].u1 * species[s].opacity_planck(j, 0);
                 }
                 Tsmean[j] = sum_Tcvrho[j]/sum_cvrho[j];
-
-                do_highenergy_cooling(j, Tsmean[j]);
+		
+		if(j>0)
+	                do_highenergy_cooling(j, Tsmean[j]);
 
                 for (int s=0; s < num_species; s++) {
                     sum_heat += species[s].dS(j) + species[s].dQ_hydro(j,0) + 0.5*(species[s].dQ_hydro(j,1)-species[s].dQ_hydro(j,0));

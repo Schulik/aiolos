@@ -1466,7 +1466,8 @@ c_Species::c_Species(c_Sim *base_simulation, string filename, string species_fil
         finalstep     = np_zeros(num_cells+2);
         timesteps_de  = np_zeros(num_cells+2);
         
-        K_zzf = std::vector<double>(num_cells+2);  
+        K_zzf          = std::vector<double>(num_cells+2);  
+        column_density = std::vector<double>(num_cells+2);  
         this->update_kzz_and_gravpot(species_index);
         
         //////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

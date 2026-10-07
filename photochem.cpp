@@ -88,18 +88,20 @@ double HOnly_cooling(const std::array<double, 3> nX, double Te) {
     return 1.*cooling;
 } // */
 
-std::vector<std::array<double, 4>> lines_O;
-std::vector<std::array<double, 4>> lines_Op;
-std::vector<std::array<double, 4>> lines_Opp;
-std::vector<std::array<double, 4>> lines_O3p;
-std::vector<std::array<double, 4>> lines_O4p;
-std::vector<std::array<double, 4>> lines_C;
-std::vector<std::array<double, 4>> lines_Cp;
-std::vector<std::array<double, 4>> lines_Cpp;
-std::vector<std::array<double, 4>> lines_C3p;
-std::vector<std::array<double, 4>> lines_C4p;
+lines lines_O;
+lines lines_Op;
+lines lines_Opp;
+lines lines_O3p;
+lines lines_O4p;
+lines lines_C;
+lines lines_Cp;
+lines lines_Cpp;
+lines lines_C3p;
+lines lines_C4p;
+
 void init_line_cooling_data() {
 	lines_O.push_back( {6300*angstroem, 1.15685197E-14, 22830.7, 8.61213387e+05});
+    lines_O.push_back( {63*micron,  1.15685197E-18, 228, 6.39e3});
 	lines_Op.push_back( {834*angstroem, 5.78622E-4, 172421.6, 1.32174E15});
 	lines_Op.push_back( {2741*angstroem, 3.81198E-13, 58225.3, 4.48777E7});
 	lines_Op.push_back( {3727*angstroem, 4.29901E-16, 38575.0, 5.36461E3});
@@ -122,37 +124,37 @@ void init_line_cooling_data() {
 	lines_C4p.push_back( {6300*angstroem, 1.15685197E-14, 22830.7, 8.61213387e+0});
 }
 
-//std::vector<std::array<double, 4>> lines_O;
-//lines_O.push_back( {6300*angstr, 1.15685197E-14, 22830.7, 8.61213387e+05});
+//
+// Optical depth at line center, see e.g. Morris, Desch, Ciesla 2009
+//
+double tau_0_line(line tline, double particlemass, double Te, double column_particle) {
 
-/*lines_Op = [
-    [834*angstr, 5.78622E-4, 172421.6, 1.32174E15],
-[2741*angstr, 3.81198E-13, 58225.3, 4.48777E7],
-[3727*angstr, 4.29901E-16, 38575.0, 5.36461E3],
-[7320*angstr, 3.76929E-13, 53063.6, 3.11018E7]]
+    double hnu        = h_planck*c_light/tline[0];
+    double A          = tline[1]/hnu;
+    double prefactor  = column_particle * A * std::pow(tline[0],3) * 0.02244839 * (-std::expm1(-tline[2]/Te));
+    double broadening = std::sqrt(2*kb*Te/(particlemass*amu));
 
-lines_Opp = [
-[52*micron, 3.13852E-18, 277.682, 2.5493E3],
-[5000*angstr, 3.386678E-14 ,28728.6, 9.66741E5],
-[166*angstr, 6.59979E-10, 86632.4, 1.475889E10],
-[83.5*angstr, 1.75205E3, 172569.7, 5.405937E21]]
+    return prefactor / broadening;
+}
 
-lines_C = [
-    [0, 0, 0, 1]]
+//
+// Escape probability, See Kwan&Krolik 1981
+//
+double P_escape(double tau, double a=1.2, double b=1e-5) {   //Escape probability functions from Hollenbach&McKee1979, Kwan & Krolik 1981 via Nakayama+2022, with brackets corrected
+    if(tau < 1)
+        return -std::expm1(-2*tau)/(2*tau);
+    return 1/(std::sqrt(3.141592)*tau * (a + (std::sqrt(std::log(tau)))/(1+b*tau)) );
+}
 
-lines_Cp = [
-    [157*micron, 1.78292054E-20, 91.2, 1.38779668E+01],
-    [2326*angstr, 1.21471023E-10, 61853.9, 1.20977633e+09],
-    [1334*angstr, 2.41304508E-03, 107718.1, 3.74008770E+15]]
-
-lines_Cpp = [
-    [1910*angstr, 3.84223024E-10, 75460.8, 1.31478953E+9],
-    [977*angstr, 1.79050834E-03, 147263.9, 7.17164800E+14]]
-
-*/
+//
+// Escape probability, See Kwan&Krolik 1981
+//
+double P_escape_tot(double tau, double taumax) {
+    return 0.5*(P_escape(tau) + P_escape(taumax-tau));
+}
 
 double C_cooling(double Te, double ne) {
-    double term = 1e-25;
+    double term = 0;
     for (auto & ln : lines_C) {
         term += ln[1]*std::exp(-ln[2]/Te) / (ne*(1.+ln[3]/ne));
     }
@@ -160,7 +162,7 @@ double C_cooling(double Te, double ne) {
 }
 
 double Cp_cooling(double Te, double ne) {    
-    double term = 1e-25;
+    double term = 0;
     for (auto & ln : lines_Cp) {
         term += ln[1]*std::exp(-ln[2]/Te) / (ne*(1.+ln[3]/ne));
     }
@@ -168,41 +170,44 @@ double Cp_cooling(double Te, double ne) {
 }
 
 double Cpp_cooling(double Te, double ne) {
-    double term = 1e-25;
+    double term = 0;
     for (auto & ln : lines_Cpp) {
         term += ln[1]*std::exp(-ln[2]/Te) / (ne*(1.+ln[3]/ne));
     }
     return term;
 }
 double C3p_cooling(double Te, double ne) {
-    double term = 1e-25;
+    double term = 0;
     for (auto & ln : lines_C3p) {
         term += ln[1]*std::exp(-ln[2]/Te) / (ne*(1.+ln[3]/ne));
     }
     return term;
 }
 double C4p_cooling(double Te, double ne) {
-    double term = 1e-25;
+    double term = 0;
     for (auto & ln : lines_C4p) {
         term += ln[1]*std::exp(-ln[2]/Te) / (ne*(1.+ln[3]/ne));
     }
     return term;
 }
-double O_cooling(double Te, double ne) {
+double O_cooling(double Te, double ne, double column) {
+    //cout<<" column in O_cooling "<<column;
 
-    double term = 1e-25;
+    double term = 0.;
     for (auto & ln : lines_O) {
-        term += ln[1]*std::exp(-ln[2]/Te) / (ne*(1.+ln[3]/ne));
+        double tau0 = tau_0_line(ln, 16., Te, column);
+        double pesc = P_escape(tau0);
+
+        //cout<<" tau, pesc = "<<tau0<<" / "<<pesc;
+        term += ln[1]*std::exp(-ln[2]/Te) / (ne+ln[3]) * pesc;
     }
-    //63 micron cooling - special treatment
-    term += 8.289e-19/ne;
-    
+    //cout<<endl;
     return term;
 }
 
 double Op_cooling(double Te, double ne) {
     
-    double term = 1e-25;
+    double term = 0;
     for (auto & ln : lines_Op) {
         term += ln[1]*std::exp(-ln[2]/Te) / (ne*(1.+ln[3]/ne));
     }
@@ -211,7 +216,7 @@ double Op_cooling(double Te, double ne) {
 
 double Opp_cooling(double Te, double ne) {
     
-    double term = 1e-25;
+    double term = 0;
     for (auto & ln : lines_Opp) {
         term += ln[1]*std::exp(-ln[2]/Te) / (ne*(1.+ln[3]/ne));
     }
@@ -220,7 +225,7 @@ double Opp_cooling(double Te, double ne) {
 }
 double O3p_cooling(double Te, double ne) {
     
-    double term = 1e-25;
+    double term = 0;
     for (auto & ln : lines_O3p) {
         term += ln[1]*std::exp(-ln[2]/Te) / (ne*(1.+ln[3]/ne));
     }
@@ -229,7 +234,7 @@ double O3p_cooling(double Te, double ne) {
 }
 double O4p_cooling(double Te, double ne) {
     
-    double term = 1e-25;
+    double term = 0;
     for (auto & ln : lines_O4p) {
         term += ln[1]*std::exp(-ln[2]/Te) / (ne*(1.+ln[3]/ne));
     }
@@ -827,7 +832,7 @@ void c_Sim::do_photochemistry() {
                 if( Cpp_idx!=-1 && e_idx!=-1 ) { species[Cpp_idx].dG(j) -=  Cpp_cooling(species[e_idx].prim[j].temperature, ne)/red; }
                 if( C3p_idx!=-1 && e_idx!=-1 ) { species[C3p_idx].dG(j) -=  C3p_cooling(species[e_idx].prim[j].temperature, ne)/red; }
                 if( C4p_idx!=-1 && e_idx!=-1 ) { species[C4p_idx].dG(j) -=  C4p_cooling(species[e_idx].prim[j].temperature, ne)/red; }
-                if( O_idx!=-1 && e_idx!=-1 ) { species[O_idx].dG(j)     -=  O_cooling(species[e_idx].prim[j].temperature, ne)/red; }
+                if( O_idx!=-1 && e_idx!=-1 ) { species[O_idx].dG(j)     -=  O_cooling(species[e_idx].prim[j].temperature, ne, species[O_idx].column_density[j])/red; }
                 if( Op_idx!=-1 && e_idx!=-1 ) { species[Op_idx].dG(j)   -=  Op_cooling(species[e_idx].prim[j].temperature, ne)/red; }
                 if( Opp_idx!=-1 && e_idx!=-1 ) { species[Opp_idx].dG(j) -=  Opp_cooling(species[e_idx].prim[j].temperature, ne)/red; }
                 if( O3p_idx!=-1 && e_idx!=-1 ) { species[O3p_idx].dG(j) -=  O3p_cooling(species[e_idx].prim[j].temperature, ne)/red; }

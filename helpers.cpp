@@ -1032,3 +1032,35 @@ double c_Sim::get_planet_distance_au(double time) {
     }
     return a * (1-e * std::cos(E));
 }
+
+//
+// Integrates the column densities for each species from the outer boundary inwards.
+// Useful e.g. to determine the optical depth in individual lines.
+// Defined as the column depth until and including the corresponding cell.
+//
+void c_Sim::compute_column_densities() {
+
+    for(int cell = num_cells+1; cell>0; cell--) 
+    {
+        double dr = dx[cell];
+        double dn = 0;
+        for(int s=0; s<num_species; s++)
+        {
+            dn = dr * species[s].prim[cell].number_density;
+            
+            if(cell==num_cells+1)
+                species[s].column_density[cell] = dn;
+            else
+                species[s].column_density[cell] = species[s].column_density[cell+1] + dn;
+        }   
+    }
+
+    if(false) {
+        for(int s=0; s<num_species; s++) {
+            cout<<" colum depth species "<<species[s].speciesname<<" Ncol = "<<species[s].column_density[2]<<endl;
+        }
+
+        char a;
+        cin>>a;
+    }
+}
