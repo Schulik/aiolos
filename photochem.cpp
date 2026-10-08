@@ -12,6 +12,9 @@
 #include "aiolos.h"
 #include "brent.h"
 
+double P_escape(double tau, double a=1.2, double b=1e-5);
+double tau_0_line(line,double,double,double);
+
 /*
 Heating and cooling rates according to Black (1981), the physical state of
 primordial intergalactic clouds*/
@@ -113,7 +116,6 @@ void init_line_cooling_data() {
 	lines_O3p.push_back( {25*micron, 2.58649627E-17, 555.66, 3.19064670E+03});
 	lines_O3p.push_back( {1404*angstroem,    1.84651335e-08, 102685.994, 8.75179124E+10});
 	lines_O4p.push_back( {1218*angstroem, 1.84651335E-08, 118094.57, 7.84917617e+10});
-
 	lines_C.push_back( {1.*angstroem,0, 1., 1.});  //C line cooling currently unclear, dummy line
 	lines_Cp.push_back( {157*micron, 1.78292054E-20, 91.2, 1.38779668E+01});
 	lines_Cp.push_back( {2326*angstroem, 1.21471023E-10, 61853.9, 1.20977633e+09});
@@ -122,6 +124,189 @@ void init_line_cooling_data() {
 	lines_Cpp.push_back( {977*angstroem, 1.79050834E-03, 147263.9, 7.17164800E+14});
     lines_C3p.push_back( {1550*angstroem, 5.52131947E-03, 92934.39, 2.86266976e+15});
 	lines_C4p.push_back( {6300*angstroem, 1.15685197E-14, 22830.7, 8.61213387e+0});
+}
+
+void c_Sim::init_highenergy_cooling_atlas(string lineliestfile) {
+    //Read filename linelistfile
+
+    if(debug >= 0) cout<<"          In read line atlas Pos0. "<<endl;
+
+    ifstream file(linelistfile);
+    string line;
+    vector<int> target_species_indexlist;
+    num_line_atlantes = 0;
+    //vector<int> target_species_indexlist;
+    if(!file) {
+        cout<<"   Couldnt open linelist file "<<linelistfile<<"!"<<endl;
+    } else {cout<<"   Opening linelist file "<<linelistfile<<"!"<<endl; }
+    
+    if(debug > 0) cout<<"          In read line atlas Pos1. "<<endl;
+
+    //////////////////////////////////////////////////////////////
+    // Read file, determine legit species, keep legit species 
+    //////////////////////////////////////////////////////////////
+    while(std::getline( file, line )) {
+
+        if(line[0]=='#') //Allow comments
+            continue;
+    
+        std::vector<string> stringlist = stringsplit(line,",");
+        string sname = stringlist[0];
+
+        int sidx     = get_species_index(sname,1); 
+        if(sidx > -1) {
+            int cnt = count(target_species_indexlist.begin(), target_species_indexlist.end(), sidx);
+            if(cnt==0) {
+                target_species_indexlist.push_back(sidx);
+                num_line_atlantes++;
+            }
+        }
+        //, figure out if species already exists in Atlas
+    }
+    file.clear();
+    file.seekg(0);
+
+    if(debug > 0) cout<<"          In read line atlas Pos2. "<<endl;
+
+    //for(auto elm: target_species_indexlist)
+    //////////////////////////////////////////////////////////////
+    //run constructor for all legit species
+    //////////////////////////////////////////////////////////////
+    
+    line_atlantes.reserve(num_line_atlantes);
+        
+    for(int n = 0; n < num_line_atlantes; n++) {
+        int target = target_species_indexlist[n];
+        line_atlantes.push_back(c_Line_Atlas(this, &species[target], target)); // Here we call the c_Species constructor
+    }
+
+    if(debug > 0) cout<<"          In read line atlas Pos3. "<<endl;
+
+    //////////////////////////////////////////////////////////////
+    // Read again
+    //////////////////////////////////////////////////////////////
+    // for each line
+    // identify species listed in file and find whether it exists
+    // if so, add to specieslist (duplicates allowed) with attached linedata
+    // Go again, now add found lines to interpreted atlantes
+    while(std::getline( file, line )) {
+
+        //cout<<line<<endl;
+
+        if(line[0]=='#') //Allow comments
+            continue;
+
+        std::vector<string> stringlist = stringsplit(line,",");
+
+        string sname = stringlist[0];
+        int sidx     = get_species_index(sname,1); 
+        double wl_num = std::stod(stringlist[1]);
+        string unit   = stringlist[2];
+        double wl_unit = 1.;
+        
+        if((unit[0] == 'a') || (unit[0] == 'A')) { //angstrom
+            wl_unit = 1e-8;
+        } else if ((unit[0] == 'n') || (unit[0] == 'N')) { //nanometer
+            wl_unit = 1e-7;
+        } else if((unit[0] == 'm') || (unit[0] == 'M')) {
+            if((unit[1] == 'm') || (unit[1] == 'M')) //millimeter
+                wl_unit = 1e-1;
+            else //micrometer
+                wl_unit = 1e-4;
+        }
+        else 
+            wl_unit = 1;
+        
+        double Aprime = std::stod(stringlist[3]);
+        double Tex    = std::stod(stringlist[4]);
+        double ncrit  = std::stod(stringlist[5]);
+        
+        if(sidx > -1) {
+            auto it   = find(target_species_indexlist.begin(), target_species_indexlist.end(), sidx);
+            int newit = it-target_species_indexlist.begin();
+
+            if(debug>0)
+                cout<<" Adding a line to species sindex/sname "<<sidx<<"/"<<sname<<" with parameter Aprime = "<<Aprime<<" newit = "<<newit<<endl;
+
+            line_atlantes[newit].add_line(sname, wl_num*wl_unit, Aprime, Tex, ncrit);
+        }
+    }
+
+    if(debug > 0) cout<<"          In read line atlas Pos4. "<<endl;
+    //////////////////////////////////////////////////////////////
+    // All lines added, now do sanity check that lines have been added to the correct species
+    //////////////////////////////////////////////////////////////
+    int cnt = 0;
+    for(auto & atlas: line_atlantes) {
+        cout<<" line atlas #"<<cnt<<" found speciesnum "<<atlas.speciesindex<<" name "<<atlas.speciesname<<" name doublecheck "<<species[atlas.speciesindex].speciesname;
+        cout<<" mass "<<atlas.particlemass<<" has the following lines "<<endl;
+        for(auto & line: atlas.linelist) {
+            cout<<"       "<<line[0]<<" "<<line[1]<<" "<<line[2]<<" "<<line[3]<<" "<<endl;
+        }
+        cnt++;
+    }
+}
+
+int c_Line_Atlas::add_line(string name, double wl, double Aprime, double Tex, double ncrit) {
+
+    line newline = {wl, Aprime, Tex, ncrit};
+    linelist.push_back( newline);
+
+    return 0;
+}
+
+c_Line_Atlas::c_Line_Atlas(c_Sim *basesim, c_Species *species, int index) {
+    this->base         = basesim;
+    this->species      = species;
+    this->speciesindex = index;
+    this->particlemass = species->mass_amu;
+    this->speciesname  = species->speciesname;
+
+    //cout << "Constructing c_Line_Atlas at " << this << endl;
+    //cout << "linelist address = " << &linelist << endl;
+    //cout << "linelist size = " << linelist.size() << endl;
+}
+//
+// General line cooling function for the Line_Atlas class
+// Includes escape probability update by Yixuan Chen.
+//
+double c_Line_Atlas::get_line_cooling(double T, double n, double column) {
+
+    double term = 0.;
+    for (auto & ln : linelist) {
+        term += ln[1]*std::exp(-ln[2]/T) / (n+ln[3]) * P_escape(tau_0_line(ln, this->particlemass, T, column));
+    }
+    return term;
+}
+
+//
+// Adds line cooling terms to all corresponding species which have data. Can be used for both neutral-collision cooling or electron-collision cooling
+//
+double c_Line_Atlas::update_line_cooling(int target, int cell, double npartner, double n_eff, double xi) {
+
+    //species here needs to be initialized to 
+    const double dT     = 1e-5;
+    double T      = species->prim[cell].temperature;
+    double ns     = species->prim[cell].number_density;
+    double column = species->column_density[cell];
+
+    if(target == -1) {
+        species->dG(cell)   +=  xi * ns * npartner *       get_line_cooling(T, n_eff, column); //Feb23rd 2025: Included simplistic neutral-excitation, see Line cooling notes and Tielens book. Cooling counted for O, as e might not exist here
+        species->dGdT(cell) +=  0.; //xi * ns * npartner * dfdx3(get_line_cooling_function, T, dT, n_eff, column);
+    }
+    else {
+        base->species[target].dG(cell)   +=  xi * ns * npartner *       get_line_cooling(T, n_eff, column); //Feb23rd 2025: Included simplistic neutral-excitation, see Line cooling notes and Tielens book. Cooling counted for O, as e might not exist here
+        base->species[target].dGdT(cell) +=  0.; //xi * ns * npartner * dfdx3(get_line_cooling_function, T, dT, n_eff, column);
+
+    }
+
+    //double n_eff = ne + xi * n_neutrals; //Cross section multiplier between neutral and electron collisions
+    //double no    = species[O_idx].prim[cell].number_density;
+    //double n_eff = ne + xi * n_neutrals; //Cross section multiplier between neutral and electron collisions
+    //double column = species[O_idx].column_density[cell];
+    //species[O_idx].dG(cell)   +=  no * ne * red * O_cooling(Te, n_eff, column);
+    //species[O_idx].dGdT(cell) +=  no * ne * red * dfdx3(O_cooling, Te, dT, n_eff, column);
+    return 0;
 }
 
 //
@@ -134,13 +319,14 @@ double tau_0_line(line tline, double particlemass, double Te, double column_part
     double prefactor  = column_particle * A * std::pow(tline[0],3) * 0.02244839 * (-std::expm1(-tline[2]/Te));
     double broadening = std::sqrt(2*kb*Te/(particlemass*amu));
 
-    return prefactor / broadening;
+    return std::sqrt(3.141592) * prefactor / broadening;
 }
 
 //
 // Escape probability, See Kwan&Krolik 1981
+// defaults: a=1.2, b=1e-5
 //
-double P_escape(double tau, double a=1.2, double b=1e-5) {   //Escape probability functions from Hollenbach&McKee1979, Kwan & Krolik 1981 via Nakayama+2022, with brackets corrected
+double P_escape(double tau, double a, double b) {   //Escape probability functions from Hollenbach&McKee1979, Kwan & Krolik 1981 via Nakayama+2022, with brackets corrected
     if(tau < 1)
         return -std::expm1(-2*tau)/(2*tau);
     return 1/(std::sqrt(3.141592)*tau * (a + (std::sqrt(std::log(tau)))/(1+b*tau)) );
@@ -255,6 +441,7 @@ double h3plus_cooling(double Te) {
     else
         return temp;
 }
+
 
 /* class C2Ray_HOnly_ionization
  *

@@ -577,33 +577,12 @@ int c_Sim::get_species_index(const string name, const int verbose=0) {
 
     for(auto ss: stringlist) {
         for(int s = 0; s<num_species; s++) {
-
-            //Old debugging block, keep in case things break
-            /*for(auto ss: stringlist) {
-                cout<<" strnglist element "<<ss<<endl;
-            }
-
-            for(int s = 0; s<num_species; s++) {
-            cout<<" species index = "<<species[s].this_species_index<<endl;
-            cout<<" species charge = "<<species[s].static_charge<<endl;
-            cout<<" species fraction = "<<species[s].initial_fraction<<endl;
-            cout<<" speciesmass = "<<species[s].mass_amu<<endl;
-            //cout<<" speciesname = "<<species[s].speciesname<<endl;
-            }*/
-
-            //cout<<" checking speciesname["<<s<<"] = "<<endl;
-            //cout<<species[s].speciesname<<endl;
-            //cout<<species[s].speciesname<<" while looking for "<<stringlist[i]<<" name "<<name<<endl;
-            //cout<<" resulting in "<<species[s].speciesname.compare(name)<<endl;
-            //cout<<" resulting in "<<species[s].speciesname.compare(stringlist[i])<<endl;
-
             if(species[s].speciesname.compare(ss)==0) {
                 //if(verbose==1)
                 //    cout<<" Found species index for "<<ss<<" = "<<species[s].speciesname<<endl;
                 return s;
             }             
         }
-        
     }
     
     if(debug>0)

@@ -287,7 +287,8 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, s
         radiation_rampup_time      = read_parameter_from_file<double>(filename,"RAD_RAMPUP_TIME", debug, 0.).value; //Ramp up the irradiation in all bands smoothly over xxx seconds.
         eband_fraction      = read_parameter_from_file<double>(filename,"EBAND_FRACTION", debug, 0.9).value; //Averaging factor for the band energy between E_upper and E_lower
         init_radiation_factor      = read_parameter_from_file<double>(filename,"INIT_RAD_FACTOR", debug, 0.).value; //Unused
-        
+        linelistfile               = read_parameter_from_file<string>(filename,"LINELIST_FILE", debug, "---").value;  //File to read in the wavelength limits
+
         //radiation_solver           = read_parameter_from_file<int>(filename,"RADIATION_SOLVER", debug, 0).value; //replaced by use_rad_fluxes
         closed_radiative_boundaries = read_parameter_from_file<int>(filename,"PARI_CLOSED_RADIATIVE_BOUND", debug, 0).value; //Reflect thermal radiation at outer boundaries?
         minimum_opacity             = read_parameter_from_file<double>(filename,"MINIMUM_OPACITY", debug, 1e-10).value;    //Minimum opacity for read-in opacities
@@ -340,8 +341,13 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, s
         bond_albedo       = read_parameter_from_file<double>(filename,"BOND_ALBEDO", debug, 0.).value; //Bond albedo, Number between 0. and 1.
         use_init_discont_smoothing = read_parameter_from_file<int>(filename,"INIT_DISCONT_SMOOTHING", debug, 0).value;  //Smooths out discontinuities in the initial density profiles with a powerlaw. Applied before init_wind discontinuity is put in.
         
-        if(photochemistry_level > 0)
+        if(photochemistry_level > 0) {
             init_line_cooling_data();
+        }
+            
+
+        
+            
 
         if(problem_number == 2)
             monitor_output_index = num_cells/2; 
@@ -864,6 +870,8 @@ c_Sim::c_Sim(string filename_solo, string speciesfile_solo, string workingdir, s
         
         //Finally, look for the species indices for some important species. Stored in the utility integers e_idx, hnull_idx, hplus_idx etc.
         init_highenergy_cooling_indices();
+        if(linelistfile.compare("---")!=0)
+            init_highenergy_cooling_atlas(linelistfile);
         
         ///////////////////////////////////////////////////////////////////////// 
         /////////////////////////////////////////////////////////////////////////

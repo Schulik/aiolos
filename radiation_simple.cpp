@@ -234,8 +234,8 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
                 }
                 Tsmean[j] = sum_Tcvrho[j]/sum_cvrho[j];
 		
-		if(j>0)
-	                do_highenergy_cooling(j, Tsmean[j]);
+		        if(j>0)
+	                do_highenergy_cooling2(j, Tsmean[j]);
 
                 for (int s=0; s < num_species; s++) {
                     sum_heat += species[s].dS(j) + species[s].dQ_hydro(j,0) + 0.5*(species[s].dQ_hydro(j,1)-species[s].dQ_hydro(j,0));
@@ -367,7 +367,7 @@ void c_Sim::update_fluxes_FLD_simple(double ddt) {
 
                 fill_alpha_basis_arrays(j);
                 compute_alpha_matrix(j);
-                do_highenergy_cooling(j, std::max(init_tmean, 3.) );
+                do_highenergy_cooling2(j, std::max(init_tmean, 3.) );
                 
                 coll_heat_matrix.setZero();
                 coll_heat_b.setZero();
@@ -908,7 +908,7 @@ int c_Sim::subcycle_heat_exchange(int j, int num_cycles, int debug, double dt) {
                         return 0;
                     }
                         
-                    do_highenergy_cooling(j, cooling_temp); 
+                    do_highenergy_cooling2(j, cooling_temp); 
                 }
                 //Update with mean temperature, as intermediate electron temperatures can be extremely high
                 //do_highenergy_cooling(j, std::max(documentation(e_idx,c), 3.) ); //TODO: Add also update for kappa_planck, to allow bolometric cooling to converge

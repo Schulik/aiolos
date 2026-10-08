@@ -143,7 +143,7 @@ void c_Species::update_opacities() {
 	                
                     if(this_species_index == h2o_idx ) {
                         if(base->photon_energies_eV[b] < 2.5)
-                            opacity_twotemp(j, b) = base->const_opacity_solar_factor / (base->photon_energies_eV[b] + 0.1);
+                            opacity_twotemp(j, b) = base->const_opacity_solar_factor;// / (base->photon_energies_eV[b] + 0.1);
                     }
                 }
                 

@@ -558,7 +558,7 @@ void c_Sim::do_chemistry(double dt_chem) {
         // Upon return momentum and v are updated (with e, p to be confirmed). Now with prim.density, primt.v, primt.eint?? updated, recomputed auxilliaries
         
         if(j>1 && j<num_cells && (e_idx>-1))
-            do_highenergy_cooling(j, species[e_idx].prim[j].temperature);
+            do_highenergy_cooling2(j, species[e_idx].prim[j].temperature);
         
             
         //
@@ -1378,7 +1378,7 @@ void  c_Sim::do_highenergy_cooling(int cell, double Te) {
     for(int s=0; s<num_species; s++) //Safety test: set all factors to zero
        species[s].dG(cell)=0;
 
-    //Excitation by neutrals
+    //Excitation by neutrals;
     if(O_idx > -1) {
         
         double ne = 0;
@@ -1517,12 +1517,8 @@ void  c_Sim::do_highenergy_cooling(int cell, double Te) {
             double n3p   = species[h3plus_idx].prim[cell].number_density;
             species[e_idx].dG(cell)   +=  n3p * ne * h3plus_cooling(Te); 
             species[e_idx].dGdT(cell) +=  n3p * ne * dfdx(h3plus_cooling, Te, dT);
-        }
-
-	    
+        }    
     }
-    
-
 
     if(steps == 200 && cell==100e99) {
         for(int s=0; s<num_species; s++)
@@ -1548,6 +1544,98 @@ void  c_Sim::do_highenergy_cooling(int cell, double Te) {
 	//cin>>a;
     }
         
+}
+
+/**
+ * New cooling function working on the line_atlas objects. Called from do_chemistry() in chemistry.cpp line 335. Equivalent functionality in photochem_level=1 in photochem.cpp lines ~700.
+ * 
+ * @param[in] cell Cell number in which to add cooling contributions.
+ * @param[in] Te   Electron temperature
+ */
+void  c_Sim::do_highenergy_cooling2(int cell, double Te) {
+
+    const double xi = 1.5e-4;   //Might need readjustment later, as this ratio can be line-dependent and not global
+    double n_e        = 0.;
+    double n_neutrals = 0.;
+    double dT = 1e-5;
+
+    /////////////////////////////////////////////////////////////
+    // Compute collision partners
+    /////////////////////////////////////////////////////////////
+    for(int s=0; s<num_species; s++) {
+        if(species[s].static_charge == 0)
+            n_neutrals += species[s].prim[cell].number_density;
+    }
+    if(e_idx > -1)    n_e = species[e_idx].prim[cell].number_density;
+
+    /////////////////////////////////////////////////////////////
+    // All collision partners known, compute n_eff
+    /////////////////////////////////////////////////////////////
+    double n_eff = n_e + xi * n_neutrals;
+
+    for(int s=0; s<num_species; s++) //Safety test: set all factors to zero
+       species[s].dG(cell)=0;
+
+    /////////////////////////////////////////////////////////////
+    // Every atlas belongs to one species - running every atlas with different arguments implements s-electron and s-neutral excitation
+    /////////////////////////////////////////////////////////////
+    for(auto & atlas: line_atlantes) {
+        //Collisions with electrons
+        atlas.update_line_cooling(e_idx, cell, n_e,        n_eff, 1.);
+
+        //Collisions with neutrals
+        atlas.update_line_cooling(-1,    cell, n_neutrals, n_eff, xi);
+    }
+
+    /////////////////////////////////////////////////////////////
+    // Add special cases here (e.g. Lyman alpha, additional chemistry cooling, etc.)
+    /////////////////////////////////////////////////////////////
+    bool special = true;
+
+    if(special){
+        /////////////////////////////////////////////////////////////
+        // Lyman-alpha
+        /////////////////////////////////////////////////////////////
+        if( e_idx!=-1 && hnull_idx!=-1 && hplus_idx!=-1) { //If all species are there - H0, H+ and e-
+            double Tn = species[hnull_idx].prim[cell].temperature;
+            double n0 = species[hnull_idx].prim[cell].number_density;
+            std::array<double, 3> nX = {species[hnull_idx].prim[cell].number_density, species[hplus_idx].prim[cell].number_density, species[e_idx].prim[cell].number_density};
+                
+            species[e_idx].dG(cell)   += n_e * HOnly_cooling(nX, Te);
+            species[e_idx].dGdT(cell) += n_e * (HOnly_cooling(nX, Te+dT)-HOnly_cooling(nX, Te-dT))/(dT+dT);  
+                
+            //Simple approximation for thermal Ly-alpha excitation by neutral collisions
+            double term = xi * n_neutrals * n0 * 7.3e-19 * std::exp(-118400./Tn);
+            species[hnull_idx].dG(cell)   += term; 
+            species[hnull_idx].dGdT(cell) += (xi * n_neutrals * n0 * 7.3e-19 * std::exp(-118400./(Tn+dT)) - term )/dT;
+        }
+
+        /////////////////////////////////////////////////////////////
+        // H3+ cooling
+        /////////////////////////////////////////////////////////////
+        if( h3plus_idx!=-1 && e_idx!=-1 ) { 
+                double n3p   = species[h3plus_idx].prim[cell].number_density;
+                species[e_idx].dG(cell)   +=  n3p * n_e * h3plus_cooling(Te); 
+                species[e_idx].dGdT(cell) +=  n3p * n_e * dfdx(h3plus_cooling, Te, dT);
+        }
+
+        /////////////////////////////////////////////////////////////
+        // Free-free emission
+        /////////////////////////////////////////////////////////////
+        if(e_idx > -1) {
+            for(int s=0; s<num_species; s++) {
+                if(species[s].static_charge > 0) {
+                    double g_incr = 1.42e-27*(species[s].static_charge*species[s].static_charge)*std::sqrt(Te)*1.3*n_e*species[s].prim[cell].number_density;
+                    species[e_idx].dG(cell)   += g_incr;
+                    species[e_idx].dGdT(cell) += (1.42e-27*(species[s].static_charge*species[s].static_charge)*std::sqrt(Te+dT)*1.3*n_e*species[s].prim[cell].number_density-g_incr)/dT;
+                }
+            }
+        }
+    
+    }
+    /////////////////////////////////////////////////////////////
+    //Line cooling end
+    /////////////////////////////////////////////////////////////
 }
 
 /* Specialied one- or few-reaction solver for a limited number of ndots.

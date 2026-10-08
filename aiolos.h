@@ -310,6 +310,33 @@ class c_Species;
 class c_Sim;
 
 /**
+ * CLASS LINE_ATLAS
+ * 
+ * A class to store information about emission lines, and ease acces to its corresponding line cooling function.
+ * Each object is a mapping of a species index to its actual linelist (hence the name line atlas might sound slightly misleading).
+ * 
+ */
+class c_Line_Atlas
+{
+    //c_Sim *base;
+    
+    public:
+    c_Species *species;
+    c_Sim     *base;
+    lines  linelist;
+    string speciesname;
+
+    double particlemass;
+    int    speciesindex;
+    
+    c_Line_Atlas(c_Sim *basesim, c_Species *targetspecies, int index);
+    int add_line(string name, double, double, double, double);
+
+    double update_line_cooling(int target, int cell, double npartner, double n_eff, double xi); //Computes n_spcies * n_collisionpartner * excitation_function  in cell
+    double get_line_cooling(double T, double n, double column);            //Computes excitation function
+};
+
+/**
  * Thermochemistry reactions
  *
  * Reactions of the form A + B + ... ->  A' + B' + ... (only unidirectional!), implementing 
@@ -469,6 +496,7 @@ public:
     string fluxfile;
     string wavebinsfile;
     string reactionfile;
+    string linelistfile;
     
     int num_bands_in;
     int num_bands_out;
@@ -816,6 +844,9 @@ public:
     double density_floor;
     double xi_rad;
     int solve_for_j;
+
+    std::vector<c_Line_Atlas> line_atlantes; //Vector storing all line cooling data and functions
+    int num_line_atlantes;
     //
     // (Photo)Chemistry
     //
@@ -961,6 +992,7 @@ public:
     void update_dS_jb(int j, int b);
     void update_dS_jb_photochem(int j, double dtt);
     void do_highenergy_cooling(int j, double Te);
+    void do_highenergy_cooling2(int j, double Te);
     void update_tau_s_jb(int j, int b);
     void update_opacities();
     void update_T_mean(int j, int flag); //similar to return_T_mean but with debug functionality
@@ -975,6 +1007,7 @@ public:
 
     void do_photochemistry();
     void init_highenergy_cooling_indices();
+    void init_highenergy_cooling_atlas(string linelistfile);
     void enforce_charge_neutrality(int cell);
     void init_highenergy_opacities();
     void find_reactionrates_relating_to_species(int cell, string speciesname);
