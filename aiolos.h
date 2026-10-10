@@ -49,7 +49,8 @@ using Matrix_t = Eigen::Matrix<double, NUM_SPECIES,NUM_SPECIES, Eigen::RowMajor>
 using Matrix3d = Eigen::Matrix<double, 3, 3, Eigen::RowMajor>;
 using Vector_t = Eigen::Matrix<double, NUM_SPECIES, 1>;
 using Vector3d = Eigen::Matrix<double, 3, 1>;
-using line     = std::array<double, 4>;
+//using line     = std::array<double, 4>;
+class line;
 using lines    = std::vector<line>;
 
 //Basic physics quantities
@@ -310,6 +311,18 @@ class c_Species;
 class c_Sim;
 
 /**
+ *  Line class
+ */
+class line {
+    public:
+    std::array<double, 8> data;
+    int continuum_species;
+
+    line(string name, double, double, double, double, int, double, double, double, double);
+    double cont_opa_fitfunction(double,double);
+};
+
+/**
  * CLASS LINE_ATLAS
  * 
  * A class to store information about emission lines, and ease acces to its corresponding line cooling function.
@@ -318,22 +331,26 @@ class c_Sim;
  */
 class c_Line_Atlas
 {
-    //c_Sim *base;
-    
     public:
     c_Species *species;
     c_Sim     *base;
     lines  linelist;
+    int num_lines;
+    
     string speciesname;
 
     double particlemass;
     int    speciesindex;
     
+    //int    has_continuum;
+    //lines  continuum_params;
+    //int    continuum_species;
+
     c_Line_Atlas(c_Sim *basesim, c_Species *targetspecies, int index);
-    int add_line(string name, double, double, double, double);
+    int add_line(string name, double, double, double, double, int, double, double, double, double);
 
     double update_line_cooling(int target, int cell, double npartner, double n_eff, double xi); //Computes n_spcies * n_collisionpartner * excitation_function  in cell
-    double get_line_cooling(double T, double n, double column);            //Computes excitation function
+    double get_line_cooling(double T, double n, double column, int cell);            //Computes excitation function
 };
 
 /**

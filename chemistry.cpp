@@ -13,16 +13,6 @@
 #include "aiolos.h"
 
 extern double HOnly_cooling(const std::array<double, 3> nX, double Te);
-extern double C_cooling(double Te, double ne);
-extern double Cp_cooling(double Te, double ne);
-extern double Cpp_cooling(double Te, double ne);
-extern double C3p_cooling(double Te, double ne);
-extern double C4p_cooling(double Te, double ne);
-extern double O_cooling(double Te, double ne, double column);
-extern double Op_cooling(double Te, double ne);
-extern double Opp_cooling(double Te, double ne);
-extern double O3p_cooling(double Te, double ne);
-extern double O4p_cooling(double Te, double ne);
 extern double h3plus_cooling(double Te);
 
 
@@ -1378,23 +1368,23 @@ void  c_Sim::do_highenergy_cooling(int cell, double Te) {
     for(int s=0; s<num_species; s++) //Safety test: set all factors to zero
        species[s].dG(cell)=0;
 
-    //Excitation by neutrals;
-    if(O_idx > -1) {
+    // //Excitation by neutrals;
+    // if(O_idx > -1) {
         
-        double ne = 0;
-        if(e_idx > -1)
-            ne = species[e_idx].prim[cell].number_density;
-        double no    = species[O_idx].prim[cell].number_density;
-        double n_eff = ne + xi * n_neutrals; //Cross section multiplier between neutral and electron collisions
-        double column = species[O_idx].column_density[cell];
+    //     double ne = 0;
+    //     if(e_idx > -1)
+    //         ne = species[e_idx].prim[cell].number_density;
+    //     double no    = species[O_idx].prim[cell].number_density;
+    //     double n_eff = ne + xi * n_neutrals; //Cross section multiplier between neutral and electron collisions
+    //     double column = species[O_idx].column_density[cell];
 
-        species[O_idx].dG(cell)   +=  xi * no * n_neutrals * red * O_cooling(Te, n_eff, column);  //Feb23rd 2025: Included simplistic neutral-excitation, see Line cooling notes and Tielens book. Cooling counted for O, as e might not exist here
-        species[O_idx].dGdT(cell) +=  xi * no * n_neutrals * red * dfdx3(O_cooling, Te, dT, n_eff, column);
+    //     species[O_idx].dG(cell)   +=  xi * no * n_neutrals * red * O_cooling(Te, n_eff, column);  //Feb23rd 2025: Included simplistic neutral-excitation, see Line cooling notes and Tielens book. Cooling counted for O, as e might not exist here
+    //     species[O_idx].dGdT(cell) +=  xi * no * n_neutrals * red * dfdx3(O_cooling, Te, dT, n_eff, column);
 
-        //cout<<" example O cooling in cell "<<cell<<" columns "<<column<<" fun and dfun = "<<no * n_eff * red * O_cooling(Te, n_eff, column)<<" "<<no * n_eff * red * dfdx3(O_cooling, Te, dT, n_eff, column)<<endl;
-        //char a;
-        //cin>>a;
-    }
+    //     //cout<<" example O cooling in cell "<<cell<<" columns "<<column<<" fun and dfun = "<<no * n_eff * red * O_cooling(Te, n_eff, column)<<" "<<no * n_eff * red * dfdx3(O_cooling, Te, dT, n_eff, column)<<endl;
+    //     //char a;
+    //     //cin>>a;
+    // }
     
     //Excitation by electrons
     if (e_idx > -1) {
@@ -1429,86 +1419,86 @@ void  c_Sim::do_highenergy_cooling(int cell, double Te) {
             species[hnull_idx].dGdT(cell) += red * (n_neutrals * nX[0] * 7.3e-19 * 1.5e-4 * std::exp(-118400./(Tn+dT)) - term )/dT;
         }
         
-        if( C_idx!=-1 && e_idx!=-1 ) { 
-            double nc   = species[C_idx].prim[cell].number_density;
+        // if( C_idx!=-1 && e_idx!=-1 ) { 
+        //     double nc   = species[C_idx].prim[cell].number_density;
             
-            species[e_idx].dG(cell)   +=  nc * ne * red * C_cooling(Te, ne); 
-            species[e_idx].dGdT(cell) +=  nc * ne * red * dfdx2(C_cooling, Te, dT, ne);
-        }
-        if( Cp_idx!=-1 && e_idx!=-1 ) { 
-            double ncp  = species[Cp_idx].prim[cell].number_density;
-            //species[Cp_idx].dG(cell) = 0;
-            species[e_idx].dG(cell) += ncp * ne * red * Cp_cooling(Te, ne); 
-            species[e_idx].dG(cell) += ncp * ne * 1.426e-27 * 1.3 * sqrt(Te) * mul  ;
-            species[e_idx].dGdT(cell) += ncp * ne * red * dfdx2(Cp_cooling, Te, dT, ne);
-            species[e_idx].dGdT(cell) += ncp * ne * 1.426e-27 * 1.3 * 0.5 /std::sqrt(Te) * mul;
-        }
-        if( Cpp_idx!=-1 && e_idx!=-1 && false) { 
-            double ncpp = species[Cpp_idx].prim[cell].number_density;
-            //species[Cpp_idx].dG(cell) = 0;
-            species[e_idx].dG(cell) += ncpp * ne * red * Cpp_cooling(Te, ne); 
-            species[e_idx].dG(cell) += ncpp * ne * 4 * 1.426e-27 * 1.3 * sqrt(Te) * mul;
-            species[e_idx].dGdT(cell) += ncpp * ne * red * dfdx2(Cpp_cooling, Te, dT, ne);
-            species[e_idx].dGdT(cell) += ncpp * ne * 4 * 1.426e-27 * 1.3 * 0.5 /std::sqrt(Te) * mul;
-        }
-	    if( C3p_idx!=-1 && e_idx!=-1) { 
-            double nc3p = species[C3p_idx].prim[cell].number_density;
-            species[e_idx].dG(cell) += nc3p * ne * red * C3p_cooling(Te, ne); 
-        }
-	    if( C4p_idx!=-1 && e_idx!=-1) { 
-            double nc4p = species[C4p_idx].prim[cell].number_density;
-            species[e_idx].dG(cell) += nc4p * ne * red * C4p_cooling(Te, ne); 
-        }
-        if( O_idx!=-1) {          
-            double no    = species[O_idx].prim[cell].number_density;
-            double n_eff = ne + xi * n_neutrals; //Cross section multiplier between neutral and electron collisions
-            //double n_eff = n_neutrals * 1.5e-4;
-            double column = species[O_idx].column_density[cell];
+        //     species[e_idx].dG(cell)   +=  nc * ne * red * C_cooling(Te, ne); 
+        //     species[e_idx].dGdT(cell) +=  nc * ne * red * dfdx2(C_cooling, Te, dT, ne);
+        // }
+        // if( Cp_idx!=-1 && e_idx!=-1 ) { 
+        //     double ncp  = species[Cp_idx].prim[cell].number_density;
+        //     //species[Cp_idx].dG(cell) = 0;
+        //     species[e_idx].dG(cell) += ncp * ne * red * Cp_cooling(Te, ne); 
+        //     species[e_idx].dG(cell) += ncp * ne * 1.426e-27 * 1.3 * sqrt(Te) * mul  ;
+        //     species[e_idx].dGdT(cell) += ncp * ne * red * dfdx2(Cp_cooling, Te, dT, ne);
+        //     species[e_idx].dGdT(cell) += ncp * ne * 1.426e-27 * 1.3 * 0.5 /std::sqrt(Te) * mul;
+        // }
+        // if( Cpp_idx!=-1 && e_idx!=-1 && false) { 
+        //     double ncpp = species[Cpp_idx].prim[cell].number_density;
+        //     //species[Cpp_idx].dG(cell) = 0;
+        //     species[e_idx].dG(cell) += ncpp * ne * red * Cpp_cooling(Te, ne); 
+        //     species[e_idx].dG(cell) += ncpp * ne * 4 * 1.426e-27 * 1.3 * sqrt(Te) * mul;
+        //     species[e_idx].dGdT(cell) += ncpp * ne * red * dfdx2(Cpp_cooling, Te, dT, ne);
+        //     species[e_idx].dGdT(cell) += ncpp * ne * 4 * 1.426e-27 * 1.3 * 0.5 /std::sqrt(Te) * mul;
+        // }
+	    // if( C3p_idx!=-1 && e_idx!=-1) { 
+        //     double nc3p = species[C3p_idx].prim[cell].number_density;
+        //     species[e_idx].dG(cell) += nc3p * ne * red * C3p_cooling(Te, ne); 
+        // }
+	    // if( C4p_idx!=-1 && e_idx!=-1) { 
+        //     double nc4p = species[C4p_idx].prim[cell].number_density;
+        //     species[e_idx].dG(cell) += nc4p * ne * red * C4p_cooling(Te, ne); 
+        // }
+        // if( O_idx!=-1) {          
+        //     double no    = species[O_idx].prim[cell].number_density;
+        //     double n_eff = ne + xi * n_neutrals; //Cross section multiplier between neutral and electron collisions
+        //     //double n_eff = n_neutrals * 1.5e-4;
+        //     double column = species[O_idx].column_density[cell];
 
-            species[O_idx].dG(cell)   +=  no * ne * red * O_cooling(Te, n_eff, column);
-            species[O_idx].dGdT(cell) +=  no * ne * red * dfdx3(O_cooling, Te, dT, n_eff, column);
-        }
-        if( Op_idx!=-1 && e_idx!=-1 ) { 
-            if(steps == 311 && cell==-100) {
-                cout<<"species[Op_idx].dG(cell) before assignment = "<<species[Op_idx].dG(cell);
-            }
+        //     species[O_idx].dG(cell)   +=  no * ne * red * O_cooling(Te, n_eff, column);
+        //     species[O_idx].dGdT(cell) +=  no * ne * red * dfdx3(O_cooling, Te, dT, n_eff, column);
+        // }
+        // if( Op_idx!=-1 && e_idx!=-1 ) { 
+        //     if(steps == 311 && cell==-100) {
+        //         cout<<"species[Op_idx].dG(cell) before assignment = "<<species[Op_idx].dG(cell);
+        //     }
             
-            double nop  = species[Op_idx].prim[cell].number_density;
-            //species[Op_idx].dG(cell) = 0;
-            species[e_idx].dG(cell) += nop * ne * red * Op_cooling(Te, ne); 
-            species[e_idx].dG(cell) += nop * ne * 1.426e-27 * 1.3 * sqrt(Te) * mul;
-            species[e_idx].dGdT(cell) += nop * ne * red * dfdx2(Op_cooling, Te, dT, ne);
-            species[e_idx].dGdT(cell) += nop * ne * 1.426e-27 * 1.3 * 0.5 /std::sqrt(Te) * mul;
+        //     double nop  = species[Op_idx].prim[cell].number_density;
+        //     //species[Op_idx].dG(cell) = 0;
+        //     species[e_idx].dG(cell) += nop * ne * red * Op_cooling(Te, ne); 
+        //     species[e_idx].dG(cell) += nop * ne * 1.426e-27 * 1.3 * sqrt(Te) * mul;
+        //     species[e_idx].dGdT(cell) += nop * ne * red * dfdx2(Op_cooling, Te, dT, ne);
+        //     species[e_idx].dGdT(cell) += nop * ne * 1.426e-27 * 1.3 * 0.5 /std::sqrt(Te) * mul;
             
-            if(steps == 311 && cell==-100) {
-                    cout<<"species[Op_idx].dG(cell) = "<<species[Op_idx].dG(cell)<<" parts = "<< nop<<"/"<<ne<<"/"<<red<<"/"<<Op_cooling(Te,ne)<<"/"<<Te<<" product = "<< nop * ne * red * Op_cooling(Te,ne)<<endl;
-                    cout<<"species[Op_idx].dG(cell) = "<<species[Op_idx].dG(cell)<<" parts = "<< nop<<"/"<<ne<<"/"<<sqrt(Te)<<"/"<<mul<< " product = "<<nop * ne * 1.426e-27 * 1.3 * sqrt(Te) * mul<<endl;
-            }
-        }
-        if( Opp_idx!=-1 && e_idx!=-1 && false) { 
-            double nopp = species[Opp_idx].prim[cell].number_density;
-            //species[Opp_idx].dG(cell) = 0;
-            species[e_idx].dG(cell) += nopp * ne * red * Opp_cooling(Te, ne);
-            species[e_idx].dG(cell) += nopp * ne * 4 * 1.426e-27 * 1.3 * sqrt(Te) * mul;
-            species[e_idx].dGdT(cell) += nopp * ne * red * dfdx2(Opp_cooling, Te, dT, ne);
-            species[e_idx].dGdT(cell) += nopp * ne * 4 * 1.426e-27 * 1.3 * 0.5 /std::sqrt(Te) * mul;
+        //     if(steps == 311 && cell==-100) {
+        //             cout<<"species[Op_idx].dG(cell) = "<<species[Op_idx].dG(cell)<<" parts = "<< nop<<"/"<<ne<<"/"<<red<<"/"<<Op_cooling(Te,ne)<<"/"<<Te<<" product = "<< nop * ne * red * Op_cooling(Te,ne)<<endl;
+        //             cout<<"species[Op_idx].dG(cell) = "<<species[Op_idx].dG(cell)<<" parts = "<< nop<<"/"<<ne<<"/"<<sqrt(Te)<<"/"<<mul<< " product = "<<nop * ne * 1.426e-27 * 1.3 * sqrt(Te) * mul<<endl;
+        //     }
+        // }
+        // if( Opp_idx!=-1 && e_idx!=-1 && false) { 
+        //     double nopp = species[Opp_idx].prim[cell].number_density;
+        //     //species[Opp_idx].dG(cell) = 0;
+        //     species[e_idx].dG(cell) += nopp * ne * red * Opp_cooling(Te, ne);
+        //     species[e_idx].dG(cell) += nopp * ne * 4 * 1.426e-27 * 1.3 * sqrt(Te) * mul;
+        //     species[e_idx].dGdT(cell) += nopp * ne * red * dfdx2(Opp_cooling, Te, dT, ne);
+        //     species[e_idx].dGdT(cell) += nopp * ne * 4 * 1.426e-27 * 1.3 * 0.5 /std::sqrt(Te) * mul;
             
-            if(steps == 311 && cell==-100) {
-                    cout<<"species[Opp_idx].dG(cell) = "<<species[Opp_idx].dG(cell)<<" parts = "<< nopp<<"/"<<ne<<"/"<<red<<"/"<<Opp_cooling(Te,ne)<<"/"<<Te<<endl;
-                    cout<<"species[Opp_idx].dG(cell) = "<<species[Opp_idx].dG(cell)<<" parts = "<< nopp<<"/"<<ne<<"/"<<sqrt(Te)<<"/"<<mul<<endl;
-            }
-        }
-	    if( O3p_idx!=-1 && e_idx!=-1) { 
-            double no3p = species[O3p_idx].prim[cell].number_density;
-            species[e_idx].dG(cell) += no3p * ne * red * O3p_cooling(Te, ne);
-        }
-	    if( O4p_idx!=-1 && e_idx!=-1) { 
-            double no4p = species[O4p_idx].prim[cell].number_density;
-            species[e_idx].dG(cell) += no4p * ne * red * O4p_cooling(Te, ne);
-		if(steps == 311 && cell==-100) {
-                     cout<<"species[O4p_idx].dG(cell) = "<<species[O4p_idx].dG(cell)<<" parts = "<< no4p<<"/"<<ne<<"/"<<red<<"/"<<O4p_cooling(Te,ne)<<"/"<<Te<<endl;
-		}
-        }
+        //     if(steps == 311 && cell==-100) {
+        //             cout<<"species[Opp_idx].dG(cell) = "<<species[Opp_idx].dG(cell)<<" parts = "<< nopp<<"/"<<ne<<"/"<<red<<"/"<<Opp_cooling(Te,ne)<<"/"<<Te<<endl;
+        //             cout<<"species[Opp_idx].dG(cell) = "<<species[Opp_idx].dG(cell)<<" parts = "<< nopp<<"/"<<ne<<"/"<<sqrt(Te)<<"/"<<mul<<endl;
+        //     }
+        // }
+	    // if( O3p_idx!=-1 && e_idx!=-1) { 
+        //     double no3p = species[O3p_idx].prim[cell].number_density;
+        //     species[e_idx].dG(cell) += no3p * ne * red * O3p_cooling(Te, ne);
+        // }
+	    // if( O4p_idx!=-1 && e_idx!=-1) { 
+        //     double no4p = species[O4p_idx].prim[cell].number_density;
+        //     species[e_idx].dG(cell) += no4p * ne * red * O4p_cooling(Te, ne);
+		// if(steps == 311 && cell==-100) {
+        //              cout<<"species[O4p_idx].dG(cell) = "<<species[O4p_idx].dG(cell)<<" parts = "<< no4p<<"/"<<ne<<"/"<<red<<"/"<<O4p_cooling(Te,ne)<<"/"<<Te<<endl;
+		// }
+        //}
 
 	    if(cell<=2) //Zero cooling in ghost cell
 		    species[e_idx].dG(cell) = 0.;
@@ -1533,15 +1523,8 @@ void  c_Sim::do_highenergy_cooling(int cell, double Te) {
 	    double ne = species[e_idx].prim[100].number_density;
         cout<<"cool funcs: "<<endl;
         cout<<" H0 "<<HOnly_cooling(nX, Te)<<endl;
-        cout<<" C0 "<<C_cooling(Te,ne)<<endl;
-        cout<<" Cp "<<Cp_cooling(Te,ne)<<endl;
-        cout<<" Cpp "<<Cpp_cooling(Te,ne)<<endl;
-        cout<<" O0 "<<O_cooling(Te,ne, 0.)<<endl;
-        cout<<" Op "<<Op_cooling(Te,ne)<<endl;
-        cout<<" Opp "<<Opp_cooling(Te,ne)<<endl;
-
-	//char a;
-	//cin>>a;
+	    //char a;
+	    //cin>>a;
     }
         
 }

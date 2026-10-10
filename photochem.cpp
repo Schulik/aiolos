@@ -103,28 +103,31 @@ lines lines_C3p;
 lines lines_C4p;
 
 void init_line_cooling_data() {
-	lines_O.push_back( {6300*angstroem, 1.15685197E-14, 22830.7, 8.61213387e+05});
-    lines_O.push_back( {63*micron,  1.15685197E-18, 228, 6.39e3});
-	lines_Op.push_back( {834*angstroem, 5.78622E-4, 172421.6, 1.32174E15});
-	lines_Op.push_back( {2741*angstroem, 3.81198E-13, 58225.3, 4.48777E7});
-	lines_Op.push_back( {3727*angstroem, 4.29901E-16, 38575.0, 5.36461E3});
-	lines_Op.push_back( {7320*angstroem, 3.76929E-13, 53063.6, 3.11018E7});
-	lines_Opp.push_back( {52*micron, 3.13852E-18, 277.682, 2.5493E3});
-	lines_Opp.push_back( {5000*angstroem, 3.386678E-14 ,28728.6, 9.66741E5});
-	lines_Opp.push_back( {166*angstroem, 6.59979E-10, 86632.4, 1.475889E10});
-	lines_Opp.push_back( {83.5*angstroem, 1.75205E3, 172569.7, 5.405937E21});
-	lines_O3p.push_back( {25*micron, 2.58649627E-17, 555.66, 3.19064670E+03});
-	lines_O3p.push_back( {1404*angstroem,    1.84651335e-08, 102685.994, 8.75179124E+10});
-	lines_O4p.push_back( {1218*angstroem, 1.84651335E-08, 118094.57, 7.84917617e+10});
-	lines_C.push_back( {1.*angstroem,0, 1., 1.});  //C line cooling currently unclear, dummy line
-	lines_Cp.push_back( {157*micron, 1.78292054E-20, 91.2, 1.38779668E+01});
-	lines_Cp.push_back( {2326*angstroem, 1.21471023E-10, 61853.9, 1.20977633e+09});
-	lines_Cp.push_back( {1334*angstroem, 2.41304508E-03, 107718.1, 3.74008770E+15});
-	lines_Cpp.push_back( {1910*angstroem, 3.84223024E-10, 75460.8, 1.31478953E+9});
-	lines_Cpp.push_back( {977*angstroem, 1.79050834E-03, 147263.9, 7.17164800E+14});
-    lines_C3p.push_back( {1550*angstroem, 5.52131947E-03, 92934.39, 2.86266976e+15});
-	lines_C4p.push_back( {6300*angstroem, 1.15685197E-14, 22830.7, 8.61213387e+0});
+
+	// lines_O.push_back( {6300*angstroem, 1.15685197E-14, 22830.7, 8.61213387e+05});
+    // lines_O.push_back( {63*micron,  1.15685197E-18, 228, 6.39e3});
+	// lines_Op.push_back( {834*angstroem, 5.78622E-4, 172421.6, 1.32174E15});
+	// lines_Op.push_back( {2741*angstroem, 3.81198E-13, 58225.3, 4.48777E7});
+	// lines_Op.push_back( {3727*angstroem, 4.29901E-16, 38575.0, 5.36461E3});
+	// lines_Op.push_back( {7320*angstroem, 3.76929E-13, 53063.6, 3.11018E7});
+	// lines_Opp.push_back( {52*micron, 3.13852E-18, 277.682, 2.5493E3});
+	// lines_Opp.push_back( {5000*angstroem, 3.386678E-14 ,28728.6, 9.66741E5});
+	// lines_Opp.push_back( {166*angstroem, 6.59979E-10, 86632.4, 1.475889E10});
+	// lines_Opp.push_back( {83.5*angstroem, 1.75205E3, 172569.7, 5.405937E21});
+	// lines_O3p.push_back( {25*micron, 2.58649627E-17, 555.66, 3.19064670E+03});
+	// lines_O3p.push_back( {1404*angstroem,    1.84651335e-08, 102685.994, 8.75179124E+10});
+	// lines_O4p.push_back( {1218*angstroem, 1.84651335E-08, 118094.57, 7.84917617e+10});
+	// lines_C.push_back( {1.*angstroem,0, 1., 1.});  //C line cooling currently unclear, dummy line
+	// lines_Cp.push_back( {157*micron, 1.78292054E-20, 91.2, 1.38779668E+01});
+	// lines_Cp.push_back( {2326*angstroem, 1.21471023E-10, 61853.9, 1.20977633e+09});
+	// lines_Cp.push_back( {1334*angstroem, 2.41304508E-03, 107718.1, 3.74008770E+15});
+	// lines_Cpp.push_back( {1910*angstroem, 3.84223024E-10, 75460.8, 1.31478953E+9});
+	// lines_Cpp.push_back( {977*angstroem, 1.79050834E-03, 147263.9, 7.17164800E+14});
+    // lines_C3p.push_back( {1550*angstroem, 5.52131947E-03, 92934.39, 2.86266976e+15});
+	// lines_C4p.push_back( {6300*angstroem, 1.15685197E-14, 22830.7, 8.61213387e+0});
 }
+
+
 
 void c_Sim::init_highenergy_cooling_atlas(string lineliestfile) {
     //Read filename linelistfile
@@ -145,11 +148,24 @@ void c_Sim::init_highenergy_cooling_atlas(string lineliestfile) {
     //////////////////////////////////////////////////////////////
     // Read file, determine legit species, keep legit species 
     //////////////////////////////////////////////////////////////
+    int format1 = 0; // Use A' or A in files - the latter needs 2 extra values for gu and gl, values are [targetspecies, wl, wl_unit, A, T_line, n_crit, gu, gl]
+    int format2 = 0; // Use additional continuum opacity, which takes []
+    int formatoffset = 0;
     while(std::getline( file, line )) {
 
         if(line[0]=='#') //Allow comments
             continue;
-    
+
+        if(line[0]=='$') {
+            std::vector<string> stringlist = stringsplit(line,"=");
+
+            format1                         = (int)(stringlist[1][0]-'0'); //Convert first  char of number after the '=' into format1
+            format2                         = (int)(stringlist[1][1]-'0'); //Convert second char of number after the '=' into format2
+
+            continue;
+        } //Read in format - if format = 0, i.e. also if this line doesn't exist, everything goes as before.
+
+        
         std::vector<string> stringlist = stringsplit(line,",");
         string sname = stringlist[0];
 
@@ -167,6 +183,7 @@ void c_Sim::init_highenergy_cooling_atlas(string lineliestfile) {
     file.seekg(0);
 
     if(debug > 0) cout<<"          In read line atlas Pos2. "<<endl;
+    if(debug > 0) cout<<"          Format strings found = "<<format1<<" "<<format2<<endl;
 
     //for(auto elm: target_species_indexlist)
     //////////////////////////////////////////////////////////////
@@ -189,11 +206,16 @@ void c_Sim::init_highenergy_cooling_atlas(string lineliestfile) {
     // identify species listed in file and find whether it exists
     // if so, add to specieslist (duplicates allowed) with attached linedata
     // Go again, now add found lines to interpreted atlantes
+    if(format1 == 1)
+        formatoffset = 2;
+    
     while(std::getline( file, line )) {
 
         //cout<<line<<endl;
 
         if(line[0]=='#') //Allow comments
+            continue;
+        if(line[0]=='$') 
             continue;
 
         std::vector<string> stringlist = stringsplit(line,",");
@@ -221,6 +243,13 @@ void c_Sim::init_highenergy_cooling_atlas(string lineliestfile) {
         double Tex    = std::stod(stringlist[4]);
         double ncrit  = std::stod(stringlist[5]);
         
+        if(format1==1) {
+            double g_u = std::stod(stringlist[6]);
+            double g_l = std::stod(stringlist[7]);
+
+            Aprime *= h_planck*c_light/(wl_num*wl_unit)*g_u/g_l;
+        }
+
         if(sidx > -1) {
             auto it   = find(target_species_indexlist.begin(), target_species_indexlist.end(), sidx);
             int newit = it-target_species_indexlist.begin();
@@ -228,7 +257,33 @@ void c_Sim::init_highenergy_cooling_atlas(string lineliestfile) {
             if(debug>0)
                 cout<<" Adding a line to species sindex/sname "<<sidx<<"/"<<sname<<" with parameter Aprime = "<<Aprime<<" newit = "<<newit<<endl;
 
-            line_atlantes[newit].add_line(sname, wl_num*wl_unit, Aprime, Tex, ncrit);
+            cout<<" stringlength = "<<stringlist.size()<<endl;
+            if(format2 == 0) {
+                cout<<"Adding classical line"<<endl;
+                line_atlantes[newit].add_line(sname, wl_num*wl_unit, Aprime, Tex, ncrit, -1, 0.,0., 0., 0.  );
+            } else {
+
+                //Check that line has actually extended data
+                if(stringlist.size() > 6 + formatoffset) {
+                    
+                    //string tname        = std::stoi(stringlist[6 + formatoffset]);
+                    int continuumtarget = get_species_index(stringlist[6 + formatoffset] ,1); 
+
+                    double cont_kappa0 = std::stod(stringlist[7 + formatoffset]);
+                    double cont_a      = std::stod(stringlist[8 + formatoffset]);
+                    double cont_b      = std::stod(stringlist[9 + formatoffset]);
+                    double cont_c      = std::stod(stringlist[10 + formatoffset]);
+
+                    cout<<"Adding new line with target = "<<continuumtarget<<endl;
+
+                    line_atlantes[newit].add_line(sname, wl_num*wl_unit, Aprime, Tex, ncrit, 
+                        continuumtarget, cont_kappa0, cont_a, cont_b, cont_c  );
+
+                } else { //Format 2 set, but no data exists, just add the regular line
+                    cout<<"Adding new but empty line"<<endl;
+                    line_atlantes[newit].add_line(sname, wl_num*wl_unit, Aprime, Tex, ncrit, -1, 0.,0., 0., 0.  );
+                }
+            }
         }
     }
 
@@ -240,20 +295,37 @@ void c_Sim::init_highenergy_cooling_atlas(string lineliestfile) {
     for(auto & atlas: line_atlantes) {
         cout<<" line atlas #"<<cnt<<" found speciesnum "<<atlas.speciesindex<<" name "<<atlas.speciesname<<" name doublecheck "<<species[atlas.speciesindex].speciesname;
         cout<<" mass "<<atlas.particlemass<<" has the following lines "<<endl;
+        int nl = 0;
         for(auto & line: atlas.linelist) {
-            cout<<"       "<<line[0]<<" "<<line[1]<<" "<<line[2]<<" "<<line[3]<<" "<<endl;
+            cout<<"       "<<line.data[0]<<" "<<line.data[1]<<" "<<line.data[2]<<" "<<line.data[3]<<" ";
+            if(line.continuum_species > -1)
+                cout<<" continuum species = "<<species[line.continuum_species].speciesname<<" kappa_0 "<<line.data[4];
+            
+            cout<<endl;
+            nl++;
         }
         cnt++;
     }
 }
 
-int c_Line_Atlas::add_line(string name, double wl, double Aprime, double Tex, double ncrit) {
 
-    line newline = {wl, Aprime, Tex, ncrit};
-    linelist.push_back( newline);
+int c_Line_Atlas::add_line(string name, double wl, double Aprime, double Tex, double ncrit, 
+    int continuum_target,  double cont_kappa0, double cont_a, double cont_b, double cont_c  ) {
+    
+    linelist.push_back( line(name, wl, Aprime, Tex, ncrit, continuum_target, cont_kappa0, cont_a, cont_b, cont_c   ));
+    num_lines++;
 
     return 0;
 }
+
+
+line::line(string name, double wl, double Aprime, double Tex, double ncrit, 
+    int continuum_target,  double cont_kappa0, double cont_a, double cont_b, double cont_c ) {
+    
+    data = {wl, Aprime, Tex, ncrit, cont_kappa0, cont_a, cont_b, cont_c} ;
+    this->continuum_species = continuum_target;
+}
+
 
 c_Line_Atlas::c_Line_Atlas(c_Sim *basesim, c_Species *species, int index) {
     this->base         = basesim;
@@ -270,13 +342,36 @@ c_Line_Atlas::c_Line_Atlas(c_Sim *basesim, c_Species *species, int index) {
 // General line cooling function for the Line_Atlas class
 // Includes escape probability update by Yixuan Chen.
 //
-double c_Line_Atlas::get_line_cooling(double T, double n, double column) {
+double c_Line_Atlas::get_line_cooling(double T, double n, double column, int cell) {
 
     double term = 0.;
+    double tau_continuum = 0; 
+    
     for (auto & ln : linelist) {
-        term += ln[1]*std::exp(-ln[2]/T) / (n+ln[3]) * P_escape(tau_0_line(ln, this->particlemass, T, column));
+        tau_continuum = 0 ;
+
+        if(ln.continuum_species>-1) {
+            double column_continuum = base->species[ln.continuum_species].column_density[cell];
+            double P_cont           = base->species[ln.continuum_species].prim[cell].pres / 1e6; //Fit is in bar
+            tau_continuum           = column_continuum * ln.cont_opa_fitfunction(P_cont,T);
+        }
+        double tau_0 = tau_0_line(ln, this->particlemass, T, column);
+
+        if(cell==2 && base->steps%1000==0)
+            cout<<" line optical depths , tau_0 = "<<tau_0<<" tau_c = "<<tau_continuum<<endl;
+
+        term += ln.data[1]*std::exp(-ln.data[2]/T) / (n+ln.data[3]) * P_escape(tau_continuum + tau_0);
     }
     return term;
+}
+
+//
+// Fit function for background continuum around a line.
+//
+// P: Partial Pressure of the blanketing species, in bar.
+// T: Temperature in Kelvin
+double line::cont_opa_fitfunction(double P,double T) {
+    return data[4] * std::pow(P, data[5]) * std::pow(T, data[6]) * std::pow(P*T, data[7]);
 }
 
 //
@@ -290,22 +385,16 @@ double c_Line_Atlas::update_line_cooling(int target, int cell, double npartner, 
     double ns     = species->prim[cell].number_density;
     double column = species->column_density[cell];
 
-    if(target == -1) {
-        species->dG(cell)   +=  xi * ns * npartner *       get_line_cooling(T, n_eff, column); //Feb23rd 2025: Included simplistic neutral-excitation, see Line cooling notes and Tielens book. Cooling counted for O, as e might not exist here
+    if(target == -1) { //Target is self
+        species->dG(cell)   +=  xi * ns * npartner *              get_line_cooling(T, n_eff, column, cell); //Feb23rd 2025: Included simplistic neutral-excitation, see Line cooling notes and Tielens book. Cooling counted for O, as e might not exist here
         species->dGdT(cell) +=  0.; //xi * ns * npartner * dfdx3(get_line_cooling_function, T, dT, n_eff, column);
     }
-    else {
-        base->species[target].dG(cell)   +=  xi * ns * npartner *       get_line_cooling(T, n_eff, column); //Feb23rd 2025: Included simplistic neutral-excitation, see Line cooling notes and Tielens book. Cooling counted for O, as e might not exist here
+    else { //Target is another species
+        base->species[target].dG(cell)   +=  xi * ns * npartner * get_line_cooling(T, n_eff, column, cell); //Feb23rd 2025: Included simplistic neutral-excitation, see Line cooling notes and Tielens book. Cooling counted for O, as e might not exist here
         base->species[target].dGdT(cell) +=  0.; //xi * ns * npartner * dfdx3(get_line_cooling_function, T, dT, n_eff, column);
 
     }
 
-    //double n_eff = ne + xi * n_neutrals; //Cross section multiplier between neutral and electron collisions
-    //double no    = species[O_idx].prim[cell].number_density;
-    //double n_eff = ne + xi * n_neutrals; //Cross section multiplier between neutral and electron collisions
-    //double column = species[O_idx].column_density[cell];
-    //species[O_idx].dG(cell)   +=  no * ne * red * O_cooling(Te, n_eff, column);
-    //species[O_idx].dGdT(cell) +=  no * ne * red * dfdx3(O_cooling, Te, dT, n_eff, column);
     return 0;
 }
 
@@ -314,9 +403,9 @@ double c_Line_Atlas::update_line_cooling(int target, int cell, double npartner, 
 //
 double tau_0_line(line tline, double particlemass, double Te, double column_particle) {
 
-    double hnu        = h_planck*c_light/tline[0];
-    double A          = tline[1]/hnu;
-    double prefactor  = column_particle * A * std::pow(tline[0],3) * 0.02244839 * (-std::expm1(-tline[2]/Te));
+    double hnu        = h_planck*c_light/tline.data[0];
+    double A          = tline.data[1]/hnu;
+    double prefactor  = column_particle * A * std::pow(tline.data[0],3) * 0.02244839 * (-std::expm1(-tline.data[2]/Te));
     double broadening = std::sqrt(2*kb*Te/(particlemass*amu));
 
     return std::sqrt(3.141592) * prefactor / broadening;
@@ -339,94 +428,6 @@ double P_escape_tot(double tau, double taumax) {
     return 0.5*(P_escape(tau) + P_escape(taumax-tau));
 }
 
-double C_cooling(double Te, double ne) {
-    double term = 0;
-    for (auto & ln : lines_C) {
-        term += ln[1]*std::exp(-ln[2]/Te) / (ne*(1.+ln[3]/ne));
-    }
-    return term;
-}
-
-double Cp_cooling(double Te, double ne) {    
-    double term = 0;
-    for (auto & ln : lines_Cp) {
-        term += ln[1]*std::exp(-ln[2]/Te) / (ne*(1.+ln[3]/ne));
-    }
-    return term;
-}
-
-double Cpp_cooling(double Te, double ne) {
-    double term = 0;
-    for (auto & ln : lines_Cpp) {
-        term += ln[1]*std::exp(-ln[2]/Te) / (ne*(1.+ln[3]/ne));
-    }
-    return term;
-}
-double C3p_cooling(double Te, double ne) {
-    double term = 0;
-    for (auto & ln : lines_C3p) {
-        term += ln[1]*std::exp(-ln[2]/Te) / (ne*(1.+ln[3]/ne));
-    }
-    return term;
-}
-double C4p_cooling(double Te, double ne) {
-    double term = 0;
-    for (auto & ln : lines_C4p) {
-        term += ln[1]*std::exp(-ln[2]/Te) / (ne*(1.+ln[3]/ne));
-    }
-    return term;
-}
-double O_cooling(double Te, double ne, double column) {
-    //cout<<" column in O_cooling "<<column;
-
-    double term = 0.;
-    for (auto & ln : lines_O) {
-        double tau0 = tau_0_line(ln, 16., Te, column);
-        double pesc = P_escape(tau0);
-
-        //cout<<" tau, pesc = "<<tau0<<" / "<<pesc;
-        term += ln[1]*std::exp(-ln[2]/Te) / (ne+ln[3]) * pesc;
-    }
-    //cout<<endl;
-    return term;
-}
-
-double Op_cooling(double Te, double ne) {
-    
-    double term = 0;
-    for (auto & ln : lines_Op) {
-        term += ln[1]*std::exp(-ln[2]/Te) / (ne*(1.+ln[3]/ne));
-    }
-    return term;
-}
-
-double Opp_cooling(double Te, double ne) {
-    
-    double term = 0;
-    for (auto & ln : lines_Opp) {
-        term += ln[1]*std::exp(-ln[2]/Te) / (ne*(1.+ln[3]/ne));
-    }
-
-    return term;
-}
-double O3p_cooling(double Te, double ne) {
-    
-    double term = 0;
-    for (auto & ln : lines_O3p) {
-        term += ln[1]*std::exp(-ln[2]/Te) / (ne*(1.+ln[3]/ne));
-    }
-
-    return term;
-}
-double O4p_cooling(double Te, double ne) {
-    
-    double term = 0;
-    for (auto & ln : lines_O4p) {
-        term += ln[1]*std::exp(-ln[2]/Te) / (ne*(1.+ln[3]/ne));
-    }
-
-    return term;
-}
 double h3plus_cooling(double Te) {
     
     double temp = 0.;
@@ -1014,16 +1015,16 @@ void c_Sim::do_photochemistry() {
                 double tau = total_opacity(j,0)*(x_i12[j+1]-x_i12[j])*1e2;
                 double red = (1.+tau*tau);
                 
-                if( C_idx!=-1 && e_idx!=-1 ) { species[C_idx].dG(j)     -=  C_cooling(species[e_idx].prim[j].temperature, ne)/red; }
-                if( Cp_idx!=-1 && e_idx!=-1 ) { species[Cp_idx].dG(j)   -=  Cp_cooling(species[e_idx].prim[j].temperature, ne)/red; }
-                if( Cpp_idx!=-1 && e_idx!=-1 ) { species[Cpp_idx].dG(j) -=  Cpp_cooling(species[e_idx].prim[j].temperature, ne)/red; }
-                if( C3p_idx!=-1 && e_idx!=-1 ) { species[C3p_idx].dG(j) -=  C3p_cooling(species[e_idx].prim[j].temperature, ne)/red; }
-                if( C4p_idx!=-1 && e_idx!=-1 ) { species[C4p_idx].dG(j) -=  C4p_cooling(species[e_idx].prim[j].temperature, ne)/red; }
-                if( O_idx!=-1 && e_idx!=-1 ) { species[O_idx].dG(j)     -=  O_cooling(species[e_idx].prim[j].temperature, ne, species[O_idx].column_density[j])/red; }
-                if( Op_idx!=-1 && e_idx!=-1 ) { species[Op_idx].dG(j)   -=  Op_cooling(species[e_idx].prim[j].temperature, ne)/red; }
-                if( Opp_idx!=-1 && e_idx!=-1 ) { species[Opp_idx].dG(j) -=  Opp_cooling(species[e_idx].prim[j].temperature, ne)/red; }
-                if( O3p_idx!=-1 && e_idx!=-1 ) { species[O3p_idx].dG(j) -=  O3p_cooling(species[e_idx].prim[j].temperature, ne)/red; }
-                if( O4p_idx!=-1 && e_idx!=-1 ) { species[O4p_idx].dG(j) -=  O4p_cooling(species[e_idx].prim[j].temperature, ne)/red; }
+                // if( C_idx!=-1 && e_idx!=-1 ) { species[C_idx].dG(j)     -=  C_cooling(species[e_idx].prim[j].temperature, ne)/red; }
+                // if( Cp_idx!=-1 && e_idx!=-1 ) { species[Cp_idx].dG(j)   -=  Cp_cooling(species[e_idx].prim[j].temperature, ne)/red; }
+                // if( Cpp_idx!=-1 && e_idx!=-1 ) { species[Cpp_idx].dG(j) -=  Cpp_cooling(species[e_idx].prim[j].temperature, ne)/red; }
+                // if( C3p_idx!=-1 && e_idx!=-1 ) { species[C3p_idx].dG(j) -=  C3p_cooling(species[e_idx].prim[j].temperature, ne)/red; }
+                // if( C4p_idx!=-1 && e_idx!=-1 ) { species[C4p_idx].dG(j) -=  C4p_cooling(species[e_idx].prim[j].temperature, ne)/red; }
+                // if( O_idx!=-1 && e_idx!=-1 ) { species[O_idx].dG(j)     -=  O_cooling(species[e_idx].prim[j].temperature, ne, species[O_idx].column_density[j])/red; }
+                // if( Op_idx!=-1 && e_idx!=-1 ) { species[Op_idx].dG(j)   -=  Op_cooling(species[e_idx].prim[j].temperature, ne)/red; }
+                // if( Opp_idx!=-1 && e_idx!=-1 ) { species[Opp_idx].dG(j) -=  Opp_cooling(species[e_idx].prim[j].temperature, ne)/red; }
+                // if( O3p_idx!=-1 && e_idx!=-1 ) { species[O3p_idx].dG(j) -=  O3p_cooling(species[e_idx].prim[j].temperature, ne)/red; }
+                // if( O4p_idx!=-1 && e_idx!=-1 ) { species[O4p_idx].dG(j) -=  O4p_cooling(species[e_idx].prim[j].temperature, ne)/red; }
                 
                 //Correction in heating function for non-ionising radiation. 
                 double adddS[3] = {0.,0.,0.};

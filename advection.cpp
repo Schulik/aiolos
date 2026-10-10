@@ -927,10 +927,6 @@ void c_Species::execute(std::vector<AOS>& u_in, std::vector<AOS>& dudt, std::vec
                 
                     double term   =  ( hydro_flux(j-1)- hydro_flux(j)) +  source[j].u3 ;
                     dQ_hydro(j,dQindex)   =  term;
-
-                    if( ((j==75) || (j==76) || (j==77)) && (base->steps%100000==0))
-                        cout<<"j = "<<j<<" e cooling in electrons : "<<dG(j)<<endl;
-                
                 }
                 dudt[j] = AOS(0, 0, 0);
             }
