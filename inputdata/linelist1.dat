@@ -16,7 +16,7 @@
 # If 1 is set, ALL lines need to be adapted to "real A" format.
 #
 # Second integer = 0: Nothing happens
-# Second integer = 1: Reads in additional continuum line parameters for line blanketing at the line position [continuum_target, kappa_0, alpha, beta]
+# Second integer = 1: Reads in additional continuum line parameters for line blanketing at the line position [continuum_target, kappa_0, alpha, beta, gamma]
 #                     In this case lines can have a continuum term, but don't have to - nothing happens if the line list entries end after n_crit
 # If 1 is set, not all lines need continuum data. 
 #
@@ -42,3 +42,7 @@ Cpp,1910,angstroem,3.84223024E-10, 75460.8, 1.31478953E+9
 Cpp,977,angstroem,1.79050834E-03, 147263.9, 7.17164800E+14
 C3p,1550,angstroem,5.52131947E-03, 92934.39, 2.86266976e+15
 C4p,6300,angstroem,1.15685197E-14, 22830.7, 8.61213387e+0
+Na,589.5924,nm,0.000206676751125015,24400,1e16
+Na,588.9950,nm,0.000207590232259598,24400,1e16
+Nap,300.15,nm,0.019836179910045,4.80e5,1e17
+Nap,372.08,nm,0.018131595646916,3.86e5,1e17
